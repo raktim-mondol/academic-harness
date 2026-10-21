@@ -102,7 +102,7 @@ The persona, the longer research system prompt (notebook discipline, specialist 
 - `latex_compile` tool (`.tex` → PDF, bibtex/biber-aware) — every preset
 - [Academic Harness](https://github.com/raktim-mondol/academic-harness) writing oracle for LaTeX papers, grants, theses, literature reviews, and rebuttals: native `ah_*` tools, paper-state card, protected-path guard, post-edit checks, and a gate that settles a writing turn. The engine is vendored inside this plugin (`vendor/academic-harness`); Pi is not required. Inactive outside a tree with `ah.yaml` — **ResearchCraft preset only** — see [Academic Harness](#academic-harness)
 - `pdf_to_markdown` tool (PDF → Markdown, via [pdf-inspector](https://github.com/firecrawl/pdf-inspector)) for literature-survey conversion of downloaded papers — every preset
-- `modal_run` / `runpod_run` tools for remote GPU/CPU compute offload, plus bundled `modal`/`runpod` skills covering the rest of each CLI (Serverless endpoints, volumes/secrets, Hub templates, …) — see [Remote compute](#remote-compute) — every preset
+- `runpod_run` (works with its API key) and `modal_run` (needs the optional `modal` SDK installed in the profile) for remote GPU/CPU compute offload, plus bundled `modal`/`runpod` skills covering the rest of each CLI (Serverless endpoints, volumes/secrets, Hub templates, …) — see [Remote compute](#remote-compute) — every preset
 - `research_template` tool over a ~330-template research-task catalogue (not DSH's Rhai `workflow` orchestrator) — every preset
 - Academic search: Parallel, Firecrawl, Scite (MCP connectors), `parallel_search` / `consensus_search` (native REST tools), and `paper_download` (Unpaywall open-access PDF resolver) — **ResearchCraft preset only**
 - `paper_mcp` tool — register a Paper2MCP stdio server from this workspace (`<cwd>/.dsh/paper-mcps.json`) so its tools can appear as `mcp__<serverName>__*` — **ResearchCraft preset only** — see [Paper agents](#paper-agents-paper2agent)
@@ -335,7 +335,13 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 | `modal_run` | `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET` | https://modal.com/settings |
 | `runpod_run` | `RUNPOD_API_KEY` | https://console.runpod.io/user/settings |
 
-`runpod_run` also needs `ssh`, `scp`, and `ssh-keygen` on `PATH` (standard OpenSSH client tools) to provision and reach the ephemeral pod.
+`runpod_run` works with its API key alone (`ssh`, `scp`, and `ssh-keygen` must also be on `PATH`). `modal_run` additionally needs the optional Modal SDK, which ResearchCraft deliberately does not install so that Add Plugin never blocks on native build scripts. Install it into the profile and restart DSH:
+
+```sh
+dsh plugin --profile <profile> add modal
+```
+
+Without it, `modal_run` returns an `sdk_missing` message with the same instruction; `runpod_run` remains available.
 
 By default every `runpod_run` call is a brand-new, disposable pod — `/workspace` (and anything uploaded into it) is gone once the pod terminates, so only what's named in `files_out` comes back. Pass `volume_name` to persist data across calls instead: it mounts a Runpod [network volume](https://docs.runpod.io/pods/storage/create-network-volumes) at `/workspace`, and reusing the same `volume_name` on a later call reattaches the same storage — e.g. upload a large dataset once, then run several training/eval passes against it without re-uploading it with `files_in` each time. The volume is looked up by name and created automatically the first time it's used, which requires `data_center_id` (network volumes are pinned to a data center); `volume_size_gb` (default 20) only applies when creating a new one. The pod's compute is always deleted after the call regardless — a named volume is not, and keeps costing storage until deleted from the Runpod console (this tool has no delete-volume path, so it won't silently remove a dataset).
 

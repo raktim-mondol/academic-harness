@@ -40,7 +40,7 @@ export function applyModalRun(ctx) {
       'Use for heavy or GPU work that should not run locally: model training/fine-tuning, GPU inference, large simulations.',
       `Pick an instance by GPU need (one of: ${MODAL_INSTANCE_IDS.join(', ')}; default "${DEFAULT_MODAL_INSTANCE_ID}").`,
       'Upload inputs with files_in (workspace-relative) and name expected outputs in files_out — they are copied back into the local workspace.',
-      'Requires MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (https://modal.com/settings). Always terminates the sandbox when done.',
+      'Requires MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (https://modal.com/settings) and the optional `modal` SDK in this profile. Always terminates the sandbox when done.',
     ].join(' '),
     parameters: {
       command: { type: 'string', required: true, description: 'Shell command to run remotely (via sh -lc) in /workspace.' },
@@ -78,7 +78,22 @@ export function applyModalRun(ctx) {
         return { error: 'unknown_instance', text: `Unknown compute instance "${instanceId}". Valid instances: ${MODAL_INSTANCE_IDS.join(', ')}.` }
       }
 
-      const { ModalClient } = await import('modal')
+      let ModalClient
+      try {
+        ({ ModalClient } = await import('modal'))
+      } catch (error) {
+        const code = error?.code
+        if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
+          return {
+            error: 'sdk_missing',
+            text: 'The optional Modal SDK is not installed in this DSH profile. '
+              + 'Install it with `dsh plugin --profile <profile> add modal`, then restart dsh; '
+              + 'or use `runpod_run` instead. ResearchCraft leaves `modal` as an optional peer '
+              + 'so plugin installation does not require native build scripts.',
+          }
+        }
+        throw error
+      }
       const root = workspaceRoot(exec)
       const timeoutMs = Math.min(Math.max(Math.floor(args.timeout_sec ?? DEFAULT_TIMEOUT_S), 1), MAX_TIMEOUT_S) * 1000
 
