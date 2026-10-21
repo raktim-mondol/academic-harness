@@ -368,9 +368,11 @@
 # Academic Harness (LaTeX writing oracle). Native `ah_*` tools plus
 # guard / post-edit check / gate / paper-state interceptors. Engine is
 # vendored in this plugin (`vendor/academic-harness`); Pi is not required.
-# Inactive outside a tree with ah.yaml. Hooks row must keep inject: []
-# (venv setup lives there). Tools row injects tools and must not await
-# the venv. See academic-harness.js / academic-harness-hooks.js.
+# Inactive outside a tree with ah.yaml. The hooks row keeps inject: [] and
+# neither row awaits venv setup in apply(): preparation runs in the
+# background, while ah_* calls and hooks await it lazily. Awaiting it here
+# stalls plugin-manager installs for the full uv/pip timeout. See
+# academic-harness.js / academic-harness-hooks.js.
 - id: academic-harness
   name: dsh-researchcraft/academic-harness
 

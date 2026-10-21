@@ -2,7 +2,7 @@
 
 Status: **deferred** (2026-10-05). Keep the current layout until we pick one of the options below.
 
-## What is shipped now (v0.13.1)
+## What is shipped now (v0.13.2)
 
 The writing oracle (inventory, facts, T0–T6 checks, ledger, briefs, plans, reviews, guard, gate) runs **inside this plugin**. Pi is not required. Nothing is installed into `$DSH_HOME`.
 

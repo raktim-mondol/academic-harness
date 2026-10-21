@@ -11,6 +11,10 @@
  * Translates DSH tool names (`write`/`edit`/`bash`) into the Claude-shaped
  * payload `ah hook` already understands. Outside a tree with `ah.yaml` this
  * module does nothing.
+ *
+ * Engine preparation runs in the background. Hooks register immediately and
+ * resolve the engine lazily via `runHook`, so a plugin-manager install never
+ * waits on the vendored venv's uv/pip timeout.
  */
 import { ahEnv, cliArgs, DSH_STATE_FOOTER, ensureAcademicHarnessInstalled, findAhRoot, LOG, run } from './academic-harness-cli.js'
 
@@ -158,15 +162,19 @@ function prependContext(ours, theirs) {
   return [ours, ...(theirs ?? [])]
 }
 
-export async function apply(ctx) {
-  const launch = await ensureAcademicHarnessInstalled()
-  if (!launch) {
-    console.warn(
-      `${LOG}: CLI not found; Academic Harness guard/gate inactive. `
-      + `Set ACADEMIC_HARNESS_CLI or check vendor/academic-harness in this plugin.`,
-    )
-    return
-  }
+export function apply(ctx) {
+  ensureAcademicHarnessInstalled()
+    .then((launch) => {
+      if (!launch) {
+        console.warn(
+          `${LOG}: CLI not found; Academic Harness guard/gate inactive. `
+          + `Set ACADEMIC_HARNESS_CLI or check vendor/academic-harness in this plugin.`,
+        )
+      }
+    })
+    .catch((error) => {
+      console.warn(`${LOG}: background install failed: ${error?.message || error}`)
+    })
 
   const handedOff = new Set()
   const t3Steered = new Set()
