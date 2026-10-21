@@ -17,7 +17,7 @@ This copy is `jmiao24/Paper2Agent` `skills/paper2agent` (commit `8c2d059`), mapp
 - Load with the `skill` tool. There is no `/paper2agent` or `$paper2agent` command, and no `claude mcp add`.
 - Missing paper URL/DOI, repository, or output directory: `ask_user_question`. Do not invent them.
 - Paper PDFs: `paper_download` (DOI) then [Paper2Skill](paper2skill/SKILL.md). `pdf_to_markdown` is a fast unreviewed preview only — never the delivered paper skill.
-- Specialists: `subagent` (continuable). Keep the returned `subagentId` as schema-1 `agent_id` in `reports/agent-runs.json`. Collect children before the next workflow gate — they do not block. A `.done_*` file means work ended, not that it passed.
+- Specialists: `subagent` (managed activation). Every call returns `{ kind: "activation", subagentId }` immediately; keep that id as schema-1 `agent_id` in `reports/agent-runs.json`, wait for each child's completion notice, and read its report before the next workflow gate. A `.done_*` file means work ended, not that it passed.
 - Independent verifiers: a **new** `subagent` spawn. Never `subagent_fork`. Never `send_message` into an implementer.
 - Heavy implement/verify: `subagent_pro`. Paper2Skill page/figure inspection: `subagent_vision` after `pdftoppm`.
 - Python: `uv venv` / `uv pip install --python "$PROJECT_PYTHON"` / `uv run`. Never bare `pip`/`python`.

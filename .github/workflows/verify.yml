@@ -47,11 +47,11 @@ jobs:
             exit 1
           fi
 
-      # Pin the CLI to the same 0.2.0-rc.2 line as package.json dsh-* deps.
+      # Pin the CLI to the same 0.2.1-rc.2 line as package.json dsh-* deps.
       # The 0.1.5-rc.2 pin plus a web-app override sent npm into a peer-
       # resolution loop that OOM'd the runner (~1h, exit 134).
       - name: Install the dsh CLI
-        run: npm install -g @deepseek-ai/dsh@0.2.0-rc.2
+        run: npm install -g @deepseek-ai/dsh@0.2.1-rc.2
 
       - name: Compose a throwaway profile that installs this plugin
         run: |

@@ -1,8 +1,12 @@
 {
   "name": "dsh-researchcraft",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "ResearchCraft as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
+  "icon": "assets/icon.svg",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -20,9 +24,13 @@
     "./subagent-models": "./subagent-models.js",
     "./prompt-section": "./prompt-section.js",
     "./client": "./lib/client.js",
+    "./icon": "./assets/icon.svg",
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
+    "assets/icon.svg",
+    "locale",
     "index.js",
     "notebook.js",
     "notebook-export.js",
@@ -98,10 +106,10 @@
     "build:patch": "node scripts/build-cordis-patch.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/dsh-mcp-client": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-settings": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-tool-subagent": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-mcp-client": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-tool-subagent": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4",
     "@firecrawl/pdf-inspector": "^1.17.0",
     "adm-zip": "^0.6.0",
@@ -113,6 +121,9 @@
   },
   "devDependencies": {
     "esbuild": "^0.25.0"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
   },
   "keywords": [
     "dsh-plugin",

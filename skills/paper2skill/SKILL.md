@@ -13,7 +13,7 @@ metadata:
 
 - If the user gives a DOI, call `paper_download` first, then `paper_bundle.py` on the saved PDF. A local PDF skips the download.
 - `pdf_to_markdown` may run as a **preview** while this reviewed package is building. It is not a substitute for `verify --strict`.
-- Page/figure inspection that needs vision: render with `pdftoppm`, then `subagent_vision`. Parallel page-range reviewers: continuable `subagent`; the final verifier is a **new** spawn.
+- Page/figure inspection that needs vision: render with `pdftoppm`, then `subagent_vision`. Parallel page-range reviewers: `subagent` (managed activation with a completion notice; local children accept `send_message`); the final verifier is a **new** spawn.
 - Run the helper with uv from this component directory: `uv run scripts/paper_bundle.py …` (PEP 723 deps: pymupdf, pymupdf4llm, pypdf, pillow).
 - After `verify --strict` exits 0, write the package to workspace `dist/<identifier>-paper/` and `ask_user_question` whether to copy it into `$DSH_HOME/skills/<identifier>-paper`.
 - Log review decisions in `notebook`.

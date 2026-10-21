@@ -21,17 +21,26 @@
 # ── identity ────────────────────────────────────────────────────────────────
 
 # The preset's own persona, shadowing the deployment default for this agent.
-# `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
+# `{{model}}` resolves from the agent's own route. The working directory is
+# supplied as runtime context: DSH 0.2.1 removed the `{{cwd}}` prompt variable,
+# and a template that still references it fails before the first request. The
+# agent calls `working_directory` when it needs the absolute path.
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
     prefix: >-
-      You are ResearchCraft, a scientific research assistant powered by the {{model}} model. Your working directory is {{cwd}}. Ask before you assume. Do not invent citations, numbers, or papers.
+      You are ResearchCraft, a scientific research assistant powered by the {{model}} model. Ask before you assume. Do not invent citations, numbers, or papers.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
   config:
     maxBytes: 65536
+
+# Official Standard's clock: durable current-time and browser-zone readings so
+# unqualified dates and elapsed durations are interpretable. ResearchCraft
+# keeps the clock without Standard's reminder tools.
+- id: time-context
+  name: '@deepseek-ai/dsh-time-context'
 
 # The longer ResearchCraft system-prompt section (notebook/subagent/MCP/tool
 # guidance) — scoped to this preset the same way `persona` above is: rows
@@ -196,23 +205,25 @@
     - id: tool-subagent-list-agents
       name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
 
+    # Every delegation is a managed activation: the tool returns
+    # `{ kind: 'activation', subagentId }` immediately and the runtime delivers
+    # the child's final answer as a completion notice. `send_message` and
+    # `interrupt_agent` come from `tool-subagent-control` above. DSH 0.2.1
+    # removed `backgroundMode`; local spawn/fork children remain continuable.
     - id: tool-subagent
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: spawn
         toolName: subagent
-        backgroundMode: continuable
 
     # Fork omits model selection so provider/model stay equal to the parent and
-    # the inherited history remains eligible for KV Cache reuse. This preset
-    # keeps fork continuable and accepts its child-scoped `report` additions invalidating
-    # that prefix; issue #2124 tracks cache-preserving continuable fork.
+    # the inherited history remains eligible for KV Cache reuse. Fork inherits
+    # the parent's preset; issue #2124 tracks cache-preserving continuable fork.
     - id: tool-subagent-fork
       name: '@deepseek-ai/dsh-tool-subagent'
       config:
         provider: fork
         toolName: subagent_fork
-        backgroundMode: continuable
 
     # Two more spawn-backed delegation tools, each pinned to a fixed model via
     # `agentOptions.model` so the top-level agent can route a delegated task
@@ -229,23 +240,23 @@
     #
     # `agentOptions.model` is forwarded by `@deepseek-ai/dsh-tool-subagent`.
     # Pin that dependency to the same line as `npm install -g @deepseek-ai/dsh`
-    # (`latest`). Spawn-in-process on 0.2.0 advertises `agentOptions`; a
+    # (`latest`). Spawn-in-process on 0.2.1 advertises `agentOptions`; a
     # mismatched older spawn provider throws at mount and drops
     # `subagent_pro`/`subagent_vision` as "unknown tool".
     - id: subagent-models
       name: dsh-researchcraft/subagent-models
 
-    # Production dsh does not install these optional providers. Install the
-    # matching Bundle in this Profile and restart the Host, then copy this
-    # preset and remove `disabled` from the matching tool row. Host availability
-    # alone grants no tool.
+    # Production dsh does not install these optional providers. Enabling the
+    # matching Bundle adds its delegation tool as a Host global for every
+    # preset; these disabled rows are only for composing one explicitly (or
+    # shadowing that global tool with preset-specific config). Host
+    # availability alone grants no tool.
     - id: tool-subagent-codex
       name: '@deepseek-ai/dsh-tool-subagent'
       disabled: true
       config:
         provider: codex
         toolName: subagent_codex
-        backgroundMode: one-shot
         maxDepth: provider-managed
 
     - id: tool-subagent-claude-code
@@ -254,7 +265,6 @@
       config:
         provider: claude-code
         toolName: subagent_claude_code
-        backgroundMode: one-shot
         maxDepth: provider-managed
 
     - id: workflow-ptc

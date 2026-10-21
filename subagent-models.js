@@ -45,7 +45,7 @@
  * `inject` must list every service a `ctx.plugin()`-mounted child reads,
  * not just what this module reads directly: Cordis gates `ctx.<service>`
  * property access per fiber, and mounting `@deepseek-ai/dsh-tool-subagent`
- * (whose 0.2.0 `inject` is `tools`/`subagents`/`systemPrompt`/
+ * (whose 0.2.1 `inject` is `tools`/`subagents`/`systemPrompt`/
  * `sessionProjections`) from inside a fiber that never declared those
  * itself throws `cannot get property "subagents" without inject` the moment
  * the child's `apply()` reads `ctx.subagents.getProvider(...)` — a
@@ -53,10 +53,13 @@
  * of just these two tools.
  *
  * This plugin pins `@deepseek-ai/dsh-tool-subagent` to the same line as
- * `npm install -g @deepseek-ai/dsh` (`latest`). 0.2.0 spawn-in-process
+ * `npm install -g @deepseek-ai/dsh` (`latest`). 0.2.1 spawn-in-process
  * advertises `agentOptions`; a mismatched older spawn provider throws
  * `provider "spawn" does not support child agentOptions` and
- * `subagent_pro`/`subagent_vision` vanish as "unknown tool".
+ * `subagent_pro`/`subagent_vision` vanish as "unknown tool". DSH 0.2.1 also
+ * removed `backgroundMode`: every delegation is a managed activation that
+ * returns a subagent id immediately, with the final answer delivered as a
+ * completion notice.
  */
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import { getStoredKey } from './settings-keys.js'
@@ -78,14 +81,12 @@ export function apply(ctx) {
   ctx.plugin(ToolSubagent, {
     provider: 'spawn',
     toolName: 'subagent_pro',
-    backgroundMode: 'continuable',
     agentOptions: { model: complexModel || DEFAULT_COMPLEX_MODEL },
   })
 
   ctx.plugin(ToolSubagent, {
     provider: 'spawn',
     toolName: 'subagent_vision',
-    backgroundMode: 'continuable',
     agentOptions: { model: visionModel || DEFAULT_VISION_MODEL },
   })
 }

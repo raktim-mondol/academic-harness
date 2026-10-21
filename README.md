@@ -4,35 +4,55 @@ ResearchCraft as a **DeepSeek Harness** profile: the DSH web UI and DSH agent, w
 
 ## Install
 
-1. Install **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)** first (`dsh`). Follow that repo's README — for example:
+ResearchCraft 0.13+ requires **DeepSeek Harness 0.2.1 or later**. Install DSH first:
 
-   ```sh
-   npm install -g @deepseek-ai/dsh
-   ```
+```sh
+npm install -g @deepseek-ai/dsh
+dsh --version   # should report 0.2.1 or later
+```
 
-   ResearchCraft 0.12+ targets DeepSeek Harness **0.2.0** (`dsh --version` should report `0.2.0` or later). You can also run without a global install: `npx @deepseek-ai/dsh web`. You need a working `dsh` CLI before the next step.
+Without a global install, `npx @deepseek-ai/dsh web` also works. You need a working `dsh` CLI for either installation option below.
 
-2. Then add this plugin:
+### Option A — Install from the DSH Web UI (recommended)
+
+1. Start the DSH web UI (`dsh web`).
+2. Open **Plugins → Add plugin**.
+3. Paste one of these into the package field:
+
+   | Source | Paste this |
+   |---|---|
+   | GitHub (recommended) | `github:raktim-mondol/dsh-researchcraft` |
+   | npm registry | `dsh-researchcraft` — available once this package is published to npm |
+   | Local checkout | the absolute path, e.g. `/home/you/dsh-researchcraft` |
+
+4. Click **Install**. ResearchCraft is installed into the profile you are currently running, enabled by default, and appears under **Installed plugins**.
+5. Start a new chat and confirm the preset selector reads **ResearchCraft**.
+
+The bundle patches the web-app layer, so the profile must already include `@deepseek-ai/dsh-web-app`; the standard `web` profile does. A local path must be absolute — the dialog does not expand `~` or resolve relative paths. Installing this way adds ResearchCraft to your current profile; use Option B for a dedicated `researchcraft` profile. DSH only offers **Update** for its on-demand Official plugins, so update a UI-installed ResearchCraft by removing and reinstalling it.
+
+### Option B — Install a dedicated profile from the CLI
 
 ```sh
 dsh plugin --profile researchcraft add github:raktim-mondol/dsh-researchcraft
 ```
 
-This creates the `researchcraft` DSH profile (if it doesn't exist yet) and adds the plugin to it.
+This creates the `researchcraft` profile if it does not exist yet and adds ResearchCraft to it. Start it with:
 
-To update to the latest version:
+```sh
+dsh --profile researchcraft
+```
+
+To update this profile later:
 
 ```sh
 dsh plugin --profile researchcraft update dsh-researchcraft
 ```
 
-To install from a local checkout instead (for plugin development):
+For local plugin development, the same command accepts an absolute checkout path:
 
 ```sh
-dsh plugin --profile researchcraft add /path/to/dsh-plugin
+dsh plugin --profile researchcraft add /absolute/path/to/dsh-researchcraft
 ```
-
-The profile must also list `@deepseek-ai/dsh-web-app` before this bundle.
 
 ## Run
 
@@ -53,7 +73,7 @@ ss -ltnp | grep 3080
 zg server off
 ```
 
-The ResearchCraft profile's bundle patch sets `agent-preset-registry` `default: researchcraft` and inserts a `preset-researchcraft` declaration (DSH 0.2.0 no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **ResearchCraft**. Confirm the preset selector at the top of the message box reads "ResearchCraft"; if it still says Standard/PTC, the profile patch did not apply.
+The ResearchCraft profile's bundle patch sets `agent-preset-registry` `default: researchcraft` and inserts a `preset-researchcraft` declaration (DSH 0.2+ no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **ResearchCraft**. Confirm the preset selector at the top of the message box reads "ResearchCraft"; if it still says Standard/PTC, the profile patch did not apply.
 
 The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), and `paper_mcp` (Paper2Agent stdio mounts) are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the ResearchCraft preset. Native `grep` / `glob` come from the ResearchCraft preset's filesystem-search row.
 
@@ -230,7 +250,7 @@ Do not run `claude mcp add`. GPU papers use `runpod_run` / `modal_run` rather th
 
 ## Browsing the web
 
-Built-in `web_search` works (DeepSeek search provider). Built-in `web_fetch` does not — there is no fetch provider, so it fails with `WEB_PROVIDER_UNAVAILABLE`. To fetch a URL, the agent uses `mcp__firecrawl__firecrawl_scrape` (Firecrawl's fetch) or `mcp__parallel__web_fetch`. For anything that needs a real rendered browser — exploring a site interactively, logging in, filling out a form, clicking through to a dataset download, or verifying a page actually renders correctly — the agent loads the bundled `agent-browser` skill (`skills/agent-browser`, shipped and seeded the same way as the skills above) and drives the [agent-browser](https://github.com/vercel-labs/agent-browser) CLI directly via `bash`. The CLI isn't bundled with this plugin's package, but the agent installs it itself when missing (`npm i -g agent-browser && agent-browser install`, or `npx agent-browser@latest ...` for a one-off task) rather than asking the user to.
+Built-in `web_search` works (DeepSeek search provider). Built-in `web_fetch` retrieves public HTTP(S) pages through the local HTTP provider; if a page is blocked, needs JavaScript, or returns `WEB_PROVIDER_UNAVAILABLE`, the agent falls back to `mcp__firecrawl__firecrawl_scrape` (Firecrawl's fetch) or `mcp__parallel__web_fetch`. DeepSeek's Search and Fetch APIs can be enabled in Web Search settings. For anything that needs a real rendered browser — exploring a site interactively, logging in, filling out a form, clicking through to a dataset download, or verifying a page actually renders correctly — the agent loads the bundled `agent-browser` skill (`skills/agent-browser`, shipped and seeded the same way as the skills above) and drives the [agent-browser](https://github.com/vercel-labs/agent-browser) CLI directly via `bash`. The CLI isn't bundled with this plugin's package, but the agent installs it itself when missing (`npm i -g agent-browser && agent-browser install`, or `npx agent-browser@latest ...` for a one-off task) rather than asking the user to.
 
 Most of what it does — navigating, reading, filling forms, extracting data, downloading files — works off an accessibility-tree snapshot and needs no image at all. The one exception is `screenshot`: since the session's own model isn't guaranteed to have vision input, the skill steers the agent to delegate reading any screenshot to `subagent_vision` (see [Subagent model routing](#subagent-model-routing)) instead of guessing at its content.
 
@@ -247,6 +267,8 @@ Besides the plain `subagent`/`subagent_fork` delegation tools, the `researchcraf
 | `subagent_vision` | Delegated tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | `SUBAGENT_MODEL_VISION` | `deepseek-flash` |
 
 Both pinned tools default to `deepseek-flash` (DeepSeek-V4.1-Flash). The legacy names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
+
+All three delegation tools use DSH 0.2.1's managed activations: a call returns a `subagentId` immediately, the child's final answer arrives as a completion notice, and `send_message` / `interrupt_agent` handle follow-ups and stops.
 
 `subagent` is deliberately left without a pinned model: forcing every routine delegation onto a hardcoded model id would break delegation outright wherever that id isn't registered under the session's provider. Only the two escalation paths are pinned, and only where the agent is choosing to opt into a specific model rather than falling back to whatever it's already using.
 
