@@ -9,3 +9,6 @@ __pycache__/
 /paper2agent/
 vendor/academic-harness/.venv/
 vendor/academic-harness/installed-version
+
+vendor/papermemory/build/
+vendor/papermemory/*.egg-info/
