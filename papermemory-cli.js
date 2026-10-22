@@ -22,9 +22,9 @@ const UV_BIN = process.platform === 'win32' ? 'uv.exe' : 'uv'
 const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['python3', 'python']
 
 export const LOG = '[dsh-researchcraft] papermemory'
-export const MIN_PAPERMEMORY_VERSION = '0.2.0'
+export const MIN_PAPERMEMORY_VERSION = '0.2.1'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh14'
+const BUNDLE_REV = 'dsh15'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -400,6 +400,10 @@ export async function ensurePaperMemoryDb(launch) {
 /**
  * Slug for auto-ingest / recap when the agent has not named a project.
  * Derived from the workspace directory name.
+ *
+ * @deprecated for writes: pass `cwd` to PaperMemory ingest and let
+ * `canonical_project_slug` resolve ah.yaml / manuscript root_path. Kept for
+ * read-side callers that still need a directory-derived key.
  */
 export function projectSlugFromCwd(cwd) {
   if (typeof cwd !== 'string' || cwd.length === 0) return undefined
@@ -431,9 +435,9 @@ function parseJsonOutput(out) {
  * are verified; the PDF ingest then merges onto that same record via --doi
  * instead of creating a second unverified local-pdf row.
  *
- * @param {{ path: string, doi?: string, title?: string, project?: string, signal?: AbortSignal }} opts
+ * @param {{ path: string, doi?: string, title?: string, project?: string, cwd?: string, signal?: AbortSignal }} opts
  */
-export async function ingestDownloadedPaper({ path, doi, title, project, signal }) {
+export async function ingestDownloadedPaper({ path, doi, title, project, cwd, signal }) {
   const launch = resolvePaperMemoryLaunch() || await ensurePaperMemoryInstalled()
   if (!launch) return { ok: false, error: 'papermemory CLI not available' }
   if (launch.readOnly) {
@@ -442,6 +446,7 @@ export async function ingestDownloadedPaper({ path, doi, title, project, signal 
   const env = papermemoryEnv()
   const extra = []
   if (project) extra.push('--project', project)
+  if (cwd) extra.push('--cwd', cwd)
 
   let doiRecord
   if (doi) {
@@ -494,9 +499,9 @@ export async function ingestDownloadedPaper({ path, doi, title, project, signal 
 /**
  * Ingest a pdf_to_markdown output onto the PaperMemory record for the source PDF.
  *
- * @param {{ path: string, pdfPath?: string, doi?: string, project?: string, signal?: AbortSignal }} opts
+ * @param {{ path: string, pdfPath?: string, doi?: string, project?: string, cwd?: string, signal?: AbortSignal }} opts
  */
-export async function ingestConvertedMarkdown({ path, pdfPath, doi, project, signal, converter, originChannel }) {
+export async function ingestConvertedMarkdown({ path, pdfPath, doi, project, cwd, signal, converter, originChannel }) {
   const launch = resolvePaperMemoryLaunch() || await ensurePaperMemoryInstalled()
   if (!launch) return { ok: false, error: 'papermemory CLI not available' }
   if (launch.readOnly) {
@@ -504,6 +509,7 @@ export async function ingestConvertedMarkdown({ path, pdfPath, doi, project, sig
   }
   const args = ['ingest', path, '--json', '--kind', 'markdown']
   if (project) args.push('--project', project)
+  if (cwd) args.push('--cwd', cwd)
   if (doi) args.push('--doi', doi)
   if (pdfPath) args.push('--pdf-path', pdfPath)
   if (converter) args.push('--converter-json', JSON.stringify(converter))

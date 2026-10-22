@@ -93,7 +93,10 @@ export function apply(ctx) {
       'MUST ask with ask_user_question before action=start unless the user already asked to index',
       'or already said yes this turn. Never start silently. Never zg index / --drop / --rebuild',
       'via bash. action=start has no timeout; the user sees a progress bar with an estimated time',
-      'and can cancel at any time. Home directory and / are refused.',
+      'and can cancel at any time. Home directory and / are refused. Paths can be excluded with',
+      'exclude (zg -g globs with a leading "!"); PaperMemory runtime paths under the index root are',
+      'excluded automatically. Exclusions apply only when a job starts: if a job for the same root',
+      'is already running, action=start joins it with its original globs instead of restarting.',
     ].join(' '),
     parameters: {
       action: {
@@ -105,6 +108,11 @@ export function apply(ctx) {
       root: {
         type: 'string',
         description: 'Absolute workspace root to index. Defaults to this session working directory.',
+      },
+      exclude: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Extra zg exclude globs, e.g. ["!tmp/**", "!*.log"]. A leading "!" is added when missing. PaperMemory store/corpus/evidence paths under root are excluded automatically. Ignored when joining an already-running job for the same root.',
       },
     },
     output: {
@@ -155,6 +163,7 @@ export function apply(ctx) {
         root,
         launch,
         embedding,
+        globs: Array.isArray(args.exclude) ? args.exclude : [],
         signal: exec.signal,
         wait: true,
         skipIfReady: false,

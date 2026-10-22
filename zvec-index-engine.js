@@ -21,6 +21,7 @@ import {
 } from './zvec-grep-cli.js'
 import { getKeysScope } from './settings-keys.js'
 import { resolveEnv } from './credential-env.js'
+import { mergeExcludes } from './zg-excludes.js'
 
 export const INDEX_STATE_FIELD = 'ZVEC_GREP_INDEX_STATE'
 export const INDEX_CANCEL_FIELD = 'ZVEC_GREP_INDEX_CANCEL'
@@ -297,11 +298,12 @@ function killIndexer(child) {
   setTimeout(() => { try { child.kill('SIGKILL') } catch { /* ignore */ } }, 4000)
 }
 
-function createJob({ root, launch, embedding }) {
+function createJob({ root, launch, embedding, globs = [] }) {
   const job = {
     root,
     launch,
     embedding,
+    globs,
     status: 'running',
     phase: 'starting',
     line: 'Starting workspace index…',
@@ -332,10 +334,11 @@ function createJob({ root, launch, embedding }) {
     ensureCancelWatch()
     publishJob(job, { immediate: true })
     console.warn(`${LOG}: indexing ${root} with ${embedding} (no timeout; cancel from Settings or the progress bar)`)
+    if (globs.length) console.warn(`${LOG}: index exclusions for ${root}: ${globs.join(' ')}`)
 
     const env = zgEnv(embedding)
     const command = cliCommand(launch)
-    const args = cliArgs(launch, ['index', '--embedding', embedding])
+    const args = cliArgs(launch, ['index', '--embedding', embedding, ...globs.flatMap((glob) => ['-g', glob])])
     const child = spawn(command, args, {
       cwd: root,
       env,
@@ -431,6 +434,7 @@ function createJob({ root, launch, embedding }) {
  * @param {string} opts.root
  * @param {object} opts.launch
  * @param {string} [opts.embedding]
+ * @param {string[]} [opts.globs] extra zg -g exclusions; PaperMemory runtime paths are added automatically
  * @param {AbortSignal} [opts.signal]
  * @param {boolean} [opts.wait=true]
  * @param {boolean} [opts.skipIfReady=false] session-start only: do nothing when already indexed
@@ -443,8 +447,10 @@ export async function startIndex(opts) {
   if (!shouldIndexRoot(root)) {
     return { status: 'failed', root, error: 'Refusing to index home directory or /' }
   }
+  const globs = mergeExcludes(root, opts.globs || [])
   ensureCancelWatch()
 
+  // Jobs are keyed by root: a running job is joined with its original globs.
   const existing = jobs.get(root)
   if (existing) {
     if (opts.signal?.aborted) existing.cancel('signal')
@@ -458,7 +464,7 @@ export async function startIndex(opts) {
     return { status: 'ready', root, skipped: true, embedding }
   }
 
-  const job = createJob({ root, launch, embedding })
+  const job = createJob({ root, launch, embedding, globs })
   jobs.set(root, job)
   if (opts.signal?.aborted) job.cancel('signal')
   else if (opts.signal) {

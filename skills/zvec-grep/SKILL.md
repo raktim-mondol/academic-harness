@@ -35,6 +35,8 @@ zvec_index  action=cancel
 
 **Never** `zg index --drop` or `--rebuild` unless the user asked. **Never** index `$HOME` or `/`.
 
+`zvec_index action=start` also accepts `exclude` — an array of zg globs (a leading `!` is added when missing), for example `["!tmp/**", "!*.log"]`. PaperMemory store, corpus, and evidence paths under the root are excluded automatically. Exclusions apply when a job starts; if a job for the same root is already running, `action=start` joins it with its original globs rather than restarting.
+
 If semantic search would improve the answer and `status` says `ready` is false:
 
 1. If the user already asked to index, or already said yes this turn → `action=start`.
@@ -62,6 +64,12 @@ Optional: `fts` (lexical constraints), `vector` (semantic-only), `fuse`, `globs`
 When the user asks whether conceptually related local material exists and you have no exact anchor, make **at most one** focused probe and stop if the hits are irrelevant.
 
 Exact follow-up (a symbol, a quoted string, a path) goes back to native `grep`.
+
+## Boundary with PaperMemory
+
+zg is **workspace context, not evidence**. For claims, numbers, quotations, methods, or citations about a paper, use PaperMemory (`papermemory_cite`, `papermemory_quote_check`, `papermemory_trace`, `papermemory_get`). If a zg hit points at a paper markdown file, open it in PaperMemory (`outline`, `get`) before using anything from it. A zg snippet is never a citable source and does not satisfy the verbatim-quote rule.
+
+zg is optional infrastructure and **fails soft**: its tools may be absent, and their absence says nothing about PaperMemory availability. PaperMemory is fail-loud; if its tools disappear, use the PaperMemory CLI fallback or report the startup failure — never substitute a zg hit as paper evidence.
 
 ## Remote embedding (ask first)
 

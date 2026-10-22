@@ -33,6 +33,18 @@ for (const name of EXPECTED) check(skill.includes(name), `SKILL.md missing tool:
 check(skill.includes('quote-not-verbatim'), 'SKILL.md missing quote refusal rule')
 check(skill.includes('Contradicted claims leave cite/recap/list'), 'SKILL.md missing contradiction gating')
 
+const zgSkill = readFileSync(join(root, 'skills/zvec-grep/SKILL.md'), 'utf8')
+for (const marker of ['workspace context, not evidence', 'never a citable source', 'does not satisfy the verbatim-quote rule', 'fails soft']) {
+  check(prompt.includes(marker), `prompt.js missing zg boundary marker: ${marker}`)
+  check(zgSkill.includes(marker), `zvec-grep SKILL.md missing claim-boundary marker: ${marker}`)
+}
+check(zgSkill.includes('## Boundary with PaperMemory'), 'zvec-grep SKILL.md missing Boundary with PaperMemory section')
+
+const zvecIndex = readFileSync(join(root, 'zvec-index.js'), 'utf8')
+check(zvecIndex.includes('exclude: {'), 'zvec_index does not declare an exclude parameter')
+check(zvecIndex.includes('PaperMemory runtime paths under the index root'), 'zvec_index description does not document automatic PaperMemory exclusions')
+check(zvecIndex.includes('globs: Array.isArray(args.exclude)'), 'zvec_index does not forward exclude globs to startIndex')
+
 const mount = readFileSync(join(root, 'papermemory.js'), 'utf8')
 check(mount.includes('failOnStartupError: true'), 'papermemory.js must fail loudly on startup')
 check(mount.includes('EXPECTED_TOOL_COUNT = 14'), 'papermemory.js missing tool-count drift check')
@@ -50,6 +62,13 @@ check(download.includes('degradation'), 'paper-download.js does not surface degr
 const cliSrc = readFileSync(join(root, 'papermemory-cli.js'), 'utf8')
 check(cliSrc.includes('probeNdjson'), 'papermemory-cli.js missing NDJSON probe')
 check(cliSrc.includes('--converter-json'), 'papermemory-cli.js missing converter forwarding')
+check(cliSrc.includes("'--cwd'"), 'papermemory-cli.js does not forward --cwd to ingest')
+for (const [file, source] of [['paper-download.js', download], ['pdf-to-markdown.js', pdf]]) {
+  check(source.includes('cwd,'), `${file} does not pass cwd to auto-ingest`)
+  check(source.includes('PAPERMEMORY_PROJECT'), `${file} lost the PAPERMEMORY_PROJECT override`)
+  check(!source.includes('projectSlugFromCwd'), `${file} still writes a cwd-derived project slug`)
+}
+check(prompt.includes('PAPERMEMORY_PROJECT'), 'prompt.js does not document the PAPERMEMORY_PROJECT override')
 
 if (failures.length) {
   console.error('Phase 7 surface check FAILED:')

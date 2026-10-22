@@ -39,7 +39,6 @@ export {
   dshHome,
   ensurePaperMemoryInstalled,
   ingestDownloadedPaper,
-  projectSlugFromCwd,
   resolvePaperMemoryLaunch,
 } from './papermemory-cli.js'
 

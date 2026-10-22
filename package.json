@@ -1,6 +1,6 @@
 {
   "name": "dsh-researchcraft",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "ResearchCraft as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",
@@ -54,6 +54,7 @@
     "mcp-connectors.js",
     "zvec-grep.js",
     "zvec-grep-cli.js",
+    "zg-excludes.js",
     "zvec-index-engine.js",
     "zvec-index.js",
     "consensus-search.js",

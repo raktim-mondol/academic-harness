@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { ingestConvertedMarkdown, projectSlugFromCwd } from './papermemory-cli.js'
+import { ingestConvertedMarkdown } from './papermemory-cli.js'
 
 const INLINE_PREVIEW_CHARS = 4_000
 
@@ -139,7 +139,8 @@ export function applyPdfToMarkdown(ctx) {
               path: outAbs,
               pdfPath: target,
               doi: args.doi,
-              project: process.env.PAPERMEMORY_PROJECT?.trim() || projectSlugFromCwd(cwd),
+              project: process.env.PAPERMEMORY_PROJECT?.trim(),
+              cwd,
               signal: exec.signal,
               converter: {
                 pdf_type: out.pdf_type,

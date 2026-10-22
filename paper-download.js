@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
-import { ingestDownloadedPaper, projectSlugFromCwd } from './papermemory-cli.js'
+import { ingestDownloadedPaper } from './papermemory-cli.js'
 
 const UNPAYWALL_URL = 'https://api.unpaywall.org/v2'
 const MAX_BYTES = 100 * 1024 * 1024
@@ -203,7 +203,8 @@ export function apply(ctx) {
           path: out,
           doi,
           title: meta.title,
-          project: process.env.PAPERMEMORY_PROJECT?.trim() || projectSlugFromCwd(cwd),
+          project: process.env.PAPERMEMORY_PROJECT?.trim(),
+          cwd,
           signal: exec.signal,
         })
       } catch (error) {

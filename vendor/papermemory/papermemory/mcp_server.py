@@ -40,6 +40,7 @@ TOOLS = [
                 "title": {"type": "string"},
                 "pdf_path": {"type": "string", "description": "Attach markdown ingest to the paper for this PDF path"},
                 "project": {"type": "string"},
+                "cwd": {"type": "string", "description": "Resolve the project from this directory (ah.yaml ancestor, manuscript root_path) when project is not given"},
                 "kind": {"type": "string"},
             },
         },
@@ -296,9 +297,14 @@ def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
             return _ok(payload)
         if name == "papermemory_ingest":
             from papermemory.ingest import ingest_arxiv, ingest_doi, ingest_path
+            from papermemory.scope import canonical_project_slug
 
+            project = args.get("project")
+            cwd = args.get("cwd")
+            if project or cwd:
+                project = canonical_project_slug(Path(cwd) if cwd else Path.cwd(), project=project, store=store)
             if args.get("arxiv"):
-                return _ok(_ingest_payload(store, ingest_arxiv(store, args["arxiv"], project_id=args.get("project"))))
+                return _ok(_ingest_payload(store, ingest_arxiv(store, args["arxiv"], project_id=project)))
             if args.get("path"):
                 path, error = _sandbox(store, args["path"])
                 if error:
@@ -311,7 +317,7 @@ def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
                 result = ingest_path(
                     store,
                     Path(path),
-                    project_id=args.get("project"),
+                    project_id=project,
                     kind=args.get("kind") or "auto",
                     doi=args.get("doi"),
                     title=args.get("title"),
@@ -321,7 +327,7 @@ def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
                 )
                 return _ok(_ingest_payload(store, result))
             if args.get("doi"):
-                return _ok(_ingest_payload(store, ingest_doi(store, args["doi"], project_id=args.get("project"))))
+                return _ok(_ingest_payload(store, ingest_doi(store, args["doi"], project_id=project)))
             return _err("path, arxiv, or doi is required", "invalid-argument")
         if name == "papermemory_get":
             max_chars = int(args.get("max_chars") or 12000)

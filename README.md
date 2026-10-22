@@ -138,6 +138,10 @@ Indexing is **opt-in**. Settings → ResearchCraft API keys → **Index at sessi
 
 While an index runs — from session start or from chat — the UI shows a **progress bar with estimated time** in Settings and in the session header, and **Cancel** is always available. There is **no timeout**. Existing indexes are left alone (no silent rebuild/drop). Home directory and `/` are not indexed. Indexes live in `<cwd>/.zvec-grep/`; the model cache is `~/.zvec-grep/models` (~130 MB once).
 
+`zvec_index action=start` accepts an `exclude` array of zg `-g` globs (for example `["!tmp/**", "!*.log"]`). PaperMemory runtime paths under the index root — the store directory's `corpus/`, `*.db*` (SQLite + WAL/SHM), `evidence/`, and `PAPERMEMORY_EVIDENCE_DIR` — are excluded automatically. Still prefer a `PAPERMEMORY_DB` outside the indexed workspace; the automatic exclusions cover the accidental case. Exclusions apply when a job starts: if an index for the same root is already running, `action=start` joins it with its original globs rather than restarting.
+
+zg is **fail-soft**, PaperMemory is **fail-loud**. If the zg install or daemon fails, semantic search is simply absent and a warning is logged; that says nothing about PaperMemory, which surfaces its own startup failure and 14-tool drift. Never read a missing zg tool as missing memory. Paper markdown in the workspace is indexed by zg for *discovery*; evidence for claims, numbers, and quotations always comes from PaperMemory (`cite`, `quote_check`, `trace`, `get`). Ingest stores a separate corpus copy, so keep the workspace file for zg and review — do not delete it after ingest.
+
 ```sh
 # only if you want to index by hand or pick a different local model
 zg index --embedding local/potion-retrieval-32m    # default — papers / notes / mixed
@@ -240,6 +244,10 @@ The SQLite store is PaperMemory's default: `~/.local/share/papermemory/papermemo
 
 `paper_download` calls ingest on the saved PDF (and DOI metadata when a DOI was given); `pdf_to_markdown write_to` auto-ingests the converted markdown (page-subset conversions are deliberately not ingested) and forwards converter/OCR signals. The agent is steered to `recap` on paper-writing tasks, to cite only memory hits, to check `supports_statement`/`degradation`, and to `cite_check` before treating a section as finished. Load the bundled `papermemory` skill (`skills/papermemory`) for the full workflow.
 
+**Auto-ingest project scope.** Both auto-ingest paths pass the workspace root (`cwd`) to PaperMemory and let it resolve the project, in this order: `PAPERMEMORY_PROJECT` (slugified) → nearest `ah.yaml` ancestor → a manuscript whose `root_path` equals the workspace → `unassigned`. Explicit ingest uses the same resolution (`papermemory_ingest` with `cwd`, or CLI `papermemory ingest --cwd PATH`); an explicit `--project` wins over `cwd` and is slugified. Set `PAPERMEMORY_PROJECT` to override the detected project.
+
+**Project-key migration.** Papers ingested before v0.15.0 were tagged with the workspace directory slug. After upgrading, a new auto-ingest in the same workspace may land under the manuscript or `ah.yaml` slug instead, so one project can temporarily split across two keys. Set `PAPERMEMORY_PROJECT` to the old slug for new ingests, or re-ingest the affected papers under the canonical project; there is no automatic `project rekey` command.
+
 ## Paper agents (Paper2Agent)
 
 The bundled `paper2agent` skill ([jmiao24/Paper2Agent](https://github.com/jmiao24/Paper2Agent), MIT) turns a paper and/or its code repository into (1) a reviewed, compact paper skill and (2) a tested FastMCP server of that paper's methods. Load it with the `skill` tool when the user asks to agentify a paper. It is not a replacement for `pdf_to_markdown` (fast unreviewed extract) or for catalogue skills such as `scanpy` (how-to).
@@ -252,7 +260,7 @@ Do not run `claude mcp add`. GPU papers use `runpod_run` / `modal_run` rather th
 |---|---|
 | `PAPERMEMORY_CLI` | Absolute path to a `papermemory` binary. Env only. |
 | `PAPERMEMORY_DB` / `PAPERMEMORY_DATA_DIR` | Override the SQLite store location. Env only. |
-| `PAPERMEMORY_PROJECT` | Default project slug for `paper_download` auto-ingest. Env only; otherwise the workspace directory name. |
+| `PAPERMEMORY_PROJECT` | Override the project for `paper_download` / `pdf_to_markdown` auto-ingest (slugified). Env only; otherwise PaperMemory resolves `ah.yaml` → manuscript `root_path` → `unassigned`. |
 | `PAPERMEMORY_SKIP_INSTALL` | `1` to skip installing the bundled venv (PATH / `PAPERMEMORY_CLI` still work). |
 
 ## Browsing the web

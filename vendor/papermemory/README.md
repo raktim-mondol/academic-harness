@@ -45,6 +45,7 @@ papermemory ingest paper.pdf --doi 10.1038/s41592-024-02201-0 --project scandy
 papermemory ingest notes.md --pdf-path paper.pdf --project scandy
 papermemory ingest --arxiv 1706.03762 --project scandy
 papermemory ingest --doi 10.1038/s41592-024-02201-0
+papermemory ingest paper.pdf --cwd ~/my-paper     # project from ah.yaml or manuscripts.root_path
 
 papermemory search "spoil shear strength"
 papermemory paper simmons2004shear
@@ -58,6 +59,8 @@ papermemory lesson "Never invent a citation. If cite returns nothing, say so." -
 ```
 
 `--json` is accepted before or after the subcommand for agent use.
+
+`--cwd` resolves the ingest project the same way the agent does (nearest `ah.yaml` ancestor, then a manuscript whose `root_path` matches, else `unassigned`). An explicit `--project` wins over `--cwd` and is slugified (`"My Paper"` → `my-paper`). The MCP `papermemory_ingest` tool accepts the same `cwd` field.
 
 ## MCP
 

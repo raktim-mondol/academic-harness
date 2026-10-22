@@ -48,10 +48,16 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_ingest(args: argparse.Namespace) -> int:
     from papermemory.ingest import ingest_arxiv, ingest_doi, ingest_path
+    from papermemory.scope import canonical_project_slug
 
     store = _store()
+    project = None
+    cwd = getattr(args, "cwd", None)
+    if args.project or cwd:
+        anchor = Path(cwd) if cwd else Path.cwd()
+        project = canonical_project_slug(anchor, project=args.project, store=store)
     if args.arxiv:
-        rec = ingest_arxiv(store, args.arxiv, project_id=args.project)
+        rec = ingest_arxiv(store, args.arxiv, project_id=project)
         return _emit(rec, args.json, _fmt_paper(rec))
     if args.path:
         import json as _json
@@ -60,7 +66,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         result = ingest_path(
             store,
             Path(args.path),
-            project_id=args.project,
+            project_id=project,
             kind=args.kind,
             doi=args.doi,
             title=args.title,
@@ -70,7 +76,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         )
         return _emit(result, args.json)
     if args.doi:
-        rec = ingest_doi(store, args.doi, project_id=args.project)
+        rec = ingest_doi(store, args.doi, project_id=project)
         return _emit(rec, args.json, _fmt_paper(rec))
     print("ingest requires PATH, --arxiv, or --doi", file=sys.stderr)
     return 2
@@ -579,6 +585,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--title")
     s.add_argument("--pdf-path", dest="pdf_path", help="attach markdown/tex ingest to an existing PDF record")
     s.add_argument("--project")
+    s.add_argument("--cwd", help="Resolve the project from this directory (ah.yaml ancestor, manuscript root_path) when --project is not given")
     s.add_argument("--kind", default="auto", choices=["auto", "pdf", "bibtex", "markdown", "tex", "dir", "manuscript"])
     s.add_argument("--origin-channel", dest="origin_channel")
     s.add_argument("--converter-json", dest="converter_json")

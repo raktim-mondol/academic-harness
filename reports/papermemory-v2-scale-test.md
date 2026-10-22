@@ -12,10 +12,10 @@ Generated from 310 markdown papers converted from PDFs found on this machine (pd
 | sections | 6174 |
 | table_chunks | 727 |
 | bibliography_chunks | 554 |
-| ingest_seconds | 2.29 |
+| ingest_seconds | 2.32 |
 | probes | 20 |
 | topn_matches | 20 |
-| p95_ms | 11.7 |
+| p95_ms | 11.33 |
 | recap_chars | 976 |
 
 ## Checks
@@ -29,7 +29,7 @@ Generated from 310 markdown papers converted from PDFs found on this machine (pd
 | same paper from another path stays one record | PASS | {'duplicate-noop': 5} |
 | no duplicate raw documents | PASS | 184 -> 184 |
 | true top-N matches bm25 for all probes | PASS | 20/20 |
-| scoped search p95 <= 120 ms | PASS | p95=11.7ms |
+| scoped search p95 <= 120 ms | PASS | p95=11.3ms |
 | cross-project leak blocked | PASS | no-match-in-project |
 | other project can retrieve its own chunk | PASS |  |
 | bibliography is suppressed, not returned | PASS | reason=all-suppressed:bibliography suppressed={'bibliography': 1, 'non_claimable': 1, 'uncovered_span': 0} results=0 token=pachetti |
@@ -47,7 +47,7 @@ Generated from 310 markdown papers converted from PDFs found on this machine (pd
 | coverage rollup is complete | PASS | {'docs': 104, 'source_chars': 5213314, 'indexed_chars': 5201961, 'capped': 0, 'with_uncovered': 104, 'ratio': 0.9978223065021596} |
 | health invariants clean | PASS | {} |
 | FTS index count matches chunks | PASS | fts=8969 chunks=8969 |
-| reindex is count-stable | PASS | 234 -> 234 |
+| reindex is count-stable | PASS | 191 -> 191 |
 | CRLF markdown is refused with a typed reason | PASS | newline-not-lf |
 | heading-less paper is unclassified/low confidence | PASS | {'headings': 0, 'structure_confidence': 'low', 'profile': 'unknown', 'profile_confidence': 20} |
 
@@ -76,11 +76,11 @@ Generated from 310 markdown papers converted from PDFs found on this machine (pd
 ## MCP surface on the scale store
 
 - tools/list: 14 tools
-- search: 3 results, typed keys ['absence_scope', 'corpus_match_count', 'coverage', 'empty_reason', 'legs', 'results']… legs={'chunk': 'ok', 'claim': 'ok', 'paper': 'ok', 'notes': 'ok'}
+- search: 3 results, typed keys ['absence_scope', 'corpus_match_count', 'coverage', 'empty_reason', 'legs', 'results', 'scope', 'suppressed', 'truncated'] legs={'chunk': 'ok', 'claim': 'ok', 'paper': 'ok', 'notes': 'ok'}
 - outline: 18 sections, profile=empirical
-- get: 10 chunk slices, 0 claims, truncated=True
-- cite: 4 hits, supports_statement=[False, False, False, False]
-- list coverage: 105 docs, ratio 0.998, chunkless=0
-- trace paper: 2 docs, 0 claims
+- get: 9 chunk slices, 0 claims, truncated=True
+- cite: 8 hits, supports_statement=[False, False, False, False, False, True, True, True]
+- list coverage: 105 docs, 0 chunkless, ratio 0.998
+- trace paper: 2 documents, 0 claims, 0 citations
 - sandbox: isError=True, code=path-escape
 
