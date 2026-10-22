@@ -1,6 +1,6 @@
 {
   "name": "academic-harness",
-  "version": "0.16.0",
+  "version": "0.16.1",
   "description": "Academic Harness as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",

@@ -234,7 +234,7 @@ async function installBundled() {
   const uv = findUv()
   let result = { code: 1, out: '', err: '' }
   if (uv) {
-    result = await run(uv, ['venv', join(vendor, '.venv')], {
+    result = await run(uv, ['venv', '--clear', join(vendor, '.venv')], {
       cwd: vendor,
       timeoutMs: INSTALL_TIMEOUT_MS,
       silent: true,
@@ -251,7 +251,7 @@ async function installBundled() {
   }
   if (!uv || result.code !== 0 || !findBundled()) {
     const python = findPython()
-    result = await run(python, ['-m', 'venv', join(vendor, '.venv')], {
+    result = await run(python, ['-m', 'venv', '--clear', join(vendor, '.venv')], {
       cwd: vendor,
       timeoutMs: INSTALL_TIMEOUT_MS,
       silent: true,
