@@ -1,6 +1,6 @@
 {
   "name": "dsh-researchcraft",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "ResearchCraft as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",

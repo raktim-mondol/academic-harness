@@ -23,7 +23,9 @@ unsupported / unverifiable / fabricated), evidence.
 Start with PaperMemory when `mcp__papermemory__*` is available: run
 `mcp__papermemory__papermemory_cite_check` on the manuscript slug (or
 ingest the `.tex` / `.bib` tree first), then `mcp__papermemory__papermemory_cite` /
-`mcp__papermemory__papermemory_get` for each key. Hits with `verified: false` / `UNVERIFIED`
-are not confirmed metadata — say so. Keys missing from memory must be
-ingested or marked unverifiable, never invented. `mcp__scite__*` still
+`mcp__papermemory__papermemory_get` for each key. A cite hit with no verified claim has
+`supports_statement: false`; `cite_check` also reports `claim_gaps` and `unverified_cited`.
+Keys missing from memory must be ingested or marked unverifiable, never invented. An empty
+search is only "no source" when its `empty_reason` is `no-match`; otherwise report the typed
+reason (`no-match-in-project`, `all-suppressed:*`, `absence-not-licensable`). `mcp__scite__*` still
 covers retraction/correction checks on top of that.

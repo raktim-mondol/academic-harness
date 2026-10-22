@@ -50,5 +50,8 @@ writing project is in play) so you reuse papers and claims already in
 memory. After a new paper is worth citing, ingest it
 (`mcp__papermemory__papermemory_ingest` with `doi` / `arxiv` / `path`) if
 `paper_download` did not already. Cite only keys returned by
-`mcp__papermemory__papermemory_cite` or `mcp__papermemory__papermemory_get`; if cite returns
-nothing, say so — do not invent a title, year, DOI, or bibtex key.
+`mcp__papermemory__papermemory_cite` or `mcp__papermemory__papermemory_get`; check each hit's
+`supports_statement` (a verified claim) and `degradation` (OCR-capped sources). If a search
+comes back empty, report its `empty_reason`: only `no-match` licenses "memory has no source
+for this"; `no-match-in-project`, `all-suppressed:*` and `absence-not-licensable` mean the
+corpus exists but the query/filter did not reach it — do not invent a title, year, DOI, or key.
