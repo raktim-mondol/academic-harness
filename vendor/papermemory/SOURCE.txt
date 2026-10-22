@@ -1,5 +1,5 @@
 Vendored from https://github.com/raktim-mondol/papermemory
-Commit: e256eb59d44629c6495a76cc5237eb563ad2553a
+Commit: 3bc5c2515691f7f0444a6817ff8da2c3e089c511
 Version: 0.2.0
 Upstream exceptions: none.
 
