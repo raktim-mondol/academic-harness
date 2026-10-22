@@ -24,7 +24,7 @@ const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['
 export const LOG = '[dsh-researchcraft] papermemory'
 export const MIN_PAPERMEMORY_VERSION = '0.2.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh13'
+const BUNDLE_REV = 'dsh14'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 

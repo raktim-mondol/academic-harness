@@ -42,7 +42,7 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "EVD-01": ("T3", "major", "Cited source does not support the claim as stated (model verdict, quote-checked)"),
     "EVD-02": ("T3", "minor", "Number in a cited sentence not found in the cited source"),
     "EVD-03": ("T3", "info", "Verifier error: the claim was not checked"),
-    "EVD-04": ("T3", "info", "Cited key has no source text"),
+    "EVD-04": ("T3", "major", "Cited key has no source text"),
     "EVD-05": ("T4", "major", "A claim's bound source passage is no longer in the source text"),
     "CLM-02": ("T4", "info", "Cited claim has no binding (when the project requires one)"),
     "CLM-05": ("T4", "minor", "Claim text changed after it was bound or verified"),
@@ -79,7 +79,7 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
 }
 
 TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")
-DEFAULT_TIERS = ("T0", "T1", "T2", "T4", "T5", "T6")      # T3 reads sources and may call a model, so it is opt-in
+DEFAULT_TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")  # T3 deterministic half runs by default; the model half needs a backend
 
 
 @dataclass

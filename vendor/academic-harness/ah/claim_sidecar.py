@@ -107,22 +107,48 @@ def find_claim(p: Project, ref: str) -> tuple[str, dict, dict]:
     return hits[0]
 
 
-def bind_passage(ctx: Context, ref: str, source: str, start: int, end: int, file_index: int = 0) -> dict:
-    """Bind a claim to lines start-end of the source's text. The quote is captured now; EVD-05 checks it later."""
+def bind_passage(ctx: Context, ref: str, source: str, start: int = 0, end: int = 0, file_index: int = 0, *,
+                 char_start: int | None = None, char_end: int | None = None,
+                 quote_sha256: str | None = None, raw_sha256: str | None = None,
+                 memory_claim_id: str | None = None, header_span_json: str | None = None) -> dict:
+    """Bind a claim to a source passage: lines (start-end) or exact char offsets.
+
+    Char spans are authoritative when supplied (memory ledger); the verbatim quote is
+    re-sliced from the stored file and line numbers are derived. The binding keeps the
+    full source sha and quote sha so verdict provenance can be checked later."""
     p = ctx.project
     uid, sc, rec = find_claim(p, ref)
     paths = resolve_all(p, source, load_registry(p), source_map(p), ctx.bib, doi_index(p))
     if not paths:
         raise ValueError(f"no source text for '{source}'")
     path = paths[min(file_index, len(paths) - 1)]
-    lines = path.read_text(errors="replace").split("\n")
-    if not (1 <= start <= end <= len(lines)):
-        raise ValueError(f"lines {start}-{end} are outside {path.name} ({len(lines)} lines)")
-    quote = re.sub(r"\s+", " ", " ".join(lines[start - 1:end])).strip()
+    text_all = path.read_text(errors="replace")
+    if char_start is not None and char_end is not None:
+        if not (0 <= char_start < char_end <= len(text_all)):
+            raise ValueError(f"char span {char_start}-{char_end} is outside {path.name} ({len(text_all)} chars)")
+        quote_raw = text_all[char_start:char_end]
+        start = text_all[:char_start].count("\n") + 1
+        end = text_all[:char_end].count("\n") + 1
+    else:
+        lines = text_all.split("\n")
+        if not (1 <= start <= end <= len(lines)):
+            raise ValueError(f"lines {start}-{end} are outside {path.name} ({len(lines)} lines)")
+        quote_raw = " ".join(lines[start - 1:end])
+        char_start = len("\n".join(lines[: start - 1])) + (1 if start > 1 else 0)
+        char_end = char_start + len(quote_raw)
+    quote = re.sub(r"\s+", " ", quote_raw).strip()
     if len(quote) < 15:
         raise ValueError("that range holds too little text to be a passage")
+    import hashlib as _hashlib
     b = {"type": "passage", "source": source, "file": str(path.relative_to(p.root)) if path.is_relative_to(p.root) else str(path),
-         "start": start, "end": end, "sha": sha256_file(path)[:16], "quote": quote[:600], "quote_hash": clause_hash(quote[:600])}
+         "start": start, "end": end, "sha": sha256_file(path)[:16], "quote": quote[:600], "quote_hash": clause_hash(quote[:600]),
+         "raw_sha256": raw_sha256 or sha256_file(path),
+         "quote_sha256": quote_sha256 or _hashlib.sha256(quote_raw.encode("utf-8")).hexdigest(),
+         "char_start": char_start, "char_end": char_end}
+    if header_span_json:
+        b["header_span_json"] = header_span_json
+    if memory_claim_id:
+        b["memory_claim_id"] = memory_claim_id
     rec["bindings"] = [x for x in rec.get("bindings", []) if not (x.get("type") == "passage" and x.get("source") == source and x.get("start") == start)] + [b]
     if rec.get("status") in ("unbound", "stale"):
         rec["status"] = "bound"

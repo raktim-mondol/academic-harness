@@ -29,7 +29,7 @@ const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['
 export const LOG = '[dsh-researchcraft] academic-harness'
 export const MIN_AH_VERSION = '0.1.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh3'
+const BUNDLE_REV = 'dsh5'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 

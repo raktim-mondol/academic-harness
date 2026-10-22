@@ -37,16 +37,15 @@ def check_t2(ctx: Context) -> list[Finding]:
         if k not in ctx.bib:
             for rel, ln, ref in where[:1]:
                 add("BIB-01", ref, rel, ln, f"cite:{k}", f"\\cite key '{k}' is not in the bibliography")
-    if ctx.registry:
-        for k, where in sorted(cited.items()):
-            src = entry_for(ctx.registry, k)
-            rel, ln, ref = where[0]
-            if src is None:
-                add("BIB-02", ref, rel, ln, f"reg:{k}", f"cited key '{k}' is not in the source registry")
-                continue
-            st = src.get("status", "ok")
-            if st in ("retracted", "corrected", "superseded"):
-                add("BIB-04", ref, rel, ln, f"status:{k}:{st}", f"cited source '{k}' is {st}")
+    for k, where in sorted(cited.items()):
+        src = entry_for(ctx.registry, k)
+        rel, ln, ref = where[0]
+        if src is None:
+            add("BIB-02", ref, rel, ln, f"reg:{k}", f"cited key '{k}' is not in the source registry")
+            continue
+        st = src.get("status", "ok")
+        if st in ("retracted", "corrected", "superseded"):
+            add("BIB-04", ref, rel, ln, f"status:{k}:{st}", f"cited source '{k}' is {st}")
             e = ctx.bib.get(k)
             if e:
                 bad = []

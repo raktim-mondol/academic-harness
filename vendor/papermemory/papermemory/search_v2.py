@@ -76,6 +76,7 @@ def _chunk_leg(store, query, limit, project_id, section_roles):
         record["snippet"] = " ".join(
             (record["raw_text"][record["char_start"]:record["char_end"]] or "").split()
         )[:400]
+        record.pop("raw_text", None)
         record["created_at"] = record.get("doc_created_at")
         record["overlap"] = overlap(query, record["snippet"])
         record["score"] = (1.0 / (RRF_K + rank)) * (0.15 + record["overlap"])

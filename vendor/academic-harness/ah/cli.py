@@ -399,6 +399,27 @@ def cmd_eval_style(a):
     return EXIT_OK
 
 
+def cmd_evidence(a):
+    from .evidence import export_ledger, import_memory_ledger
+
+    p = _proj(a)
+    if a.action == "export":
+        rows = export_ledger(p)
+        text = "\n".join(json.dumps(row, ensure_ascii=False) for row in rows)
+        if a.out:
+            Path(a.out).write_text(text + ("\n" if text else ""), encoding="utf-8")
+        if a.json:
+            print(json.dumps({"rows": len(rows), "out": a.out}, indent=1))
+        elif not a.out:
+            print(text)
+        return EXIT_OK
+    if not a.path:
+        print("import-ledger requires a PaperMemory ledger path", file=sys.stderr)
+        return EXIT_ERROR
+    print(json.dumps(import_memory_ledger(p, Path(a.path)), indent=1))
+    return EXIT_OK
+
+
 def cmd_source(a):
     from .sources.index import Index
     from .sources.registry import add_source, load_registry, resolve, source_map
@@ -763,12 +784,22 @@ def main(argv=None) -> int:
     sp.add_argument("--query", default="")
     sp.add_argument("--k", type=int, default=3)
     from . import cli_author
+    ev = add("evidence", cmd_evidence, "exchange evidence ledger rows with PaperMemory")
+    ev.add_argument("action", choices=["export", "import-ledger"])
+    ev.add_argument("path", nargs="?")
+    ev.add_argument("--ledger", action="store_true")
+    ev.add_argument("--out")
+
     sp = add("claims", cli_author.cmd_claims, "cited claims: list, extract sidecars, bind, verify")
     sp.add_argument("action", nargs="?", choices=["list", "extract", "bind", "verify", "show"])
     sp.add_argument("ref", nargs="?")
     sp.add_argument("--limit", type=int, default=40)
     sp.add_argument("--source")
     sp.add_argument("--lines", help="START-END lines of the source text")
+    sp.add_argument("--char-span", dest="char_span", help="START-END character offsets (authoritative when set)")
+    sp.add_argument("--quote-sha256", dest="quote_sha256")
+    sp.add_argument("--raw-sha256", dest="raw_sha256")
+    sp.add_argument("--memory-claim", dest="memory_claim")
     sp.add_argument("--auto", action="store_true", help="bind the best retrieved passage")
     sp.add_argument("--fact")
     sp.add_argument("--token")
