@@ -164,7 +164,7 @@ ok('patch keeps legacy preset', patch.includes('id: preset-researchcraft-legacy'
 ok('preset uses workflow-ptc', /name: '@deepseek-ai\/dsh-workflow-ptc'/.test(yml))
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-ok('package is academic-harness 0.16.0', pkg.name === 'academic-harness' && pkg.version === '0.16.0')
+ok('package is academic-harness 0.16.2', pkg.name === 'academic-harness' && pkg.version === '0.16.2')
 ok('package export ah', pkg.exports['./ah'] === './academic-harness.js')
 ok('package export ah-hooks', pkg.exports['./ah-hooks'] === './academic-harness-hooks.js')
 ok('package export academic-harness alias', pkg.exports['./academic-harness'] === './academic-harness.js')
