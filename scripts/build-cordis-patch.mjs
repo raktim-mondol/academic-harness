@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
  * Compose cordis.patch.yml for DSH 0.2.1+: registry default, host plugin, and
- * the `preset-academic-harness` / `preset-researchcraft-legacy` declarations
- * whose `config.plugins` is the contents of
- * presets/academic-harness/agent.cordis.yml. Keep that YAML as the plugin-list
- * source of truth; regenerate the patch after editing it.
+ * the `preset-academic-harness` declaration whose `config.plugins` is the
+ * contents of presets/academic-harness/agent.cordis.yml. Keep that YAML as the
+ * plugin-list source of truth; regenerate the patch after editing it.
  */
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
@@ -46,13 +45,6 @@ ${preset({
   name: 'Academic Harness',
   description: 'Scientific research assistant — literature, analysis, lab notebook, and specialist subagents on DeepSeek Harness.',
   order: 0,
-})}
-${preset({
-  rowId: 'preset-researchcraft-legacy',
-  id: 'researchcraft',
-  name: 'Academic Harness (legacy)',
-  description: 'Legacy preset id retained for sessions created before v0.16.0. Removed in v0.17.0.',
-  order: 100,
 })}
 `
 

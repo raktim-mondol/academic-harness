@@ -160,7 +160,7 @@ ok('preset mounts hooks', /name: academic-harness\/ah-hooks\b/.test(yml))
 const patch = readFileSync(join(ROOT, 'cordis.patch.yml'), 'utf8')
 ok('patch inlines academic-harness', /name: academic-harness\/ah\b/.test(patch))
 ok('patch inlines hooks', /name: academic-harness\/ah-hooks\b/.test(patch))
-ok('patch keeps legacy preset', patch.includes('id: preset-researchcraft-legacy') && patch.includes('id: researchcraft'))
+ok('patch has no legacy preset', !patch.includes('preset-researchcraft-legacy') && !patch.includes('id: researchcraft'))
 ok('preset uses workflow-ptc', /name: '@deepseek-ai\/dsh-workflow-ptc'/.test(yml))
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
@@ -171,6 +171,12 @@ ok('package export academic-harness alias', pkg.exports['./academic-harness'] ==
 ok('package export hooks alias', pkg.exports['./academic-harness-hooks'] === './academic-harness-hooks.js')
 ok('package files include engine JS', pkg.files.includes('academic-harness.js') && pkg.files.includes('academic-harness-hooks.js'))
 ok('prompt mentions Academic Harness', /Academic Harness/.test(readFileSync(join(ROOT, 'prompt.js'), 'utf8')))
+try {
+  const section = await import('../prompt-section.js')
+  ok('prompt-section imports', typeof section.apply === 'function' && section.inject?.includes('systemPrompt'))
+} catch (error) {
+  ok('prompt-section imports', false, error.message)
+}
 
 {
   const { executeAh } = await import('../academic-harness.js')

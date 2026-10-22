@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
- * Rename acceptance: package/patch identity, legacy preset, API-key migration,
- * and the profile migration script (dry-run + apply) against temp profiles.
+ * Rename acceptance: package/patch identity, preset identity, API-key
+ * migration, and the profile migration script (dry-run + apply) against temp
+ * profiles.
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
@@ -11,7 +12,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { getStoredKey, registerKeysSettings } from '../settings-keys.js'
-import { LEGACY_PRESET_ID, PRESET_ID, isPluginPreset } from '../preset-ids.js'
+import { PRESET_ID, isPluginPreset } from '../preset-ids.js'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -52,27 +53,24 @@ check('package identity is academic-harness 0.16.2', () => {
   assert.ok(pkg.files.includes('scripts'))
 })
 
-check('preset ids accept new and legacy', () => {
+check('preset ids accept only the current preset', () => {
   assert.equal(PRESET_ID, 'academic-harness')
-  assert.equal(LEGACY_PRESET_ID, 'researchcraft')
   assert.ok(isPluginPreset(PRESET_ID))
-  assert.ok(isPluginPreset(LEGACY_PRESET_ID))
+  assert.ok(!isPluginPreset('researchcraft'))
   assert.ok(!isPluginPreset('standard'))
 })
 
-check('generated patch has both presets and no old module specifiers', () => {
+check('generated patch has one preset and no old module specifiers', () => {
   const patch = readFileSync(join(ROOT, 'cordis.patch.yml'), 'utf8')
   assert.match(patch, /default: academic-harness/)
   assert.match(patch, /- id: academic-harness\n      name: academic-harness/)
-  const newStart = patch.indexOf('    - id: preset-academic-harness')
-  const legacyStart = patch.indexOf('    - id: preset-researchcraft-legacy')
-  assert.ok(newStart >= 0 && legacyStart > newStart)
-  const newBody = patch.slice(patch.indexOf('        plugins:', newStart), legacyStart)
-  const legacyBody = patch.slice(patch.indexOf('        plugins:', legacyStart))
-  assert.equal(newBody, legacyBody, 'both presets must mount the same plugin list')
-  assert.ok(newBody.includes('name: academic-harness/ah'))
-  assert.ok(newBody.includes('name: academic-harness/ah-hooks'))
-  assert.ok(!newBody.includes('dsh-researchcraft/'))
+  const presetStart = patch.indexOf('    - id: preset-academic-harness')
+  assert.ok(presetStart >= 0)
+  assert.ok(!patch.includes('preset-researchcraft-legacy'))
+  const presetBody = patch.slice(patch.indexOf('        plugins:', presetStart))
+  assert.ok(presetBody.includes('name: academic-harness/ah'))
+  assert.ok(presetBody.includes('name: academic-harness/ah-hooks'))
+  assert.ok(!presetBody.includes('dsh-researchcraft/'))
   assert.ok(!patch.includes('name: dsh-researchcraft'))
 })
 

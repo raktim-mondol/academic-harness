@@ -73,7 +73,7 @@ The repo, npm package, plugin, preset, profile, launcher, and product name were 
 | repo / package `dsh-researchcraft` | `academic-harness` |
 | profile `researchcraft` | `academic-harness` |
 | launcher `dsh-researchcraft` | `academic-harness` (old command stays as a transition alias) |
-| preset `researchcraft` | `academic-harness` (legacy preset kept for old sessions) |
+| preset `researchcraft` | `academic-harness` (legacy preset removed) |
 | Settings → ResearchCraft API keys | Settings → Academic Harness API keys |
 | env `RESEARCHCRAFT_*` | `ACADEMIC_HARNESS_*` (old names still honored) |
 
@@ -84,7 +84,7 @@ node scripts/migrate-profile.mjs --profile researchcraft --to academic-harness -
 dsh plugin --profile academic-harness install
 ```
 
-The migration backs up the old profile, moves the dependency/bundle entries, merges the API-key config into the new entry, updates the preset default, and renames the profile directory. Old sessions still open through the legacy `researchcraft` preset. `dsh plugin --profile academic-harness update academic-harness` is the new update command.
+The migration backs up the old profile, moves the dependency/bundle entries, merges the API-key config into the new entry, updates the preset default, and renames the profile directory. Sessions pinned to the removed legacy `researchcraft` preset do not resolve; start a new chat on Academic Harness. `dsh plugin --profile academic-harness update academic-harness` is the new update command.
 
 **One DSH surface at a time.** `dsh-web`, `dsh-tui`, `dsh-martty`, and `academic-harness` share `$DSH_HOME` (including port `3080` and the zvec-grep daemon). Ctrl+C does not always wait for those to exit, so starting another launcher while one is still in the background will fail or pick up the wrong process. The shared launcher (`scripts/dsh-launch`, installed as those four commands plus the transition alias `dsh-researchcraft`) stops leftover DSH processes and `zg server off` before exec. If you invoke `dsh --profile …` directly, stop the previous one first:
 
@@ -95,7 +95,7 @@ ss -ltnp | grep 3080
 zg server off
 ```
 
-The Academic Harness profile's bundle patch sets `agent-preset-registry` `default: academic-harness` and inserts `preset-academic-harness` plus a legacy `preset-researchcraft-legacy` declaration (DSH 0.2+ no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **Academic Harness**; the legacy preset exists only so sessions created before v0.16.0 still resolve. Confirm the preset selector at the top of the message box reads "Academic Harness"; if it still says Standard/PTC, the profile patch did not apply.
+The Academic Harness profile's bundle patch sets `agent-preset-registry` `default: academic-harness` and inserts only `preset-academic-harness` (DSH 0.2+ no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **Academic Harness**, and the selector lists no legacy preset. Confirm the preset selector at the top of the message box reads "Academic Harness"; if it still says Standard/PTC, the profile patch did not apply.
 
 The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), and `paper_mcp` (Paper2Agent stdio mounts) are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
 
