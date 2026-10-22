@@ -27,7 +27,7 @@ export function applyImageGenerate(ctx) {
       'Generate a conceptual scientific schematic, diagram, or illustration and write it to the workspace.',
       'Uses Gemini image generation (gemini-2.5-flash-image "nano banana" by default; gemini-3.1-flash-image "nano',
       'banana 2" and gemini-3-pro-image "nano banana pro" also available) — needs GEMINI_API_KEY. Model is set via',
-      'Settings -> ResearchCraft API keys, the IMAGE_MODEL env var, or the model arg here (highest priority).',
+      'Settings -> Academic Harness API keys, the IMAGE_MODEL env var, or the model arg here (highest priority).',
       'Set IMAGE_PROVIDER=openai plus IMAGE_BASE_URL/IMAGE_API_KEY to use an OpenAI-compatible Images API instead.',
       'Do not use this for quantitative data plots or charts — write Python (matplotlib/etc.) for those.',
     ].join(' '),
@@ -72,7 +72,7 @@ export function applyImageGenerate(ctx) {
       if (!imageGenConfigured(keyOverrides) && !model) {
         return {
           ok: false,
-          error: 'image_generate is not configured. Set GEMINI_API_KEY (Settings -> ResearchCraft API keys, or the '
+          error: 'image_generate is not configured. Set GEMINI_API_KEY (Settings -> Academic Harness API keys, or the '
             + 'env var) for the default nano-banana path, or IMAGE_MODEL + IMAGE_BASE_URL + IMAGE_API_KEY for an '
             + 'OpenAI-compatible Images API.',
         }

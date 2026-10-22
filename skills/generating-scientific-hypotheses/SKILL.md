@@ -43,7 +43,7 @@ These outputs recombine published knowledge. Treat them as hypotheses, not new b
 2. **Search before proposing.**
    - Therapeutic ask: disease mechanisms → a testable assay → intervention candidates.
    - Open scientific ask: existing explanations → gaps → new claims that could fill them.
-   - On ResearchCraft: `consensus_search` **and** `parallel_search` (`advanced` for a survey); `mcp__papermemory__papermemory_search` for claims and papers already in memory; `paper_download` + `pdf_to_markdown` when a claim needs the full paper (download also ingests into PaperMemory). If those tools are absent, use the literature/web search this surface has. Still no invented citations.
+   - On Academic Harness: `consensus_search` **and** `parallel_search` (`advanced` for a survey); `mcp__papermemory__papermemory_search` for claims and papers already in memory; `paper_download` + `pdf_to_markdown` when a claim needs the full paper (download also ingests into PaperMemory). If those tools are absent, use the literature/web search this surface has. Still no invented citations.
 
 3. **Propose 5–8 candidates**, not one. Prefer non-obvious links across fields over a known result relabeled as a hypothesis.
 

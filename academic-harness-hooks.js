@@ -18,10 +18,10 @@
  */
 import { ahEnv, cliArgs, DSH_STATE_FOOTER, ensureAcademicHarnessInstalled, findAhRoot, LOG, run } from './academic-harness-cli.js'
 
-export const name = 'dsh-researchcraft-academic-harness-hooks'
+export const name = 'academic-harness-ah-hooks'
 export const inject = []
 
-const PLUGIN = 'dsh-researchcraft-academic-harness'
+const PLUGIN = 'academic-harness-ah'
 const HOOK_TIMEOUT_MS = 120_000
 const DSH_TO_CC = { write: 'Write', edit: 'Edit', bash: 'Bash' }
 

@@ -95,7 +95,7 @@ export function applyRunpodRun(ctx) {
       if (!key) {
         return {
           error: 'not_configured',
-          text: 'Runpod is not configured. Set RUNPOD_API_KEY (Settings -> ResearchCraft API keys, or the env var — '
+          text: 'Runpod is not configured. Set RUNPOD_API_KEY (Settings -> Academic Harness API keys, or the env var — '
             + 'get one at https://console.runpod.io/user/settings).',
         }
       }

@@ -55,6 +55,12 @@ jobs:
       - name: Check the MCP tool surface and plugin guidance
         run: PM_CLI="$(command -v papermemory)" node scripts/test-phase7.mjs
 
+      - name: Check rename identity and migration
+        run: |
+          node scripts/test-rename.mjs
+          node scripts/test-academic-harness.mjs
+          node scripts/test-paper2agent.mjs
+
       - name: Rebuild the client bundle and check it's committed
         run: |
           npm run build
@@ -77,11 +83,11 @@ jobs:
             "name": "dsh-profile-ci",
             "private": true,
             "dependencies": {
-              "dsh-researchcraft": "file:${{ github.workspace }}"
+              "academic-harness": "file:${{ github.workspace }}"
             },
             "dsh": {
               "profile": {
-                "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "dsh-researchcraft"]
+                "bundles": ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "academic-harness"]
               }
             }
           }
@@ -118,7 +124,7 @@ jobs:
             echo "::error::dsh did not report a listening web server — see boot.log above"
             exit 1
           fi
-          if grep -qiE 'failed to import|entry "agent-presets" not found' boot.log; then
+          if grep -qiE 'failed to import|entry "agent-presets" not found|Unknown agent preset|Duplicate agent preset' boot.log; then
             echo "::error::dsh booted with plugin/preset errors — see boot.log above"
             exit 1
           fi

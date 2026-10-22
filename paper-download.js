@@ -75,7 +75,7 @@ async function fetchPdf(url, email, signal) {
     redirect: 'follow',
     signal,
     headers: {
-      'User-Agent': `ResearchCraft/1.0 (open-access paper downloader${email ? `; mailto:${email}` : ''})`,
+      'User-Agent': `Academic Harness/1.0 (open-access paper downloader${email ? `; mailto:${email}` : ''})`,
       Accept: 'application/pdf,*/*;q=0.8',
     },
   })
@@ -105,7 +105,7 @@ async function fetchPdf(url, email, signal) {
   return buffer
 }
 
-export const name = 'dsh-researchcraft-paper-download'
+export const name = 'academic-harness-paper-download'
 export const inject = ['tools']
 
 /** Register the open-access paper download tool. */
@@ -116,7 +116,7 @@ export function apply(ctx) {
       'Download a paper PDF into the workspace so it can be read in full with pdf_to_markdown, instead of relying',
       'on an abstract or a search snippet. Give either doi (resolved to an open-access copy via the Unpaywall API,',
       'https://unpaywall.org) or url (a direct link you already have, e.g. from search results or an arXiv page).',
-      'Requires UNPAYWALL_EMAIL (Settings -> ResearchCraft API keys, or env) when using doi — Unpaywall asks API',
+      'Requires UNPAYWALL_EMAIL (Settings -> Academic Harness API keys, or env) when using doi — Unpaywall asks API',
       'callers to identify themselves with a real contact email; it does not require url. When a DOI has no',
       'open-access copy, this returns a clear "paywalled" result (not an error) with the landing-page URL so you',
       'can tell the user rather than guessing at the content or fabricating what the paper says.',
@@ -163,7 +163,7 @@ export function apply(ctx) {
       if (doi) {
         const email = await resolveEnv('UNPAYWALL_EMAIL')
         if (!email && !pdfUrl) {
-          return { success: false, error: 'UNPAYWALL_EMAIL is not set (Settings -> ResearchCraft API keys, or the matching env var).' }
+          return { success: false, error: 'UNPAYWALL_EMAIL is not set (Settings -> Academic Harness API keys, or the matching env var).' }
         }
         if (email) {
           const resolved = await resolveOpenAccess(doi, email, exec.signal)

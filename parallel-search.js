@@ -35,7 +35,7 @@ function render(value) {
   return [{ type: 'text', text: lines.join('\n\n') }]
 }
 
-export const name = 'dsh-researchcraft-parallel-search'
+export const name = 'academic-harness-parallel-search'
 export const inject = ['tools']
 
 /** Register the Parallel web-search tool with per-call mode selection. */
@@ -45,7 +45,7 @@ export function apply(ctx) {
     description: [
       'Primary Parallel web search: ranked URLs with LLM-oriented excerpts. Prefer this over mcp__parallel__web_search,',
       'which is the same search job locked to basic mode — only fall back to that MCP tool if this one is missing or errors.',
-      'Requires PARALLEL_API_KEY (Settings -> ResearchCraft API keys, or env).',
+      'Requires PARALLEL_API_KEY (Settings -> Academic Harness API keys, or env).',
       'Always pass `mode` — pick it for the task, do not default blindly:',
       '`turbo` (~250ms) simple fact lookups / current numbers (English and Japanese queries only);',
       '`fast` (~700ms) ordinary non-literature lookups;',
@@ -87,7 +87,7 @@ export function apply(ctx) {
       const key = await resolveEnv('PARALLEL_API_KEY')
       if (!key) {
         return {
-          error: 'PARALLEL_API_KEY is not set (Settings -> ResearchCraft API keys, or the matching env var). mcp__parallel__* is also disabled without this key.',
+          error: 'PARALLEL_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var). mcp__parallel__* is also disabled without this key.',
         }
       }
       const queries = (args.search_queries || []).map((q) => String(q).trim()).filter(Boolean)

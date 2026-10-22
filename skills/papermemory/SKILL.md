@@ -15,7 +15,7 @@ metadata:
 
 # PaperMemory
 
-Local, verbatim-first academic memory on the ResearchCraft preset. Database:
+Local, verbatim-first academic memory on the Academic Harness preset. Database:
 `~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB`); the
 plugin auto-installs the CLI and mounts 14 MCP tools. Do not `pip install` a
 second copy. Prefer `mcp__papermemory__*` when present; CLI fallback:

@@ -4,7 +4,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_MODAL_INSTANCE_ID, MODAL_INSTANCE_IDS, resolveModalInstance } from './modal-instances.js'
 import { resolveEnv } from './credential-env.js'
 
-const APP_NAME = 'dsh-researchcraft'
+const APP_NAME = 'academic-harness'
 const WORKDIR = '/workspace'
 const DEFAULT_TIMEOUT_S = 600
 const MAX_TIMEOUT_S = 3600
@@ -68,7 +68,7 @@ export function applyModalRun(ctx) {
         return {
           error: 'not_configured',
           text: 'Modal is not configured. Set MODAL_TOKEN_ID and MODAL_TOKEN_SECRET '
-            + '(Settings -> ResearchCraft API keys, or the env vars — get them at https://modal.com/settings).',
+            + '(Settings -> Academic Harness API keys, or the env vars — get them at https://modal.com/settings).',
         }
       }
 
@@ -88,7 +88,7 @@ export function applyModalRun(ctx) {
             error: 'sdk_missing',
             text: 'The optional Modal SDK is not installed in this DSH profile. '
               + 'Install it with `dsh plugin --profile <profile> add modal`, then restart dsh; '
-              + 'or use `runpod_run` instead. ResearchCraft leaves `modal` as an optional peer '
+              + 'or use `runpod_run` instead. Academic Harness leaves `modal` as an optional peer '
               + 'so plugin installation does not require native build scripts.',
           }
         }

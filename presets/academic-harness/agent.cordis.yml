@@ -1,4 +1,4 @@
-# The `researchcraft` agent preset: standard coding tools with a scientific
+# The `academic-harness` agent preset: standard coding tools with a scientific
 # research persona and the scientific-agent-skills catalogue.
 #
 # This file is an AGENT-PLANE composition. The roster mounts it ONCE under a
@@ -29,7 +29,7 @@
   name: '@deepseek-ai/dsh-persona'
   config:
     prefix: >-
-      You are ResearchCraft, a scientific research assistant powered by the {{model}} model. Ask before you assume. Do not invent citations, numbers, or papers.
+      You are Academic Harness, a scientific research assistant powered by the {{model}} model. Ask before you assume. Do not invent citations, numbers, or papers.
 
 - id: agent-instructions
   name: '@deepseek-ai/dsh-agent-instructions'
@@ -37,19 +37,19 @@
     maxBytes: 65536
 
 # Official Standard's clock: durable current-time and browser-zone readings so
-# unqualified dates and elapsed durations are interpretable. ResearchCraft
+# unqualified dates and elapsed durations are interpretable. Academic Harness
 # keeps the clock without Standard's reminder tools.
 - id: time-context
   name: '@deepseek-ai/dsh-time-context'
 
-# The longer ResearchCraft system-prompt section (notebook/subagent/MCP/tool
+# The longer Academic Harness system-prompt section (notebook/subagent/MCP/tool
 # guidance) — scoped to this preset the same way `persona` above is: rows
 # registered here are visible only to sessions joined to this preset's
 # standing mount. Previously called from the plugin's bundle-level apply()
 # in index.js, which made it global — every session on every preset got the
-# ResearchCraft prompt even outside this preset. See prompt-section.js.
-- id: researchcraft-prompt
-  name: dsh-researchcraft/prompt-section
+# Academic Harness prompt even outside this preset. See prompt-section.js.
+- id: academic-harness-prompt
+  name: academic-harness/prompt-section
 
 # ── shell ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +103,7 @@
   name: '@deepseek-ai/dsh-skill-filesystem'
   config:
     customSkillDirs:
-      - !!js process.env.RESEARCHCRAFT_SKILLS_DIR || (process.env.HOME + '/scientific-agent-skills/skills')
+      - !!js process.env.ACADEMIC_HARNESS_SKILLS_DIR || process.env.RESEARCHCRAFT_SKILLS_DIR || (process.env.HOME + '/scientific-agent-skills/skills')
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
@@ -232,7 +232,7 @@
     # shared `read_image` tool from `@deepseek-ai/dsh-tool-fs`, gated on the
     # child's route actually declaring image input). Mounted programmatically
     # rather than as static rows so the model ids can come from Settings ->
-    # ResearchCraft API keys as well as SUBAGENT_MODEL_COMPLEX/
+    # Academic Harness API keys as well as SUBAGENT_MODEL_COMPLEX/
     # SUBAGENT_MODEL_VISION — see subagent-models.js for the resolution order
     # and the restart caveat this shares with the MCP connectors below, and
     # for the `inject` declaration a `ctx.plugin()`-mounted child like this
@@ -244,7 +244,7 @@
     # mismatched older spawn provider throws at mount and drops
     # `subagent_pro`/`subagent_vision` as "unknown tool".
     - id: subagent-models
-      name: dsh-researchcraft/subagent-models
+      name: academic-harness/subagent-models
 
     # Production dsh does not install these optional providers. Enabling the
     # matching Bundle adds its delegation tool as a Host global for every
@@ -303,13 +303,13 @@
 
 # One JS module mounts three `mcp-client` instances programmatically (rather
 # than static rows) so each server's key can come from the credentials store
-# (Settings -> ResearchCraft API keys) as well as its env var — see
+# (Settings -> Academic Harness API keys) as well as its env var — see
 # mcp-connectors.js for the resolution order and per-server detail. Tools
 # surface as `mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`. No
 # realm needed: like tool-web, it registers only into the shared `tools`
 # registry and provides no service of its own.
 - id: mcp-connectors
-  name: dsh-researchcraft/mcp-connectors
+  name: academic-harness/mcp-connectors
 
 # zvec-grep local workspace search (loopback Streamable HTTP MCP via
 # `zg server on` while this fiber is loaded, `zg server off` on unload).
@@ -320,32 +320,32 @@
 # (Settings default no); see zvec-index.js. No realm. HTTP rather than
 # `zg server --stdio` — see zvec-grep.js.
 - id: zvec-grep
-  name: dsh-researchcraft/zvec-grep
+  name: academic-harness/zvec-grep
 
 # Native index/status/cancel tool (progress + Cancel in Settings and the
 # session header). Separate row so it can inject `tools`; the MCP row above
 # must not. See zvec-index.js. Indexing is opt-in (Settings default no).
 - id: zvec-index
-  name: dsh-researchcraft/zvec-index
+  name: academic-harness/zvec-index
 
 # Parallel Search REST (x-api-key auth) — per-call `mode` (turbo/fast/basic/
 # advanced). The MCP `web_search` tool cannot set mode; this is how the
 # agent picks one. See parallel-search.js. Kept in this preset alongside
 # the connectors above rather than global, same reason as consensus-search.
 - id: parallel-search
-  name: dsh-researchcraft/parallel-search
+  name: academic-harness/parallel-search
 
 # Consensus is a plain REST tool (x-api-key auth), not an MCP client — see
 # consensus-search.js. Kept in this preset alongside the connectors above
 # rather than global, since it's specifically an academic-search capability.
 - id: consensus-search
-  name: dsh-researchcraft/consensus-search
+  name: academic-harness/consensus-search
 
 # Resolves a DOI to an open-access PDF via the Unpaywall API and saves it to
 # the workspace (or downloads a direct URL) — see paper-download.js. Kept
 # here rather than global for the same reason as consensus-search above.
 - id: paper-download
-  name: dsh-researchcraft/paper-download
+  name: academic-harness/paper-download
 
 # Paper2MCP stdio servers registered in this workspace
 # (`<cwd>/.dsh/paper-mcps.json`). Native `paper_mcp` (status/register/
@@ -353,17 +353,17 @@
 # create. Standing process-lifetime, same restart caveat as the connectors
 # above. See paper-mcp.js. No realm.
 - id: paper-mcp
-  name: dsh-researchcraft/paper-mcp
+  name: academic-harness/paper-mcp
 
 # PaperMemory local academic memory (stdio MCP via `papermemory mcp`).
 # Surfaces as `mcp__papermemory__*` (search, ingest, cite, cite-check, recap,
 # remember, claim, lesson, get) when the CLI is on PATH or the plugin-managed
 # venv is ready; skips the mount (and logs) when it is not, so a missing
 # install does not take this preset down. Store is the default PaperMemory
-# SQLite DB. Auto-installs on first ResearchCraft start; see papermemory.js.
+# SQLite DB. Auto-installs on first Academic Harness start; see papermemory.js.
 # No realm. paper_download also auto-ingests the saved PDF into this store.
 - id: papermemory
-  name: dsh-researchcraft/papermemory
+  name: academic-harness/papermemory
 
 # Academic Harness (LaTeX writing oracle). Native `ah_*` tools plus
 # guard / post-edit check / gate / paper-state interceptors. Engine is
@@ -374,7 +374,7 @@
 # stalls plugin-manager installs for the full uv/pip timeout. See
 # academic-harness.js / academic-harness-hooks.js.
 - id: academic-harness
-  name: dsh-researchcraft/academic-harness
+  name: academic-harness/ah
 
 - id: academic-harness-hooks
-  name: dsh-researchcraft/academic-harness-hooks
+  name: academic-harness/ah-hooks

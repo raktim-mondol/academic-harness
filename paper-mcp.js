@@ -5,7 +5,7 @@
  * (python, server entry, env *names*, serverName). Secrets stay in
  * Settings/env via resolveEnv — never in that JSON.
  *
- * On ResearchCraft `session/created`, this row attempts a stdio mount
+ * On Academic Harness `session/created`, this row attempts a stdio mount
  * (`@deepseek-ai/dsh-mcp-client`) so tools surface as `mcp__<serverName>__*`.
  * Those mounts are standing for the life of `dsh` (same as Parallel/Scite):
  * the first workspace to claim a serverName keeps it until restart. Status
@@ -20,11 +20,12 @@ import { dirname, isAbsolute, join, resolve } from 'node:path'
 import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { isPluginPreset } from './preset-ids.js'
 
-export const name = 'dsh-researchcraft-paper-mcp'
+export const name = 'academic-harness-paper-mcp'
 export const inject = ['tools']
 
-const LOG = '[dsh-researchcraft] paper-mcp'
+const LOG = '[academic-harness] paper-mcp'
 const SCHEMA_VERSION = 1
 const NAME_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/
 const DEFAULT_TIMEOUT_MS = 300_000
@@ -192,7 +193,7 @@ export async function apply(ctx) {
   ctx.on('session/created', (session) => {
     if (session?.header?.origin === 'subagent') return
     const preset = session?.header?.agentPreset
-    if (preset && preset !== 'researchcraft') return
+    if (preset && !isPluginPreset(preset)) return
     const cwd = sessionCwd(session)
     if (!cwd) return
     let registry

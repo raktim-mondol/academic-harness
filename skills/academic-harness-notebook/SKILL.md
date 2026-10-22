@@ -1,11 +1,11 @@
 ---
-name: researchcraft-notebook
+name: academic-harness-notebook
 description: >-
-  Keep ResearchCraft's living lab notebook with the notebook tool: hypotheses,
+  Keep Academic Harness's living lab notebook with the notebook tool: hypotheses,
   methods, observations, decisions, artifact links, and append-only corrections.
 ---
 
-# ResearchCraft lab notebook
+# Academic Harness lab notebook
 
 You are on DeepSeek Harness. Use the `notebook` tool as you work.
 

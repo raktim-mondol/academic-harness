@@ -1,8 +1,8 @@
-# Academic Harness in ResearchCraft — open decision
+# Academic Harness engine — open decision
 
 Status: **deferred** (2026-10-05). Keep the current layout until we pick one of the options below.
 
-## What is shipped now (v0.14.1)
+## What is shipped now (v0.16.0)
 
 The writing oracle (inventory, facts, T0–T6 checks, ledger, briefs, plans, reviews, guard, gate) runs **inside this plugin**. Pi is not required. Nothing is installed into `$DSH_HOME`.
 
@@ -31,6 +31,6 @@ Do not start (2) or (3) until this is chosen.
 
 ## Runtime
 
-First ResearchCraft start creates the plugin-local `.venv` (via `uv`, or `python -m venv` + pip). Override: `ACADEMIC_HARNESS_CLI` / `AH_CMD`. Skip: `ACADEMIC_HARNESS_SKIP_INSTALL=1`.
+First Academic Harness start creates the plugin-local `.venv` (via `uv`, or `python -m venv` + pip). Override: `ACADEMIC_HARNESS_CLI` / `AH_CMD`. Skip: `ACADEMIC_HARNESS_SKIP_INSTALL=1`.
 
 Inactive outside a directory tree with `ah.yaml`.

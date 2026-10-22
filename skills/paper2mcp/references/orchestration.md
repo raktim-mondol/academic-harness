@@ -2,7 +2,7 @@
 
 The host provides agent spawning, execution tools, concurrency limits, and lifecycle events. Role instructions live in `references/agents/`. A role description alone is not a running agent.
 
-### ResearchCraft (DSH) spawn and collect
+### Academic Harness (DSH) spawn and collect
 
 On this plugin the host tools are `subagent` / `subagent_pro`. Each launch returns `{ kind: "activation", subagentId }` immediately and the final answer arrives as a completion notice. Record that `subagentId` as schema-1 `agent_id`. Managed children do not block the parent: wait for each completion notice, use `send_message` only to steer or continue a local child, and read the assigned report path before treating the assignment as terminal. A `.done_*` file means work ended, not that it passed.
 

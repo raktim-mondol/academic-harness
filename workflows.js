@@ -64,9 +64,9 @@ export function queryResearchTemplates(args = {}) {
 }
 
 /**
- * Register the ResearchCraft task-template catalogue.
+ * Register the Academic Harness task-template catalogue.
  *
- * Named `research_template`, not `workflow`: the ResearchCraft preset also
+ * Named `research_template`, not `workflow`: the Academic Harness preset also
  * mounts DSH's Rhai `workflow` tool (`@deepseek-ai/dsh-tool-workflow`), and
  * scoped tools shadow globals — a same-name register here was invisible to
  * the agent (verified: `workflow action=get id=agentify-paper` ran a Rhai
@@ -76,7 +76,7 @@ export function applyWorkflows(ctx) {
   ctx.tools.register(defineTool({
     name: 'research_template',
     description: [
-      'Browse and use ResearchCraft\'s catalogue of ~330 one-click research task templates across 22 disciplines',
+      'Browse and use Academic Harness\'s catalogue of ~330 one-click research task templates across 22 disciplines',
       '(paper, literature, genomics, chemistry, clinical, ml, statistics, grants, and more).',
       'Not the DSH Rhai `workflow` orchestrator — this is prompt templates only.',
       'Use action "list" (default) to browse by category and/or search text — returns compact summaries, not full prompts.',

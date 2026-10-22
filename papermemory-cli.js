@@ -6,7 +6,7 @@
  *
  * Search/cite/ingest surface over stdio MCP (`papermemory mcp`). The store is
  * the default PaperMemory DB (~/.local/share/papermemory/papermemory.db) so a
- * standalone CLI and ResearchCraft share the same academic memory.
+ * standalone CLI and Academic Harness share the same academic memory.
  */
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -21,7 +21,7 @@ const BIN_NAMES = process.platform === 'win32' ? ['papermemory.exe', 'papermemor
 const UV_BIN = process.platform === 'win32' ? 'uv.exe' : 'uv'
 const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['python3', 'python']
 
-export const LOG = '[dsh-researchcraft] papermemory'
+export const LOG = '[academic-harness] papermemory'
 export const MIN_PAPERMEMORY_VERSION = '0.2.1'
 /** Bump when the vendored tree changes without a pyproject version bump. */
 const BUNDLE_REV = 'dsh15'
@@ -138,7 +138,8 @@ function findUv() {
 }
 
 function findPython() {
-  const override = process.env.RESEARCHCRAFT_PYTHON?.trim()
+  const override = process.env.ACADEMIC_HARNESS_PYTHON?.trim()
+    || process.env.RESEARCHCRAFT_PYTHON?.trim()
   if (override) return override
   for (const name of PYTHON_BINS) {
     for (const dir of (process.env.PATH || '').split(delimiter)) {

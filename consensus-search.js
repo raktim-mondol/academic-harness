@@ -72,7 +72,7 @@ function render(value) {
   return [{ type: 'text', text: lines.join('\n\n') }]
 }
 
-export const name = 'dsh-researchcraft-consensus-search'
+export const name = 'academic-harness-consensus-search'
 export const inject = ['tools']
 
 /** Register the Consensus literature-search tool. */
@@ -82,7 +82,7 @@ export function apply(ctx) {
     description: [
       'Search 220M+ peer-reviewed papers via the Consensus API — evidence-backed answers over the academic literature,',
       'with real filters (study type, year, sample size, journal quartile, domain, human/controlled/open-access, …).',
-      'Requires CONSENSUS_API_KEY (Settings -> ResearchCraft API keys, or env). For peer-reviewed literature, use this',
+      'Requires CONSENSUS_API_KEY (Settings -> Academic Harness API keys, or env). For peer-reviewed literature, use this',
       'alongside parallel_search with mode basic or advanced (not instead of it, and not mcp__parallel__web_search unless',
       'parallel_search failed) — this tool is the filterable structured paper index with per-paper takeaways;',
       'parallel_search covers multi-hop web + literature excerpts. Prefer both over built-in web_search / mcp__firecrawl__*',
@@ -129,7 +129,7 @@ export function apply(ctx) {
     async execute(args) {
       const key = await resolveEnv('CONSENSUS_API_KEY')
       if (!key) {
-        return { error: 'CONSENSUS_API_KEY is not set (Settings -> ResearchCraft API keys, or the matching env var).' }
+        return { error: 'CONSENSUS_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).' }
       }
       const params = buildQuery(args)
       const res = await fetch(`${API_URL}?${params}`, { headers: { 'x-api-key': key } })

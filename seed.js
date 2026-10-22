@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -25,8 +25,21 @@ function copyMissing(src, dest) {
   return n
 }
 
+/** Carry a pre-v0.16.0 seeded notebook skill over to its new directory name. */
+function migrateLegacyNotebookSkill(dest) {
+  const oldDir = join(dest, 'researchcraft-notebook')
+  const newDir = join(dest, 'academic-harness-notebook')
+  if (!existsSync(oldDir) || existsSync(newDir)) return
+  renameSync(oldDir, newDir)
+  const skill = join(newDir, 'SKILL.md')
+  if (!existsSync(skill)) return
+  const text = readFileSync(skill, 'utf8')
+  const next = text.replace(/^name: researchcraft-notebook$/m, 'name: academic-harness-notebook')
+  if (next !== text) writeFileSync(skill, next)
+}
+
 /**
- * Install first-party skills into DSH home. The ResearchCraft agent preset is
+ * Install first-party skills into DSH home. The Academic Harness agent preset is
  * a `@deepseek-ai/dsh-agent-preset` declaration in `cordis.patch.yml` (DSH
  * 0.2.0+); `$DSH_HOME/.agent-presets/` is not read. Scientific catalogue
  * skills stay on disk (scientific-agent-skills or a fallback checkout) and
@@ -34,5 +47,7 @@ function copyMissing(src, dest) {
  */
 export function seed() {
   const home = dshHome()
-  copyMissing(join(here, 'skills'), join(home, 'skills'))
+  const dest = join(home, 'skills')
+  migrateLegacyNotebookSkill(dest)
+  copyMissing(join(here, 'skills'), dest)
 }

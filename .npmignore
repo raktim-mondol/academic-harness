@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.e2e/
+.dsh/
+.zvec-grep/
+.archify/
+.qoder/
+academic-harness_docs/
+vendor/academic-harness/.venv/
+vendor/academic-harness/installed-version
+vendor/papermemory/build/

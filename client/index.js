@@ -1,13 +1,13 @@
 /**
- * dsh-researchcraft client plugin: Settings page for ResearchCraft API keys
+ * academic-harness client plugin: Settings page for Academic Harness API keys
  * plus zvec-grep index progress (header chip + tool card). Uses
  * `ctx.configForms` (DSH 0.2.0; the 0.1.x `settingsScope` seam is gone).
- * Host keys live on the `researchcraft` Loader entry Config.
+ * Host keys live on the `academic-harness` Loader entry Config.
  */
 import { ApiKeysSection } from './ApiKeysSection.jsx'
 import { ZvecIndexHeaderAction, ZvecIndexToolView } from './ZvecIndexProgress.jsx'
 
-const ENTRY_ID = 'researchcraft'
+const ENTRY_ID = 'academic-harness'
 
 export const inject = ['slots', 'configForms']
 
@@ -16,9 +16,9 @@ export function apply(ctx) {
 
   ctx.effect(() => ctx.configForms.whileServed([ENTRY_ID], () => ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
-    id: 'researchcraft-api-keys',
+    id: 'academic-harness-api-keys',
     order: 60,
-    label: () => 'ResearchCraft API keys',
+    label: () => 'Academic Harness API keys',
     inject: () => ({ scope }),
   }, ApiKeysSection))))
 

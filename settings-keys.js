@@ -1,10 +1,10 @@
 /**
- * The `dsh-researchcraft` host entry Config: API keys for the MCP
+ * The `academic-harness` host entry Config: API keys for the MCP
  * connectors, image generation, and remote-compute tools, plus a handful of
  * non-secret preferences (IMAGE_MODEL, SUBAGENT_MODEL_COMPLEX,
  * SUBAGENT_MODEL_VISION, ZVEC_GREP_EMBEDDING, ZVEC_GREP_AUTO_INDEX) that ride
  * along in the same schema/UI section for convenience — editable from
- * Settings -> ResearchCraft API keys.
+ * Settings -> Academic Harness API keys.
  * Registered at plugin load; resolveEnv() (credential-env.js) reads the live
  * value on every call, so a value entered in Settings works without a
  * restart for fields read per-call (IMAGE_MODEL, ZVEC_GREP_AUTO_INDEX) —
@@ -17,7 +17,7 @@
  *
  * DSH 0.2.0 dropped `ctx.settings.register(namespace, schema)`. Keys live on
  * this plugin's Cordis Config (volatile strings) and persist through the
- * profile patch on Loader entry id `researchcraft`. The browser page uses
+ * profile patch on Loader entry id `academic-harness`. The browser page uses
  * `ctx.configForms.get(KEYS_ENTRY_ID)`.
  *
  * Fields are deliberately NOT `role('secret')`: that role strips the field
@@ -27,14 +27,17 @@
  * input, Save/Clear, never populating the field from the stored value) is
  * this plugin's actual protection against displaying a stored key.
  */
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 
-export const KEYS_NAMESPACE = 'dsh-researchcraft-keys'
+/** 0.1.x settings.yaml section. Import-only; never written. */
+export const LEGACY_KEYS_NAMESPACE = 'dsh-researchcraft-keys'
 /** Loader row id of the host plugin; 0.2.0 settings forms key by entry id. */
-export const KEYS_ENTRY_ID = 'researchcraft'
+export const KEYS_ENTRY_ID = 'academic-harness'
+/** Pre-v0.16.0 Loader row ids whose config may still hold API keys. */
+export const LEGACY_ENTRY_IDS = ['researchcraft', 'dsh-researchcraft']
 
 export const KEY_FIELDS = [
   'PARALLEL_API_KEY',
@@ -68,6 +71,7 @@ export const KeysSettingsSchema = z.object(shape)
 let keysCtx
 let keysConfig
 let scope
+let legacyKeys = {}
 
 function unwrapField(raw) {
   if (raw && typeof raw === 'object' && typeof raw.get === 'function') return raw.get()
@@ -115,13 +119,65 @@ function makeScope(ctx) {
 
 const SKIP_IMPORT_FIELDS = new Set(['ZVEC_GREP_INDEX_STATE', 'ZVEC_GREP_INDEX_CANCEL'])
 
+function dshHome() {
+  return process.env.DSH_HOME || join(homedir(), '.dsh')
+}
+
+function migrationMarkerPath() {
+  return join(dshHome(), 'academic-harness-migrations.json')
+}
+
+function migrationKey(ctx) {
+  try {
+    const path = ctx?.settings?.documentPath
+    return typeof path === 'string' && path.length > 0 ? path : 'dsh-home'
+  } catch {
+    return 'dsh-home'
+  }
+}
+
+function migrationDocuments() {
+  try {
+    const parsed = JSON.parse(readFileSync(migrationMarkerPath(), 'utf8'))
+    return parsed && typeof parsed.documents === 'object' ? parsed.documents : {}
+  } catch {
+    return {}
+  }
+}
+
+function alreadyMigrated(ctx) {
+  return Boolean(migrationDocuments()[migrationKey(ctx)])
+}
+
+/** Mark this profile document as migrated so a cleared field stays cleared. */
+function markMigrated(ctx) {
+  const documents = migrationDocuments()
+  documents[migrationKey(ctx)] = new Date().toISOString()
+  const path = migrationMarkerPath()
+  const tmp = `${path}.tmp`
+  try {
+    writeFileSync(tmp, `${JSON.stringify({ version: 1, documents }, null, 2)}\n`, { mode: 0o600 })
+    renameSync(tmp, path)
+  } catch {
+    // Best effort: migration still succeeded; worst case it retries next boot.
+  }
+}
+
+function unquote(value) {
+  const text = String(value || '').trim()
+  if ((text.startsWith("'") && text.endsWith("'")) || (text.startsWith('"') && text.endsWith('"'))) {
+    return text.slice(1, -1)
+  }
+  return text
+}
+
 /** Flat `dsh-researchcraft-keys:` mapping from a 0.1.x settings.yaml import. */
 function parseImportedKeys(text) {
   const out = {}
   let inSection = false
   for (const line of String(text || '').split(/\r?\n/)) {
     if (/^[A-Za-z0-9_.-]+:\s*$/.test(line)) {
-      inSection = line.startsWith(`${KEYS_NAMESPACE}:`)
+      inSection = line.startsWith(`${LEGACY_KEYS_NAMESPACE}:`)
       continue
     }
     if (!inSection) continue
@@ -131,40 +187,115 @@ function parseImportedKeys(text) {
     }
     const match = line.match(/^\s+([A-Z0-9_]+):\s*(.*)$/)
     if (!match || !KEY_FIELDS.includes(match[1]) || SKIP_IMPORT_FIELDS.has(match[1])) continue
-    let value = match[2].trim()
-    if (
-      (value.startsWith("'") && value.endsWith("'"))
-      || (value.startsWith('"') && value.endsWith('"'))
-    ) {
-      value = value.slice(1, -1)
-    }
+    const value = unquote(match[2])
     if (value) out[match[1]] = value
   }
   return out
 }
 
 /**
- * DSH 0.2.0 imported `settings.yaml` once, keyed by Loader entry id. The 0.1.x
- * namespace was `dsh-researchcraft-keys`, so those values stayed in
- * `settings.yaml.imported`. Copy them onto this entry when Config is empty.
+ * Read the flat config of a pre-v0.16.0 host row from the live profile patch.
+ * This is a line scanner rather than a YAML parse so unrelated `!!js` tags in
+ * the same document cannot make migration fail. Only plain `KEY: value` entries
+ * inside that row's `config:` block are considered.
  */
-function migrateImportedKeys(ctx) {
-  const current = readSection()
-  const already = KEY_FIELDS.some((field) => !SKIP_IMPORT_FIELDS.has(field) && current[field])
-  if (already || !ctx.settings?.update) return
-  const home = process.env.DSH_HOME || join(homedir(), '.dsh')
-  const imported = join(home, 'settings.yaml.imported')
-  if (!existsSync(imported)) return
-  let patch
+function readLegacyEntryConfig(ctx) {
+  let documentPath
   try {
-    patch = parseImportedKeys(readFileSync(imported, 'utf8'))
+    documentPath = ctx?.settings?.documentPath
   } catch {
-    return
+    return {}
   }
-  if (Object.keys(patch).length === 0) return
-  ctx.settings.update(KEYS_ENTRY_ID, patch).catch((error) => {
-    console.warn(`[dsh-researchcraft] could not migrate imported API keys: ${error?.message || error}`)
-  })
+  if (typeof documentPath !== 'string' || !documentPath || !existsSync(documentPath)) return {}
+
+  let text
+  try {
+    text = readFileSync(documentPath, 'utf8')
+  } catch {
+    return {}
+  }
+
+  const out = {}
+  let rowIndent = -1
+  let inConfig = false
+  for (const line of text.split(/\r?\n/)) {
+    const row = line.match(/^(\s*)-\s+id:\s*(['"]?)([^'"]+)\2\s*$/)
+    if (row) {
+      const indent = row[1].length
+      if (LEGACY_ENTRY_IDS.includes(row[3])) {
+        rowIndent = indent
+        inConfig = false
+        continue
+      }
+      if (rowIndent >= 0 && indent <= rowIndent) {
+        rowIndent = -1
+        inConfig = false
+      }
+      continue
+    }
+    if (rowIndent < 0) continue
+    if (/^\s*config:\s*$/.test(line)) {
+      inConfig = true
+      continue
+    }
+    if (!inConfig) continue
+    const indent = line.match(/^(\s*)/)[1].length
+    if (line.trim() && indent <= rowIndent) {
+      rowIndent = -1
+      inConfig = false
+      continue
+    }
+    const field = line.match(/^\s+([A-Z0-9_]+):\s*(.*)$/)
+    if (!field || !KEY_FIELDS.includes(field[1]) || SKIP_IMPORT_FIELDS.has(field[1])) continue
+    const value = unquote(field[2])
+    if (value) out[field[1]] = value
+  }
+  return out
+}
+
+/**
+ * Collect legacy values once per profile document. Live Config wins; the old
+ * host row wins over the 0.1.x `settings.yaml.imported` section. Only fields
+ * that are currently empty are copied, so partially configured new rows do not
+ * block the rest.
+ */
+function loadLegacyKeys(ctx) {
+  legacyKeys = {}
+  if (alreadyMigrated(ctx)) return
+  const current = readSection()
+  const sources = [readLegacyEntryConfig(ctx)]
+
+  const importedPath = join(dshHome(), 'settings.yaml.imported')
+  if (existsSync(importedPath)) {
+    try {
+      sources.push(parseImportedKeys(readFileSync(importedPath, 'utf8')))
+    } catch {
+      // Unreadable legacy file: keep going with the old host row only.
+    }
+  }
+
+  for (const field of KEY_FIELDS) {
+    if (SKIP_IMPORT_FIELDS.has(field) || current[field].trim()) continue
+    for (const source of sources) {
+      const value = typeof source[field] === 'string' ? source[field].trim() : ''
+      if (value) {
+        legacyKeys[field] = value
+        break
+      }
+    }
+  }
+}
+
+async function persistLegacyKeys(ctx) {
+  if (Object.keys(legacyKeys).length === 0 || !ctx.settings?.update) return
+  try {
+    await ctx.settings.update(KEYS_ENTRY_ID, { ...legacyKeys })
+    legacyKeys = {}
+    markMigrated(ctx)
+  } catch {
+    // Keep the in-memory fallback for this session; values stay usable.
+    console.warn('[academic-harness] could not persist migrated API-key fields; they remain active for this session')
+  }
 }
 
 /** Bind the live Config; call once, at plugin apply(). */
@@ -175,7 +306,8 @@ export function registerKeysSettings(ctx, config) {
   if (typeof ctx.settings?.configure === 'function') {
     ctx.effect(() => ctx.settings.configure({ auto: false }))
   }
-  migrateImportedKeys(ctx)
+  loadLegacyKeys(ctx)
+  persistLegacyKeys(ctx).catch(() => {})
   return scope
 }
 
@@ -193,6 +325,8 @@ export function getKeysScope() {
  * "configured" but the credential silently fails to authenticate.
  */
 export function getStoredKey(name) {
-  const value = scope?.get()?.[name]?.trim()
-  return typeof value === 'string' && value.length > 0 ? value : undefined
+  const live = scope?.get()?.[name]?.trim()
+  if (typeof live === 'string' && live.length > 0) return live
+  const legacy = legacyKeys[name]?.trim()
+  return typeof legacy === 'string' && legacy.length > 0 ? legacy : undefined
 }

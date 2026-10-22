@@ -1,7 +1,7 @@
 {
-  "name": "dsh-researchcraft",
-  "version": "0.15.0",
-  "description": "ResearchCraft as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
+  "name": "academic-harness",
+  "version": "0.16.0",
+  "description": "Academic Harness as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",
   "publishConfig": {
@@ -19,6 +19,8 @@
     "./paper-download": "./paper-download.js",
     "./paper-mcp": "./paper-mcp.js",
     "./papermemory": "./papermemory.js",
+    "./ah": "./academic-harness.js",
+    "./ah-hooks": "./academic-harness-hooks.js",
     "./academic-harness": "./academic-harness.js",
     "./academic-harness-hooks": "./academic-harness-hooks.js",
     "./subagent-models": "./subagent-models.js",
@@ -51,6 +53,7 @@
     "workflows.json",
     "credential-env.js",
     "settings-keys.js",
+    "preset-ids.js",
     "mcp-connectors.js",
     "zvec-grep.js",
     "zvec-grep-cli.js",
@@ -84,11 +87,11 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/raktim-mondol/dsh-researchcraft.git"
+    "url": "git+https://github.com/raktim-mondol/academic-harness.git"
   },
-  "homepage": "https://github.com/raktim-mondol/dsh-researchcraft#readme",
+  "homepage": "https://github.com/raktim-mondol/academic-harness#readme",
   "bugs": {
-    "url": "https://github.com/raktim-mondol/dsh-researchcraft/issues"
+    "url": "https://github.com/raktim-mondol/academic-harness/issues"
   },
   "dsh": {
     "bundle": {
@@ -134,6 +137,6 @@
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
-    "researchcraft"
+    "academic-harness"
   ]
 }

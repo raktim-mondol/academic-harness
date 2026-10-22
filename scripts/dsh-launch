@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Shared launcher for dsh-web, dsh-tui, dsh-martty, and dsh-researchcraft.
+# Shared launcher for dsh-web, dsh-tui, dsh-martty, and academic-harness
+# (the latter also answers to the transition alias dsh-researchcraft).
 #
 # Only one DSH surface should be running: a leftover web server on :3080 or a
 # leftover zvec-grep daemon will collide when you switch launchers (Ctrl+C does
@@ -93,10 +94,10 @@ stop_zg_daemon() {
   fi
 }
 
-# ResearchCraft's agent preset is seeded into $DSH_HOME and the picker may
-# persist it as the *global* default. dsh-tui / dsh-web then try to mount
-# dsh-researchcraft/* plugins that are not installed in those profiles.
-clear_researchcraft_global_default() {
+# Academic Harness's agent preset may be seeded into $DSH_HOME and the picker
+# may persist it as the *global* default. dsh-tui / dsh-web then try to mount
+# academic-harness/* plugins that are not installed in those profiles.
+clear_academic_harness_global_default() {
   local settings="$DSH_HOME/settings.yaml"
   [ -f "$settings" ] || return 1
   command -v python3 >/dev/null 2>&1 || return 1
@@ -105,7 +106,7 @@ import pathlib, re, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
 new, n = re.subn(
-    r"(?m)^agent-presets:\n  default: researchcraft\n",
+    r"(?m)^agent-presets:\n  default: (?:researchcraft|academic-harness)\n",
     "",
     text,
     count=1,
@@ -120,21 +121,29 @@ PY
 stop_leftover_dsh
 stop_zg_daemon
 
-if [ "$cmd" = "dsh-researchcraft" ]; then
-  if [ -z "${RESEARCHCRAFT_SKILLS_DIR:-}" ]; then
-    if [ -d "$HOME/scientific-agent-skills/skills" ]; then
-      export RESEARCHCRAFT_SKILLS_DIR="$HOME/scientific-agent-skills/skills"
-    elif [ -d "$HOME/researchcraft/projects/default/sandbox/.pi/skills" ]; then
-      export RESEARCHCRAFT_SKILLS_DIR="$HOME/researchcraft/projects/default/sandbox/.pi/skills"
+if [ "$cmd" = "academic-harness" ] || [ "$cmd" = "dsh-researchcraft" ]; then
+  if [ -z "${ACADEMIC_HARNESS_SKILLS_DIR:-}" ]; then
+    export ACADEMIC_HARNESS_SKILLS_DIR="${RESEARCHCRAFT_SKILLS_DIR:-}"
+    if [ -z "${ACADEMIC_HARNESS_SKILLS_DIR:-}" ]; then
+      if [ -d "$HOME/scientific-agent-skills/skills" ]; then
+        export ACADEMIC_HARNESS_SKILLS_DIR="$HOME/scientific-agent-skills/skills"
+      elif [ -d "$HOME/researchcraft/projects/default/sandbox/.pi/skills" ]; then
+        export ACADEMIC_HARNESS_SKILLS_DIR="$HOME/researchcraft/projects/default/sandbox/.pi/skills"
+      fi
     fi
   fi
-  exec dsh --profile researchcraft "$@"
+  if [ "$cmd" = "dsh-researchcraft" ]; then
+    log "dsh-researchcraft is a transition alias; use academic-harness"
+  fi
+  profile=academic-harness
+  [ -d "$DSH_HOME/profiles/academic-harness" ] || profile=researchcraft
+  exec dsh --profile "$profile" "$@"
 fi
 
 case "$cmd" in
   dsh-web|dsh-tui|dsh-martty)
-    if clear_researchcraft_global_default; then
-      log "cleared global agent-presets default \"researchcraft\" so $cmd can boot without that plugin"
+    if clear_academic_harness_global_default; then
+      log "cleared global agent-presets default so $cmd can boot without that plugin"
     fi
     ;;
 esac
@@ -145,7 +154,7 @@ case "$cmd" in
   dsh-martty) exec dsh --profile martty "$@" ;;
   *)
     echo "unknown dsh launcher: $cmd" >&2
-    echo "use: dsh-web | dsh-tui | dsh-martty | dsh-researchcraft" >&2
+    echo "use: dsh-web | dsh-tui | dsh-martty | academic-harness (or dsh-researchcraft alias)" >&2
     exit 1
     ;;
 esac

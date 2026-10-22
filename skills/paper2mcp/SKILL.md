@@ -9,7 +9,7 @@ metadata:
 
 # Paper2MCP
 
-## ResearchCraft on DSH
+## Academic Harness on DSH
 
 - Launch specialists with `subagent`. Each call returns `{ kind: "activation", subagentId }` immediately; record the id as schema-1 `agent_id`, wait for every child's completion notice, and read its assigned report before the next `verify_workflow.py` gate.
 - Verifiers and the delivery verifier: **new** `subagent` spawns, distinct from every implementer. Never `subagent_fork`.

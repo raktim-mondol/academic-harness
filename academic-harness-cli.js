@@ -26,7 +26,7 @@ const INSTALL_TIMEOUT_MS = 5 * 60 * 1000
 const UV_BIN = process.platform === 'win32' ? 'uv.exe' : 'uv'
 const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['python3', 'python']
 
-export const LOG = '[dsh-researchcraft] academic-harness'
+export const LOG = '[academic-harness] ah'
 export const MIN_AH_VERSION = '0.1.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
 const BUNDLE_REV = 'dsh5'
@@ -112,7 +112,8 @@ function findUv() {
 }
 
 function findPython() {
-  const override = process.env.RESEARCHCRAFT_PYTHON?.trim()
+  const override = process.env.ACADEMIC_HARNESS_PYTHON?.trim()
+    || process.env.RESEARCHCRAFT_PYTHON?.trim()
   if (override) return override
   for (const name of PYTHON_BINS) {
     for (const dir of (process.env.PATH || '').split(delimiter)) {

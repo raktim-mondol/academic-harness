@@ -1,5 +1,5 @@
 /**
- * Native `zvec_index` tool on the ResearchCraft preset.
+ * Native `zvec_index` tool on the Academic Harness preset.
  *
  * Separate from zvec-grep.js because this row must inject `tools` (to
  * register a defineTool) and the MCP connector row must not — inject: ['tools']
@@ -24,7 +24,7 @@ import {
   startIndex,
 } from './zvec-index-engine.js'
 
-export const name = 'dsh-researchcraft-zvec-index'
+export const name = 'academic-harness-zvec-index'
 export const inject = ['tools']
 
 const ACTIONS = ['start', 'status', 'cancel']

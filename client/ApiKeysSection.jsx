@@ -19,7 +19,7 @@ const ZVEC_GREP_EMBEDDING_OPTIONS = [
 ]
 const ZVEC_GREP_AUTO_INDEX_OPTIONS = [
   { value: 'no', label: 'No — ask in chat when semantic search would help (default)' },
-  { value: 'yes', label: 'Yes — index this workspace when a ResearchCraft session opens' },
+  { value: 'yes', label: 'Yes — index this workspace when an Academic Harness session opens' },
 ]
 const CUSTOM_MODEL = '__custom__'
 
@@ -37,7 +37,7 @@ const KEYS = [
   { field: 'MODAL_TOKEN_ID', label: 'Modal — token ID', group: 'Remote compute', hint: 'From modal.com/settings.' },
   { field: 'MODAL_TOKEN_SECRET', label: 'Modal — token secret', group: 'Remote compute', hint: 'From modal.com/settings.' },
   { field: 'RUNPOD_API_KEY', label: 'Runpod', group: 'Remote compute', hint: 'From console.runpod.io/user/settings.' },
-  { field: 'ZVEC_GREP_AUTO_INDEX', label: 'Index at session start', group: 'Workspace search (zvec-grep)', type: 'select', options: ZVEC_GREP_AUTO_INDEX_OPTIONS, hideCustom: true, hint: 'Default is No. When No, you can still ask in chat to index, and the agent will ask first when semantic search would help. When Yes, a ResearchCraft session indexes that workspace in the background if no index exists yet. Applies to the next session — no restart. While indexing, a progress bar with estimated time and Cancel appear here and in the session header. There is no timeout.' },
+  { field: 'ZVEC_GREP_AUTO_INDEX', label: 'Index at session start', group: 'Workspace search (zvec-grep)', type: 'select', options: ZVEC_GREP_AUTO_INDEX_OPTIONS, hideCustom: true, hint: 'Default is No. When No, you can still ask in chat to index, and the agent will ask first when semantic search would help. When Yes, an Academic Harness session indexes that workspace in the background if no index exists yet. Applies to the next session — no restart. While indexing, a progress bar with estimated time and Cancel appear here and in the session header. There is no timeout.' },
   { field: 'ZVEC_GREP_EMBEDDING', label: 'zvec-grep embedding', group: 'Workspace search (zvec-grep)', type: 'select', options: ZVEC_GREP_EMBEDDING_OPTIONS, hint: 'Default local model for new zg indexes (potion-retrieval-32m, ~130 MB download, no API key). Existing indexes keep their stored model. Restart dsh after changing.' },
   { field: 'ZVEC_GREP_API_KEY', label: 'zvec-grep remote embedding key', group: 'Workspace search (zvec-grep)', hint: 'Leave empty. Only needed for a remote (Qwen) embedding model, not for the default local Potion models.' },
 ]
@@ -214,7 +214,7 @@ export function ApiKeysSection(props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '4px 0' }}>
       <p style={{ margin: 0, opacity: 0.75, fontSize: '0.9em' }}>
-        API keys for ResearchCraft's academic-search connectors, image generation, remote-compute tools, and optional zvec-grep remote embeddings.
+        API keys for Academic Harness's academic-search connectors, image generation, remote-compute tools, and optional zvec-grep remote embeddings.
         A key set here is used only when the matching environment variable isn't already set when DSH starts.
       </p>
       {!writable && (

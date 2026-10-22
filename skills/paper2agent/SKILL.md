@@ -10,7 +10,7 @@ metadata:
 
 # Paper2Agent
 
-## ResearchCraft on DSH
+## Academic Harness on DSH
 
 This copy is `jmiao24/Paper2Agent` `skills/paper2agent` (commit `8c2d059`), mapped onto this plugin. Scientific procedure and Python helpers are unchanged.
 

@@ -34,7 +34,7 @@ An unresolved installation, credential, data/model, GPU, or native-runtime requi
 
 The final response leads with the ZIP link, followed by the delivered tools, short installation/startup directions or a `USAGE.md` link, actual validation scope, and required external conditions. Link detailed workspace evidence only as useful supporting material. A complete delivery covers the selected tools; it does not claim the whole repository or paper has been reproduced.
 
-## ResearchCraft: register the server in this workspace
+## Academic Harness: register the server in this workspace
 
 After a successful ZIP, write `<workspace>/.dsh/paper-mcps.json` so this host can attach the stdio server. Store **environment variable names**, never secret values.
 

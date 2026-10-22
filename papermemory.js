@@ -1,7 +1,7 @@
 /**
- * PaperMemory MCP connector on the ResearchCraft preset.
+ * PaperMemory MCP connector on the Academic Harness preset.
  *
- * First ResearchCraft start installs the `papermemory` CLI (PATH, then a
+ * First Academic Harness start installs the `papermemory` CLI (PATH, then a
  * plugin-managed venv under $DSH_HOME/papermemory from the vendored package)
  * and mounts `mcp__papermemory__*` over stdio (`papermemory mcp`). Stopping
  * DSH tears the child down with the MCP client. The SQLite store stays at
@@ -26,7 +26,7 @@ import {
 
 const EXPECTED_TOOL_COUNT = 14
 
-export const name = 'dsh-researchcraft-papermemory'
+export const name = 'academic-harness-papermemory'
 // Same as mcp-connectors.js / zvec-grep.js: this row only registers into the
 // host `tools` registry. Declaring inject: ['tools'] on the standing preset
 // fiber can stall apply() so the CLI is never installed.

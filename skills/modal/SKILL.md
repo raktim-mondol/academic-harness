@@ -11,7 +11,7 @@ Reach beyond `modal_run` — via the `bash` tool and the `modal` CLI — for any
 
 ## Prerequisites
 
-- `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` (Settings -> ResearchCraft API keys, or env) — same credentials `modal_run` uses.
+- `MODAL_TOKEN_ID` / `MODAL_TOKEN_SECRET` (Settings -> Academic Harness API keys, or env) — same credentials `modal_run` uses.
 - The `modal` CLI (ships with the `modal` Python package). **Install it yourself if it's missing** — don't ask the user to do it:
 
   ```bash

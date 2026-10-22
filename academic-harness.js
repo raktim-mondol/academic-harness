@@ -1,5 +1,5 @@
 /**
- * Native Academic Harness tools on the ResearchCraft preset.
+ * Native Academic Harness tools on the Academic Harness preset.
  *
  * Thin wrappers over the vendored `ah` engine (Python). Inactive as a
  * no-op error when the workspace has no `ah.yaml`, except `ah_init` /
@@ -18,7 +18,7 @@ import {
 
 export { findAhRoot }
 
-export const name = 'dsh-researchcraft-academic-harness'
+export const name = 'academic-harness-ah'
 export const inject = ['tools']
 
 const DEFAULT_TIMEOUT_MS = 120_000

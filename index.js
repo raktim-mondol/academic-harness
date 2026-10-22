@@ -10,14 +10,14 @@ import { applyScientificResult } from './scientific-result.js'
 import { seed } from './seed.js'
 import { KeysSettingsSchema, registerKeysSettings } from './settings-keys.js'
 
-export const name = 'dsh-researchcraft'
+export const name = 'academic-harness'
 export const inject = ['tools', 'settings']
 export const Config = KeysSettingsSchema
 
-// The ResearchCraft persona and system-prompt guidance are NOT registered
+// The Academic Harness persona and system-prompt guidance are NOT registered
 // here: they live in prompt-section.js, mounted as a row inside the
-// ResearchCraft preset (cordis.patch.yml `preset-researchcraft`, plugins
-// sourced from presets/researchcraft/agent.cordis.yml) so they apply only
+// Academic Harness preset (cordis.patch.yml `preset-academic-harness`, plugins
+// sourced from presets/academic-harness/agent.cordis.yml) so they apply only
 // to sessions on that preset. This apply() runs at the bundle (host) level —
 // every session on every preset — so it carries only the tools and settings
 // that are meant to be available everywhere.

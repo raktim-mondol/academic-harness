@@ -18,11 +18,14 @@ const KIND_TO_SCRIPT = {
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 function helpersDir() {
-  return process.env.RESEARCHCRAFT_HELPERS_DIR || join(HERE, 'python-helpers')
+  return process.env.ACADEMIC_HARNESS_HELPERS_DIR
+    || process.env.RESEARCHCRAFT_HELPERS_DIR
+    || join(HERE, 'python-helpers')
 }
 
 function pythonBin() {
-  if (process.env.RESEARCHCRAFT_PYTHON) return process.env.RESEARCHCRAFT_PYTHON
+  const override = process.env.ACADEMIC_HARNESS_PYTHON || process.env.RESEARCHCRAFT_PYTHON
+  if (override) return override
   const dir = helpersDir()
   const venv = process.platform === 'win32'
     ? join(dir, '.venv', 'Scripts', 'python.exe')

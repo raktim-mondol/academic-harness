@@ -27,7 +27,7 @@ export const MIN_ZG_VERSION = '0.2.2'
 export const ZG_PACKAGE_SPEC = `@zvec/zvec-grep@^${MIN_ZG_VERSION}`
 const BIN_NAMES = process.platform === 'win32' ? ['zg.cmd', 'zg.exe', 'zg'] : ['zg']
 const NPM_BIN = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-export const LOG = '[dsh-researchcraft] zvec-grep'
+export const LOG = '[academic-harness] zvec-grep'
 
 export function dshHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh')

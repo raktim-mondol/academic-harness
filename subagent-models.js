@@ -1,10 +1,10 @@
 /**
  * Task-complexity model routing for delegated specialists, mounted
  * programmatically (like mcp-connectors.js) instead of as static cordis.yml
- * rows so each model id can come from the `dsh-researchcraft-keys` settings
- * store (Settings -> ResearchCraft API keys) as well as the matching env
+ * rows so each model id can come from the host entry Config
+ * (Settings -> Academic Harness API keys) as well as the matching env
  * var. Adds two subagent tools alongside the default `subagent`
- * (presets/researchcraft/agent.cordis.yml), each pinned to a fixed model via
+ * (presets/academic-harness/agent.cordis.yml), each pinned to a fixed model via
  * `agentOptions.model`:
  *
  * - `subagent_pro` — an escalation path for delegated work that needs
@@ -30,7 +30,7 @@
  *
  * `@deepseek-ai/dsh-tool-subagent`'s `agentOptions` is read once when this
  * plugin instance mounts, not per call (unlike `resolveEnv()` fields such as
- * IMAGE_MODEL) — and the `researchcraft` preset mounts once as a standing
+ * IMAGE_MODEL) — and the `academic-harness` preset mounts once as a standing
  * composition for the life of the running `dsh` process (see
  * mcp-connectors.js). So, like the MCP connector keys, a value changed in
  * Settings or the environment only reaches these two tools after `dsh`
@@ -64,7 +64,7 @@
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import { getStoredKey } from './settings-keys.js'
 
-export const name = 'dsh-researchcraft-subagent-models'
+export const name = 'academic-harness-subagent-models'
 export const inject = ['tools', 'subagents', 'systemPrompt', 'sessionProjections']
 
 const DEFAULT_COMPLEX_MODEL = 'deepseek-flash'

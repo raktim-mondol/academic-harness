@@ -5,7 +5,7 @@ description: Write or rewrite a paragraph, table or figure in an Academic Harnes
 
 # Write a unit
 
-ResearchCraft on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
+Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 
 A unit is one paragraph, float or display. The harness checks every edit by code. Follow this order so the edit passes the first time.
 

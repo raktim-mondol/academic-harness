@@ -5,7 +5,7 @@ description: Revise an Academic Harness manuscript in response to reviewer or su
 
 # Revise from review
 
-ResearchCraft on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
+Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 
 1. **List the items.** `ah_review` shows each numbered item with its status. If the comments are not imported yet, call `ah_review` with `action: import`, a review `id` (e.g. `R1`), and `file` pointing at the comments; the harness stores a snapshot of the text at that moment.
 2. **One item at a time.** For each item decide: change the text (addressed), or explain why not (rebutted). Declining a point is the author's decision: use `ah_decision_request`.

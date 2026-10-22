@@ -9,7 +9,7 @@ metadata:
 
 # Paper2Skill
 
-## ResearchCraft on DSH
+## Academic Harness on DSH
 
 - If the user gives a DOI, call `paper_download` first, then `paper_bundle.py` on the saved PDF. A local PDF skips the download.
 - `pdf_to_markdown` may run as a **preview** while this reviewed package is building. It is not a substitute for `verify --strict`.

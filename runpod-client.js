@@ -66,7 +66,7 @@ function runSync(cmd, args) {
 
 /** Generate an ephemeral OpenSSH ed25519 key pair in a temp dir. */
 export function makeEphemeralSshKey() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-researchcraft-runpod-ssh-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'academic-harness-runpod-ssh-'))
   const privateKeyPath = path.join(dir, 'id_ed25519')
   const cleanup = () => {
     try {
@@ -78,7 +78,7 @@ export function makeEphemeralSshKey() {
 
   // Prefer ssh-keygen (emits native OpenSSH keys that ssh/scp accept).
   try {
-    runSync('ssh-keygen', ['-t', 'ed25519', '-f', privateKeyPath, '-N', '', '-C', 'dsh-researchcraft-ephemeral', '-q'])
+    runSync('ssh-keygen', ['-t', 'ed25519', '-f', privateKeyPath, '-N', '', '-C', 'academic-harness-ephemeral', '-q'])
     const publicKeyOpenSsh = fs.readFileSync(`${privateKeyPath}.pub`, 'utf8').trim()
     if (!publicKeyOpenSsh.startsWith('ssh-')) throw new Error('ssh-keygen produced an unexpected public key format')
     return { privateKeyPath, publicKeyOpenSsh, cleanup }
@@ -92,7 +92,7 @@ export function makeEphemeralSshKey() {
       fs.writeFileSync(privateKeyPath, privateKey, { mode: 0o600 })
       let publicKeyOpenSsh = runSync('ssh-keygen', ['-y', '-f', privateKeyPath]).trim()
       if (!publicKeyOpenSsh.startsWith('ssh-')) throw new Error('ssh-keygen -y did not produce an OpenSSH public key')
-      publicKeyOpenSsh = `${publicKeyOpenSsh} dsh-researchcraft-ephemeral`
+      publicKeyOpenSsh = `${publicKeyOpenSsh} academic-harness-ephemeral`
       fs.writeFileSync(`${privateKeyPath}.pub`, `${publicKeyOpenSsh}\n`, { mode: 0o644 })
       return { privateKeyPath, publicKeyOpenSsh, cleanup }
     } catch {
@@ -313,7 +313,7 @@ export async function tarUploadDir(keyPath, ssh, localDir, remoteDir, signal) {
   })
 }
 
-/** Unique short pod name for dsh-researchcraft ephemeral jobs. */
+/** Unique short pod name for academic-harness ephemeral jobs. */
 export function ephemeralPodName() {
   return `dshrc-${randomBytes(4).toString('hex')}`
 }

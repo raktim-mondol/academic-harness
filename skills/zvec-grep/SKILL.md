@@ -11,7 +11,7 @@ Do **not** load this for exact identifiers, quotes, filenames, regexes, or exhau
 
 ## Install the CLI
 
-The plugin already installs `zg` into `~/.dsh/zvec-grep` on the first ResearchCraft start. **Do not** `npm i -g @zvec/zvec-grep` and **do not** ask the user to restart `dsh` unless `mcp__zvec_grep__zvec_grep_search` is still missing after that first start.
+The plugin already installs `zg` into `~/.dsh/zvec-grep` on the first Academic Harness start. **Do not** `npm i -g @zvec/zvec-grep` and **do not** ask the user to restart `dsh` unless `mcp__zvec_grep__zvec_grep_search` is still missing after that first start.
 
 Only if the tool is absent (install failed or `ZVEC_GREP_SKIP_INSTALL=1`):
 
@@ -101,4 +101,4 @@ zg query --rg -F "loadTheme" src                  # exhaustive rg; agents prefer
 zg server status --check-ready
 ```
 
-The plugin starts `zg server on` when the ResearchCraft preset mounts and talks to the loopback daemon over HTTP (`http://127.0.0.1:7999/mcp`), not `zg server --stdio`. Stopping `dsh` runs `zg server off`. Do not leave a long-lived daemon running for this plugin, and do not `zg server off` while DSH is still up unless the user asked.
+The plugin starts `zg server on` when the Academic Harness preset mounts and talks to the loopback daemon over HTTP (`http://127.0.0.1:7999/mcp`), not `zg server --stdio`. Stopping `dsh` runs `zg server off`. Do not leave a long-lived daemon running for this plugin, and do not `zg server off` while DSH is still up unless the user asked.

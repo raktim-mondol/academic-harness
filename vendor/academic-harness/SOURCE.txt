@@ -2,6 +2,10 @@ Vendored from https://github.com/raktim-mondol/academic-harness
 Commit: dbc7414662c776b55e9da87c798d1ad08bf1c941
 Version: 0.1.0 (rubric 1.2.0)
 
+Note (2026-10-23): the upstream engine repository is no longer available at this
+URL; the name now refers to this DSH plugin. The vendored tree and this pin are
+authoritative for the engine; see docs/ACADEMIC-HARNESS-ENGINE.md.
+
 Python engine only (`ah/` package + pyproject.toml). The Pi adapter
 (`packages/ah-pi/`), Claude Code adapter, examples, phase reports, golden
 sets, tests, and `vendor/pi/` were not copied. The engine stays inside this

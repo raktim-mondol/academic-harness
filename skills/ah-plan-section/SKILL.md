@@ -5,7 +5,7 @@ description: Propose an outline change for a new section or claim in an Academic
 
 # Plan a section
 
-ResearchCraft on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
+Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 
 The author states what to write and what it must support. You propose an outline. Prose waits until the author approves.
 

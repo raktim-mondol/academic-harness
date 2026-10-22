@@ -5,7 +5,7 @@ description: Audit a section or chapter of an Academic Harness project and repor
 
 # Audit a section (read-only)
 
-ResearchCraft on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
+Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 
 1. Run `ah_check` with the section's files and `evidence: true`. These are code results: report them as they are, ordered by level.
 2. Run `ah_claims` for the file. For each numeric or comparative claim that matters, use `ah_source_search` with the cited key and compare the source's wording, value, measure and condition with the claim. Report only what you verified in a passage, and quote it with its locator.

@@ -1,7 +1,7 @@
 /**
- * zvec-grep (zg) MCP connector on the ResearchCraft preset.
+ * zvec-grep (zg) MCP connector on the Academic Harness preset.
  *
- * First ResearchCraft start (after `dsh plugin add`) installs the zg CLI into
+ * First Academic Harness start (after `dsh plugin add`) installs the zg CLI into
  * `$DSH_HOME/zvec-grep` if it is not already on PATH / ZVEC_GREP_CLI, then
  * starts `zg server on` and mounts `mcp__zvec_grep__zvec_grep_search` over
  * the daemon's loopback Streamable HTTP MCP — no second restart. Stopping
@@ -13,12 +13,13 @@
  * native `grep` / `glob`.
  *
  * HTTP rather than `zg server --stdio`: DSH's MCP client is Streamable HTTP.
- * Bundled zg is `@zvec/zvec-grep@^0.2.2` (upgraded on ResearchCraft start
+ * Bundled zg is `@zvec/zvec-grep@^0.2.2` (upgraded on Academic Harness start
  * if the copy under $DSH_HOME/zvec-grep is older).
  */
 import { isAbsolute } from 'node:path'
 import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import { resolveEnv } from './credential-env.js'
+import { isPluginPreset } from './preset-ids.js'
 import {
   bundledInstallDir,
   DEFAULT_EMBEDDING,
@@ -36,7 +37,7 @@ import {
   waitForIndex,
 } from './zvec-index-engine.js'
 
-export const name = 'dsh-researchcraft-zvec-grep'
+export const name = 'academic-harness-zvec-grep'
 // Same as mcp-connectors.js: this row only registers into the host `tools`
 // registry. Declaring inject: ['tools'] on the standing preset fiber can
 // stall apply() so the CLI is never installed.
@@ -75,7 +76,7 @@ function mountSearch(ctx, launch, embedding, daemon) {
   ctx.on('session/created', (session) => {
     if (session?.header?.origin === 'subagent') return
     const preset = session?.header?.agentPreset
-    if (preset && preset !== 'researchcraft') return
+    if (preset && !isPluginPreset(preset)) return
     const cwd = sessionCwd(session)
     if (!shouldIndexRoot(cwd)) return
     void (async () => {

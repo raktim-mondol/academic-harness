@@ -13,7 +13,7 @@ Create visual diagrams as self-contained HTML files with inline SVG and CSS, fol
 
 Forty visual types. Semantic patterns describe behavior independently; type references describe layout. Details load from `references/` only when selected.
 
-## ResearchCraft on DSH
+## Academic Harness on DSH
 
 This copy is the `cathrynlavery/diagram-design` skill, mapped onto this plugin.
 
@@ -30,7 +30,7 @@ This copy is the `cathrynlavery/diagram-design` skill, mapped onto this plugin.
 
 ## 0. First-time setup — style guide gate
 
-On ResearchCraft, skip this gate unless the user asked to match a brand, venue, or profile. Proceed with the shipped default skin.
+On Academic Harness, skip this gate unless the user asked to match a brand, venue, or profile. Proceed with the shipped default skin.
 
 **Before generating your first diagram in a new branded (non-paper) project, verify the style guide has been customized.**
 

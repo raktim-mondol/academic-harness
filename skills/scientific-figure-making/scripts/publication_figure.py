@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Publication-figure helpers for ResearchCraft.
+"""Publication-figure helpers for Academic Harness.
 
 House style adapted from the conventions in Chen Liu's figures4papers
 (https://github.com/ChenLiu-1996/figures4papers). No code from that

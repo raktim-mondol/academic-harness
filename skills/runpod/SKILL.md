@@ -11,7 +11,7 @@ Reach beyond `runpod_run` — via the `bash` tool and the `runpodctl` CLI — fo
 
 ## Prerequisites
 
-- `RUNPOD_API_KEY` (Settings -> ResearchCraft API keys, or env) — same credential `runpod_run` uses. `export RUNPOD_API_KEY=...` before calling `runpodctl` non-interactively — `runpodctl doctor` is interactive/human-only (also sets up SSH keys) and should not be run by the agent.
+- `RUNPOD_API_KEY` (Settings -> Academic Harness API keys, or env) — same credential `runpod_run` uses. `export RUNPOD_API_KEY=...` before calling `runpodctl` non-interactively — `runpodctl doctor` is interactive/human-only (also sets up SSH keys) and should not be run by the agent.
 - The `runpodctl` binary on `PATH`. **Install it yourself if it's missing** — don't ask the user to do it, and don't use the official `curl -sSL https://cli.runpod.net | bash` installer (it demands root). Fetch the plain release binary into a user-writable dir instead:
 
   ```bash

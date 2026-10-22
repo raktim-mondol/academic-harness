@@ -49,7 +49,7 @@ export function getImageGenConfig(overrides = {}) {
       || DEFAULT_GEMINI_MODEL
     ).trim()
     // overrides.imageApiKey/geminiApiKey come from the credentials store
-    // (Settings -> ResearchCraft API keys) — process.env still wins when set.
+    // (Settings -> Academic Harness API keys) — process.env still wins when set.
     const apiKey = (
       process.env.IMAGE_API_KEY
       || process.env.GEMINI_API_KEY

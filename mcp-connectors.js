@@ -1,9 +1,9 @@
 /**
  * Academic search MCP connectors (Parallel, Firecrawl, Scite), mounted
  * programmatically instead of as static cordis.yml rows so each server's
- * auth can come from the `dsh-researchcraft-keys` settings store
- * (Settings -> ResearchCraft API keys) as well as the matching env var.
- * Resolved once when the `researchcraft` preset first mounts. That mount is
+ * auth can come from the host entry Config (Settings -> Academic Harness API
+ * keys) as well as the matching env var.
+ * Resolved once when the `academic-harness` preset first mounts. That mount is
  * a STANDING composition shared by every session naming the preset for the
  * life of the running `dsh` process (see @deepseek-ai/dsh-agent-preset) —
  * a new chat session does NOT get a fresh mount, so a key entered or
@@ -34,12 +34,12 @@
  * with `x-api-key` auth, so it's now `consensus-search.js` — a native
  * per-call tool, not a standing MCP mount, which also means a
  * Settings-changed CONSENSUS_API_KEY takes effect on the next call rather
- * than needing a restart. See presets/researchcraft/agent.cordis.yml.
+ * than needing a restart. See presets/academic-harness/agent.cordis.yml.
  */
 import * as McpClient from '@deepseek-ai/dsh-mcp-client'
 import { resolveEnv } from './credential-env.js'
 
-export const name = 'dsh-researchcraft-mcp-connectors'
+export const name = 'academic-harness-mcp-connectors'
 export const inject = []
 
 export async function apply(ctx) {
