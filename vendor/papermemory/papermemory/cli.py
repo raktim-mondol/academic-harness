@@ -54,6 +54,9 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         rec = ingest_arxiv(store, args.arxiv, project_id=args.project)
         return _emit(rec, args.json, _fmt_paper(rec))
     if args.path:
+        import json as _json
+
+        converter = _json.loads(args.converter_json) if getattr(args, "converter_json", None) else None
         result = ingest_path(
             store,
             Path(args.path),
@@ -62,6 +65,8 @@ def cmd_ingest(args: argparse.Namespace) -> int:
             doi=args.doi,
             title=args.title,
             pdf_path=args.pdf_path,
+            origin_channel=getattr(args, "origin_channel", None),
+            converter=converter,
         )
         return _emit(result, args.json)
     if args.doi:
@@ -74,7 +79,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
 def cmd_search(args: argparse.Namespace) -> int:
     from papermemory.search import search
 
-    hits = search(_store(), args.query, kind=args.kind, limit=args.limit, project_id=args.project)
+    hits = search(_store(), args.query, kind=args.kind, limit=args.limit, project_id=args.project, section_roles=args.section_role or None)
     if args.json:
         return _emit(hits, True)
     if not hits:
@@ -96,11 +101,17 @@ def cmd_paper(args: argparse.Namespace) -> int:
     if not rec:
         print(f"paper not found: {args.key}", file=sys.stderr)
         return 1
-    rec["chunks"] = store.conn.execute(
-        "SELECT id, section, page, chunk_index, substr(text,1,240) AS preview FROM chunks WHERE paper_id=? ORDER BY chunk_index",
-        (rec["id"],),
-    ).fetchall()
-    rec["chunks"] = [dict(r) for r in rec["chunks"]]
+    rec["chunks"] = [
+        {
+            "id": row["id"],
+            "section": row["section"],
+            "chunk_index": row["chunk_index"],
+            "char_start": row["char_start"],
+            "char_end": row["char_end"],
+            "preview": " ".join((row["text"][row["char_start"]:row["char_end"]] or "").split())[:240],
+        }
+        for row in store.paper_chunks(rec["id"])
+    ]
     rec["claims"] = store.list_claims(paper_id=rec["id"])
     rec["relations"] = store.neighbors("paper", rec["id"])
     if args.json:
@@ -117,31 +128,6 @@ def cmd_paper(args: argparse.Namespace) -> int:
         for claim in rec["claims"][:12]:
             print(f"- [{claim['status']}/{claim['claim_type']}] {claim['claim_text']}")
     return 0
-
-
-def cmd_understand(args: argparse.Namespace) -> int:
-    store = _store()
-    rec = store.get_paper(args.key)
-    if not rec:
-        print(f"paper not found: {args.key}", file=sys.stderr)
-        return 1
-    from papermemory.understand import understand_text
-
-    text = rec.get("abstract") or ""
-    chunks = store.conn.execute(
-        "SELECT text FROM chunks WHERE paper_id=? ORDER BY chunk_index",
-        (rec["id"],),
-    ).fetchall()
-    if chunks:
-        text = "\n\n".join(r["text"] for r in chunks)
-    summary = understand_text(text)
-    if args.save:
-        store.replace_chunks(rec["id"], summary["chunks"])
-        existing = {c["claim_text"] for c in store.list_claims(paper_id=rec["id"])}
-        for claim in summary["claims"]:
-            if claim["claim_text"] not in existing:
-                store.add_claim({**claim, "paper_id": rec["id"]})
-    return _emit({"paper": rec, "understand": summary}, args.json)
 
 
 def cmd_cite(args: argparse.Namespace) -> int:
@@ -181,7 +167,7 @@ def cmd_cite_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_verify(args: argparse.Namespace) -> int:
+def cmd_lookup(args: argparse.Namespace) -> int:
     from papermemory.scholar import fetch_arxiv, fetch_crossref
 
     store = _store()
@@ -220,7 +206,7 @@ def cmd_remember(args: argparse.Namespace) -> int:
 def cmd_recall(args: argparse.Namespace) -> int:
     from papermemory.search import search
 
-    hits = search(_store(), args.query, kind=args.kind, limit=args.limit, project_id=args.project)
+    hits = search(_store(), args.query, kind=args.kind, limit=args.limit, project_id=args.project, section_roles=args.section_role or None)
     return _emit(hits, args.json) if args.json else cmd_search(args)
 
 
@@ -323,6 +309,11 @@ def cmd_claim(args: argparse.Namespace) -> int:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     store = _store()
+    if getattr(args, "schema", False):
+        from papermemory.ops import doctor_schema
+
+        report = doctor_schema(store)
+        return _emit(report, args.json, json.dumps(report, indent=2))
     stats = store.stats()
     issues = []
     if stats["unverified_papers"]:
@@ -332,6 +323,233 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         issues.append(f"{empty_abs} papers have no abstract")
     report = {"db": str(store.path), "stats": stats, "issues": issues, "ok": not issues}
     return _emit(report, args.json, json.dumps(report, indent=2))
+
+
+def cmd_migrate(args: argparse.Namespace) -> int:
+    from papermemory.db import Store
+    from papermemory.ops import migrate
+
+    store = Store.connect_for_migration(db_path())
+    try:
+        result = migrate(store)
+    finally:
+        store.close()
+    return _emit(result, args.json, f"migrate: {result}")
+
+
+def cmd_backup(args: argparse.Namespace) -> int:
+    from papermemory.ops import backup
+
+    result = backup(_store(), Path(args.out) if args.out else None)
+    return _emit(result, args.json, f"backup: {result['path']} ({result['papers']} papers)")
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    import time as _time
+
+    from papermemory.ops import export_store
+
+    store = _store()
+    out = Path(args.out) if args.out else store.path.parent / "exports" / f"papermemory-{_time.strftime('%Y%m%d-%H%M%S')}.jsonl"
+    result = export_store(store, out)
+    return _emit(result, args.json, f"export: {result['path']} {result['tables']}")
+
+
+def cmd_restore(args: argparse.Namespace) -> int:
+    from papermemory.ops import restore_store
+
+    result = restore_store(_store(), Path(args.path), force=args.force)
+    return _emit(result, args.json, f"restore: {result['papers']} papers from {args.path}")
+
+
+def cmd_vacuum(args: argparse.Namespace) -> int:
+    from papermemory.ops import vacuum
+
+    result = vacuum(_store())
+    return _emit(result, args.json, f"vacuum: {result['before_bytes']} -> {result['after_bytes']} bytes")
+
+
+def cmd_health(args: argparse.Namespace) -> int:
+    from papermemory.ops import health_lite
+
+    result = health_lite(_store())
+    return _emit(result, args.json, json.dumps(result, indent=2))
+
+
+def cmd_events_export(args: argparse.Namespace) -> int:
+    from papermemory.ops import export_events_jsonl
+
+    result = export_events_jsonl(_store(), Path(args.out))
+    return _emit(result, args.json, f"events: {result['files']}")
+
+
+def cmd_merge(args: argparse.Namespace) -> int:
+    result = _store().merge_papers(args.source, args.into)
+    return _emit(result, args.json, f"merge: {result}")
+
+
+def cmd_promote(args: argparse.Namespace) -> int:
+    result = _store().promote_identity(args.paper, args.kind, args.value)
+    return _emit(result, args.json, f"promote: {result}")
+
+
+def cmd_outline(args: argparse.Namespace) -> int:
+    from papermemory.outline import outline
+
+    result = outline(_store(), args.key)
+    return _emit(result, args.json, json.dumps(result, indent=2, default=str))
+
+
+def cmd_reindex(args: argparse.Namespace) -> int:
+    from papermemory.reindex import reindex_from_raw
+
+    if not args.from_raw:
+        print("reindex requires --from-raw", file=sys.stderr)
+        return 2
+    result = reindex_from_raw(_store(), paper_id=args.paper)
+    return _emit(result, args.json, f"reindex: {result}")
+
+
+def cmd_list(args: argparse.Namespace) -> int:
+    from papermemory.listing import list_rows
+
+    kind = getattr(args, "kind", "papers") or "papers"
+    page_size = getattr(args, "page_size", None) or getattr(args, "limit", 50) or 50
+    result = list_rows(
+        _store(), kind, project=args.project, status=getattr(args, "status", None),
+        cite_state=getattr(args, "cite_state", None), cursor=getattr(args, "cursor", None),
+        page_size=page_size,
+    )
+    return _emit(result, args.json, json.dumps(result, indent=2, default=str))
+
+
+def cmd_coverage(args: argparse.Namespace) -> int:
+    store = _store()
+    sql = """SELECT cov.*, p.id AS paper_id, p.title, p.doi, d.origin_path
+             FROM coverage cov JOIN raw_documents d ON d.id=cov.doc_id
+             JOIN papers p ON p.id=d.paper_id"""
+    values: list[Any] = []
+    if args.project:
+        sql += " WHERE EXISTS(SELECT 1 FROM paper_projects pp WHERE pp.paper_id=p.id AND pp.project_key=?)"
+        values.append(args.project)
+    sql += " ORDER BY cov.ratio ASC, p.id"
+    rows = [dict(row) for row in store.conn.execute(sql, values).fetchall()]
+    totals = {
+        "docs": len(rows),
+        "source_chars": sum(row["source_chars"] for row in rows),
+        "indexed_chars": sum(row["indexed_chars"] for row in rows),
+        "capped": sum(1 for row in rows if row["capped"]),
+        "with_uncovered": sum(1 for row in rows if row["uncovered_json"] not in ("[]", "", None)),
+    }
+    totals["ratio"] = totals["indexed_chars"] / max(totals["source_chars"], 1)
+    return _emit({"totals": totals, "docs": rows}, args.json, json.dumps(totals, indent=2))
+
+
+def cmd_verify_claim(args: argparse.Namespace) -> int:
+    from papermemory.grounding import verify_claim
+
+    walk = verify_claim(_store(), args.claim)
+    _emit(walk, args.json, json.dumps(walk, indent=2, default=str))
+    return 0 if walk["ok"] else 1
+
+
+def cmd_quote_check(args: argparse.Namespace) -> int:
+    from papermemory.grounding import quote_check
+
+    result = quote_check(
+        _store(), args.quote, paper_id=args.paper, chunk_id=args.chunk,
+        doc_id=args.doc, max_matches=args.max_matches,
+    )
+    return _emit(result, args.json, json.dumps(result, indent=2, default=str))
+
+
+def cmd_trace(args: argparse.Namespace) -> int:
+    from papermemory.grounding import verify_claim
+
+    store = _store()
+    if args.claim:
+        return _emit(verify_claim(store, args.claim), args.json)
+    if args.paper:
+        paper = store.get_paper(args.paper)
+        if not paper:
+            print("paper not found", file=sys.stderr)
+            return 1
+        docs = [dict(row) for row in store.conn.execute("SELECT id, sha256, is_current, corpus_path, origin_channel FROM raw_documents WHERE paper_id=? ORDER BY created_at", (paper["id"],))]
+        claims = [dict(row) for row in store.conn.execute("SELECT id, status, quote_sha256 FROM claims WHERE paper_id=?", (paper["id"],))]
+        citations = [dict(row) for row in store.conn.execute("SELECT tex_file, tex_line, bibtex_key FROM citations WHERE paper_id=?", (paper["id"],))]
+        return _emit({"paper": paper["id"], "documents": docs, "claims": claims, "citations": citations}, args.json)
+    print("trace requires --claim or --paper", file=sys.stderr)
+    return 2
+
+
+def cmd_claims(args: argparse.Namespace) -> int:
+    from papermemory.claims import list_claims
+
+    result = list_claims(
+        _store(), project=args.project, status=args.status, since=args.since,
+        cursor=args.cursor, page_size=args.page_size,
+    )
+    return _emit(result, args.json, json.dumps(result, indent=2, default=str))
+
+
+def cmd_sweep(args: argparse.Namespace) -> int:
+    from papermemory.claims import supersession_sweep
+
+    result = supersession_sweep(_store(), args.doc, batch_size=args.batch_size)
+    return _emit(result, args.json, f"sweep: {result}")
+
+
+def cmd_catalog(args: argparse.Namespace) -> int:
+    from papermemory.claims import write_catalog
+
+    result = write_catalog(_store(), args.project)
+    return _emit(result, args.json, f"catalog: {result}")
+
+
+def cmd_register_ah(args: argparse.Namespace) -> int:
+    from papermemory.ah_bridge import register_to_ah
+
+    result = register_to_ah(
+        _store(), paper=args.paper, project=args.project,
+        all_citable=args.all_citable, ah_root=args.ah_root, dry_run=args.dry_run,
+    )
+    return _emit(result, args.json, f"register-ah: {result}")
+
+
+def cmd_evidence_export(args: argparse.Namespace) -> int:
+    from papermemory.ah_bridge import export_evidence
+
+    result = export_evidence(_store(), args.out, project=args.project)
+    return _emit(result, args.json, f"evidence: {result}")
+
+
+def cmd_import_verdicts(args: argparse.Namespace) -> int:
+    from papermemory.ah_bridge import import_verdicts
+
+    result = import_verdicts(_store(), args.path)
+    return _emit(result, args.json, f"verdicts: {result}")
+
+
+def cmd_log(args: argparse.Namespace) -> int:
+    from papermemory.ops import log_tail, prune_events
+
+    store = _store()
+    if args.prune:
+        removed = prune_events(store, keep_days=args.keep_days)
+        return _emit({"pruned": removed, "keep_days": args.keep_days}, args.json, f"pruned {removed} events")
+    rows = log_tail(store, limit=args.tail)
+    if args.json:
+        return _emit(rows, True)
+    for row in rows:
+        print(f"{row['ts']} {row['op']} | paper={row.get('paper_id') or '-'} status={row['status']} reason={row.get('reason_code') or '-'} {row.get('detail') or ''}")
+    return 0
+
+
+def cmd_tools(args: argparse.Namespace) -> int:
+    from papermemory.mcp_server import TOOLS
+
+    names = [tool["name"] for tool in TOOLS]
+    return _emit(names, args.json, "\n".join(names))
 
 
 def cmd_mcp(_args: argparse.Namespace) -> int:
@@ -362,6 +580,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--pdf-path", dest="pdf_path", help="attach markdown/tex ingest to an existing PDF record")
     s.add_argument("--project")
     s.add_argument("--kind", default="auto", choices=["auto", "pdf", "bibtex", "markdown", "tex", "dir", "manuscript"])
+    s.add_argument("--origin-channel", dest="origin_channel")
+    s.add_argument("--converter-json", dest="converter_json")
     s.set_defaults(func=cmd_ingest)
 
     s = sub.add_parser("search", help="hybrid search across papers, claims, chunks, notes", parents=[shared])
@@ -369,16 +589,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--kind", default="all")
     s.add_argument("--project")
     s.add_argument("--limit", type=int, default=8)
+    s.add_argument("--section-role", action="append", dest="section_role", default=[])
     s.set_defaults(func=cmd_search)
 
     s = sub.add_parser("paper", help="show a paper by id or bibtex key", parents=[shared])
     s.add_argument("key")
     s.set_defaults(func=cmd_paper)
-
-    s = sub.add_parser("understand", help="split sections and extract candidate claims", parents=[shared])
-    s.add_argument("key")
-    s.add_argument("--save", action="store_true")
-    s.set_defaults(func=cmd_understand)
 
     s = sub.add_parser("cite", help="find a citable paper for a statement", parents=[shared])
     s.add_argument("query")
@@ -389,10 +605,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("manuscript")
     s.set_defaults(func=cmd_cite_check)
 
-    s = sub.add_parser("verify", help="look up DOI/arXiv metadata", parents=[shared])
+    s = sub.add_parser("lookup", help="look up DOI/arXiv metadata", parents=[shared])
     s.add_argument("key", nargs="?")
     s.add_argument("--all", action="store_true")
-    s.set_defaults(func=cmd_verify)
+    s.set_defaults(func=cmd_lookup)
 
     s = sub.add_parser("remember", help="save a writing or reading decision", parents=[shared])
     s.add_argument("text")
@@ -406,6 +622,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--kind", default="all")
     s.add_argument("--project")
     s.add_argument("--limit", type=int, default=8)
+    s.add_argument("--section-role", action="append", dest="section_role", default=[])
     s.set_defaults(func=cmd_recall)
 
     s = sub.add_parser("lesson", help="save a durable writing/reading rule", parents=[shared])
@@ -457,8 +674,129 @@ def build_parser() -> argparse.ArgumentParser:
     m.add_argument("--notes")
     m.set_defaults(func=cmd_manuscript)
 
+    s = sub.add_parser("merge", help="merge one paper into another", parents=[shared])
+    s.add_argument("source")
+    s.add_argument("--into", required=True)
+    s.set_defaults(func=cmd_merge)
+
+    s = sub.add_parser("promote", help="promote a paper identity", parents=[shared])
+    s.add_argument("paper")
+    s.add_argument("kind", choices=["doi", "arxiv_id", "pmid", "title_year", "legacy_id"])
+    s.add_argument("value")
+    s.set_defaults(func=cmd_promote)
+
+    s = sub.add_parser("list", help="list papers, claims, lessons, or coverage", parents=[shared])
+    s.add_argument("--kind", default="papers", choices=["papers", "claims", "lessons", "coverage"])
+    s.add_argument("--project")
+    s.add_argument("--status")
+    s.add_argument("--cite-state")
+    s.add_argument("--cursor")
+    s.add_argument("--page-size", type=int, default=50, dest="page_size")
+    s.add_argument("--limit", type=int, default=50)
+    s.set_defaults(func=cmd_list)
+
+    s = sub.add_parser("coverage", help="chunk coverage per document", parents=[shared])
+    s.add_argument("--project")
+    s.set_defaults(func=cmd_coverage)
+
+    s = sub.add_parser("outline", help="derived section outline for a paper", parents=[shared])
+    s.add_argument("key")
+    s.set_defaults(func=cmd_outline)
+
+    s = sub.add_parser("reindex", help="re-derive sections/chunks/FTS from stored raw markdown", parents=[shared])
+    s.add_argument("--from-raw", action="store_true", dest="from_raw")
+    s.add_argument("--paper")
+    s.set_defaults(func=cmd_reindex)
+
+    s = sub.add_parser("verify", help="walk a claim's provenance", parents=[shared])
+    s.add_argument("claim")
+    s.set_defaults(func=cmd_verify_claim)
+
+    s = sub.add_parser("quote-check", help="exact-substring quote check", parents=[shared])
+    s.add_argument("quote")
+    s.add_argument("--paper")
+    s.add_argument("--chunk")
+    s.add_argument("--doc")
+    s.add_argument("--max-matches", type=int, default=20, dest="max_matches")
+    s.set_defaults(func=cmd_quote_check)
+
+    s = sub.add_parser("trace", help="walk claim or paper provenance", parents=[shared])
+    s.add_argument("--claim")
+    s.add_argument("--paper")
+    s.set_defaults(func=cmd_trace)
+
+    s = sub.add_parser("claims", help="list claims (keyset paging)", parents=[shared])
+    s.add_argument("--project")
+    s.add_argument("--status")
+    s.add_argument("--since")
+    s.add_argument("--cursor", type=int)
+    s.add_argument("--page-size", type=int, default=50, dest="page_size")
+    s.set_defaults(func=cmd_claims)
+
+    s = sub.add_parser("sweep", help="mark claims on a superseded document", parents=[shared])
+    s.add_argument("--doc", required=True)
+    s.add_argument("--batch-size", type=int, default=200, dest="batch_size")
+    s.set_defaults(func=cmd_sweep)
+
+    s = sub.add_parser("catalog", help="write corpus/CATALOG.json|.md from rows", parents=[shared])
+    s.add_argument("--project")
+    s.set_defaults(func=cmd_catalog)
+
+    s = sub.add_parser("register-ah", help="register markdown papers into an Academic Harness project", parents=[shared])
+    s.add_argument("--paper")
+    s.add_argument("--project")
+    s.add_argument("--all-citable", action="store_true", dest="all_citable")
+    s.add_argument("--ah-root", dest="ah_root")
+    s.add_argument("--dry-run", action="store_true", dest="dry_run")
+    s.set_defaults(func=cmd_register_ah)
+
+    s = sub.add_parser("evidence-export", help="write pm-evidence-1 rows for AH", parents=[shared])
+    s.add_argument("out")
+    s.add_argument("--project")
+    s.set_defaults(func=cmd_evidence_export)
+
+    s = sub.add_parser("import-verdicts", help="import AH verdict ledger rows", parents=[shared])
+    s.add_argument("path")
+    s.set_defaults(func=cmd_import_verdicts)
+
+    s = sub.add_parser("log", help="tail or prune the event ledger", parents=[shared])
+    s.add_argument("--tail", type=int, default=20)
+    s.add_argument("--prune", action="store_true")
+    s.add_argument("--keep-days", type=int, default=90, dest="keep_days")
+    s.set_defaults(func=cmd_log)
+
+    s = sub.add_parser("tools", help="print the MCP tool surface", parents=[shared])
+    s.set_defaults(func=cmd_tools)
+
     s = sub.add_parser("doctor", help="health check", parents=[shared])
+    s.add_argument("--schema", action="store_true", help="schema/version/runtime report")
     s.set_defaults(func=cmd_doctor)
+
+    s = sub.add_parser("migrate", help="run explicit single-writer migrations", parents=[shared])
+    s.set_defaults(func=cmd_migrate)
+
+    s = sub.add_parser("backup", help="copy the database with sha256", parents=[shared])
+    s.add_argument("--out")
+    s.set_defaults(func=cmd_backup)
+
+    s = sub.add_parser("export", help="export all tables as JSONL", parents=[shared])
+    s.add_argument("--out")
+    s.set_defaults(func=cmd_export)
+
+    s = sub.add_parser("restore", help="restore a JSONL export", parents=[shared])
+    s.add_argument("path")
+    s.add_argument("--force", action="store_true")
+    s.set_defaults(func=cmd_restore)
+
+    s = sub.add_parser("vacuum", help="compact the database", parents=[shared])
+    s.set_defaults(func=cmd_vacuum)
+
+    s = sub.add_parser("health", help="lightweight integrity and count report", parents=[shared])
+    s.set_defaults(func=cmd_health)
+
+    s = sub.add_parser("events-export", help="write events-YYYYMM.jsonl files", parents=[shared])
+    s.add_argument("out")
+    s.set_defaults(func=cmd_events_export)
 
     s = sub.add_parser("mcp", help="run the MCP stdio server", parents=[shared])
     s.set_defaults(func=cmd_mcp)
@@ -476,8 +814,13 @@ def main(argv: list[str] | None = None) -> int:
     except BrokenPipeError:
         return 0
     except Exception as exc:
+        code = getattr(exc, "code", None)
+        payload = {"error": str(exc)}
+        if code:
+            payload["code"] = code
         if getattr(args, "json", False):
-            print(json.dumps({"error": str(exc)}), file=sys.stderr)
+            print(json.dumps(payload), file=sys.stderr)
         else:
-            print(f"error: {exc}", file=sys.stderr)
+            prefix = f"[{code}] " if code else ""
+            print(f"error: {prefix}{exc}", file=sys.stderr)
         return 1

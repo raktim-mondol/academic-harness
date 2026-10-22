@@ -6,9 +6,8 @@ from typing import Any, Callable
 
 from papermemory.bibtex import parse_bibtex
 from papermemory.citations import extract_cite_keys
+from papermemory.corpus import ingest_markdown as ingest_markdown_v2
 from papermemory.db import Store
-from papermemory.pdf import extract_pdf
-from papermemory.understand import understand_text
 from papermemory.util import normalize_doi, slugify, strip_tex_comments, word_count
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", "figures", "qa_crops", "_work"}
@@ -22,15 +21,13 @@ def ingest_bibtex(store: Store, text: str, *, project_id: str | None = None, sou
                 **entry,
                 "project_id": project_id,
                 "source_type": "bibtex",
-                "verified": 1 if entry.get("doi") or entry.get("arxiv_id") else 0,
-                "verification_note": "has identifier" if (entry.get("doi") or entry.get("arxiv_id")) else "bibtex-only",
+                "verified": 1 if (entry.get("doi") or entry.get("arxiv_id")) else 0,
             }
         )
         if project_id:
-            ms = store.get_manuscript(project_id)
-            if ms:
-                store.add_relation("manuscript", ms["id"], "cites", "paper", record["id"], evidence=source)
+            store.add_membership(record["id"], project_id)
         papers.append(record)
+    store.conn.commit()
     return papers
 
 
@@ -43,44 +40,30 @@ def ingest_pdf(
     doi: str | None = None,
     title: str | None = None,
 ) -> dict[str, Any]:
-    extracted = extract_pdf(path)
+    """Phase 1: PDFs are metadata-only. Chunk derivation comes from markdown."""
     doi_n = normalize_doi(doi)
-    existing = store.find_paper(doi=doi_n, pdf_path=str(path.expanduser().resolve())) if (doi_n or path) else None
-    heading = (title or "").strip()
-    if not heading and existing and existing.get("title"):
-        heading = existing["title"]
+    heading = (title or "").strip() or path.stem
     if not heading:
-        heading = (extracted.get("title") or path.stem).strip()
-    paper = store.upsert_paper(
+        heading = path.stem
+    record = store.upsert_paper(
         {
             "title": heading,
-            "authors": extracted.get("authors") or [],
             "doi": doi_n,
-            "url": f"https://doi.org/{doi_n}" if doi_n else None,
             "pdf_path": str(path.expanduser().resolve()),
             "source_type": "pdf",
             "project_id": project_id,
-            "abstract": None,
             "verified": 1 if doi_n else 0,
-            "verification_note": "doi" if doi_n else "local-pdf",
         }
     )
-    summary = None
-    if understand:
-        summary = understand_text(extracted["text"])
-        if summary.get("abstract") and not paper.get("abstract"):
-            paper = store.upsert_paper({**paper, "abstract": summary["abstract"], "authors": paper.get("authors") or []})
-        store.replace_chunks(paper["id"], summary["chunks"])
-        for claim in summary["claims"]:
-            store.add_claim({**claim, "paper_id": paper["id"]})
-    else:
-        from papermemory.understand import chunk_text
-
-        chunks = []
-        for page in extracted["pages"]:
-            chunks.extend(chunk_text(page["text"], page=page["page"]))
-        store.replace_chunks(paper["id"], chunks)
-    return {"paper": paper, "understand": summary, "pages": extracted["page_count"]}
+    if project_id:
+        store.add_membership(record["id"], project_id)
+    store.conn.commit()
+    return {
+        "paper": record,
+        "status": "chunkless",
+        "reason_code": "pdf-metadata-only",
+        "pages": None,
+    }
 
 
 def ingest_markdown(
@@ -91,33 +74,23 @@ def ingest_markdown(
     doi: str | None = None,
     pdf_path: str | None = None,
     title: str | None = None,
+    origin_channel: str | None = None,
+    converter_json: str | None = None,
 ) -> dict[str, Any]:
-    text = path.read_text(encoding="utf-8", errors="replace")
-    heading = title
-    if not heading:
-        heading = path.stem
-        for line in text.splitlines():
-            if line.startswith("# "):
-                heading = line[2:].strip()
-                break
-    doi_n = normalize_doi(doi)
-    resolved_pdf = str(Path(pdf_path).expanduser().resolve()) if pdf_path else None
-    paper = store.upsert_paper(
-        {
-            "title": heading,
-            "doi": doi_n,
-            "url": f"https://doi.org/{doi_n}" if doi_n else None,
-            "pdf_path": resolved_pdf,
-            "source_type": "markdown",
-            "project_id": project_id,
-            "abstract": text[:1500],
-            "verified": 1 if doi_n else 0,
-            "verification_note": "doi" if doi_n else None,
-        }
+    import json as _json
+
+    identity_override = ("doi", normalize_doi(doi)) if doi else None
+    converter = _json.loads(converter_json) if converter_json else None
+    return ingest_markdown_v2(
+        store,
+        path,
+        project_id=project_id,
+        identity_override=identity_override,
+        pdf_path=str(Path(pdf_path).expanduser().resolve()) if pdf_path else None,
+        title_hint=title,
+        origin_channel=origin_channel,
+        converter=converter,
     )
-    summary = understand_text(text)
-    store.replace_chunks(paper["id"], summary["chunks"])
-    return {"paper": paper, "understand": summary}
 
 
 def ingest_arxiv(store: Store, arxiv_id: str, *, project_id: str | None = None) -> dict[str, Any]:
@@ -126,9 +99,8 @@ def ingest_arxiv(store: Store, arxiv_id: str, *, project_id: str | None = None) 
     meta = fetch_arxiv(arxiv_id)
     paper = store.upsert_paper({**meta, "project_id": project_id})
     if project_id:
-        ms = store.get_manuscript(project_id)
-        if ms:
-            store.add_relation("manuscript", ms["id"], "cites", "paper", paper["id"])
+        store.add_membership(paper["id"], project_id)
+    store.conn.commit()
     return paper
 
 
@@ -138,9 +110,8 @@ def ingest_doi(store: Store, doi: str, *, project_id: str | None = None) -> dict
     meta = fetch_crossref(doi)
     paper = store.upsert_paper({**meta, "project_id": project_id})
     if project_id:
-        ms = store.get_manuscript(project_id)
-        if ms:
-            store.add_relation("manuscript", ms["id"], "cites", "paper", paper["id"])
+        store.add_membership(paper["id"], project_id)
+    store.conn.commit()
     return paper
 
 
@@ -207,14 +178,6 @@ def ingest_manuscript(store: Store, root: Path, *, slug: str | None = None) -> d
     if section_dir.exists():
         for tex in sorted(section_dir.glob("*.tex")):
             text = tex.read_text(encoding="utf-8", errors="replace")
-            keys = extract_cite_keys(text)
-            paper_map = {
-                row["bibtex_key"]: row["id"]
-                for row in store.conn.execute("SELECT id, bibtex_key FROM papers WHERE bibtex_key IS NOT NULL").fetchall()
-            }
-            for key in set(keys):
-                if key in paper_map:
-                    store.add_relation("manuscript", ms["id"], "cites", "paper", paper_map[key], evidence=str(tex))
             sections.append(
                 {
                     "name": tex.stem,
@@ -261,6 +224,8 @@ def ingest_path(
     doi: str | None = None,
     title: str | None = None,
     pdf_path: str | None = None,
+    origin_channel: str | None = None,
+    converter: dict | None = None,
 ) -> dict[str, Any]:
     path = path.expanduser().resolve()
     if not path.exists():
@@ -273,7 +238,7 @@ def ingest_path(
                 kind = "dir"
         else:
             suffix = path.suffix.lower()
-            kind = {".pdf": "pdf", ".bib": "bibtex", ".md": "markdown", ".tex": "tex"}.get(suffix, "file")
+            kind = {".pdf": "pdf", ".bib": "bibtex", ".md": "markdown", ".tex": "markdown"}.get(suffix, "file")
     if progress:
         progress(f"ingest {kind}: {path}")
     if kind == "manuscript":
@@ -284,9 +249,10 @@ def ingest_path(
         papers = ingest_bibtex(store, path.read_text(encoding="utf-8", errors="replace"), project_id=project_id, source=str(path))
         return {"papers": papers, "count": len(papers)}
     if kind == "markdown":
-        return ingest_markdown(store, path, project_id=project_id, doi=doi, pdf_path=pdf_path, title=title)
-    if kind == "tex":
-        return ingest_markdown(store, path, project_id=project_id, doi=doi, pdf_path=pdf_path, title=title)
+        return ingest_markdown(
+            store, path, project_id=project_id, doi=doi, pdf_path=pdf_path, title=title,
+            origin_channel=origin_channel, converter_json=None if converter is None else __import__("json").dumps(converter),
+        )
     if kind == "dir":
         results = []
         for child in sorted(path.rglob("*")):

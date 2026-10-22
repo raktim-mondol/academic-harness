@@ -142,7 +142,11 @@ export function apply(ctx) {
         bits.push(`source: ${value.source_url}`)
         if (value.papermemory?.ok) {
           const key = value.papermemory.bibtex_key
-          bits.push(`PaperMemory: ingested${key ? ` as ${key}` : ''}${value.papermemory.verified ? ' (verified)' : ' (UNVERIFIED until DOI/arXiv lookup)'}.`)
+          const status = value.papermemory.status || 'ingested'
+          const citeState = value.papermemory.cite_state ? ` (${value.papermemory.cite_state})` : ''
+          bits.push(`PaperMemory: ${status}${citeState}${key ? ` as ${key}` : ''}${value.papermemory.verified ? ' (verified)' : ' (UNVERIFIED until DOI/arXiv lookup)'}.`)
+          const degraded = value.papermemory.degradation?.pages_needing_ocr_count
+          if (degraded) bits.push(`OCR: ${degraded} page(s) flagged; claims from this source stay capped below verified.`)
         } else if (value.papermemory?.error) {
           bits.push(`PaperMemory ingest skipped: ${value.papermemory.error}`)
         }

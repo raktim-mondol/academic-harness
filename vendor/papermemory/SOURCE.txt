@@ -1,9 +1,13 @@
 Vendored from https://github.com/raktim-mondol/papermemory
-Commit: cb197e5fa543510f808e4e63515e8703f4423209
-Version: 0.1.0
-Python package unmodified except:
-- mcp_server.py (NDJSON stdio as well as Content-Length, required by DSH's MCP SDK)
-- ingest/CLI/db: PATH ingest accepts --doi/--title/--pdf-path so a PDF and its
-  markdown conversion merge onto one verified paper record
-Tests and the upstream skill were not copied; skills/papermemory/SKILL.md in
-this plugin is adapted for DeepSeek Harness MCP names.
+Commit: e256eb59d44629c6495a76cc5237eb563ad2553a
+Version: 0.2.0
+Upstream exceptions: none.
+
+Tests are the upstream tests (vendor/papermemory/tests, tests/test_phase0.py …
+test_phase7.py), run by CI. The upstream skill is not copied; the plugin's
+skills/papermemory/SKILL.md is adapted for DeepSeek Harness MCP names.
+
+Companion local patch (this repo only): vendor/academic-harness registry
+--keys aliases (entry_for consulted by resolve/resolve_all/BIB-02) and
+byte-copy of .md/.txt sources, applied ahead of the Academic Harness upstream
+release; documented in vendor/academic-harness/SOURCE.txt.

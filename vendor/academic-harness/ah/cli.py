@@ -405,7 +405,7 @@ def cmd_source(a):
     p = _proj(a)
     if a.action == "add":
         meta = {"title": a.title, "year": a.year, "doi": a.doi, "kind": a.kind, "class": a.cls, "tags": a.tags.split(",") if a.tags else None}
-        e = add_source(p, Path(a.path), a.id, **meta)
+        e = add_source(p, Path(a.path), a.id, keys=a.keys.split(",") if getattr(a, "keys", None) else None, **meta)
         print(json.dumps(e, indent=1))
     elif a.action == "list":
         reg = load_registry(p)
@@ -753,6 +753,7 @@ def main(argv=None) -> int:
     sp.add_argument("action", choices=["add", "list", "search"])
     sp.add_argument("path", nargs="?")
     sp.add_argument("--id")
+    sp.add_argument("--keys", help="comma-separated citation-key aliases for this source")
     sp.add_argument("--title")
     sp.add_argument("--year", type=int)
     sp.add_argument("--doi")

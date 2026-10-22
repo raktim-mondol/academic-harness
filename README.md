@@ -215,23 +215,30 @@ T3 (does this cited clause match the source) is advisory and never a gate. Optio
 
 [PaperMemory](https://github.com/raktim-mondol/papermemory) is the local academic-memory layer on the ResearchCraft preset: papers (title, authors, year, venue, DOI, arXiv, bibtex key), claims with quoted evidence, citation graphs, manuscript recap, and cite-check. It is how the agent remembers papers it has read and cites without inventing references — open-web and peer-reviewed discovery stays on Parallel / Consensus / Firecrawl / Scite.
 
-You do **not** install PaperMemory yourself. The first time the ResearchCraft preset mounts after `dsh plugin add`, the plugin uses `papermemory` already on `PATH` if present, otherwise installs the vendored package (with `pypdf`) into `~/.dsh/papermemory` via `uv` (or `python -m venv` + pip). It then mounts `mcp__papermemory__*` over stdio (`papermemory mcp`) — no second restart. If install or the MCP handshake fails, the rest of the preset still loads and the memory tools are absent (a warning is logged). Override with `PAPERMEMORY_CLI` if you already have a binary you want to keep; `PAPERMEMORY_SKIP_INSTALL=1` skips the bundled venv.
+You do **not** install PaperMemory yourself. The first time the ResearchCraft preset mounts after `dsh plugin add`, the plugin uses `papermemory` already on `PATH` if present, otherwise installs the vendored package (with `pypdf`) into `~/.dsh/papermemory` via `uv` (or `python -m venv` + pip). It then mounts `mcp__papermemory__*` over stdio (`papermemory mcp`) — no second restart. Startup is **fail-loud**: a missing or broken memory server (and any drift from the expected 14-tool surface) is logged/surfaced instead of silently reading as an empty store. Override with `PAPERMEMORY_CLI` if you already have a binary you want to keep; `PAPERMEMORY_SKIP_INSTALL=1` skips the bundled venv.
 
 The SQLite store is PaperMemory's default: `~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB` or `PAPERMEMORY_DATA_DIR`). A standalone `papermemory` CLI, Grok, and ResearchCraft share that same database. No API key.
+
+**Memory v2 (markdown-first, verbatim).** Each paper is stored as content-addressed markdown; chunks are byte slices, sections carry heading paths and deterministic roles, and claims are anchored to exact quote spans. `papermemory_claim` requires an `evidence` quote from the stored text; an absent quote is refused and a whitespace-only mismatch stays `unverified-quote` (`asserted-quote-differs`). Only a passing byte re-slice (`papermemory verify`, or `papermemory_trace`'s walk) promotes a claim to `verified`; OCR-derived papers are capped at `extracted` (`channel-capped:ocr-recovered`). Search returns typed `empty_reason`/`suppressed`/`legs` instead of an unqualified empty list. Existing stores migrate once with `papermemory migrate` (schema 2000); legacy chunks/claims are quarantined, not promoted — re-ingest papers as markdown to make them citable.
 
 | Tool | What it does |
 |---|---|
 | `mcp__papermemory__papermemory_recap` | Writing-project briefing: venue, sections, contributions, citation gaps |
-| `mcp__papermemory__papermemory_search` | Hybrid search over papers, claims, chunks, notes, lessons |
+| `mcp__papermemory__papermemory_search` | bm25-ordered chunk leg + claim/paper/notes legs; typed `empty_reason`, `suppressed`, `legs` |
 | `mcp__papermemory__papermemory_ingest` | Ingest a local PDF/BibTeX/markdown/manuscript path, or an arXiv id / DOI |
 | `mcp__papermemory__papermemory_get` | Paper by id or bibtex key, with claims and chunks |
 | `mcp__papermemory__papermemory_cite` | Find a stored paper to cite. Empty result means do not invent a citation |
 | `mcp__papermemory__papermemory_cite_check` | Compare a manuscript's in-text keys against memory |
 | `mcp__papermemory__papermemory_remember` | Save a writing/reading decision |
-| `mcp__papermemory__papermemory_claim` | Store a claim with optional evidence quote |
+| `mcp__papermemory__papermemory_claim` | Store a verbatim-anchored claim (evidence required); supersede/contradict/rebind/bind actions |
+| `mcp__papermemory__papermemory_quote_check` | Exact-substring quote check with occurrences and locators |
+| `mcp__papermemory__papermemory_trace` | Provenance walk for a claim, or paper → docs → claims → citations |
+| `mcp__papermemory__papermemory_outline` | Derived section outline (roles, spans, DOI, source filename) |
+| `mcp__papermemory__papermemory_list` | Enumerate papers/claims/lessons/coverage with totals |
+| `mcp__papermemory__papermemory_register_to_ah` | Register stored markdown into an Academic Harness project |
 | `mcp__papermemory__papermemory_lesson` | Save a durable academic writing/reading rule |
 
-`paper_download` calls ingest on the saved PDF (and DOI metadata when a DOI was given). The agent is steered to `recap` on paper-writing tasks, to cite only memory hits, and to `cite_check` before treating a section as finished. Load the bundled `papermemory` skill (`skills/papermemory`) for the full workflow.
+`paper_download` calls ingest on the saved PDF (and DOI metadata when a DOI was given); `pdf_to_markdown write_to` auto-ingests the converted markdown (page-subset conversions are deliberately not ingested) and forwards converter/OCR signals. The agent is steered to `recap` on paper-writing tasks, to cite only memory hits, to check `supports_statement`/`degradation`, and to `cite_check` before treating a section as finished. Load the bundled `papermemory` skill (`skills/papermemory`) for the full workflow.
 
 ## Paper agents (Paper2Agent)
 

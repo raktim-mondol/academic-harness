@@ -2,87 +2,102 @@
 name: papermemory
 description: >
   Academic paper memory for understanding papers and writing papers. Use for
-  literature, citations, claims, manuscripts, related work, bibtex, DOI/arXiv
-  ingest, cite-check, and recap of a writing project. Triggers: paper memory,
-  remember this paper, cite this, citation check, literature review, manuscript
-  status, /papermemory. Not for coding-session memory or the lab notebook.
+  literature, citations, verbatim claims, manuscripts, related work, bibtex,
+  DOI/arXiv ingest, cite-check, outlines, and recap of a writing project.
+  Triggers: paper memory, remember this paper, cite this, citation check,
+  literature review, manuscript status, /papermemory. Not for coding-session
+  memory or the lab notebook.
 license: MIT
 metadata:
-  version: "0.1.0"
+  version: "0.2.0"
   source: https://github.com/raktim-mondol/papermemory
 ---
 
 # PaperMemory
 
-Local academic memory on the ResearchCraft preset. Database: `~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB`). The plugin auto-installs the CLI and mounts MCP tools; do not `pip install` a second copy.
+Local, verbatim-first academic memory on the ResearchCraft preset. Database:
+`~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB`); the
+plugin auto-installs the CLI and mounts 14 MCP tools. Do not `pip install` a
+second copy. Prefer `mcp__papermemory__*` when present; CLI fallback:
+`papermemory <cmd> --json`.
 
-Prefer MCP tools `mcp__papermemory__*` when they are in the catalog. CLI fallback: `papermemory <cmd> --json`.
+The unit of trust is a claim anchored to a byte span of a stored markdown
+paper. Raw papers are content-addressed; every chunk is a contiguous byte
+slice, so quotes re-slice exactly. Memory never paraphrases source text.
 
 ## First action
 
-On any paper-writing or paper-reading task, call `mcp__papermemory__papermemory_recap` (pass `project` when you know the manuscript slug). If the slug is unknown, omit `project`. Workspace directory name is a reasonable default slug (`journal_paper_writing` → `journal-paper-writing`).
+Call `papermemory_recap` with the manuscript/project slug on any paper task.
+If it returns `empty_reason: project-not-found`, pick a `known_projects` entry;
+never present another project's papers as this project's evidence.
 
-If MCP is absent:
-
-```bash
-papermemory recap --json --project <slug>
-```
-
-## MCP tools
+## Tools
 
 | Goal | Tool |
 | --- | --- |
-| Writing-project briefing | `mcp__papermemory__papermemory_recap` (`project`) |
-| Search papers/claims/chunks/notes | `mcp__papermemory__papermemory_search` (`query`, optional `kind`, `project`, `limit`) |
-| Ingest PDF / bib / markdown / manuscript path | `mcp__papermemory__papermemory_ingest` (`path`, optional `project`, `kind`) |
-| Ingest arXiv / DOI | `mcp__papermemory__papermemory_ingest` (`arxiv` or `doi`, optional `project`) |
-| Show a paper | `mcp__papermemory__papermemory_get` (`key` = id or bibtex key) |
-| Find a citation | `mcp__papermemory__papermemory_cite` (`query`) |
-| Check manuscript cites | `mcp__papermemory__papermemory_cite_check` (`manuscript` slug) |
-| Save a decision | `mcp__papermemory__papermemory_remember` (`content`, optional `concepts`, `project`) |
-| Save a durable rule | `mcp__papermemory__papermemory_lesson` (`content`, optional `concepts`, `project`) |
-| Store a claim | `mcp__papermemory__papermemory_claim` (`text`, optional `paper`, `evidence`, `status`) |
+| Project briefing (stable + volatile, budgeted) | `papermemory_recap` |
+| Search chunks/claims/papers/notes (typed empty reasons) | `papermemory_search` |
+| Enumerate papers, claims, lessons, coverage | `papermemory_list` |
+| Paper outline (roles, spans, DOI, filename) | `papermemory_outline` |
+| Ingest markdown / PDF / bib / manuscript tree | `papermemory_ingest` |
+| Show a paper with full claims and chunk slices | `papermemory_get` |
+| Find a citable paper (claims, support flag, degradation) | `papermemory_cite` |
+| Check manuscript citations and claim gaps | `papermemory_cite_check` |
+| Store a verbatim-anchored claim / lifecycle action | `papermemory_claim` |
+| Exact-substring quote check | `papermemory_quote_check` |
+| Claim provenance walk or paper reverse-hop | `papermemory_trace` |
+| Save a project decision | `papermemory_remember` |
+| Save a durable rule (supersede supported) | `papermemory_lesson` |
+| Register markdown into an Academic Harness project | `papermemory_register_to_ah` |
 
-`paper_download` already ingests the saved PDF (and DOI metadata when given). Still ingest a DOI/arXiv you have not downloaded, a local `.bib` / manuscript tree, or a PDF obtained some other way.
+## Claim rules
+
+1. `papermemory_quote_check` the exact wording against the paper (or rely on
+   `papermemory_claim`, which locates it and refuses a miss with
+   `quote-not-verbatim`).
+2. Store with `evidence`. The tool records the located span, `quote_sha256`,
+   origin channel and overlapping chunks. Whitespace-only differences are
+   stored `unverified-quote` / `asserted-quote-differs`; never claim them as
+   verified.
+3. `papermemory_trace` walks sources → chunk hashes → quote materialization →
+   current doc → file sha. It promotes to `verified` only after a passing byte
+   re-slice. OCR-converted papers stay capped at `extracted`.
+4. Corrections are events, not edits: `action: supersede | contradict |
+   rebind`, with `target_claim_id`. Contradicted claims leave cite/recap/list.
+5. Near-duplicate claims (>0.9 token Jaccard on the same paper) supersede the
+   older one; 0.4–0.9 returns `similar_to` without mutation.
+
+## Absence and citation integrity
+
+- `papermemory_search` returns `empty_reason`, `suppressed`, `legs`, and
+  `coverage`. Assert "memory has no source" only for `no-match`. For
+  `no-match-in-project`, `all-suppressed:*`, `absence-not-licensable`, or
+  `leg-error:*`, report the reason and enumerate with `papermemory_list`.
+- Cite only what `papermemory_cite`/`papermemory_get` return. Check
+  `supports_statement` (a verified claim) and `degradation` (OCR pages).
+- Run `papermemory_cite_check` before finishing a section; resolve
+  `claim_gaps`, `missing_from_memory`, and `unverified_cited`.
+- Never recopy `notebook`, session notes, or your own paraphrase as evidence.
+
+## Reading and ingest
+
+1. Prefer markdown per paper. `pdf_to_markdown` with `write_to` ingests
+   automatically (unless a page subset was converted); scanned/OCR output is
+   marked `ocr-recovered` and claims from it are capped below `verified`.
+2. `papermemory_outline` then `papermemory_get` for structure and full slices;
+   don't reason from 400-char previews (v2 returns bounded but complete text).
+3. `papermemory_register_to_ah` for Academic Harness projects (AH id is the
+   paper id; citation keys are registered as aliases).
 
 ## CLI fallback
 
-| Goal | Command |
-| --- | --- |
-| Ingest a manuscript tree | `papermemory ingest PATH --kind manuscript --project SLUG --json` |
-| Ingest PDF / bib / markdown | `papermemory ingest PATH --project SLUG --json` |
-| Ingest arXiv / DOI | `papermemory ingest --arxiv ID --project SLUG --json` / `--doi DOI` |
-| Search | `papermemory search QUERY --json` |
-| Show a paper | `papermemory paper BIBKEY --json` |
-| Find a citation | `papermemory cite QUERY --json` |
-| Check manuscript cites | `papermemory cite-check SLUG --json` |
-| Save a decision | `papermemory remember TEXT --concepts a,b --project SLUG --json` |
-| Save a durable rule | `papermemory lesson TEXT --concepts a,b --json` |
-| Store a claim | `papermemory claim TEXT --paper ID --evidence QUOTE --status extracted --json` |
-
-## Citation integrity
-
-- Cite only papers returned by `papermemory_cite` or `papermemory_get` (or the matching CLI).
-- If the hit is `verified: false` / `UNVERIFIED`, say so and do not treat the metadata as confirmed.
-- If cite returns no hits, say that memory has no source. Do not invent a title, year, DOI, or bibtex key.
-- Before finishing a section, run `cite_check`. Missing keys must be ingested or removed, not guessed.
-
-## Understanding a paper
-
-1. `paper_download` (DOI or URL) or `ingest` the PDF / arXiv / DOI.
-2. `pdf_to_markdown` to read the PDF; `papermemory_get` for stored claims and chunks.
-3. Save claims with an evidence quote and `status=extracted` until the quote is checked against stored paper text.
-4. `remember` the reading notes tagged with the bibtex key.
-
-## Writing a paper
-
-1. `recap` for venue, citation style, section word counts, open reviewer comments, terminology.
-2. Search claims/papers before writing related work. New literature still comes from `consensus_search` + `parallel_search`; ingest what you will cite.
-3. `remember` outline decisions and rejected phrasings.
-4. `cite_check` before calling a section done.
+`papermemory recap|search|list|outline|paper|cite|cite-check|claims|trace|verify|quote-check|ingest|register-ah|evidence-export|import-verdicts|sweep|catalog|health|log --json`.
+`papermemory verify CLAIM` walks provenance; `papermemory lookup KEY` is DOI
+metadata lookup (not the same command).
 
 ## Do not
 
-- Do not use the lab `notebook`, coding-agent memory, or generic session notes as the source of citations.
-- Do not mark a claim `verified` unless the evidence quote is in the stored paper text.
-- Do not `pip install papermemory` / `uv add papermemory` yourself — the plugin installs into `~/.dsh/papermemory` (or uses PATH / `PAPERMEMORY_CLI`).
+- Do not mark a claim verified by assertion; only the byte re-slice promotes it.
+- Do not invent titles, years, DOIs, or keys; missing keys are gaps to report.
+- Do not treat chunkless (metadata-only) papers as evidence; they are
+  bibliographic rows (`cite_state='chunkless'`).

@@ -52,18 +52,26 @@ def to_text(src: Path) -> str:
     return src.read_text(errors="replace")
 
 
-def add_source(project: Project, path: Path, sid: str, **meta) -> dict:
-    """Register a source: copy its text into sources/files/<id>.txt (read-only) and record its hash."""
-    text = to_text(path)
+def add_source(project: Project, path: Path, sid: str, *, keys=None, **meta) -> dict:
+    """Register a source: copy its text into sources/files/<id>.txt (read-only) and record its hash.
+
+    Markdown/text sources are byte-copied so the stored verbatim layer and its sha256
+    stay identical to the sender's raw document (no newline re-encoding)."""
+    src = Path(path)
     dest = project.root / "sources" / "files" / f"{sid}.txt"
     dest.parent.mkdir(parents=True, exist_ok=True)
     if dest.exists():
         dest.chmod(0o644)
-    dest.write_text(text)
+    if src.suffix.lower() in {".md", ".txt"}:
+        dest.write_bytes(src.read_bytes())
+    else:
+        dest.write_text(to_text(src))
     dest.chmod(0o444)
     reg = load_registry(project)
     entry = {"id": sid, **{k: v for k, v in meta.items() if v is not None}, "file": str(dest.relative_to(project.root)),
              "sha256": sha256_file(dest), "status": meta.get("status") or "ok"}
+    if keys:
+        entry["keys"] = list(keys)
     reg[sid] = {**reg.get(sid, {}), **entry}
     save_registry(project, reg)
     return reg[sid]
@@ -130,13 +138,24 @@ def doi_index(project: Project) -> dict[str, list[Path]]:
     return out
 
 
+def entry_for(reg: dict[str, dict], key: str) -> dict | None:
+    """Registry entry by citation key: the id itself or any alias registered with --keys."""
+    if key in reg:
+        return reg[key]
+    for entry in reg.values():
+        if key in (entry.get("keys") or []):
+            return entry
+    return None
+
+
 def resolve_all(project: Project, key: str, reg=None, smap=None, bib: dict | None = None, dois: dict | None = None) -> list[Path]:
     """Primary file for the key plus every other conversion of the same paper (same DOI). The DOI comes from the
     registry, the bibliography, or the primary file itself, so papers the key map does not list can still be found."""
     reg = load_registry(project) if reg is None else reg
     primary = resolve(project, key, reg, smap)
     dois = doi_index(project) if dois is None else dois
-    doi = (reg.get(key, {}).get("doi") or (bib.get(key).fields.get("doi") if bib and bib.get(key) else "") or "")
+    entry = entry_for(reg, key) or {}
+    doi = (entry.get("doi") or (bib.get(key).fields.get("doi") if bib and bib.get(key) else "") or "")
     doi = _norm_doi(str(doi)) if doi else ""
     if not doi and primary is not None:
         for d, fl in dois.items():
@@ -157,8 +176,9 @@ def resolve(project: Project, key: str, reg: dict[str, dict] | None = None, smap
     reg = load_registry(project) if reg is None else reg
     smap = source_map(project) if smap is None else smap
     cands: list[str] = []
-    if key in reg and reg[key].get("file"):
-        cands.append(reg[key]["file"])
+    entry = entry_for(reg, key)
+    if entry and entry.get("file"):
+        cands.append(entry["file"])
     if key in smap:
         cands.append(smap[key])
     for d in project.cfg.get("source_dirs", []) or []:

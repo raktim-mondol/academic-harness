@@ -15,3 +15,7 @@ unless the project asks for it; `http` (OpenAI-compatible) and `command`
 backends work without Pi.
 
 Python package unmodified.
+
+Local DSH patch (ahead of upstream): registry --keys citation-key aliases
+(entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt
+sources so AH copies stay byte-identical to the sender's raw document.

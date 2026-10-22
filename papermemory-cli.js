@@ -22,9 +22,9 @@ const UV_BIN = process.platform === 'win32' ? 'uv.exe' : 'uv'
 const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['python3', 'python']
 
 export const LOG = '[dsh-researchcraft] papermemory'
-export const MIN_PAPERMEMORY_VERSION = '0.1.0'
+export const MIN_PAPERMEMORY_VERSION = '0.2.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh2'
+const BUNDLE_REV = 'dsh13'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -159,7 +159,10 @@ function findPython() {
 export function resolvePaperMemoryLaunch() {
   const override = process.env.PAPERMEMORY_CLI?.trim()
   if (override) return launchFromCommand(override)
-  return findBundled() || findOnPath()
+  const bundled = findBundled()
+  if (bundled) return bundled
+  const onPath = findOnPath()
+  return onPath ? { ...onPath, readOnly: true } : undefined
 }
 
 export function run(command, args, { cwd, timeoutMs, env, signal, silent } = {}) {
@@ -226,8 +229,20 @@ function specWithPdf(dir) {
   return `${dir}[pdf]`
 }
 
-async function installBundled() {
-  const dir = bundledInstallDir()
+async function installedVersion(launch) {
+  try {
+    const result = await run(launch.command, cliArgs(launch, ['version', '--json']), {
+      timeoutMs: INIT_TIMEOUT_MS,
+      silent: true,
+    })
+    const parsed = parseJsonOutput(result.out)
+    return parsed?.version
+  } catch {
+    return undefined
+  }
+}
+
+async function installBundled() {  const dir = bundledInstallDir()
   const vendor = vendorDir()
   if (!existsSync(join(vendor, 'pyproject.toml'))) {
     console.warn(`${LOG}: vendored package missing at ${vendor}`)
@@ -240,7 +255,7 @@ async function installBundled() {
   const uv = findUv()
   let result = { code: 1, out: '', err: '' }
   if (uv) {
-    result = await run(uv, ['venv', join(dir, '.venv')], {
+    result = await run(uv, ['venv', '--clear', join(dir, '.venv')], {
       cwd: dir,
       timeoutMs: INSTALL_TIMEOUT_MS,
       silent: true,
@@ -257,7 +272,7 @@ async function installBundled() {
   }
   if (!uv || result.code !== 0 || !findBundled()) {
     const python = findPython()
-    result = await run(python, ['-m', 'venv', join(dir, '.venv')], {
+    result = await run(python, ['-m', 'venv', '--clear', join(dir, '.venv')], {
       cwd: dir,
       timeoutMs: INSTALL_TIMEOUT_MS,
       silent: true,
@@ -285,9 +300,44 @@ async function installBundled() {
     )
     return undefined
   }
+  const cliVersion = await installedVersion(launch)
+  if (!versionAtLeast(cliVersion, MIN_PAPERMEMORY_VERSION)) {
+    console.warn(
+      `${LOG}: installed papermemory version ${cliVersion || 'unknown'} is below `
+      + `${MIN_PAPERMEMORY_VERSION}; refusing a half-installed CLI`,
+    )
+    return undefined
+  }
   writeFileSync(versionStampPath(), `${wantStamp()}\n`)
-  console.warn(`${LOG}: CLI ready (${wantStamp()})`)
+  console.warn(`${LOG}: CLI ready (${wantStamp()}, version ${cliVersion})`)
   return launch
+}
+
+async function probeNdjson(launch, timeoutMs = 5000) {
+  return await new Promise((resolve) => {
+    const child = spawn(launch.command, [...(launch.args || []), 'mcp'], { stdio: ['pipe', 'pipe', 'pipe'] })
+    let settled = false
+    const done = (ok) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      try { child.kill('SIGKILL') } catch { /* gone */ }
+      resolve(ok)
+    }
+    const timer = setTimeout(() => done(false), timeoutMs)
+    child.stdout.once('data', (buf) => {
+      const text = buf.toString()
+      if (text.startsWith('Content-Length:')) return done(false)
+      done(text.includes('{') && text.includes('jsonrpc'))
+    })
+    child.on('error', () => done(false))
+    try {
+      child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }) + '\n')
+      child.stdin.end()
+    } catch {
+      done(false)
+    }
+  })
 }
 
 /**
@@ -306,8 +356,23 @@ export async function ensurePaperMemoryInstalled() {
   if (installed) return installed
   const onPath = findOnPath()
   if (onPath) {
-    console.warn(`${LOG}: bundled install missing; falling back to PATH ${onPath.command}`)
-    return onPath
+    const version = await installedVersion(onPath)
+    if (!versionAtLeast(version, MIN_PAPERMEMORY_VERSION)) {
+      console.warn(
+        `${LOG}: PATH fallback ${onPath.command} is version ${version || 'unknown'} `
+        + `(< ${MIN_PAPERMEMORY_VERSION}); not using it`,
+      )
+      return undefined
+    }
+    if (!(await probeNdjson(onPath))) {
+      console.warn(
+        `${LOG}: PATH fallback ${onPath.command} does not speak NDJSON MCP on startup; refusing it `
+        + '(Content-Length-only servers deadlock DSH)',
+      )
+      return undefined
+    }
+    console.warn(`${LOG}: bundled install missing; PATH fallback ${onPath.command} is read-only (${version})`)
+    return { ...onPath, readOnly: true, version }
   }
   return undefined
 }
@@ -315,6 +380,10 @@ export async function ensurePaperMemoryInstalled() {
 /** Create the SQLite store if it does not exist yet. */
 export async function ensurePaperMemoryDb(launch) {
   if (!launch) return false
+  if (launch.readOnly) {
+    console.warn(`${LOG}: init skipped: PATH fallback is read-only`)
+    return false
+  }
   const result = await run(launch.command, cliArgs(launch, ['init', '--json']), {
     timeoutMs: INIT_TIMEOUT_MS,
     env: papermemoryEnv(),
@@ -367,6 +436,9 @@ function parseJsonOutput(out) {
 export async function ingestDownloadedPaper({ path, doi, title, project, signal }) {
   const launch = resolvePaperMemoryLaunch() || await ensurePaperMemoryInstalled()
   if (!launch) return { ok: false, error: 'papermemory CLI not available' }
+  if (launch.readOnly) {
+    return { ok: false, error: 'papermemory-write-unavailable: plugin-managed install missing (PATH fallback is read-only)' }
+  }
   const env = papermemoryEnv()
   const extra = []
   if (project) extra.push('--project', project)
@@ -413,6 +485,9 @@ export async function ingestDownloadedPaper({ path, doi, title, project, signal 
     bibtex_key: paper?.bibtex_key || paper?.id,
     verified: Boolean(Number(paper?.verified)),
     doi: paper?.doi,
+    status: parsed?.status || 'created',
+    cite_state: parsed?.cite_state || paper?.cite_state,
+    degradation: parsed?.degradation || null,
   }
 }
 
@@ -421,13 +496,18 @@ export async function ingestDownloadedPaper({ path, doi, title, project, signal 
  *
  * @param {{ path: string, pdfPath?: string, doi?: string, project?: string, signal?: AbortSignal }} opts
  */
-export async function ingestConvertedMarkdown({ path, pdfPath, doi, project, signal }) {
+export async function ingestConvertedMarkdown({ path, pdfPath, doi, project, signal, converter, originChannel }) {
   const launch = resolvePaperMemoryLaunch() || await ensurePaperMemoryInstalled()
   if (!launch) return { ok: false, error: 'papermemory CLI not available' }
+  if (launch.readOnly) {
+    return { ok: false, error: 'papermemory-write-unavailable: plugin-managed install missing (PATH fallback is read-only)' }
+  }
   const args = ['ingest', path, '--json', '--kind', 'markdown']
   if (project) args.push('--project', project)
   if (doi) args.push('--doi', doi)
   if (pdfPath) args.push('--pdf-path', pdfPath)
+  if (converter) args.push('--converter-json', JSON.stringify(converter))
+  if (originChannel) args.push('--origin-channel', originChannel)
   const result = await run(launch.command, cliArgs(launch, args), {
     timeoutMs: INGEST_TIMEOUT_MS,
     env: papermemoryEnv(),
@@ -446,5 +526,8 @@ export async function ingestConvertedMarkdown({ path, pdfPath, doi, project, sig
     bibtex_key: paper?.bibtex_key || paper?.id,
     verified: Boolean(Number(paper?.verified)),
     doi: paper?.doi,
+    status: parsed?.status || 'created',
+    cite_state: parsed?.cite_state || paper?.cite_state,
+    degradation: parsed?.degradation || null,
   }
 }

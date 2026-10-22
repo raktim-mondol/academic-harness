@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 
 from ..context import Context, unit_ref
+from ..sources.registry import entry_for
 from ..tex.text import RE_CITE
 from .base import Finding, make
 
@@ -38,7 +39,7 @@ def check_t2(ctx: Context) -> list[Finding]:
                 add("BIB-01", ref, rel, ln, f"cite:{k}", f"\\cite key '{k}' is not in the bibliography")
     if ctx.registry:
         for k, where in sorted(cited.items()):
-            src = ctx.registry.get(k)
+            src = entry_for(ctx.registry, k)
             rel, ln, ref = where[0]
             if src is None:
                 add("BIB-02", ref, rel, ln, f"reg:{k}", f"cited key '{k}' is not in the source registry")

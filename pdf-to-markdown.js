@@ -51,6 +51,7 @@ export function applyPdfToMarkdown(ctx) {
         type: 'string',
         description: 'Workspace-relative output path for the Markdown, e.g. literature/smith-2024.md. Recommended instead of returning the full text inline.',
       },
+      doi: { type: 'string', description: 'Optional DOI to attach the converted markdown to the same PaperMemory record.' },
       ocr: {
         type: 'boolean',
         description: 'Selectively OCR pages the native extraction flags as low-quality (mode=auto). Requires PDFium/ONNX Runtime installed locally. Default false.',
@@ -68,7 +69,11 @@ export function applyPdfToMarkdown(ctx) {
           let text = `${head}\nwritten to: ${value.written_to}`
           if (value.papermemory?.ok) {
             const key = value.papermemory.bibtex_key
-            text += `\nPaperMemory: ingested markdown${key ? ` as ${key}` : ''}${value.papermemory.doi ? ` doi ${value.papermemory.doi}` : ''}`
+            const status = value.papermemory.status || 'ingested'
+            const citeState = value.papermemory.cite_state ? ` (${value.papermemory.cite_state})` : ''
+            text += `\nPaperMemory: ${status}${citeState}${key ? ` as ${key}` : ''}${value.papermemory.doi ? ` doi ${value.papermemory.doi}` : ''}`
+            const degraded = value.papermemory.degradation?.pages_needing_ocr_count
+            if (degraded) text += `; ${degraded} page(s) flagged for OCR (claims capped)`
           } else if (value.papermemory?.error) {
             text += `\nPaperMemory ingest skipped: ${value.papermemory.error}`
           }
@@ -121,15 +126,31 @@ export function applyPdfToMarkdown(ctx) {
         writeFileSync(outAbs, out.markdown, 'utf8')
         delete out.markdown
         out.written_to = args.write_to
-        try {
-          out.papermemory = await ingestConvertedMarkdown({
-            path: outAbs,
-            pdfPath: target,
-            project: process.env.PAPERMEMORY_PROJECT?.trim() || projectSlugFromCwd(cwd),
-            signal: exec.signal,
-          })
-        } catch (error) {
-          out.papermemory = { ok: false, error: error instanceof Error ? error.message : String(error) }
+        const subset = Array.isArray(args.pages) && args.pages.length > 0
+        if (subset) {
+          out.papermemory = { ok: false, error: 'page-subset conversion is not ingested (it would replace the full paper text with an excerpt)' }
+        } else {
+          try {
+            const originChannel = (
+              String(out.pdf_type || '').toLowerCase().includes('scanned')
+              || (out.pages_needing_ocr || []).length > 0
+            ) ? 'ocr-recovered' : 'converter'
+            out.papermemory = await ingestConvertedMarkdown({
+              path: outAbs,
+              pdfPath: target,
+              doi: args.doi,
+              project: process.env.PAPERMEMORY_PROJECT?.trim() || projectSlugFromCwd(cwd),
+              signal: exec.signal,
+              converter: {
+                pdf_type: out.pdf_type,
+                confidence: out.confidence,
+                pages_needing_ocr: out.pages_needing_ocr,
+              },
+              originChannel,
+            })
+          } catch (error) {
+            out.papermemory = { ok: false, error: error instanceof Error ? error.message : String(error) }
+          }
         }
       }
       return out
