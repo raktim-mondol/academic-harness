@@ -47,7 +47,7 @@ jobs:
       - name: Install the vendored PaperMemory package and its tests
         run: |
           python -m pip install --upgrade pip
-          pip install -e "vendor/papermemory[pdf]" pytest
+          pip install -e "vendor/papermemory[pdf]" pytest scipy pillow defusedxml
 
       - name: Run the PaperMemory test suite
         run: python -m pytest -q vendor/papermemory/tests
@@ -60,6 +60,18 @@ jobs:
           node scripts/test-search-normalize.mjs
           node scripts/test-search-ratelimit.mjs
           node scripts/test-search-execute.mjs
+
+      - name: Run non-search tool tests
+        run: |
+          node scripts/test-citation-format.mjs
+          node scripts/test-review-store.mjs
+          node scripts/test-review-tool.mjs
+          node scripts/test-integrity.mjs
+          node scripts/test-registries.mjs
+          node scripts/test-optional-tools.mjs
+          node scripts/test-audits.mjs
+          node scripts/test-grants.mjs
+          node scripts/test-nonsearch-tools.mjs
 
       - name: Check rename identity and migration
         run: |

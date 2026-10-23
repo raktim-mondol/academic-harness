@@ -1,10 +1,13 @@
 # academic-harness
 
+[![verify](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml/badge.svg)](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml)
+[![npm](https://img.shields.io/npm/v/academic-harness.svg)](https://www.npmjs.com/package/academic-harness)
+
 Academic Harness as a **DeepSeek Harness** profile: the DSH web UI and DSH agent, with its scientific skills, living lab notebook, and specialist subagents.
 
 ## Install
 
-Academic Harness 0.16+ requires **DeepSeek Harness 0.2.1 or later**. Install DSH first:
+Academic Harness 0.18 requires **DeepSeek Harness 0.2.1 or later**. Install DSH first:
 
 ```sh
 npm install -g @deepseek-ai/dsh
@@ -97,7 +100,7 @@ zg server off
 
 The Academic Harness profile's bundle patch sets `agent-preset-registry` `default: academic-harness` and inserts only `preset-academic-harness` (DSH 0.2+ no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **Academic Harness**, and the selector lists no legacy preset. Confirm the preset selector at the top of the message box reads "Academic Harness"; if it still says Standard/PTC, the profile patch did not apply.
 
-The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), and `paper_mcp` (Paper2Agent stdio mounts) are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
+The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation` (bibliography formatting/validation), `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy` (datasets and venue policy), and the optional `author_lookup`/`openreview` are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
 
 ## What it adds
 
@@ -127,6 +130,11 @@ The persona, the longer research system prompt (notebook discipline, specialist 
 - `runpod_run` (works with its API key) and `modal_run` (needs the optional `modal` SDK installed in the profile) for remote GPU/CPU compute offload, plus bundled `modal`/`runpod` skills covering the rest of each CLI (Serverless endpoints, volumes/secrets, Hub templates, …) — see [Remote compute](#remote-compute) — every preset
 - `research_template` tool over a ~330-template research-task catalogue (not DSH's Rhai `workflow` orchestrator) — every preset
 - Literature and web search: a `literature_search` multi-source router plus OpenAlex, Semantic Scholar, Crossref, arXiv, PubMed/Europe PMC, CORE, Elicit, FutureHouse, Consensus, Parallel, Brave, Tavily, Exa, Perplexity, and Jina Reader (native REST tools), plus Parallel, Firecrawl, and Scite (MCP connectors), `parallel_extract` (URL extraction), and `paper_download` (Unpaywall open-access PDF resolver) — **Academic Harness preset only**
+- Paper integrity: `integrity_check` (retraction / expression-of-concern / correction status from Crossref + OpenAlex, with the notice DOIs) — **Academic Harness preset only**
+- Reference and citation: `citation` (APA/Vancouver/Harvard/IEEE/Chicago/MLA formatting, BibTeX/RIS export, DOI→BibTeX, and validation) — **Academic Harness preset only** — see [References and citation](#references-and-citation)
+- Systematic reviews: `review` (protocol, record intake, two-stage screening, verbatim evidence, PRISMA-style counts, exports) — **Academic Harness preset only** — see [Systematic reviews](#systematic-reviews)
+- Clinical and regulatory evidence: `clinicaltrials` (ClinicalTrials.gov trials and posted results) and `openfda` (adverse events, recalls, 510(k), labels, food events) — **Academic Harness preset only** — see [Clinical and regulatory evidence](#clinical-and-regulatory-evidence)
+- Datasets and venue policy: `dataset_search` (DataCite discovery, Zenodo/Figshare file listings) and `journal_policy` (DOAJ + Sherpa Romeo OA/self-archiving policy) — **Academic Harness preset only** — see [Datasets and journal policy](#datasets-and-journal-policy)
 - `paper_mcp` tool — register a Paper2MCP stdio server from this workspace (`<cwd>/.dsh/paper-mcps.json`) so its tools can appear as `mcp__<serverName>__*` — **Academic Harness preset only** — see [Paper agents](#paper-agents-paper2agent)
 - [PaperMemory](https://github.com/raktim-mondol/papermemory) local academic memory: `mcp__papermemory__*` (search, ingest, cite, cite-check, recap, remember, claim). First Academic Harness start uses `papermemory` on PATH or installs the vendored package into `~/.dsh/papermemory`. `paper_download` auto-ingests the saved PDF. Store: `~/.local/share/papermemory/papermemory.db` — **Academic Harness preset only** — see [Paper memory](#paper-memory)
 - Workspace semantic search via [zvec-grep](https://github.com/zvec-ai/zvec-grep): `mcp__zvec_grep__zvec_grep_search` (local BM25 + vectors). First Academic Harness start installs the `zg` CLI into `~/.dsh/zvec-grep`. Indexing is **off at session start by default** (Settings → Index at session start); you can index later from chat, and the agent asks first when semantic search would help. While indexing, a progress bar with estimated time and Cancel is shown (no timeout) — exact lookup stays on native `grep` / `glob` — **Academic Harness preset only** — see [Workspace search](#workspace-search)
@@ -142,11 +150,11 @@ Every credential below (`PARALLEL_API_KEY`, `FIRECRAWL_API_KEY`, `CONSENSUS_API_
 
 The same Settings page also has an **Image model** dropdown for `IMAGE_MODEL` — not a credential, so it isn't password-masked and applies immediately on selection rather than needing Save (see [Image generation](#image-generation)). It also has two more model-id dropdowns, **Complex-task model** (`SUBAGENT_MODEL_COMPLEX`) and **Image-reading model** (`SUBAGENT_MODEL_VISION`) — not credentials either, but these two behave like the MCP connectors below, not like Image model: they need a restart to apply (see [Subagent model routing](#subagent-model-routing)). **zvec-grep embedding** (`ZVEC_GREP_EMBEDDING`) is the same restart-needed dropdown: it is passed into `zg server on` at mount time. **Index at session start** (`ZVEC_GREP_AUTO_INDEX`, default No) is live for the next Academic Harness session — no restart (see [Workspace search](#workspace-search)).
 
-Tools that call `resolveEnv()` per invocation (`image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`) pick up a Settings change on the very next call, no restart needed.
+Tools that call `resolveEnv()` per invocation (`image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`, `integrity_check`, `citation`, `review`, `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `author_lookup`) pick up a Settings change on the very next call, no restart needed.
 
 The MCP connectors (Parallel, Firecrawl, Scite, zvec-grep, PaperMemory) and the two subagent-model fields are different: the `academic-harness` agent preset mounts once as a standing composition shared by every chat session for the life of the running `dsh` process, so a change only reaches them after you **stop and restart `dsh` itself** — a new chat session on the same running process is not enough. `consensus_search`, `parallel_search`, and the academic database tools aren't MCP connectors — see below — so they don't have this restart requirement.
 
-**Also make sure the chat session is actually on the Academic Harness preset.** The MCP connectors, native academic-search tools (`literature_search`, `openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `paper_resolve`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`), `mcp__zvec_grep__zvec_grep_search`, and `mcp__papermemory__*` are wired into the `academic-harness` agent preset only; a session left on the default preset (Standard/PTC/etc.) has none of them, and calling one fails with `tools[name] is not a function`. Check the preset selector next to the session title (top of the message box for a new chat, top-left of an existing one) reads "Academic Harness" before asking the agent to search.
+**Also make sure the chat session is actually on the Academic Harness preset.** The MCP connectors, native academic-search tools (`literature_search`, `openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `paper_resolve`, `integrity_check`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`), `mcp__zvec_grep__zvec_grep_search`, and `mcp__papermemory__*` are wired into the `academic-harness` agent preset only; a session left on the default preset (Standard/PTC/etc.) has none of them, and calling one fails with `tools[name] is not a function`. Check the preset selector next to the session title (top of the message box for a new chat, top-left of an existing one) reads "Academic Harness" before asking the agent to search.
 
 ## Workspace search
 
@@ -228,16 +236,19 @@ Five keyless-by-default native tools cover the open bibliographic backbones:
 |---|---|---|---|
 | `openalex_search` | [OpenAlex](https://openalex.org) | `OPENALEX_API_KEY` optional | 300M+ CC0 works; `filter`, `query`, and `group_by`. Keyless 10 RPS, keyed 30 RPS; semantic queries 1 RPS. |
 | `s2_search` | [Semantic Scholar](https://www.semanticscholar.org/product/api) | `S2_API_KEY` optional | `relevance`, `bulk` (1,000/page), and ~500-word `snippet` modes; TLDRs and OA PDFs. Serialized at 1 RPS. |
-| `pubmed_search` | Europe PMC / PubMed | `NCBI_API_KEY`, `NCBI_EMAIL` optional | Europe PMC JSON by default (no key, MeSH support); `source: "ncbi"` uses E-utilities at 3 RPS (10 with a key). |
+| `pubmed_search` | Europe PMC / PubMed | `NCBI_API_KEY`, `NCBI_EMAIL` optional | Europe PMC JSON by default (no key, MeSH support); `source: "ncbi"` uses E-utilities at 3 RPS (10 with a key). `preprints: true` restricts to Europe PMC preprints (SRC:PPR). |
 | `arxiv_search` | [arXiv](https://info.arxiv.org/help/api/) | none | Fielded `ti:` / `au:` / `abs:` / `cat:` queries; serialized to one request every 3 s per arXiv's terms. |
 | `crossref_lookup` | [Crossref](https://www.crossref.org/documentation/retrieve-metadata/rest-api/) | `CROSSREF_MAILTO` optional | Canonical DOI metadata; the polite pool uses `CROSSREF_MAILTO`, falling back to `UNPAYWALL_EMAIL`. |
+| `integrity_check` | Crossref relationships + OpenAlex flags | `OPENALEX_API_KEY` optional | Retraction / expression-of-concern / correction status for a DOI or an exact title. |
 
 Two further tools work across them:
 
 - `openalex_citations` walks forward (`citations`) and backward (`references`) citation edges. Accepts a DOI, PMID, or OpenAlex ID.
 - `paper_resolve` converts between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID. Use it before citing when results came from more than one database, so the same paper is not cited twice under different IDs.
 
-All seven are native REST tools — no MCP mount and no restart requirement. Shared record normalization and per-provider rate limiting live in `search-normalize.js` and `search-http.js`. The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` added by domain, and keeps `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
+`integrity_check` reports publication status for a DOI (or an exact title): `retracted`, `expression_of_concern`, `corrected`, `clean`, `unknown`, or `not_found`, with the notice DOI for each signal. A registry that could not be queried produces `unknown` and names the failing source — a failed lookup is never presented as `clean`. PubPeer has no public API, so the tool returns its URL instead of scraping it, and status is not claim support: whether a paper backs a statement stays with PaperMemory `quote_check`/`trace` and scite. OpenAlex's keyless budget is shared per network, so an `unknown` with `openalex: OpenAlex API error 401` means the budget is exhausted — set `OPENALEX_API_KEY`.
+
+All eight are native REST tools — no MCP mount and no restart requirement. Shared record normalization and per-provider rate limiting live in `search-normalize.js` and `search-http.js`. The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` added by domain, and keeps `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
 
 `literature_search` is the router for one-shot discovery: auto mode runs OpenAlex + Semantic Scholar, adds PubMed for biomedical queries and arXiv for preprint/CS/physics queries, and accepts explicit sources including Crossref. It deduplicates across providers and fuses their rankings with reciprocal-rank fusion, so a paper found high in two indexes outranks one found once. Coverage is the top-N relevance slice per source, not exhaustive; use the source-specific tools afterward for filters, citation trails, or pagination.
 
@@ -313,6 +324,62 @@ The SQLite store is PaperMemory's default: `~/.local/share/papermemory/papermemo
 **Auto-ingest project scope.** Both auto-ingest paths pass the workspace root (`cwd`) to PaperMemory and let it resolve the project, in this order: `PAPERMEMORY_PROJECT` (slugified) → nearest `ah.yaml` ancestor → a manuscript whose `root_path` equals the workspace → `unassigned`. Explicit ingest uses the same resolution (`papermemory_ingest` with `cwd`, or CLI `papermemory ingest --cwd PATH`); an explicit `--project` wins over `cwd` and is slugified. Set `PAPERMEMORY_PROJECT` to override the detected project.
 
 **Project-key migration.** Papers ingested before v0.15.0 were tagged with the workspace directory slug. After upgrading, a new auto-ingest in the same workspace may land under the manuscript or `ah.yaml` slug instead, so one project can temporarily split across two keys. Set `PAPERMEMORY_PROJECT` to the old slug for new ingests, or re-ingest the affected papers under the canonical project; there is no automatic `project rekey` command.
+
+## References and citation
+
+`citation` is a preset-only native tool — local, no key — with four actions:
+
+- `format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers.
+- `bibtex` / `ris` export from CSL-JSON records, existing BibTeX/RIS text, or DOIs (Crossref content negotiation).
+- `validate` reports missing fields, duplicate DOIs/keys, and invalid DOIs; `check_dois: true` checks each DOI against Crossref (identity only, not claim support).
+
+The IEEE, Chicago author-date, and MLA CSL styles are vendored under `styles/` (CC BY-SA 3.0; see [styles/README.md](styles/README.md)). Set `CROSSREF_MAILTO` or `UNPAYWALL_EMAIL` for the Crossref polite pool.
+
+Use `citation` for the final bibliography. To pull a paper into the workspace and store citable evidence, use `paper_download` (open-access only) and PaperMemory — a reference in a manager is not verified evidence, so claims still need `papermemory_quote_check` / `papermemory_trace`.
+
+## Systematic reviews
+
+`review` is a preset-only native tool — local, no key, no database — that keeps a systematic or scoping review auditable. State lives under `<cwd>/.dsh/review/<slug>/` as append-only JSONL event logs plus a write-once `protocol.json`; the current state is derived from the log, so concurrent subagent writes cannot corrupt it and overrides keep their history.
+
+- `start` — question, databases, inclusion/exclusion criteria, date range. Refuses to overwrite an existing review unless `resume: true`.
+- `add` — records from a search tool's result array or a workspace JSON/JSONL file; deduplicates by DOI, PMID, arXiv ID, then normalized title+year, and logs every query in `search_log.jsonl`.
+- `screen` — `title_abstract` / `full_text` × `include` / `exclude` / `maybe`. A full-text decision requires a prior title/abstract include; exclude and maybe require a reason; re-screening requires `override: true`.
+- `evidence` — only after a full-text include; claim, verbatim quote, and location. The ledger stores the quote but does not verify it — PaperMemory `quote_check`/`trace` remains the verifier.
+- `status` — records, query counts, PRISMA-style stage counts, exclusion reasons, includes missing evidence.
+- `export` — `markdown` report skeleton, `csv` evidence table, or `json` full ledger under `exports/`; refuses to overwrite without `overwrite: true`.
+
+The tool never makes inclusion decisions — discovery stays in the search tools and every screening decision and reason comes from the user or the stated criteria. The `systematic-review-ledger` skill documents the full workflow.
+
+## Clinical and regulatory evidence
+
+Two preset-only native tools cover records that are not journal literature:
+
+- `clinicaltrials` — ClinicalTrials.gov API v2, free and keyless. `search` filters by `query` (free text), `condition`, `intervention`, `phase`, `status`, and `study_type`, returns normalized trials (NCT id, status, phase, enrollment, sponsor, conditions, interventions, endpoints, locations, `has_results`) and a `next_page_token`. `get` reads one NCT id; `include_results: true` adds posted outcome measures and adverse-event counts.
+- `openfda` — openFDA, free and keyless with a low shared daily quota (`OPENFDA_API_KEY` raises it; a 429 means the quota is exhausted). One `search` action over an allowlisted endpoint: `drug/event`, `drug/enforcement`, `device/event`, `device/510k`, `drug/label`, or `food/event`. The openFDA search expression is passed through unchanged, records are compacted per endpoint, and every response carries the source query URL. A no-match search is an empty result, not an error.
+
+Both are informational only — no medical or legal advice — and neither is a literature search: cite NCT ids/report numbers as registry evidence, not as peer-reviewed findings.
+
+## Datasets and journal policy
+
+- `dataset_search` — DataCite dataset discovery (`query`, `repository`, `year`, cursor paging) with DOI, title, creators, publisher, version, license, and landing URL. `get` reads one DOI; `files` lists file names/sizes/download URLs for Zenodo and Figshare DOIs and returns the landing URL for other repositories. Free, keyless, and no downloads. Optional `ZENODO_API_KEY`, `FIGSHARE_API_KEY`, and `DATACITE_API_KEY` are sent as auth headers when set (public data works without them).
+- `journal_policy` — venue policy from DOAJ (listing, APC, license, OA start year; keyless) plus Sherpa Romeo (preprint/postprint/published permissions, embargo, conditions; needs `SHERPA_ROMERO_API_KEY`). Without the key the result is DOAJ-only with an explicit `key_not_set` note. An unknown journal is `not_found`, an ambiguous title returns candidate ISSNs, and a failed lookup is `unknown` — never reported as "not listed".
+
+Both are compliance/discovery aids: cite dataset DOIs, never infer a license or APC, and treat policy output as compliance information rather than legal advice.
+
+## Optional tools
+
+Several tools ship behind an opt-in flag: `AH_ENABLE_OPTIONAL_TOOLS=1` (env only, not Settings). With the flag unset the tools are not registered at all — they are absent from the tool list and the system prompt. The preset rows always exist, so enabling the flag needs a **dsh restart**.
+
+- `author_lookup` — ORCID author search and single-ORCID records (name, works count, employment with ROR ids) plus ROR institution search/lookup (name, aliases, country, website). `ORCID_TOKEN` is optional and only raises limits; ROR is keyless. Ambiguous names return candidates — identities are never merged automatically.
+- `openreview` — OpenReview API v2 submission search, a forum's reviews/decision, and venue metadata. Read-only; fields a venue does not publish stay absent. OpenReview may answer with an HTTP 403 browser-verification challenge, in which case open the forum URL with `agent-browser`.
+- `pdf_references` — GROBID bibliography extraction from a workspace PDF. Requires `GROBID_BASE_URL` (for example `http://127.0.0.1:8070`) **in addition** to the flag; without a reachable GROBID service the tool reports the failure and never generates references itself. `resolve: true` checks each extracted DOI's title against Crossref.
+- `stat_audit` — recomputes p-values from reported t/F/χ²/z/r statistics and df, flags `p = 0` and incompatible statistic/p pairs, and optionally runs GRIM on reported means. Requires sciPy in the helper environment. Candidate inconsistencies only, never misconduct; GRIMMER is not implemented.
+- `figure_audit` — local inventory of figure files (dimensions, DPI, mode, format), low-DPI and missing-DPI flags, and dHash-based near-duplicate groups. Advisory; it does not detect manipulation.
+- `repo_audit` — static reproducibility checklist (README, LICENSE, environment file, tests, CI, entry points, data availability, release tag) for a local path or an https `repo_url` cloned into a temp dir. Code is not executed unless `run_tests: true`; `GITHUB_TOKEN` (env only) is optional for API metadata.
+- `grant_search` — funded-project and opportunity discovery: NIH RePORTER (awards, amounts, dates), NSF Award Search (awards), and Grants.gov (posted/forecast opportunities). Filters by query, PI, organization, and fiscal year; `get` reads one award/opportunity by id. Informational only, not grant-writing advice.
+- `patent_search` — PatentsView prior-art/assignee/inventor lookup over US patents with grant/priority dates and optional abstracts. **Requires `PATENTSVIEW_API_KEY` on every call**; without it the call returns a clear error. No legal-status or freedom-to-operate conclusions.
+
+`literature_search` also gains a `preprints` source (Europe PMC `SRC:PPR`) available without the flag, and chooses it automatically for biomedical queries that mention preprints.
 
 ## Paper agents (Paper2Agent)
 
@@ -444,6 +511,20 @@ A subagent the top-level agent delegates to runs in its own DSH session, but its
 
 `research_template` browses (`action: "list"`, filterable by `category`/`query`) and retrieves (`action: "get"`, with `values` filling `{placeholder}` tokens) a catalogue of ~330 one-click research-task prompt templates across 22 disciplines, ported from Academic Harness's own template library. It is a different tool from DSH's `workflow` (Rhai multi-agent scripts); the Academic Harness preset mounts both, so they cannot share a name.
 
+## Release notes
+
+### 0.18.0
+
+Academic tooling beyond search (see [docs/NON-SEARCH-TOOLS-PLAN.md](docs/NON-SEARCH-TOOLS-PLAN.md)):
+
+- `citation` — local APA/Vancouver/Harvard/IEEE/Chicago/MLA formatting, BibTeX/RIS export, DOI→BibTeX, and validation.
+- `integrity_check` — retraction / expression-of-concern / correction status from Crossref + OpenAlex (never `clean` on a failed lookup).
+- `review` — systematic/scoping-review ledger with protocol, screening, evidence, PRISMA-style counts, and exports (new `systematic-review-ledger` skill).
+- `clinicaltrials` and `openfda` — trial records/posted results and regulatory adverse-event/recall/510(k) data.
+- `dataset_search` and `journal_policy` — DataCite discovery with Zenodo/Figshare file listings, and DOAJ + Sherpa Romeo venue policy; new `ZENODO_API_KEY`, `FIGSHARE_API_KEY`, and `DATACITE_API_KEY` support.
+- Optional (`AH_ENABLE_OPTIONAL_TOOLS=1`): `author_lookup` (ORCID/ROR), `openreview`, `pdf_references` (BYO GROBID), `stat_audit`, `figure_audit`, `repo_audit`, `grant_search` (NIH/NSF/Grants.gov), and `patent_search` (PatentsView).
+- Europe PMC preprint routing: `pubmed_search preprints: true` and a `literature_search` `preprints` source (`SRC:PPR`).
+
 ## Development
 
 Every server-side file is plain ESM JS — no build step. The Settings page (`client/`) is the exception: it's a browser bundle (React, esbuild) served to the DSH web client, built with:
@@ -454,6 +535,15 @@ npm run build # after any client/ change — rebuilds lib/client.js
 ```
 
 `lib/client.js` is committed so installing the plugin never needs a build step or `pnpm approve-builds` for this package itself.
+
+The tool tests are plain Node scripts and need no network (the Python-helper cases skip themselves when sciPy/Pillow are unavailable):
+
+```sh
+for t in citation-format review-store review-tool integrity registries \
+         optional-tools audits grants nonsearch-tools; do
+  node scripts/test-$t.mjs
+done
+```
 
 ## License
 

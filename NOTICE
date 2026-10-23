@@ -155,5 +155,15 @@ template catalogue are adapted from the ResearchCraft codebase (MIT), a
 white-labeled fork of K-Dense BYOK — see
 https://github.com/K-Dense-AI/k-dense-byok.
 
+Citation formatting uses the open-source `citation-js` packages
+(`@citation-js/core`, `@citation-js/plugin-bibtex`, `@citation-js/plugin-csl`,
+`@citation-js/plugin-ris`, all MIT License) as npm dependencies, not vendored
+code. The CSL style files under `styles/` (`ieee.csl`,
+`chicago-author-date.csl`, `modern-language-association.csl`) are unmodified
+files from the Citation Style Language styles repository,
+https://github.com/citation-style-language/styles, retrieved 2026-10-23 and
+licensed under CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/).
+See `styles/README.md`.
+
 ResearchCraft branding and content © ResearchCraft.
 Site: https://researchcraft.dev

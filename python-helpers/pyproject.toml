@@ -20,4 +20,5 @@ dependencies = [
     "nibabel",
     "tifffile",
     "pillow",
+    "defusedxml",
 ]

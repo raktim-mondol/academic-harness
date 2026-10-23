@@ -16,6 +16,8 @@ metadata:
 
 # ClinicalTrials.gov
 
+> **In Academic Harness:** prefer the native `clinicaltrials` tool for trial search, NCT lookup, and posted results — `search` accepts condition/intervention/phase/status filters, `get` with `include_results: true` returns outcome measures and adverse-event counts. Keep this skill's Python client as a fallback when the native tool is unavailable or you need fields it does not normalize.
+
 The world's largest trial registry: roughly 560 000 studies, sponsor-submitted, going back to
 2000. It answers the question that no bench assay can — *has anyone already tried this in
 people, and what happened to them when they did.* For a target or an indication it is the

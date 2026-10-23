@@ -390,6 +390,8 @@
           # search-http.js. Kept in this preset, like consensus-search above.
           - id: paper-resolve
             name: academic-harness/paper-resolve
+          - id: integrity-check
+            name: academic-harness/integrity-check
           - id: openalex-search
             name: academic-harness/openalex-search
           - id: openalex-cite
@@ -431,6 +433,68 @@
           # here rather than global for the same reason as consensus-search above.
           - id: paper-download
             name: academic-harness/paper-download
+
+          # Citation formatting/export/validation (Phase 1 of docs/NON-SEARCH-TOOLS-PLAN.md).
+          # Native, preset-only, local tool: citation-js + CSL styles under styles/.
+          # See citation.js and citation-format.js.
+          - id: citation
+            name: academic-harness/citation
+
+          # Systematic/scoping-review ledger (Phase 3 of docs/NON-SEARCH-TOOLS-PLAN.md):
+          # protocol, records, two-stage screening, evidence, PRISMA counts, exports.
+          # Append-only event logs under <cwd>/.dsh/review/<slug>/; see review.js and
+          # review-store.js. The tool never makes inclusion decisions.
+          - id: review
+            name: academic-harness/review
+
+          # Clinical and regulatory evidence (Phase 4): ClinicalTrials.gov v2 trials and
+          # posted results, plus openFDA adverse events/recalls/510(k)/labels/food events.
+          # Free and keyless; OPENFDA_API_KEY only raises limits. Neither is a literature
+          # search. See clinicaltrials.js and openfda.js.
+          - id: clinicaltrials
+            name: academic-harness/clinicaltrials
+          - id: openfda
+            name: academic-harness/openfda
+
+          # Datasets and venue policy (Phase 5): DataCite dataset discovery with Zenodo/
+          # Figshare file listings, and DOAJ + Sherpa Romeo OA policy. Both free; Sherpa
+          # needs SHERPA_ROMERO_API_KEY for the policy half. See dataset-search.js and
+          # journal-policy.js.
+          - id: dataset-search
+            name: academic-harness/dataset-search
+          - id: journal-policy
+            name: academic-harness/journal-policy
+
+          # Optional Phase 6 tools (identity + peer review). These rows always exist,
+          # but apply() registers nothing unless AH_ENABLE_OPTIONAL_TOOLS=1, so the tools
+          # are absent from the base tool list and prompt by default. Changing the flag
+          # needs a dsh restart. See author-lookup.js and openreview.js.
+          - id: author-lookup
+            name: academic-harness/author-lookup
+          - id: openreview
+            name: academic-harness/openreview
+
+          # Optional Phase 7 local audits. Same gate as above (AH_ENABLE_OPTIONAL_TOOLS=1);
+          # pdf_references additionally requires GROBID_BASE_URL, and none of these are
+          # advertised in the base prompt. See stat-audit.js, figure-audit.js,
+          # pdf-references.js, and repo-audit.js.
+          - id: pdf-references
+            name: academic-harness/pdf-references
+          - id: stat-audit
+            name: academic-harness/stat-audit
+          - id: figure-audit
+            name: academic-harness/figure-audit
+          - id: repo-audit
+            name: academic-harness/repo-audit
+
+          # Optional Phase 8 funding/patent discovery. Same AH_ENABLE_OPTIONAL_TOOLS gate.
+          # patent_search additionally requires PATENTSVIEW_API_KEY on every call and
+          # returns a clear error without it. Neither is advertised in the base prompt.
+          # See grant-search.js and patent-search.js.
+          - id: grant-search
+            name: academic-harness/grant-search
+          - id: patent-search
+            name: academic-harness/patent-search
 
           # Paper2MCP stdio servers registered in this workspace
           # (`<cwd>/.dsh/paper-mcps.json`). Native `paper_mcp` (status/register/

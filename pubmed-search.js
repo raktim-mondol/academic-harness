@@ -30,9 +30,16 @@ function render(value) {
   return [{ type: 'text', text: `${header}\n\n${renderPapers(value.results || [])}` }]
 }
 
+/** Add Europe PMC's SRC:PPR restriction unless the query already scopes by SRC. */
+export function buildEuropePmcQuery(query, preprints) {
+  const raw = String(query || '').trim()
+  return preprints && !/\bSRC:/.test(raw) ? `(${raw}) AND SRC:PPR` : raw
+}
+
 async function searchEuropePmc(args, exec) {
+  const query = buildEuropePmcQuery(args.query, args.preprints)
   const params = new URLSearchParams({
-    query: String(args.query).trim(),
+    query,
     format: 'json',
     resultType: RESULT_TYPES.includes(args.result_type) ? args.result_type : 'lite',
     pageSize: String(Math.min(Math.max(Number(args.max_results) || 25, 1), 100)),
@@ -119,6 +126,9 @@ export async function runPubMedSearch(args, exec) {
   if (args.source && !SOURCES.includes(args.source)) {
     return { error: `source must be one of ${SOURCES.join(', ')}` }
   }
+  if (args.preprints && source === 'ncbi') {
+    return { error: 'preprints: true is Europe PMC only; use source="europepmc" (Europe PMC indexes bioRxiv/medRxiv)' }
+  }
   return source === 'ncbi' ? searchNcbi(args, exec) : searchEuropePmc(args, exec)
 }
 
@@ -130,12 +140,13 @@ export function apply(ctx) {
     name: 'pubmed_search',
     description: [
       'Search biomedical and life-sciences literature in Europe PMC (default) or PubMed via NCBI E-utilities.',
-      'Europe PMC needs no key, returns JSON, supports MeSH queries, and includes open-access full-text links. Use source="ncbi" when you specifically need PubMed/NCBI records; NCBI_API_KEY raises the limit from 3 to 10 RPS.',
+      'Europe PMC needs no key, returns JSON, supports MeSH queries, and includes open-access full-text links. Set `preprints: true` to restrict the query to Europe PMC preprints (SRC:PPR — bioRxiv, medRxiv, and other preprint servers). Use source="ncbi" when you specifically need PubMed/NCBI records; NCBI_API_KEY raises the limit from 3 to 10 RPS.',
       'Use this for clinical/biomedical questions; pair with openalex_search and s2_search for broader coverage, and consensus_search for study-design filters.',
     ].join(' '),
     parameters: {
       query: { type: 'string', required: true, description: 'Europe PMC or PubMed query, including MeSH terms.' },
       source: { type: 'string', enum: SOURCES, description: 'europepmc (default, no key) or ncbi (PubMed E-utilities).' },
+      preprints: { type: 'boolean', description: 'Europe PMC only: restrict to preprints via SRC:PPR (bioRxiv/medRxiv and others).' },
       result_type: { type: 'string', enum: RESULT_TYPES, description: 'Europe PMC result detail: lite (default) or core.' },
       max_results: { type: 'number', description: 'Max results, 1-100. Default 25.' },
       cursor_mark: { type: 'string', description: 'Europe PMC cursorMark from a previous response, for paging.' },

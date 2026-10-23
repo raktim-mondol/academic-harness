@@ -10,6 +10,8 @@ metadata:
 
 # Citation Management
 
+> **In Academic Harness:** prefer the native `citation` tool for bibliography formatting, BibTeX/RIS export, DOI→BibTeX, and validation. Use this skill for Google Scholar/PubMed workflows, metadata extraction beyond the tool's actions, or when `citation` is unavailable.
+
 ## Overview
 
 Manage citations systematically throughout the research and writing process. This skill provides tools and strategies for searching academic databases (Google Scholar, PubMed), extracting accurate metadata from multiple sources (CrossRef, PubMed, arXiv), validating citation information, and generating properly formatted BibTeX entries.

@@ -15,9 +15,10 @@ import { runPubMedSearch } from './pubmed-search.js'
 import { runArxivSearch } from './arxiv-search.js'
 import { runCrossrefQuery } from './crossref-lookup.js'
 
-const ALLOWED = ['openalex', 's2', 'pubmed', 'arxiv', 'crossref']
+const ALLOWED = ['openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints']
 const BIOMEDICAL = /\b(clinic|clinical|patient|patients|trial|trials|disease|therapy|therapies|treatment|cancer|tumou?r|gene|genes|genetic|protein|proteins|cell|cells|drug|drugs|medical|medicine|health|epidemi\w*|cohort|rct|surgery|surgical|diagnos\w*|psychiatr\w*|neuron\w*|biolog\w*|immun\w*|infect\w*|virus|viral|vaccine|malaria|diabetes|alzheimer|parkinson|cardio\w*|oncology)\b/i
-const PREPRINT = /\b(arxiv|preprint|neural|machine learning|deep learning|transformer|transformers|llm|llms|language model|computer vision|algorithm|algorithms|quantum|physics|astrophysic\w*|cosmolog\w*|particle|mathematic\w*|theorem|robot\w*|reinforcement learning|dataset|benchmark|computational)\b/i
+const PREPRINT = /\b(arxiv|preprints?|neural|machine learning|deep learning|transformer|transformers|llm|llms|language model|computer vision|algorithm|algorithms|quantum|physics|astrophysic\w*|cosmolog\w*|particle|mathematic\w*|theorem|robot\w*|reinforcement learning|dataset|benchmark|computational)\b/i
+const ASKS_FOR_PREPRINTS = /\b(preprints?|biorxiv|medrxiv)\b/i
 const STOPWORDS = new Set([
   'a', 'an', 'the', 'of', 'for', 'and', 'or', 'in', 'on', 'to', 'with', 'by',
   'from', 'at', 'is', 'are', 'be', 'as', 'that', 'this', 'these', 'those',
@@ -54,6 +55,7 @@ export function chooseSources(query, requested) {
   const sources = ['openalex', 's2']
   if (BIOMEDICAL.test(query)) sources.push('pubmed')
   if (PREPRINT.test(query)) sources.push('arxiv')
+  if (BIOMEDICAL.test(query) && ASKS_FOR_PREPRINTS.test(query)) sources.push('preprints')
   return sources
 }
 
@@ -89,6 +91,13 @@ async function runSource(source, { query, perSource, yearMin, yearMax, openAcces
         query: arxivDiscoveryQuery(query),
         field: 'all',
         max_results: Math.min(perSource, 200),
+      }, { signal })
+    case 'preprints':
+      return runPubMedSearch({
+        query: openAccessOnly ? `(${query}) AND OPEN_ACCESS:y` : query,
+        source: 'europepmc',
+        preprints: true,
+        max_results: Math.min(perSource, 100),
       }, { signal })
     case 'crossref': {
       const filters = []
@@ -144,7 +153,7 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'literature_search',
     description: [
-      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries and arXiv for preprint/CS/physics queries; Crossref is available explicitly.',
+      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries, arXiv for preprint/CS/physics queries, and Europe PMC preprints (SRC:PPR) when a biomedical query asks for preprints; Crossref and preprints are also available explicitly.',
       'Results are deduplicated and rank-fused across sources (reciprocal-rank fusion), so use this when you want one clean discovery list instead of issuing the same query to several tools. Coverage is the top-N relevance slice per source, not exhaustive; use source-specific tools for filters, citation trails, or pagination.',
       'Optional year range and open_access_only filters. source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
     ].join(' '),
@@ -155,7 +164,7 @@ export function apply(ctx) {
           { type: 'string' },
           { type: 'array', items: { type: 'string' } },
         ],
-        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref. Accepts an array or comma-separated string.',
+        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints. Accepts an array or comma-separated string.',
       },
       max_results: { type: 'number', description: 'Total unique results to return, 1-100. Default 20. This is a top-N slice, not exhaustive coverage.' },
       year_min: { type: 'number', description: 'Earliest publication year. Records with unknown years are kept.' },

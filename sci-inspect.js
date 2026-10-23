@@ -1,8 +1,8 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { isAbsolute, join, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { helpersDir, pythonBin } from './python-runtime.js'
 
 const KINDS = ['chem', 'structure', 'massspec', 'arrays', 'imaging', 'anndata']
 
@@ -13,25 +13,6 @@ const KIND_TO_SCRIPT = {
   arrays: 'arrays_helper.py',
   imaging: 'imaging_helper.py',
   anndata: 'anndata_helper.py',
-}
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-
-function helpersDir() {
-  return process.env.ACADEMIC_HARNESS_HELPERS_DIR
-    || process.env.RESEARCHCRAFT_HELPERS_DIR
-    || join(HERE, 'python-helpers')
-}
-
-function pythonBin() {
-  const override = process.env.ACADEMIC_HARNESS_PYTHON || process.env.RESEARCHCRAFT_PYTHON
-  if (override) return override
-  const dir = helpersDir()
-  const venv = process.platform === 'win32'
-    ? join(dir, '.venv', 'Scripts', 'python.exe')
-    : join(dir, '.venv', 'bin', 'python')
-  if (existsSync(venv)) return venv
-  return process.platform === 'win32' ? 'python' : 'python3'
 }
 
 function workspaceRoot(exec) {
