@@ -94,6 +94,24 @@ Parallel search has four modes. Pick one on every \`parallel_search\` call. Alwa
 - \`basic\` (~1s) — longer excerpts per source; 2-3 high-quality queries. Use this (or \`advanced\`) for peer-reviewed literature.
 - \`advanced\` (~3s) — multi-hop retrieval for literature surveys, deep research, and background for a code-review. Quality over latency. Prefer this over \`basic\` when the literature question spans several papers or hops.
 
+\`brave_search\` (needs \`BRAVE_API_KEY\`) is an independent-index general web fallback when \`parallel_search\` is unset or failing; it is not a literature index. \`parallel_extract\` is the native URL-reading path (focused excerpts, or full content with \`full_content: true\`) and takes the same \`PARALLEL_API_KEY\` — use it, \`mcp__parallel__web_fetch\`, or \`mcp__firecrawl__firecrawl_scrape\` once you already have a URL. Firecrawl's mounted tools are \`firecrawl_scrape\`, \`firecrawl_search\`, and \`firecrawl_parse\`; do not assume a paper-search tool is mounted.
+
+\`tavily_search\` (\`TAVILY_API_KEY\`), \`exa_search\` (\`EXA_API_KEY\`), and \`perplexity_search\` (\`PERPLEXITY_API_KEY\`) are additional general web indexes: Tavily for chunked content and topic modes, Exa for neural/entity search, Perplexity for raw ranked results with strict domain/date filters. \`jina_read\` (\`JINA_API_KEY\` optional) converts a URL or PDF to Markdown — keyless Reader is 20 RPM — and runs a Jina web search when a key is set. None of these is a literature index; use the academic database tools for papers.
+
+### Academic databases
+
+These are the open bibliographic backbones. All are native tools; only Semantic Scholar and OpenAlex benefit from a key, and keys raise limits rather than unlocking access.
+
+- \`openalex_search\` — OpenAlex's 300M+ CC0 works. Best for structured discovery: \`filter\` for exact facets, \`query\` for relevance, \`group_by\` for counts. Semantic queries are capped at 1 RPS.
+- \`s2_search\` — Semantic Scholar: \`relevance\` (default), \`bulk\` (boolean queries, 1,000 per page), and \`snippet\` (~500-word full-text excerpts). Returns TLDRs, citation counts, and OA PDFs.
+- \`pubmed_search\` — Europe PMC by default (JSON, no key, MeSH support); \`source: "ncbi"\` uses E-utilities and honors \`NCBI_API_KEY\`/\`NCBI_EMAIL\`. Use for biomedical questions.
+- \`arxiv_search\` — fielded preprint search (\`ti:\`, \`au:\`, \`abs:\`, \`cat:\`). One request every 3 seconds by design, so do not fan out many calls at once.
+- \`crossref_lookup\` — canonical DOI metadata. Set \`CROSSREF_MAILTO\` (or reuse \`UNPAYWALL_EMAIL\`) for the polite pool.
+- \`openalex_citations\` — forward (\`citations\`) and backward (\`references\`) citation trails.
+- \`paper_resolve\` — convert between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID. Resolve identifiers before citing; never treat two IDs for the same paper as two sources.
+
+For peer-reviewed discovery, start with \`openalex_search\` + \`s2_search\`; add \`pubmed_search\` for biomedical and \`arxiv_search\` for preprints. Use \`consensus_search\` when you need study-design filters or per-paper takeaways, and \`parallel_search\` (\`basic\`/\`advanced\`) for web + literature excerpts. Do not send the identical query to more than three sources in one round — complement, don't duplicate. Before citing, resolve the identifier with \`paper_resolve\` and ingest the paper into PaperMemory.
+
 When a task needs a real rendered browser rather than a text fetch — exploring a site interactively, logging in, filling out or submitting a form, clicking through to a dataset download, or checking that a page actually renders right — load the \`agent-browser\` skill with the \`skill\` tool and drive the \`agent-browser\` CLI via \`bash\`. Install it yourself if missing (\`npm i -g agent-browser && agent-browser install\`, or \`npx agent-browser@latest ...\` for a one-off) rather than asking the user to. Its accessibility-tree \`snapshot\`/\`read\` commands cover most of this without any image at all; the moment it takes a \`screenshot\` (visual layout, a chart-heavy page, confirming something looks right), delegate reading that image to \`subagent_vision\` — the current session's model is not guaranteed to have vision input, so never guess at a screenshot's content yourself.
 
 When a claim really needs the full paper rather than an abstract or search snippet — verifying a specific number, method detail, or figure a search result only summarizes — call \`paper_download\` with the DOI (needs UNPAYWALL_EMAIL) or a direct PDF URL to pull it into the workspace, rather than reasoning from the snippet alone. It resolves the DOI to an open-access copy via Unpaywall and returns a clear "paywalled, no open-access copy" result (not an error) when there isn't one — tell the user that rather than fabricating what the paper says. A successful download is also ingested into PaperMemory (see below).
@@ -102,7 +120,7 @@ Once a paper is downloaded as a PDF (via \`paper_download\` or otherwise), call 
 
 ## Paper memory
 
-Local academic memory ([PaperMemory](https://github.com/raktim-mondol/papermemory)) is mounted as \`mcp__papermemory__*\` on this preset. It is the source of citations and stored claims for papers you have ingested. \`consensus_search\` / \`parallel_search\` still find new literature; ingest what you will cite. Papers enter as markdown (each paper one \`.md\`), through \`pdf_to_markdown write_to\` (auto-ingest), or via \`papermemory_ingest\`. Load the \`papermemory\` skill on paper-writing or paper-reading work.
+Local academic memory ([PaperMemory](https://github.com/raktim-mondol/papermemory)) is mounted as \`mcp__papermemory__*\` on this preset. It is the source of citations and stored claims for papers you have ingested. The academic database tools (\`openalex_search\`, \`s2_search\`, \`pubmed_search\`, \`arxiv_search\`), \`consensus_search\`, and \`parallel_search\` still find new literature; ingest what you will cite. Papers enter as markdown (each paper one \`.md\`), through \`pdf_to_markdown write_to\` (auto-ingest), or via \`papermemory_ingest\`. Load the \`papermemory\` skill on paper-writing or paper-reading work.
 
 - On any paper-writing or paper-reading task, call \`mcp__papermemory__papermemory_recap\` first, scoped to the manuscript/project. If it returns \`empty_reason: project-not-found\`, use one of its \`known_projects\` — do not fall back to a global search and present other projects' papers as this project's evidence.
 - Claims are verbatim-anchored: every \`papermemory_claim\` needs an \`evidence\` quote that exists in the stored markdown. A claim without a quote is refused; a quote that is not in the paper is refused; a whitespace-only mismatch is stored as \`unverified-quote\` with \`asserted-quote-differs\`. Use \`papermemory_quote_check\` first when unsure, then \`papermemory_trace\` (claim walk; the CLI equivalent is \`papermemory verify CLAIM\`) to confirm provenance before quoting.
@@ -159,7 +177,7 @@ The moment a Runpod or Modal task needs more than \`runpod_run\`/\`modal_run\` c
 
 ## Workspace search
 
-Local files in this working directory are searched with two complementary tools. Do not use literature/web search (\`consensus_search\`, \`parallel_search\`, \`mcp__firecrawl__*\`, \`web_search\`) for content that should come from the workspace.
+Local files in this working directory are searched with two complementary tools. Do not use literature/web search (\`openalex_search\`, \`s2_search\`, \`pubmed_search\`, \`arxiv_search\`, \`consensus_search\`, \`parallel_search\`, \`brave_search\`, \`tavily_search\`, \`exa_search\`, \`perplexity_search\`, \`parallel_extract\`, \`jina_read\`, \`mcp__firecrawl__*\`, \`web_search\`) for content that should come from the workspace.
 
 - Exact word, quotation, identifier, filename, path, regex, or exhaustive occurrence list — native \`grep\` / \`glob\`. Do not call zvec-grep for these.
 - Wording or location unknown, or the answer needs semantic, fuzzy, relationship, chronology, causality, comparison, or cross-file synthesis — \`mcp__zvec_grep__zvec_grep_search\` (Academic Harness preset; needs a local zg index).

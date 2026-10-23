@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -69,6 +69,75 @@ for (const [file, source] of [['paper-download.js', download], ['pdf-to-markdown
   check(!source.includes('projectSlugFromCwd'), `${file} still writes a cwd-derived project slug`)
 }
 check(prompt.includes('PAPERMEMORY_PROJECT'), 'prompt.js does not document the PAPERMEMORY_PROJECT override')
+
+check(existsSync(join(root, 'scripts/test-search-execute.mjs')), 'missing scripts/test-search-execute.mjs')
+
+const searchModules = {
+  'search-normalize.js': null,
+  'search-http.js': null,
+  'paper-resolve.js': 'paper_resolve',
+  'openalex-search.js': 'openalex_search',
+  'openalex-cite.js': 'openalex_citations',
+  'semantic-scholar-search.js': 's2_search',
+  'crossref-lookup.js': 'crossref_lookup',
+  'arxiv-search.js': 'arxiv_search',
+  'pubmed-search.js': 'pubmed_search',
+}
+for (const [file, tool] of Object.entries(searchModules)) {
+  const path = join(root, file)
+  check(existsSync(path), `missing search module: ${file}`)
+  if (!existsSync(path)) continue
+  const source = readFileSync(path, 'utf8')
+  if (tool) {
+    check(source.includes('export const name'), `${file} does not export a plugin name`)
+    check(source.includes(`name: '${tool}'`), `${file} does not register ${tool}`)
+  }
+}
+
+const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
+for (const [file, tool] of Object.entries(searchModules)) {
+  if (!tool) continue
+  const slug = file.replace(/\.js$/, '')
+  check(pkg.exports?.[`./${slug}`] === `./${file}`, `package.json missing export ${slug}`)
+  check(pkg.files?.includes(file), `package.json files missing ${file}`)
+}
+
+const presetSource = readFileSync(join(root, 'presets/academic-harness/agent.cordis.yml'), 'utf8')
+for (const slug of ['paper-resolve', 'openalex-search', 'openalex-cite', 'semantic-scholar-search', 'crossref-lookup', 'arxiv-search', 'pubmed-search', 'parallel-extract', 'brave-search', 'tavily-search', 'exa-search', 'perplexity-search', 'jina-reader']) {
+  check(presetSource.includes(`academic-harness/${slug}`), `preset missing row ${slug}`)
+}
+
+for (const marker of ['openalex_search', 's2_search', 'pubmed_search', 'arxiv_search', 'crossref_lookup', 'paper_resolve', 'openalex_citations', 'brave_search', 'parallel_extract', 'tavily_search', 'exa_search', 'perplexity_search', 'jina_read', 'Academic databases']) {
+  check(prompt.includes(marker), `prompt.js missing search marker: ${marker}`)
+}
+
+const arxivSource = readFileSync(join(root, 'arxiv-search.js'), 'utf8')
+check(arxivSource.includes('minIntervalMs: 3000, maxConcurrent: 1'), 'arxiv_search lost its 3s / single-connection limiter')
+
+const webModules = {
+  'parallel-extract.js': 'parallel_extract',
+  'brave-search.js': 'brave_search',
+  'tavily-search.js': 'tavily_search',
+  'exa-search.js': 'exa_search',
+  'perplexity-search.js': 'perplexity_search',
+  'jina-reader.js': 'jina_read',
+}
+for (const [file, tool] of Object.entries(webModules)) {
+  const path = join(root, file)
+  check(existsSync(path), `missing search module: ${file}`)
+  if (!existsSync(path)) continue
+  const source = readFileSync(path, 'utf8')
+  check(source.includes('export const name'), `${file} does not export a plugin name`)
+  check(source.includes(`name: '${tool}'`), `${file} does not register ${tool}`)
+  const slug = file.replace(/\.js$/, '')
+  check(pkg.exports?.[`./${slug}`] === `./${file}`, `package.json missing export ${slug}`)
+  check(pkg.files?.includes(file), `package.json files missing ${file}`)
+}
+
+const settingsSource = readFileSync(join(root, 'settings-keys.js'), 'utf8')
+for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY']) {
+  check(settingsSource.includes(key), `settings-keys.js missing ${key}`)
+}
 
 if (failures.length) {
   console.error('Phase 7 surface check FAILED:')

@@ -357,6 +357,51 @@
           - id: parallel-search
             name: academic-harness/parallel-search
 
+          # Parallel Extract REST (x-api-key) — native URL extraction (excerpts or full
+          # content) with the same PARALLEL_API_KEY as parallel_search. Use after search
+          # has produced URLs; see parallel-extract.js.
+          - id: parallel-extract
+            name: academic-harness/parallel-extract
+
+          # Brave web search (independent index, x-subscription-token) — general web
+          # fallback, not a literature index. Requires BRAVE_API_KEY; see brave-search.js.
+          - id: brave-search
+            name: academic-harness/brave-search
+
+          # Additional general web indexes and readers (Phase 3): Tavily, Exa,
+          # Perplexity Search, and Jina Reader/Search. Native REST tools, not literature
+          # indexes; each requires its own key except keyless Jina Reader. See
+          # tavily-search.js, exa-search.js, perplexity-search.js, jina-reader.js.
+          - id: tavily-search
+            name: academic-harness/tavily-search
+          - id: exa-search
+            name: academic-harness/exa-search
+          - id: perplexity-search
+            name: academic-harness/perplexity-search
+          - id: jina-reader
+            name: academic-harness/jina-reader
+
+          # Free academic backbones: OpenAlex, Semantic Scholar, Crossref, arXiv, and
+          # PubMed/Europe PMC. All are native REST tools, keyless by default; the keys
+          # in Settings only raise rate/budget limits. paper-resolve converts between
+          # DOI/PMID/arXiv/OpenAlex/S2 identifiers so the same paper is not treated as
+          # two. Shared normalization and rate limiting live in search-normalize.js and
+          # search-http.js. Kept in this preset, like consensus-search above.
+          - id: paper-resolve
+            name: academic-harness/paper-resolve
+          - id: openalex-search
+            name: academic-harness/openalex-search
+          - id: openalex-cite
+            name: academic-harness/openalex-cite
+          - id: semantic-scholar-search
+            name: academic-harness/semantic-scholar-search
+          - id: crossref-lookup
+            name: academic-harness/crossref-lookup
+          - id: arxiv-search
+            name: academic-harness/arxiv-search
+          - id: pubmed-search
+            name: academic-harness/pubmed-search
+
           # Consensus is a plain REST tool (x-api-key auth), not an MCP client — see
           # consensus-search.js. Kept in this preset alongside the connectors above
           # rather than global, since it's specifically an academic-search capability.

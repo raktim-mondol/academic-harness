@@ -55,6 +55,12 @@ jobs:
       - name: Check the MCP tool surface and plugin guidance
         run: PM_CLI="$(command -v papermemory)" node scripts/test-phase7.mjs
 
+      - name: Run search provider tests
+        run: |
+          node scripts/test-search-normalize.mjs
+          node scripts/test-search-ratelimit.mjs
+          node scripts/test-search-execute.mjs
+
       - name: Check rename identity and migration
         run: |
           node scripts/test-rename.mjs

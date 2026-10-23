@@ -126,7 +126,7 @@ The persona, the longer research system prompt (notebook discipline, specialist 
 - `pdf_to_markdown` tool (PDF → Markdown, via [pdf-inspector](https://github.com/firecrawl/pdf-inspector)) for literature-survey conversion of downloaded papers — every preset
 - `runpod_run` (works with its API key) and `modal_run` (needs the optional `modal` SDK installed in the profile) for remote GPU/CPU compute offload, plus bundled `modal`/`runpod` skills covering the rest of each CLI (Serverless endpoints, volumes/secrets, Hub templates, …) — see [Remote compute](#remote-compute) — every preset
 - `research_template` tool over a ~330-template research-task catalogue (not DSH's Rhai `workflow` orchestrator) — every preset
-- Academic search: Parallel, Firecrawl, Scite (MCP connectors), `parallel_search` / `consensus_search` (native REST tools), and `paper_download` (Unpaywall open-access PDF resolver) — **Academic Harness preset only**
+- Literature and web search: OpenAlex, Semantic Scholar, Crossref, arXiv, PubMed/Europe PMC, Consensus, Parallel, Brave, Tavily, Exa, Perplexity, and Jina Reader (native REST tools), plus Parallel, Firecrawl, and Scite (MCP connectors), `parallel_extract` (URL extraction), and `paper_download` (Unpaywall open-access PDF resolver) — **Academic Harness preset only**
 - `paper_mcp` tool — register a Paper2MCP stdio server from this workspace (`<cwd>/.dsh/paper-mcps.json`) so its tools can appear as `mcp__<serverName>__*` — **Academic Harness preset only** — see [Paper agents](#paper-agents-paper2agent)
 - [PaperMemory](https://github.com/raktim-mondol/papermemory) local academic memory: `mcp__papermemory__*` (search, ingest, cite, cite-check, recap, remember, claim). First Academic Harness start uses `papermemory` on PATH or installs the vendored package into `~/.dsh/papermemory`. `paper_download` auto-ingests the saved PDF. Store: `~/.local/share/papermemory/papermemory.db` — **Academic Harness preset only** — see [Paper memory](#paper-memory)
 - Workspace semantic search via [zvec-grep](https://github.com/zvec-ai/zvec-grep): `mcp__zvec_grep__zvec_grep_search` (local BM25 + vectors). First Academic Harness start installs the `zg` CLI into `~/.dsh/zvec-grep`. Indexing is **off at session start by default** (Settings → Index at session start); you can index later from chat, and the agent asks first when semantic search would help. While indexing, a progress bar with estimated time and Cancel is shown (no timeout) — exact lookup stays on native `grep` / `glob` — **Academic Harness preset only** — see [Workspace search](#workspace-search)
@@ -135,22 +135,22 @@ The persona, the longer research system prompt (notebook discipline, specialist 
 
 ## API keys
 
-Every credential below (`PARALLEL_API_KEY`, `FIRECRAWL_API_KEY`, `CONSENSUS_API_KEY`, `SCITE_API_KEY`, `UNPAYWALL_EMAIL`, `GEMINI_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `RUNPOD_API_KEY`, `ZVEC_GREP_API_KEY`) can be set two ways:
+Every credential below (`PARALLEL_API_KEY`, `FIRECRAWL_API_KEY`, `CONSENSUS_API_KEY`, `SCITE_API_KEY`, `BRAVE_API_KEY`, `TAVILY_API_KEY`, `EXA_API_KEY`, `PERPLEXITY_API_KEY`, `JINA_API_KEY`, `UNPAYWALL_EMAIL`, `OPENALEX_API_KEY`, `S2_API_KEY`, `CROSSREF_MAILTO`, `NCBI_API_KEY`, `NCBI_EMAIL`, `GEMINI_API_KEY`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `RUNPOD_API_KEY`, `ZVEC_GREP_API_KEY`) can be set two ways:
 
 - **Settings → Academic Harness API keys** in the DSH web UI — type a key, Save. Persisted in the profile's `settings.yaml`; a blank field always means "keep the current value", Clear removes it.
 - **Shell environment variable** — takes priority over Settings when both are set.
 
 The same Settings page also has an **Image model** dropdown for `IMAGE_MODEL` — not a credential, so it isn't password-masked and applies immediately on selection rather than needing Save (see [Image generation](#image-generation)). It also has two more model-id dropdowns, **Complex-task model** (`SUBAGENT_MODEL_COMPLEX`) and **Image-reading model** (`SUBAGENT_MODEL_VISION`) — not credentials either, but these two behave like the MCP connectors below, not like Image model: they need a restart to apply (see [Subagent model routing](#subagent-model-routing)). **zvec-grep embedding** (`ZVEC_GREP_EMBEDDING`) is the same restart-needed dropdown: it is passed into `zg server on` at mount time. **Index at session start** (`ZVEC_GREP_AUTO_INDEX`, default No) is live for the next Academic Harness session — no restart (see [Workspace search](#workspace-search)).
 
-Tools that call `resolveEnv()` per invocation (`image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `paper_download`) pick up a Settings change on the very next call, no restart needed.
+Tools that call `resolveEnv()` per invocation (`image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`) pick up a Settings change on the very next call, no restart needed.
 
-The MCP connectors (Parallel, Firecrawl, Scite, zvec-grep, PaperMemory) and the two subagent-model fields are different: the `academic-harness` agent preset mounts once as a standing composition shared by every chat session for the life of the running `dsh` process, so a change only reaches them after you **stop and restart `dsh` itself** — a new chat session on the same running process is not enough. `consensus_search` and `parallel_search` aren't MCP connectors — see below — so they don't have this restart requirement.
+The MCP connectors (Parallel, Firecrawl, Scite, zvec-grep, PaperMemory) and the two subagent-model fields are different: the `academic-harness` agent preset mounts once as a standing composition shared by every chat session for the life of the running `dsh` process, so a change only reaches them after you **stop and restart `dsh` itself** — a new chat session on the same running process is not enough. `consensus_search`, `parallel_search`, and the academic database tools aren't MCP connectors — see below — so they don't have this restart requirement.
 
-**Also make sure the chat session is actually on the Academic Harness preset.** The MCP connectors, native academic-search tools (`consensus_search`, `parallel_search`), `mcp__zvec_grep__zvec_grep_search`, and `mcp__papermemory__*` are wired into the `academic-harness` agent preset only; a session left on the default preset (Standard/PTC/etc.) has none of them, and calling one fails with `tools[name] is not a function`. Check the preset selector next to the session title (top of the message box for a new chat, top-left of an existing one) reads "Academic Harness" before asking the agent to search.
+**Also make sure the chat session is actually on the Academic Harness preset.** The MCP connectors, native academic-search tools (`openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `paper_resolve`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`), `mcp__zvec_grep__zvec_grep_search`, and `mcp__papermemory__*` are wired into the `academic-harness` agent preset only; a session left on the default preset (Standard/PTC/etc.) has none of them, and calling one fails with `tools[name] is not a function`. Check the preset selector next to the session title (top of the message box for a new chat, top-left of an existing one) reads "Academic Harness" before asking the agent to search.
 
 ## Workspace search
 
-[zvec-grep](https://github.com/zvec-ai/zvec-grep) (`zg`) is the local-first hybrid search layer on the Academic Harness preset: BM25 + vectors over an on-disk index, exposed as `mcp__zvec_grep__zvec_grep_search`. Exact words, quotes, identifiers, filenames, regexes, and exhaustive hit lists stay on the preset's native `grep` / `glob` (`@deepseek-ai/dsh-tool-fs-search`). Open-web and literature search stay on Parallel / Consensus / Firecrawl / Scite — zg is workspace-only.
+[zvec-grep](https://github.com/zvec-ai/zvec-grep) (`zg`) is the local-first hybrid search layer on the Academic Harness preset: BM25 + vectors over an on-disk index, exposed as `mcp__zvec_grep__zvec_grep_search`. Exact words, quotes, identifiers, filenames, regexes, and exhaustive hit lists stay on the preset's native `grep` / `glob` (`@deepseek-ai/dsh-tool-fs-search`). Open-web and literature search stay on the academic database tools (`openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`), Parallel, Consensus, Firecrawl, and Scite — zg is workspace-only.
 
 You do **not** install `zg` yourself. The first time the Academic Harness preset mounts after `dsh plugin add`, the plugin runs `npm install --prefix ~/.dsh/zvec-grep @zvec/zvec-grep@^0.2.2`, starts `zg server on` (the loopback daemon), and mounts search over Streamable HTTP at `http://127.0.0.1:7999/mcp` — no second restart. That first start can take several minutes (npm + later the ~130 MB Potion model). Later starts reuse `~/.dsh/zvec-grep`, **upgrade it if the bundled copy is older than 0.2.2**, and start the daemon again. Stopping `dsh` runs `zg server off`, so the daemon does not stay up in the background. Override with `ZVEC_GREP_CLI` if you already have a `zg` binary you want to keep. If install or the daemon fails, the rest of the preset still loads and the search tool is absent (a warning is logged).
 
@@ -184,14 +184,14 @@ The loopback daemon under `~/.zvec-grep/daemon/` is started with the Academic Ha
 
 Install, index, and routing details for the agent are in the bundled `zvec-grep` skill (`skills/zvec-grep`).
 
-## Academic search
+## Academic and web search
 
 Three literature/web MCP servers are wired into the `academic-harness` preset and surface as `mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*` tools:
 
 | Connector | Key | Without it |
 |---|---|---|
 | [Parallel](https://parallel.ai) — `mcp__parallel__web_search` (search fallback, always `basic`) and `mcp__parallel__web_fetch` (read a URL) | `PARALLEL_API_KEY` (required) | Connector stays disabled. The key is always sent as a Bearer token so MCP calls are not on the anonymous rate limit. |
-| [Firecrawl](https://firecrawl.dev) — scrape/crawl/extract | `FIRECRAWL_API_KEY` (optional) | Works keyless, rate-limited |
+| [Firecrawl](https://firecrawl.dev) — `firecrawl_scrape`, `firecrawl_search`, `firecrawl_parse` | `FIRECRAWL_API_KEY` (optional) | Works keyless, rate-limited. The keyless mount exposes only these three tools (verified 2026-10-23); paper-index tools are not advertised. |
 | [Scite](https://scite.ai) — Smart Citations, retraction/correction checks, evidence datasets (patents, clinical trials, grants, drug safety, …) | `SCITE_API_KEY` (required) | Connector stays disabled |
 
 `parallel_search` is the **primary** Parallel search tool: a native REST call to `POST /v1/search` (`x-api-key` auth). It requires `PARALLEL_API_KEY` and a **`mode` on every call**. `mcp__parallel__web_search` is the same search job locked to `basic` — the agent is steered to use it only if `parallel_search` is missing or errors. `mcp__parallel__web_fetch` is for reading a specific URL, not for search. Pass `objective`, 1–5 keyword `search_queries`, and `mode`:
@@ -205,7 +205,39 @@ Three literature/web MCP servers are wired into the `academic-harness` preset an
 
 The system prompt steers the agent to use **both** `consensus_search` and `parallel_search` (`basic` or `advanced`) for peer-reviewed literature, `fast` only for ordinary non-literature lookups, and `mcp__parallel__web_search` only as a fallback when `parallel_search` is unavailable. A Settings-changed `PARALLEL_API_KEY` takes effect on the next `parallel_search` call; the MCP connector still needs a `dsh` restart.
 
+`brave_search` (requires `BRAVE_API_KEY`) is an independent-index web fallback for general queries when `parallel_search` is unavailable or when independent coverage matters. It is not a literature index. `parallel_extract` (same `PARALLEL_API_KEY`) is the native URL-reading path: 1–20 URLs with focused excerpts, or full content when `full_content` is true. Use it, `mcp__parallel__web_fetch`, or `mcp__firecrawl__firecrawl_scrape` after a search has produced URLs.
+
+Four more native web tools are available per key:
+
+| Tool | Key | Notes |
+|---|---|---|
+| `tavily_search` | `TAVILY_API_KEY` | AI-native chunks, topic modes (general/news/finance), domain/time filters, optional answer. |
+| `exa_search` | `EXA_API_KEY` | Neural/entity search; `lite` uses cached snapshots and never fetches live pages; optional text/highlights/summary. |
+| `perplexity_search` | `PERPLEXITY_API_KEY` | Raw ranked results (not synthesized answers), with country/domain/language/date filters. |
+| `jina_read` | `JINA_API_KEY` optional | URL/PDF → Markdown (`read`) or Jina web search (`search`). Keyless Reader is 20 RPM; search requires a key. |
+
+None of these is a literature index; the system prompt steers papers to the academic database tools.
+
 [Consensus](https://consensus.app) is a native `consensus_search` tool (not an MCP connector) over its `GET /v1/search` REST API — plain `x-api-key` auth, no OAuth. Requires `CONSENSUS_API_KEY` (required — the tool returns a clear error, not a disabled connector, when unset). Supports the API's full filter set: study type, year/month range, sample size, journal quartile (SJR), citation count, study duration, domain, country, publisher, open-access/preprint/human/controlled/clinical-guideline flags, and pagination.
+
+### Academic databases (OpenAlex, Semantic Scholar, Crossref, arXiv, PubMed)
+
+Five keyless-by-default native tools cover the open bibliographic backbones:
+
+| Tool | Source | Key | Notes |
+|---|---|---|---|
+| `openalex_search` | [OpenAlex](https://openalex.org) | `OPENALEX_API_KEY` optional | 300M+ CC0 works; `filter`, `query`, and `group_by`. Keyless 10 RPS, keyed 30 RPS; semantic queries 1 RPS. |
+| `s2_search` | [Semantic Scholar](https://www.semanticscholar.org/product/api) | `S2_API_KEY` optional | `relevance`, `bulk` (1,000/page), and ~500-word `snippet` modes; TLDRs and OA PDFs. Serialized at 1 RPS. |
+| `pubmed_search` | Europe PMC / PubMed | `NCBI_API_KEY`, `NCBI_EMAIL` optional | Europe PMC JSON by default (no key, MeSH support); `source: "ncbi"` uses E-utilities at 3 RPS (10 with a key). |
+| `arxiv_search` | [arXiv](https://info.arxiv.org/help/api/) | none | Fielded `ti:` / `au:` / `abs:` / `cat:` queries; serialized to one request every 3 s per arXiv's terms. |
+| `crossref_lookup` | [Crossref](https://www.crossref.org/documentation/retrieve-metadata/rest-api/) | `CROSSREF_MAILTO` optional | Canonical DOI metadata; the polite pool uses `CROSSREF_MAILTO`, falling back to `UNPAYWALL_EMAIL`. |
+
+Two further tools work across them:
+
+- `openalex_citations` walks forward (`citations`) and backward (`references`) citation edges. Accepts a DOI, PMID, or OpenAlex ID.
+- `paper_resolve` converts between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID. Use it before citing when results came from more than one database, so the same paper is not cited twice under different IDs.
+
+All seven are native REST tools — no MCP mount and no restart requirement. Shared record normalization and per-provider rate limiting live in `search-normalize.js` and `search-http.js`. The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` added by domain, and keeps `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
 
 [Unpaywall](https://unpaywall.org) backs `paper_download` (also a native REST tool, not an MCP connector): given a DOI, it resolves the best open-access location and the tool downloads that PDF straight into the workspace (or downloads a direct URL you already have, no DOI needed). Requires `UNPAYWALL_EMAIL` — Unpaywall's API asks callers to identify themselves with a real contact email; the tool returns a clear error, not a disabled connector, when unset, and never invents one on your behalf. When a DOI has no open-access copy, the tool returns a plain "paywalled" result (with the landing-page URL) rather than an error — the agent is steered to report that honestly instead of inferring the paper's content from a search snippet. The response is also checked against the PDF magic bytes before being saved, so a login/CAPTCHA page returned instead of the real file surfaces as a clear error rather than a corrupt "PDF." A successful download is ingested into PaperMemory (see [Paper memory](#paper-memory)); ingest failure does not fail the download.
 
@@ -350,7 +382,7 @@ The tool finds `python-helpers/.venv` automatically. Override with `ACADEMIC_HAR
 
 ## Downloading and reading papers
 
-Two tools cover the full loop for actually reading a paper rather than just its abstract: `paper_download` (Academic Harness preset only — see [Academic search](#academic-search)) gets the PDF onto disk, and `pdf_to_markdown` (every preset) turns it into readable text. A successful `paper_download` is also ingested into PaperMemory (see [Paper memory](#paper-memory)).
+Two tools cover the full loop for actually reading a paper rather than just its abstract: `paper_download` (Academic Harness preset only — see [Academic and web search](#academic-and-web-search)) gets the PDF onto disk, and `pdf_to_markdown` (every preset) turns it into readable text. A successful `paper_download` is also ingested into PaperMemory (see [Paper memory](#paper-memory)).
 
 ### PDF to Markdown
 

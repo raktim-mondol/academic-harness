@@ -29,7 +29,17 @@ const KEYS = [
   { field: 'FIRECRAWL_API_KEY', label: 'Firecrawl', group: 'Literature search', hint: 'Optional — raises the keyless rate limit.' },
   { field: 'CONSENSUS_API_KEY', label: 'Consensus', group: 'Literature search', hint: 'Required to enable this connector.' },
   { field: 'SCITE_API_KEY', label: 'Scite', group: 'Literature search', hint: 'Required to enable this connector.' },
+  { field: 'BRAVE_API_KEY', label: 'Brave Search', group: 'Web search', hint: 'Optional — enables brave_search as an independent web-index fallback (not a literature index). Read per call, no restart.' },
+  { field: 'TAVILY_API_KEY', label: 'Tavily', group: 'Web search', hint: 'Required for tavily_search — AI-native web search with chunked content and topic modes.' },
+  { field: 'EXA_API_KEY', label: 'Exa', group: 'Web search', hint: 'Required for exa_search — neural/entity web search with optional content extraction.' },
+  { field: 'PERPLEXITY_API_KEY', label: 'Perplexity', group: 'Web search', hint: 'Required for perplexity_search — raw ranked web results (not the synthesized-answer API).' },
+  { field: 'JINA_API_KEY', label: 'Jina', group: 'Web search', hint: 'Optional for jina_read (keyless Reader is 20 RPM); required for jina_read mode=search.' },
   { field: 'UNPAYWALL_EMAIL', label: 'Unpaywall contact email', group: 'Literature search', hint: 'Required for paper_download to resolve a DOI to an open-access PDF — Unpaywall asks API callers to identify themselves with a real email.' },
+  { field: 'OPENALEX_API_KEY', label: 'OpenAlex', group: 'Academic databases', hint: 'Optional — a free key raises the daily budget and rate limit (10 → 30 RPS) and enables cursor paging. Used by openalex_search, openalex_citations, and paper_resolve.' },
+  { field: 'S2_API_KEY', label: 'Semantic Scholar', group: 'Academic databases', hint: 'Optional — a free key gives s2_search and paper_resolve a dedicated 1 RPS bucket. Unkeyed traffic shares a heavily throttled pool.' },
+  { field: 'CROSSREF_MAILTO', label: 'Crossref contact email', group: 'Academic databases', hint: 'Optional — moves crossref_lookup into the polite pool (3 RPS list, 10 RPS single). Falls back to the Unpaywall email.' },
+  { field: 'NCBI_API_KEY', label: 'NCBI API key', group: 'Academic databases', hint: 'Optional — raises pubmed_search source="ncbi" from 3 to 10 requests per second.' },
+  { field: 'NCBI_EMAIL', label: 'NCBI contact email', group: 'Academic databases', hint: 'Optional — NCBI asks API callers for a contact email. Falls back to the Unpaywall email.' },
   { field: 'GEMINI_API_KEY', label: 'Gemini', group: 'Image generation', hint: 'Enables the image_generate tool.' },
   { field: 'IMAGE_MODEL', label: 'Image model', group: 'Image generation', type: 'select', options: IMAGE_MODEL_OPTIONS, hint: 'Which Gemini model image_generate uses by default. Defaults to nano banana if unset.' },
   { field: 'SUBAGENT_MODEL_COMPLEX', label: 'Complex-task model', group: 'Subagent model routing', type: 'select', options: SUBAGENT_MODEL_COMPLEX_OPTIONS, hint: 'Model for the subagent_pro delegation tool (unusually heavy reasoning). Requires restarting dsh to apply — same as the MCP connector keys above, not like Image model.' },
@@ -214,7 +224,7 @@ export function ApiKeysSection(props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '4px 0' }}>
       <p style={{ margin: 0, opacity: 0.75, fontSize: '0.9em' }}>
-        API keys for Academic Harness's academic-search connectors, image generation, remote-compute tools, and optional zvec-grep remote embeddings.
+        API keys for Academic Harness's academic- and web-search connectors, image generation, remote-compute tools, and optional zvec-grep remote embeddings.
         A key set here is used only when the matching environment variable isn't already set when DSH starts.
       </p>
       {!writable && (

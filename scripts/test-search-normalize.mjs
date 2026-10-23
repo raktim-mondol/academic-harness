@@ -1,0 +1,339 @@
+import assert from 'node:assert/strict'
+import { buildParams as buildOpenAlexParams } from '../openalex-search.js'
+import { buildSearchQuery } from '../arxiv-search.js'
+import { buildParams as buildBraveParams } from '../brave-search.js'
+import { buildBody as buildParallelExtractBody } from '../parallel-extract.js'
+import { buildBody as buildTavilyBody } from '../tavily-search.js'
+import { buildBody as buildExaBody } from '../exa-search.js'
+import { buildBody as buildPerplexityBody } from '../perplexity-search.js'
+import { buildRequest as buildJinaRequest } from '../jina-reader.js'
+import {
+  capText,
+  canonicalArxivId,
+  canonicalDoi,
+  fromArxivEntry,
+  fromBraveResult,
+  fromCrossrefWork,
+  fromEuropePmcResult,
+  fromNcbiSummary,
+  fromOpenAlexWork,
+  fromPerplexityResult,
+  fromExaResult,
+  fromTavilyResult,
+  fromSemanticScholarPaper,
+  fromSemanticScholarSnippet,
+  identifierKind,
+  mergePapers,
+  normalizeTitle,
+  reconstructAbstract,
+  renderPapers,
+} from '../search-normalize.js'
+
+assert.equal(canonicalDoi('https://doi.org/10.1000/ABC.1'), '10.1000/abc.1')
+assert.equal(canonicalDoi('doi: 10.1000/ABC.1'), '10.1000/abc.1')
+assert.equal(canonicalDoi('not-a-doi'), null)
+assert.equal(canonicalArxivId('arXiv:2301.12345v2'), '2301.12345')
+assert.equal(canonicalArxivId('https://arxiv.org/abs/hep-th/9901001'), 'hep-th/9901001')
+assert.equal(normalizeTitle('A <i>Test</i> Paper!'), 'a test paper')
+assert.equal(reconstructAbstract({ Hello: [0], world: [1] }), 'Hello world')
+assert.match(capText('x'.repeat(30), 10), /\[output truncated\]/)
+
+assert.deepEqual(identifierKind('https://doi.org/10.1000/abc.1'), { kind: 'doi', value: '10.1000/abc.1' })
+assert.deepEqual(identifierKind('PMID: 12345678'), { kind: 'pmid', value: '12345678' })
+assert.deepEqual(identifierKind('2301.12345'), { kind: 'arxiv', value: '2301.12345' })
+assert.deepEqual(identifierKind('W2741809807'), { kind: 'openalex', value: 'W2741809807' })
+assert.equal(identifierKind('a'.repeat(40)).kind, 's2')
+assert.equal(identifierKind('???').kind, 'unknown')
+
+const openalex = fromOpenAlexWork({
+  id: 'https://openalex.org/W123',
+  doi: 'https://doi.org/10.1000/ABC.1',
+  ids: { pmid: 'https://pubmed.ncbi.nlm.nih.gov/12345678', pmcid: 'PMC123' },
+  title: 'A <i>Test</i> Paper',
+  publication_year: 2024,
+  authorships: [
+    { author: { display_name: 'Ada Lovelace', orcid: 'https://orcid.org/0000-0001' } },
+    { author: { display_name: 'Alan Turing' } },
+  ],
+  primary_location: {
+    source: { display_name: 'Journal of Tests' },
+    landing_page_url: 'https://example.org/paper',
+  },
+  best_oa_location: { pdf_url: 'https://example.org/paper.pdf' },
+  open_access: { oa_status: 'gold' },
+  cited_by_count: 12,
+  type: 'article',
+  topics: [{ display_name: 'Testing' }],
+  abstract_inverted_index: { A: [0], longer: [1], abstract: [2] },
+})
+assert.equal(openalex.source, 'openalex')
+assert.equal(openalex.doi, '10.1000/abc.1')
+assert.equal(openalex.pmid, '12345678')
+assert.equal(openalex.pmcid, 'PMC123')
+assert.equal(openalex.openalex_id, 'W123')
+assert.equal(openalex.title, 'A Test Paper')
+assert.equal(openalex.year, 2024)
+assert.equal(openalex.venue, 'Journal of Tests')
+assert.equal(openalex.oa_status, 'gold')
+assert.equal(openalex.oa_url, 'https://example.org/paper.pdf')
+assert.equal(openalex.abstract, 'A longer abstract')
+assert.equal(openalex.authors.length, 2)
+assert.deepEqual(openalex.sources, ['openalex'])
+
+const semantic = fromSemanticScholarPaper({
+  paperId: 's2-paper',
+  externalIds: { DOI: '10.1000/ABC.1', PubMed: '12345678', ArXiv: '2301.12345' },
+  title: 'A Test Paper',
+  year: 2024,
+  venue: 'Journal of Tests',
+  authors: [{ name: 'Ada Lovelace' }],
+  citationCount: 20,
+  influentialCitationCount: 4,
+  tldr: { text: 'A one-line summary.' },
+  openAccessPdf: { url: 'https://example.org/paper.pdf' },
+  fieldsOfStudy: ['Computer Science'],
+  publicationTypes: ['JournalArticle'],
+})
+assert.equal(semantic.s2_id, 's2-paper')
+assert.equal(semantic.arxiv_id, '2301.12345')
+assert.equal(semantic.tldr, 'A one-line summary.')
+assert.equal(semantic.citation_count, 20)
+assert.equal(semantic.influential_citation_count, 4)
+
+const snippet = fromSemanticScholarSnippet({
+  snippet: { text: '...verbatim excerpt...' },
+  paper: { paperId: 's2-paper', title: 'A Test Paper', year: 2024 },
+})
+assert.deepEqual(snippet.snippets, ['...verbatim excerpt...'])
+
+const crossref = fromCrossrefWork({
+  DOI: '10.1000/ABC.1',
+  title: ['A Test Paper'],
+  author: [{ given: 'Ada', family: 'Lovelace' }],
+  issued: { 'date-parts': [[2023]] },
+  'container-title': ['Journal of Tests'],
+  'is-referenced-by-count': 15,
+  URL: 'https://doi.org/10.1000/abc.1',
+  abstract: '<jats:p>A <b>longer</b> abstract</jats:p>',
+  subject: ['Testing'],
+})
+assert.equal(crossref.year, 2023)
+assert.equal(crossref.venue, 'Journal of Tests')
+assert.equal(crossref.citation_count, 15)
+assert.equal(crossref.abstract, 'A longer abstract')
+
+const arxiv = fromArxivEntry({
+  id: 'http://arxiv.org/abs/2301.12345v2',
+  title: 'A Test Preprint',
+  summary: 'Preprint abstract',
+  published: '2023-01-02T00:00:00Z',
+  authors: ['Ada Lovelace', 'Alan Turing'],
+  doi: '10.1000/abc.1',
+  journalRef: 'Journal of Tests',
+  primaryCategory: 'cs.CL',
+  categories: ['cs.CL', 'cs.AI'],
+  pdfUrl: 'https://arxiv.org/pdf/2301.12345v2',
+  absUrl: 'https://arxiv.org/abs/2301.12345v2',
+})
+assert.equal(arxiv.arxiv_id, '2301.12345')
+assert.equal(arxiv.year, 2023)
+assert.equal(arxiv.oa_url, 'https://arxiv.org/pdf/2301.12345v2')
+assert.deepEqual(arxiv.fields, ['cs.CL', 'cs.AI'])
+
+const europePmc = fromEuropePmcResult({
+  id: '26161953',
+  source: 'MED',
+  pmid: '26161953',
+  pmcid: 'PMC4498753',
+  doi: '10.1371/journal.pone.0130140',
+  title: 'A Test Article',
+  authorString: 'Smith J, Doe A.',
+  journalTitle: 'PLOS ONE',
+  pubYear: '2015',
+  abstractText: 'Article abstract',
+  citedByCount: 100,
+  isOpenAccess: 'Y',
+  fullTextUrlList: { fullTextUrl: [{ documentStyle: 'pdf', url: 'https://example.org/a.pdf' }] },
+  pubTypeList: { pubType: ['Journal Article'] },
+})
+assert.equal(europePmc.pmid, '26161953')
+assert.equal(europePmc.pmcid, 'PMC4498753')
+assert.equal(europePmc.oa_url, 'https://example.org/a.pdf')
+assert.equal(europePmc.authors.length, 2)
+assert.equal(europePmc.year, 2015)
+
+const ncbi = fromNcbiSummary({
+  uid: '12345678',
+  title: 'A Test Summary',
+  authors: [{ name: 'Smith J' }],
+  pubdate: '2024 Jan',
+  fulljournalname: 'Journal of Tests',
+  articleids: [{ idtype: 'doi', value: '10.1000/abc.1' }, { idtype: 'pmc', value: 'PMC123' }],
+})
+assert.equal(ncbi.pmid, '12345678')
+assert.equal(ncbi.doi, '10.1000/abc.1')
+assert.equal(ncbi.oa_status, 'open')
+assert.equal(fromNcbiSummary({ uid: '1', error: 'cannot get document summary' }), null)
+
+const grouped = buildOpenAlexParams({ entity: 'works', group_by: 'publication_year' }, null, null)
+assert.equal(grouped.has('select'), false, 'group_by must not send select')
+assert.equal(grouped.get('group_by'), 'publication_year')
+assert.equal(buildSearchQuery('Turing', 'author'), 'au:Turing')
+assert.equal(buildSearchQuery('Alan Turing', 'author'), 'au:"Alan Turing"')
+assert.equal(buildSearchQuery('quantum', 'title'), 'ti:quantum')
+assert.equal(buildSearchQuery('cs.CL', 'category'), 'cat:cs.CL')
+assert.equal(buildSearchQuery('cat:cs.CL AND abs:retrieval', 'author'), 'cat:cs.CL AND abs:retrieval')
+
+const brave = fromBraveResult({
+  title: 'A <b>Web</b> Result',
+  url: 'https://www.example.org/post',
+  description: 'A description',
+  profile: { long_name: 'Example' },
+  extra_snippets: ['one', 'two'],
+})
+assert.equal(brave.source, 'brave')
+assert.equal(brave.title, 'A Web Result')
+assert.equal(brave.venue, 'Example')
+assert.equal(brave.abstract, 'A description')
+assert.equal(brave.type, 'web')
+assert.deepEqual(brave.snippets, ['one', 'two'])
+assert.equal(fromBraveResult({ title: 'T', url: 'https://www.example.org/x' }).venue, 'example.org')
+
+const braveParams = buildBraveParams({ query: 'test', count: 50, country: 'gb', freshness: 'pw', extra_snippets: true })
+assert.equal(braveParams.get('q'), 'test')
+assert.equal(braveParams.get('count'), '20')
+assert.equal(braveParams.get('country'), 'GB')
+assert.equal(braveParams.get('freshness'), 'pw')
+assert.equal(braveParams.get('extra_snippets'), 'true')
+
+const extractBody = buildParallelExtractBody({
+  urls: ['https://a.example/x'],
+  objective: 'Get methods',
+  search_queries: ['method'],
+  full_content: true,
+})
+assert.deepEqual(extractBody.urls, ['https://a.example/x'])
+assert.equal(extractBody.advanced_settings.full_content, true)
+assert.throws(() => buildParallelExtractBody({ urls: [] }), /at least one/)
+assert.throws(() => buildParallelExtractBody({ urls: ['ftp://example.org/x'] }), /HTTP/)
+
+const tavilyPaper = fromTavilyResult({
+  title: 'Tavily <b>Title</b>',
+  url: 'https://www.example.org/t',
+  content: 'Tavily content',
+  published_date: '2024-01-02',
+})
+assert.equal(tavilyPaper.source, 'tavily')
+assert.equal(tavilyPaper.title, 'Tavily Title')
+assert.equal(tavilyPaper.abstract, 'Tavily content')
+assert.equal(tavilyPaper.year, 2024)
+assert.equal(tavilyPaper.venue, 'example.org')
+
+const exaPaper = fromExaResult({
+  id: 'exa-1',
+  title: 'Exa Title',
+  url: 'https://example.org/e',
+  summary: 'Exa summary',
+  author: 'Ada Lovelace',
+  publishedDate: '2023-05-06',
+  highlights: ['first highlight'],
+})
+assert.equal(exaPaper.source, 'exa')
+assert.equal(exaPaper.abstract, 'Exa summary')
+assert.equal(exaPaper.authors[0].name, 'Ada Lovelace')
+assert.equal(exaPaper.year, 2023)
+assert.deepEqual(exaPaper.snippets, ['first highlight'])
+
+const perplexityPaper = fromPerplexityResult({
+  title: 'Perplexity Title',
+  url: 'https://example.org/p',
+  snippet: 'Perplexity snippet',
+  date: '2024-02-03',
+})
+assert.equal(perplexityPaper.source, 'perplexity')
+assert.equal(perplexityPaper.abstract, 'Perplexity snippet')
+assert.equal(perplexityPaper.year, 2024)
+
+const tavilyBody = buildTavilyBody({
+  query: 'test',
+  search_depth: 'advanced',
+  max_results: 50,
+  chunks_per_source: 3,
+  topic: 'news',
+  include_answer: true,
+  include_domains: ['example.org'],
+})
+assert.equal(tavilyBody.max_results, 20)
+assert.equal(tavilyBody.chunks_per_source, 3)
+assert.equal(tavilyBody.topic, 'news')
+assert.equal(tavilyBody.include_answer, 'basic')
+assert.deepEqual(tavilyBody.include_domains, ['example.org'])
+assert.throws(() => buildTavilyBody({ query: 'x', search_depth: 'ultra-fast', chunks_per_source: 2 }), /ultra-fast/)
+
+const exaBody = buildExaBody({
+  query: 'test',
+  type: 'deep',
+  num_results: 500,
+  include_text: true,
+  include_highlights: true,
+})
+assert.equal(exaBody.numResults, 100)
+assert.deepEqual(exaBody.contents, { text: true, highlights: true })
+assert.throws(
+  () => buildExaBody({ query: 'x', category: 'people', start_published_date: '2024-01-01' }),
+  /do not support publication-date filters/,
+)
+
+const perplexityBody = buildPerplexityBody({
+  query: 'test',
+  search_type: 'people',
+  max_results: 30,
+  country: 'gb',
+  search_domain_filter: ['example.org'],
+  search_language_filter: ['en'],
+  search_recency_filter: 'week',
+})
+assert.equal(perplexityBody.max_results, 30)
+assert.equal(perplexityBody.country, 'GB')
+assert.deepEqual(perplexityBody.search_language_filter, ['en'])
+assert.throws(() => buildPerplexityBody({ query: 'x', max_results: 30 }), /people/)
+assert.throws(() => buildPerplexityBody({ query: 'x', country: 'GBR' }), /two-letter/)
+
+const jinaRead = buildJinaRequest({ url: 'https://example.org/a' }, null)
+assert.equal(jinaRead.url, 'https://r.jina.ai/https://example.org/a')
+assert.equal(jinaRead.headers.Authorization, undefined)
+const jinaInferredSearch = buildJinaRequest({ query: 'inferred' }, 'jina-key')
+assert.equal(jinaInferredSearch.url, 'https://s.jina.ai/?q=inferred')
+assert.equal(jinaInferredSearch.mode, 'search')
+const jinaSearch = buildJinaRequest({ mode: 'search', query: 'test query' }, 'jina-key')
+assert.equal(jinaSearch.url, 'https://s.jina.ai/?q=test%20query')
+assert.equal(jinaSearch.headers.Authorization, 'Bearer jina-key')
+assert.throws(() => buildJinaRequest({ mode: 'search' }, 'key'), /query is required/)
+assert.throws(() => buildJinaRequest({ url: 'ftp://example.org' }, null), /HTTP/)
+
+const merged = mergePapers([openalex, crossref, semantic])
+assert.equal(merged.length, 1, 'DOI duplicates must collapse')
+assert.deepEqual(merged[0].sources.sort(), ['crossref', 'openalex', 's2'])
+assert.equal(merged[0].citation_count, 20, 'highest citation count wins')
+assert.equal(merged[0].authors.length, 2, 'longest author list wins')
+assert.equal(merged[0].abstract, 'A longer abstract', 'longest abstract wins')
+
+const titleOnly = mergePapers([
+  { source: 'a', sources: ['a'], title: 'Same Title', year: 2020, authors: [], fields: [], snippets: [] },
+  { source: 'b', sources: ['b'], title: 'Same  title!', year: 2020, authors: [], fields: [], snippets: [] },
+])
+assert.equal(titleOnly.length, 1, 'title+year fallback must collapse')
+assert.deepEqual(titleOnly[0].sources, ['a', 'b'])
+
+const noYear = mergePapers([
+  { source: 'a', sources: ['a'], title: 'Same Title', year: null, authors: [], fields: [], snippets: [] },
+  { source: 'b', sources: ['b'], title: 'Same Title', year: null, authors: [], fields: [], snippets: [] },
+])
+assert.equal(noYear.length, 2, 'a missing year must not merge title-only records')
+
+const markdown = renderPapers(merged, { abstractChars: 20 })
+assert.match(markdown, /A Test Paper/)
+assert.match(markdown, /doi: 10\.1000\/abc\.1/)
+assert.match(markdown, /20 citations/)
+
+console.log('Search normalization OK')

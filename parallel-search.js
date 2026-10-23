@@ -9,6 +9,7 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const API_URL = 'https://api.parallel.ai/v1/search'
 const MODES = ['turbo', 'fast', 'basic', 'advanced']
@@ -83,7 +84,7 @@ export function apply(ctx) {
       schema: { type: 'json' },
       render: (_args, value) => render(value),
     },
-    async execute(args) {
+    async execute(args, exec) {
       const key = await resolveEnv('PARALLEL_API_KEY')
       if (!key) {
         return {
@@ -106,21 +107,31 @@ export function apply(ctx) {
       if (!body.objective) {
         return { error: 'objective is required.' }
       }
-      if (args.max_chars_total != null) body.max_chars_total = Number(args.max_chars_total)
-      const res = await fetch(API_URL, {
+      if (args.max_chars_total != null) {
+        const maxChars = Number(args.max_chars_total)
+        if (Number.isFinite(maxChars) && maxChars > 0) body.max_chars_total = maxChars
+      }
+
+      const limiter = getLimiter('parallel', { minIntervalMs: 100 })
+      const result = await limiter.run(() => fetchJson(API_URL, {
         method: 'POST',
+        retries: 0,
+        signal: exec.signal,
         headers: {
           'Content-Type': 'application/json',
           'x-api-key': key,
+          'User-Agent': searchUserAgent(),
         },
         body: JSON.stringify(body),
-      })
-      const payload = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        const message = payload?.error?.message ?? payload?.detail ?? payload?.message
-        return { error: `Parallel Search API error ${res.status}`, status: res.status, detail: message ?? payload }
+      }))
+      if (!result.ok) {
+        const message = result.data?.error?.message ?? result.data?.detail ?? result.data?.message ?? result.detail ?? result.error
+        return { error: `Parallel Search API error ${result.status}`, status: result.status, detail: message }
       }
-      return { ...payload, mode }
+      const data = result.data && typeof result.data === 'object' && !Array.isArray(result.data)
+        ? result.data
+        : {}
+      return { ...data, mode }
     },
     presentCall(args) {
       const q = Array.isArray(args.search_queries) ? args.search_queries.filter(Boolean)[0] : ''
