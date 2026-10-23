@@ -100,7 +100,7 @@ zg server off
 
 The Academic Harness profile's bundle patch sets `agent-preset-registry` `default: academic-harness` and inserts only `preset-academic-harness` (DSH 0.2+ no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **Academic Harness**, and the selector lists no legacy preset. Confirm the preset selector at the top of the message box reads "Academic Harness"; if it still says Standard/PTC, the profile patch did not apply.
 
-The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation` (bibliography formatting/validation), `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy` (datasets and venue policy), and the optional `author_lookup`/`openreview` are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
+The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation`, `manuscript_citations`, `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy`/`funder_policy` (datasets and venue/funder policy), and the optional `author_lookup`/`openreview` are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
 
 ## What it adds
 
@@ -117,6 +117,7 @@ The persona, the longer research system prompt (notebook discipline, specialist 
   - a `diagram-design` skill (39 editorial HTML+SVG diagram types; no Mermaid slop) — vendored from [`diagram-design`](https://github.com/cathrynlavery/diagram-design)
   - a `generating-scientific-hypotheses` skill (literature-grounded hypothesis generation: search-checked novelty, ranked falsifiable cards) — first-party, distilled from Gottweis et al. / Ghareeb et al. 2026 (see [NOTICE](NOTICE))
   - a `paper2agent` skill (turn a paper and/or its code repo into a reviewed paper skill and a tested FastMCP server) — vendored from [`Paper2Agent`](https://github.com/jmiao24/Paper2Agent) — see [Paper agents](#paper-agents-paper2agent)
+  - a `remove-ai-signs` skill (density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations) — adapted from the local skill of the same name, whose guide adapts Wikipedia's "Signs of AI writing" (CC BY-SA 4.0). It is a style pass, not a detector-evasion tool
 
   `ACADEMIC_HARNESS_SKILLS_DIR` (or a `~/scientific-agent-skills/skills` checkout) still works as an override if you want a different catalogue instead — available on every preset; the old `RESEARCHCRAFT_SKILLS_DIR` name is still honored as a fallback
 - `notebook` tool — log, read, and export a living lab notebook (JSONL under `<cwd>/.dsh/notebook/`), shared across a subagent delegation tree, with a zip-bundle export alongside the plain Markdown one — every preset
@@ -131,10 +132,10 @@ The persona, the longer research system prompt (notebook discipline, specialist 
 - `research_template` tool over a ~330-template research-task catalogue (not DSH's Rhai `workflow` orchestrator) — every preset
 - Literature and web search: a `literature_search` multi-source router plus OpenAlex, Semantic Scholar, Crossref, arXiv, PubMed/Europe PMC, CORE, Elicit, FutureHouse, Consensus, Parallel, Brave, Tavily, Exa, Perplexity, and Jina Reader (native REST tools), plus Parallel, Firecrawl, and Scite (MCP connectors), `parallel_extract` (URL extraction), and `paper_download` (Unpaywall open-access PDF resolver) — **Academic Harness preset only**
 - Paper integrity: `integrity_check` (retraction / expression-of-concern / correction status from Crossref + OpenAlex, with the notice DOIs) — **Academic Harness preset only**
-- Reference and citation: `citation` (APA/Vancouver/Harvard/IEEE/Chicago/MLA formatting, BibTeX/RIS export, DOI→BibTeX, and validation) — **Academic Harness preset only** — see [References and citation](#references-and-citation)
+- Reference and citation: `citation` (APA/Vancouver/Harvard/IEEE/Chicago/MLA formatting, BibTeX/RIS export, DOI→BibTeX, and validation) and `manuscript_citations` (manuscript ↔ `.bib` consistency: missing, unused, and duplicate keys, undefined `\ref` targets) — **Academic Harness preset only** — see [References and citation](#references-and-citation)
 - Systematic reviews: `review` (protocol, record intake, two-stage screening, verbatim evidence, PRISMA-style counts, exports) — **Academic Harness preset only** — see [Systematic reviews](#systematic-reviews)
 - Clinical and regulatory evidence: `clinicaltrials` (ClinicalTrials.gov trials and posted results) and `openfda` (adverse events, recalls, 510(k), labels, food events) — **Academic Harness preset only** — see [Clinical and regulatory evidence](#clinical-and-regulatory-evidence)
-- Datasets and venue policy: `dataset_search` (DataCite discovery, Zenodo/Figshare file listings) and `journal_policy` (DOAJ + Sherpa Romeo OA/self-archiving policy) — **Academic Harness preset only** — see [Datasets and journal policy](#datasets-and-journal-policy)
+- Datasets and venue policy: `dataset_search` (DataCite discovery, Zenodo/Figshare file listings), `journal_policy` (DOAJ + Sherpa Romeo OA/self-archiving policy), and `funder_policy` (OpenAlex funder identity + Sherpa Juliet OA policy) — **Academic Harness preset only** — see [Datasets and journal policy](#datasets-and-journal-policy)
 - `paper_mcp` tool — register a Paper2MCP stdio server from this workspace (`<cwd>/.dsh/paper-mcps.json`) so its tools can appear as `mcp__<serverName>__*` — **Academic Harness preset only** — see [Paper agents](#paper-agents-paper2agent)
 - [PaperMemory](https://github.com/raktim-mondol/papermemory) local academic memory: `mcp__papermemory__*` (search, ingest, cite, cite-check, recap, remember, claim). First Academic Harness start uses `papermemory` on PATH or installs the vendored package into `~/.dsh/papermemory`. `paper_download` auto-ingests the saved PDF. Store: `~/.local/share/papermemory/papermemory.db` — **Academic Harness preset only** — see [Paper memory](#paper-memory)
 - Workspace semantic search via [zvec-grep](https://github.com/zvec-ai/zvec-grep): `mcp__zvec_grep__zvec_grep_search` (local BM25 + vectors). First Academic Harness start installs the `zg` CLI into `~/.dsh/zvec-grep`. Indexing is **off at session start by default** (Settings → Index at session start); you can index later from chat, and the agent asks first when semantic search would help. While indexing, a progress bar with estimated time and Cancel is shown (no timeout) — exact lookup stays on native `grep` / `glob` — **Academic Harness preset only** — see [Workspace search](#workspace-search)
@@ -150,7 +151,7 @@ Every credential below (`PARALLEL_API_KEY`, `FIRECRAWL_API_KEY`, `CONSENSUS_API_
 
 The same Settings page also has an **Image model** dropdown for `IMAGE_MODEL` — not a credential, so it isn't password-masked and applies immediately on selection rather than needing Save (see [Image generation](#image-generation)). It also has two more model-id dropdowns, **Complex-task model** (`SUBAGENT_MODEL_COMPLEX`) and **Image-reading model** (`SUBAGENT_MODEL_VISION`) — not credentials either, but these two behave like the MCP connectors below, not like Image model: they need a restart to apply (see [Subagent model routing](#subagent-model-routing)). **zvec-grep embedding** (`ZVEC_GREP_EMBEDDING`) is the same restart-needed dropdown: it is passed into `zg server on` at mount time. **Index at session start** (`ZVEC_GREP_AUTO_INDEX`, default No) is live for the next Academic Harness session — no restart (see [Workspace search](#workspace-search)).
 
-Tools that call `resolveEnv()` per invocation (`image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`, `integrity_check`, `citation`, `review`, `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `author_lookup`) pick up a Settings change on the very next call, no restart needed.
+Tools that call `resolveEnv()` per invocation (`image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`, `integrity_check`, `citation`, `review`, `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy`, `author_lookup`) pick up a Settings change on the very next call, no restart needed.
 
 The MCP connectors (Parallel, Firecrawl, Scite, zvec-grep, PaperMemory) and the two subagent-model fields are different: the `academic-harness` agent preset mounts once as a standing composition shared by every chat session for the life of the running `dsh` process, so a change only reaches them after you **stop and restart `dsh` itself** — a new chat session on the same running process is not enough. `consensus_search`, `parallel_search`, and the academic database tools aren't MCP connectors — see below — so they don't have this restart requirement.
 
@@ -337,6 +338,8 @@ The IEEE, Chicago author-date, and MLA CSL styles are vendored under `styles/` (
 
 Use `citation` for the final bibliography. To pull a paper into the workspace and store citable evidence, use `paper_download` (open-access only) and PaperMemory — a reference in a manager is not verified evidence, so claims still need `papermemory_quote_check` / `papermemory_trace`.
 
+`manuscript_citations` checks the manuscript against the bibliography: pass a `.tex` or Pandoc `.md` file (and optionally `bib_path`; for LaTeX the `.bib` is discovered from `\bibliography{...}` / `\addbibresource{...}`). It reports keys cited but missing from the `.bib`, entries never cited, duplicate bibliography keys, and — for LaTeX — undefined `\ref` targets and duplicate `\label`s. `\nocite{*}` suppresses unused-entry reporting. It is local and deterministic, does not reformat citations, and rejects `.docx` because Word citation fields cannot be inspected reliably.
+
 ## Systematic reviews
 
 `review` is a preset-only native tool — local, no key, no database — that keeps a systematic or scoping review auditable. State lives under `<cwd>/.dsh/review/<slug>/` as append-only JSONL event logs plus a write-once `protocol.json`; the current state is derived from the log, so concurrent subagent writes cannot corrupt it and overrides keep their history.
@@ -363,8 +366,9 @@ Both are informational only — no medical or legal advice — and neither is a 
 
 - `dataset_search` — DataCite dataset discovery (`query`, `repository`, `year`, cursor paging) with DOI, title, creators, publisher, version, license, and landing URL. `get` reads one DOI; `files` lists file names/sizes/download URLs for Zenodo and Figshare DOIs and returns the landing URL for other repositories. Free, keyless, and no downloads. Optional `ZENODO_API_KEY`, `FIGSHARE_API_KEY`, and `DATACITE_API_KEY` are sent as auth headers when set (public data works without them).
 - `journal_policy` — venue policy from DOAJ (listing, APC, license, OA start year; keyless) plus Sherpa Romeo (preprint/postprint/published permissions, embargo, conditions; needs `SHERPA_ROMERO_API_KEY`). Without the key the result is DOAJ-only with an explicit `key_not_set` note. An unknown journal is `not_found`, an ambiguous title returns candidate ISSNs, and a failed lookup is `unknown` — never reported as "not listed".
+- `funder_policy` — OpenAlex funder identity (canonical name, alternate titles, country, award/works counts; keyless) plus Sherpa Juliet per-version OA policy (embargo, license, conditions) when `SHERPA_ROMERO_API_KEY` is set. Without the key it returns the identity and `key_not_set`; it never guesses a funder's policy.
 
-Both are compliance/discovery aids: cite dataset DOIs, never infer a license or APC, and treat policy output as compliance information rather than legal advice.
+These are compliance/discovery aids: cite dataset DOIs, never infer a license or APC, and treat policy output as compliance information rather than legal advice.
 
 ## Optional tools
 
@@ -513,6 +517,12 @@ A subagent the top-level agent delegates to runs in its own DSH session, but its
 
 ## Release notes
 
+### Unreleased
+
+- `remove-ai-signs` skill vendored into the plugin (style editing for machine-sounding prose; no detector-evasion or provenance-removal claims) and steered from a new `## Writing quality` prompt section.
+- `manuscript_citations` — manuscript ↔ `.bib` consistency for `.tex`/`.md`: missing, unused, and duplicate keys, undefined `\ref` targets, duplicate labels.
+- `funder_policy` — OpenAlex funder identity plus Sherpa Juliet per-version OA policy (keyed half).
+
 ### 0.18.0
 
 Academic tooling beyond search (see [docs/NON-SEARCH-TOOLS-PLAN.md](docs/NON-SEARCH-TOOLS-PLAN.md)):
@@ -540,7 +550,7 @@ The tool tests are plain Node scripts and need no network (the Python-helper cas
 
 ```sh
 for t in citation-format review-store review-tool integrity registries \
-         optional-tools audits grants nonsearch-tools; do
+         optional-tools audits grants manuscript-tools nonsearch-tools; do
   node scripts/test-$t.mjs
 done
 ```

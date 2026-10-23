@@ -1225,3 +1225,24 @@ Release — v0.18.0, done 2026-10-24
 - [x] `scripts/test-nonsearch-tools.mjs` and new unit tests pass
 - [x] README and this plan's status updated
 - [x] Version bump (`package.json` / `package-lock.json` → 0.18.0)
+
+## 21. Post-plan additions (unreleased)
+
+- **`manuscript_citations`** (`manuscript-citations.js`) — local manuscript ↔
+  bibliography audit for `.tex` and Pandoc `.md`: missing keys, unused
+  entries, duplicate bibliography keys, undefined `\ref` targets, duplicate
+  labels. `.docx` is rejected (opaque citation fields). No network.
+- **`funder_policy`** (`funder-policy.js`) — OpenAlex funder identity keyless;
+  Sherpa Juliet per-version OA policy with `SHERPA_ROMERO_API_KEY`, with the
+  same `key_not_set` degrade as `journal_policy`. `versionInfo()` is shared
+  from `journal-policy.js`.
+- Tests: `scripts/test-manuscript-tools.mjs`; the golden surface and CI steps
+  cover both tools. Release/version bump not yet made.
+- **`remove-ai-signs` skill** — vendored from the user's local Qoder skill
+  (guide adapted from Wikipedia WP:AICAT, CC BY-SA 4.0; see NOTICE), with the
+  scanner path made workspace-relative. New `## Writing quality` prompt
+  section frames it as density-based style editing that preserves meaning,
+  numbers, citations, and technical language — explicitly not detector evasion
+  and never provenance stripping. Golden test runs the scanner.
+  This deliberately replaces the request to integrate the Turnitout-Humanizer:
+  no detector-bypass, watermark, or C2PA-stripping functionality is included.

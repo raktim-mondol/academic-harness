@@ -165,5 +165,11 @@ https://github.com/citation-style-language/styles, retrieved 2026-10-23 and
 licensed under CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/).
 See `styles/README.md`.
 
+The `remove-ai-signs` skill under `skills/remove-ai-signs` is adapted from the
+local skill of the same name. Its reference guide, `references/signs.md`, is
+adapted from Wikipedia's "Signs of AI writing" (WP:AICAT) and is licensed
+CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). It is a prose
+style-editing aid; it makes no detector-evasion or provenance-removal claim.
+
 ResearchCraft branding and content © ResearchCraft.
 Site: https://researchcraft.dev

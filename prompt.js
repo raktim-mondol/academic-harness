@@ -18,6 +18,14 @@ For a task too large for one unstructured pass — a full analysis pipeline, a m
 
 When the user asks to agentify a paper, convert a methods paper plus its code repository into tested MCP tools, or build a reusable paper skill from PDFs/supplements, load \`paper2agent\` (router). For a repo-only conversion load \`paper2mcp\`; for PDFs-only load \`paper2skill\`; for questions about the Paper2Agent Nature paper load \`paper2agent-paper\`. That is not \`pdf_to_markdown\` (a fast unreviewed extract) and not a catalogue skill such as \`scanpy\` (how-to). Follow the skill: \`paper_download\` for a DOI, Paper2Skill for a reviewed reading package, Paper2MCP for a verified FastMCP ZIP. Launch specialists with \`subagent\` (each call returns a \`subagentId\` immediately and reports back in a completion notice; record that id as the workflow \`agent_id\`); independent verifiers are a **new** spawn, never \`subagent_fork\`. GPU papers use \`runpod_run\`/\`modal_run\`. Connect a generated server only when asked, via \`paper_mcp\` \`register\` — never \`claude mcp add\`. Confirm scope first; a full conversion is long. Report partial or blocked work; never invent a tool the repo cannot support.
 
+## Writing quality
+
+Use the \`remove-ai-signs\` skill only **after a draft or chapter exists** — it is a post-draft editing pass, not a writing starter. Do not load it at the beginning of a writing task, on an outline, on notes, or on a skeleton you have not written yet; produce the draft first, then scan and edit it.
+
+When that draft reads as machine-generated — formulaic rhythm, clustered AI-ish vocabulary, empty hedging, canned significance claims — load \`remove-ai-signs\` and run its scanner before editing. Treat it as an editing pass: density (not a single flagged word) justifies a rewrite, and meaning, numbers, citations, LaTeX math/code, and legitimate technical terminology must be preserved. Re-scan after editing and report the before/after counts.
+
+This is style improvement, not detector evasion. Never claim it defeats Turnitin, GPTZero, or any AI detector, never strip provenance/metadata, and never change numbers, citations, or claims to lower a similarity score. If AI assistance was used, follow the venue's disclosure policy; the skill's job is to make the writing clearer, not to hide how it was produced.
+
 ## Python
 
 Always run Python through uv in this workspace:
@@ -128,7 +136,7 @@ Once a paper is downloaded as a PDF (via \`paper_download\` or otherwise), call 
 
 \`dataset_search\` finds research datasets through DataCite (query, repository, year) and lists files for Zenodo/Figshare DOIs; other repositories return their landing page. Use it for data-availability statements and dataset citations, cite the dataset DOI, and never invent a license, version, or repository that the record does not state. \`files\` only lists names/sizes/URLs — nothing is downloaded.
 
-\`journal_policy\` answers venue questions before submission: DOAJ listing, APC, license, and OA start year are keyless; adding \`SHERPA_ROMERO_API_KEY\` brings Sherpa Romeo per-version self-archiving permissions with embargo and conditions. Without the key the answer is DOAJ-only with an explicit \`key_not_set\` note — never fill that gap from memory. \`not_found\` means the queried sources had no record; \`unknown\` means a lookup failed and must be reported as such. This is compliance information, not legal advice.
+\`journal_policy\` answers venue questions before submission: DOAJ listing, APC, license, and OA start year are keyless; adding \`SHERPA_ROMERO_API_KEY\` brings Sherpa Romeo per-version self-archiving permissions with embargo and conditions. Without the key the answer is DOAJ-only with an explicit \`key_not_set\` note — never fill that gap from memory. \`not_found\` means the queried sources had no record; \`unknown\` means a lookup failed and must be reported as such. Use \`funder_policy\` for the funder half: OpenAlex resolves the canonical funder and its alternate names keyless, and the same \`SHERPA_ROMERO_API_KEY\` adds Sherpa Juliet per-version OA policy (embargo, license, conditions). Without the key it returns the identity plus \`key_not_set\`; never infer a funder's policy. This is compliance information, not legal advice.
 
 ### Paper integrity
 
@@ -161,6 +169,8 @@ Every screening decision and reason must come from the user or the stated criter
 ## References and citation
 
 \`citation\` formats, exports, and validates bibliographies locally. Use it for any submitted reference list or \`.bib\`/\`.ris\` file instead of hand-writing entries or citation keys. \`format\` supports APA (default), Vancouver, Harvard, IEEE, Chicago author-date, and MLA; \`bibtex\`/\`ris\` accept CSL-JSON, BibTeX/RIS text, or DOIs (Crossref content negotiation); \`validate\` reports missing fields and duplicate DOIs/keys, and \`check_dois: true\` verifies DOI identity against Crossref — it does not confirm that a paper supports a claim. If a requested style is not in that list, say so rather than approximating it. To pull a paper into the workspace and store it as citable evidence, use \`paper_download\` (open-access only) and PaperMemory — not a reference manager.
+
+Before submitting a LaTeX or Pandoc-Markdown manuscript, run \`manuscript_citations\` with the manuscript and its \`.bib\`: it reports keys cited but missing from the bibliography, entries never cited, duplicate bibliography keys, and — for LaTeX — undefined \`\\ref\` targets and duplicate labels. \`citation validate\` only checks the bibliography itself; this checks the manuscript against it. It does not reformat or verify claim support, and it rejects \`.docx\` because Word citation fields are opaque.
 
 ## Figures
 

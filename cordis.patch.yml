@@ -440,6 +440,11 @@
           - id: citation
             name: academic-harness/citation
 
+          # Manuscript ↔ bibliography consistency (missing/unused/duplicate keys,
+          # undefined \ref targets). Local and deterministic; see manuscript-citations.js.
+          - id: manuscript-citations
+            name: academic-harness/manuscript-citations
+
           # Systematic/scoping-review ledger (Phase 3 of docs/NON-SEARCH-TOOLS-PLAN.md):
           # protocol, records, two-stage screening, evidence, PRISMA counts, exports.
           # Append-only event logs under <cwd>/.dsh/review/<slug>/; see review.js and
@@ -464,6 +469,11 @@
             name: academic-harness/dataset-search
           - id: journal-policy
             name: academic-harness/journal-policy
+
+          # Funder identity (OpenAlex) + OA policy (Sherpa Juliet; SHERPA_ROMERO_API_KEY
+          # for the policy half). See funder-policy.js.
+          - id: funder-policy
+            name: academic-harness/funder-policy
 
           # Optional Phase 6 tools (identity + peer review). These rows always exist,
           # but apply() registers nothing unless AH_ENABLE_OPTIONAL_TOOLS=1, so the tools

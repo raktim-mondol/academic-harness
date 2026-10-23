@@ -64,6 +64,7 @@ jobs:
       - name: Run non-search tool tests
         run: |
           node scripts/test-citation-format.mjs
+          node scripts/test-manuscript-tools.mjs
           node scripts/test-review-store.mjs
           node scripts/test-review-tool.mjs
           node scripts/test-integrity.mjs

@@ -68,7 +68,7 @@ export function formatEmbargo(embargo) {
 }
 
 /** Sherpa's version objects vary by API revision; read both shapes. */
-function versionInfo(version) {
+export function versionInfo(version) {
   if (!version) return null
   const permittedOa = version.permitted_oa || version.permittedOa
   const permissions = (Array.isArray(permittedOa) ? permittedOa : (permittedOa ? [permittedOa] : [])).filter(Boolean)
