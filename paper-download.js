@@ -18,6 +18,7 @@ import { canonicalArxivId, canonicalDoi } from './search-normalize.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const UNPAYWALL_URL = 'https://api.unpaywall.org/v2'
+const OPENALEX_URL = 'https://api.openalex.org/works/doi:'
 const EUROPE_PMC_URL = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search'
 const CORE_URL = 'https://api.core.ac.uk/v3/search/works/'
 const MAX_BYTES = 100 * 1024 * 1024
@@ -163,6 +164,40 @@ async function resolveOpenAccess(doi, email, signal) {
   }
 }
 
+/** OpenAlex's best open-access publisher PDF, free and without an email. */
+export async function resolveOpenAlex(doi, { signal } = {}) {
+  const [apiKey, mailto] = await Promise.all([
+    resolveEnv('OPENALEX_API_KEY'),
+    resolveEnv('CROSSREF_MAILTO').then((value) => value || resolveEnv('UNPAYWALL_EMAIL')),
+  ])
+  const params = new URLSearchParams({
+    select: 'id,doi,title,open_access,best_oa_location,primary_location',
+  })
+  if (apiKey) params.set('api_key', apiKey)
+  if (mailto) params.set('mailto', mailto)
+  const limiter = getLimiter('openalex', { minIntervalMs: apiKey ? 34 : 100 })
+  const result = await limiter.run(() => fetchJson(`${OPENALEX_URL}${encodeURIComponent(doi)}?${params}`, {
+    signal,
+    headers: { 'User-Agent': searchUserAgent(mailto) },
+  }))
+  if (!result.ok) return { found: false, error: `OpenAlex API error ${result.status}` }
+  const work = result.data && typeof result.data === 'object' ? result.data : {}
+  const pdfUrl = work.best_oa_location?.pdf_url
+    || work.primary_location?.pdf_url
+    || (work.open_access?.is_oa ? work.open_access.oa_url : null)
+  if (!pdfUrl) return { found: false, error: 'OpenAlex has no open-access PDF URL' }
+  return {
+    found: true,
+    pdfUrl,
+    title: work.title,
+    oa_status: work.open_access?.oa_status || 'open',
+    license: work.best_oa_location?.license || null,
+    landing_page: work.best_oa_location?.landing_page_url
+      || work.primary_location?.landing_page_url
+      || `https://doi.org/${doi}`,
+  }
+}
+
 /** Europe PMC open-access PDF, preferring an explicit PDF link then PMC render. */
 export async function resolveEuropePmc(doi, { signal } = {}) {
   const params = new URLSearchParams({
@@ -289,6 +324,16 @@ export async function* resolvePdfSources({ doi, arxivId, email, signal } = {}) {
   }
 
   if (doi) {
+    const openalex = await resolveOpenAlex(doi, { signal })
+    if (openalex.found) {
+      const step = candidate({ source: 'openalex', ...openalex })
+      if (step) yield step
+    } else {
+      yield { attempt: { source: 'openalex', error: openalex.error || 'no open-access PDF' } }
+    }
+  }
+
+  if (doi) {
     const europePmc = await resolveEuropePmc(doi, { signal })
     if (europePmc.found) {
       const step = candidate({ source: 'europepmc', ...europePmc })
@@ -406,7 +451,7 @@ export function apply(ctx) {
     name: 'paper_download',
     description: [
       'Download a paper PDF into the workspace so it can be read in full with pdf_to_markdown, instead of relying on an abstract or a search snippet.',
-      'Give doi, arxiv_id, or url. With a DOI it tries, in order: Unpaywall (needs UNPAYWALL_EMAIL, but other fallbacks still run without it), Europe PMC open-access links, CORE repository downloads, and arXiv when the DOI is an arXiv DOI. A direct `url` is tried first.',
+      'Give doi, arxiv_id, or url. With a DOI it tries, in order: Unpaywall (needs UNPAYWALL_EMAIL, but other fallbacks still run without it), OpenAlex\'s publisher open-access PDF, Europe PMC open-access links, CORE repository downloads, and arXiv when the DOI is an arXiv DOI. A direct `url` is tried first.',
       'When no open-access PDF is found, this returns a clear "paywalled" result with every attempted source (not an error) so you can tell the user rather than fabricating content. On success the PDF is checked for PDF magic bytes and ingested into PaperMemory (mcp__papermemory__*); ingest failure does not fail the download.',
     ].join(' '),
     parameters: {

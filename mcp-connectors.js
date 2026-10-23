@@ -13,8 +13,10 @@
  * the correct preset). `dsh-mcp-client`'s own config is fixed per instance,
  * and env vars have the same restart requirement.
  *
- * Firecrawl works keyless (rate-limited). Parallel MCP does not: it is only
- * mounted when PARALLEL_API_KEY is set, and that key is always sent as a
+ * Firecrawl now requires a key for its remote MCP calls (keyless calls return
+ * an upgrade message), so the connector is mounted only when
+ * FIRECRAWL_API_KEY is set. Parallel MCP does not mount keyless either: it is
+ * only mounted when PARALLEL_API_KEY is set, and that key is always sent as a
  * Bearer token so it stays off the anonymous rate limit. `mcp__parallel__web_search`
  * is the same search job as native `parallel_search` but locked to `basic`
  * mode — keep it as a fallback if the REST tool is missing or fails.
@@ -58,13 +60,13 @@ export async function apply(ctx) {
     })
   }
 
-  ctx.plugin(McpClient, {
-    serverName: 'firecrawl',
-    transport: 'streamable-http',
-    url: firecrawlKey
-      ? `https://mcp.firecrawl.dev/${encodeURIComponent(firecrawlKey)}/v2/mcp`
-      : 'https://mcp.firecrawl.dev/v2/mcp',
-  })
+  if (firecrawlKey) {
+    ctx.plugin(McpClient, {
+      serverName: 'firecrawl',
+      transport: 'streamable-http',
+      url: `https://mcp.firecrawl.dev/${encodeURIComponent(firecrawlKey)}/v2/mcp`,
+    })
+  }
 
   if (sciteKey) {
     ctx.plugin(McpClient, {

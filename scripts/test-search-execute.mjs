@@ -469,6 +469,13 @@ calls.length = 0
 globalThis.fetch = async (url) => {
   const target = String(url)
   if (target.includes('api.unpaywall.org')) return jsonResponse({ is_oa: false, oa_status: 'closed' })
+  if (target.includes('api.openalex.org')) {
+    return jsonResponse({
+      title: 'OpenAlex Paper',
+      best_oa_location: { pdf_url: 'https://example.org/openalex.pdf' },
+      open_access: { oa_status: 'gold' },
+    })
+  }
   if (target.includes('europepmc')) {
     return jsonResponse({
       resultList: {
@@ -492,14 +499,14 @@ globalThis.fetch = async (url) => {
 }
 resetLimitersForTests()
 const fallbacks = await resolvePdfCandidates({ doi: '10.1000/test', email: 'test@example.org' })
-assert.deepEqual(fallbacks.candidates.map((candidate) => candidate.source), ['europepmc', 'core'])
+assert.deepEqual(fallbacks.candidates.map((candidate) => candidate.source), ['openalex', 'europepmc', 'core'])
 assert.equal(fallbacks.attempts[0].source, 'unpaywall')
 
 resetLimitersForTests()
 const noEmail = await resolvePdfCandidates({ doi: '10.1000/test' })
 assert.equal(noEmail.attempts[0].source, 'unpaywall')
 assert.match(noEmail.attempts[0].error, /UNPAYWALL_EMAIL is not set/)
-assert.deepEqual(noEmail.candidates.map((candidate) => candidate.source), ['europepmc', 'core'])
+assert.deepEqual(noEmail.candidates.map((candidate) => candidate.source), ['openalex', 'europepmc', 'core'])
 
 let pdfCalls = 0
 globalThis.fetch = async () => {

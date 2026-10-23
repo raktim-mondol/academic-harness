@@ -323,11 +323,12 @@
 
           # ── literature & academic search MCP connectors ─────────────────────────────
 
-          # One JS module mounts three `mcp-client` instances programmatically (rather
-          # than static rows) so each server's key can come from the credentials store
-          # (Settings -> Academic Harness API keys) as well as its env var — see
-          # mcp-connectors.js for the resolution order and per-server detail. Tools
-          # surface as `mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`. No
+          # One JS module mounts up to three `mcp-client` instances programmatically
+          # (rather than static rows) so each server's key can come from the credentials
+          # store (Settings -> Academic Harness API keys) as well as its env var — see
+          # mcp-connectors.js for the resolution order and per-server detail. Each
+          # connector mounts only when its key is set; tools surface as
+          # `mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`. No
           # realm needed: like tool-web, it registers only into the shared `tools`
           # registry and provides no service of its own.
           - id: mcp-connectors

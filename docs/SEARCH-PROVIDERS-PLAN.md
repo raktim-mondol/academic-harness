@@ -1,6 +1,6 @@
 # Search Providers — gap analysis and implementation plan
 
-Status: **Phase 0–5 implemented** (2026-10-23; optional self-hosted providers deferred) · Released as plugin **v0.17.0**
+Status: **Phase 0–5 implemented** (2026-10-23; optional self-hosted providers deferred) · Released as plugin **v0.17.1**
 Source docs: `academic-harness_docs/Search Providers API Reference.md`,
 `academic-harness_docs/Claude Code Mods  Complete Tutorial + Research Harness.md`,
 `academic-harness_docs/Jev Delegation Routing for the Academic Research Harness.md`
@@ -616,7 +616,7 @@ Implementation notes / deviations:
 - Crossref `link[]` is treated as a landing/resource link, not an OA assertion; the normalized record carries no `license` field yet.
 - OpenAlex `group_by` calls omit `select` (OpenAlex rejects the combination).
 - Semantic Scholar without a key can return 429; tools surface that as a clear error, not "not found".
-- Firecrawl Research Index check (2026-10-23): the keyless MCP mount exposes only `firecrawl_scrape`, `firecrawl_search`, and `firecrawl_parse`. The paper-index tools are not advertised or prompted for; the documented free endpoints remain REST-only/unavailable through this mount.
+- Firecrawl Research Index check (2026-10-23): the MCP mount exposes only `firecrawl_scrape`, `firecrawl_search`, and `firecrawl_parse`; paper-index tools are not advertised. Live end-to-end calls return an upgrade message without `FIRECRAWL_API_KEY`, so the connector is now mounted only when the key is set.
 - Phase 2 adds `parallel_extract` and `brave_search`; `parallel_search` now also goes through the shared limiter/retry client.
 - Phase 3 adds `tavily_search`, `exa_search`, `perplexity_search`, and `jina_read`. Jina Reader works keyless at 20 RPM; Jina Search (`mode=search`) requires `JINA_API_KEY`.
 - Perplexity Search uses `search_type` values `web`/`fast`/`people` (verified against the 2026 API reference), not `standard`.
@@ -626,7 +626,7 @@ Implementation notes / deviations:
 - CORE requests use the trailing-slash endpoint (the non-slash URL returns a 301 that consumes quota) and are not retried.
 - Phase 5 adds `literature_search`: auto = OpenAlex + S2, plus PubMed for biomedical and arXiv for preprint/CS/physics queries; Crossref is opt-in because its relevance ranking is noisy. Results are deduplicated and fused with reciprocal-rank fusion.
 - The router converts free-text discovery queries into arXiv operator queries (`all:term AND ...`) instead of quoted phrases; quoted multi-word queries were returning zero arXiv results.
-- `paper_download` now tries Unpaywall -> Europe PMC -> CORE -> arXiv, accepts `arxiv_id`, and treats `UNPAYWALL_EMAIL` as recommended rather than required. Fallback resolution is lazy (it stops at the first PDF that downloads), URLs are HTTP(S)-only, every redirect is revalidated, loopback/private/link-local/ULA targets are rejected, downloads are capped at 120s/100MB, and all fallbacks still pass the PDF magic-byte check and PaperMemory ingest.
+- `paper_download` now tries Unpaywall -> OpenAlex publisher PDF -> Europe PMC -> CORE -> arXiv, accepts `arxiv_id`, and treats `UNPAYWALL_EMAIL` as recommended rather than required. The OpenAlex step is what makes DOI downloads work without an email when the publisher exposes a direct OA PDF (verified live with a 21 MB PLOS ONE PDF). Fallback resolution is lazy (it stops at the first PDF that downloads), URLs are HTTP(S)-only, every redirect is revalidated, loopback/private/link-local/ULA targets are rejected, downloads are capped at 120s/100MB, and all fallbacks still pass the PDF magic-byte check and PaperMemory ingest.
 - Self-hosted Crawl4AI/SearXNG integration is intentionally deferred (BYO infrastructure, not a default preset dependency).
 
 Phase 2 — done 2026-10-23
@@ -658,3 +658,4 @@ Release
 - [x] README and this plan's status updated
 - [x] Version bump to 0.17.0
 - [x] Commit/push Phases 4–5; CI green (run 39935793768)
+- [x] Post-release v0.17.1: OpenAlex PDF fallback, Firecrawl key requirement, FutureHouse/Edison migration, rate-limit hints, SSRF revalidation
