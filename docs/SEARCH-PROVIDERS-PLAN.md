@@ -657,4 +657,4 @@ Release
 - [x] `node scripts/test-phase7.mjs` and new search tests pass
 - [x] README and this plan's status updated
 - [x] Version bump to 0.17.0
-- [ ] Commit/push Phases 4–5; CI green
+- [x] Commit/push Phases 4–5; CI green (run 39935793768)
