@@ -1,6 +1,6 @@
 # Non-Search Academic Tools — gap analysis and implementation plan
 
-Status: **Phases 0–8 implemented and released as v0.18.0** (2026-10-24) · previous baseline **v0.17.1**
+Status: **Phases 0–8 released as v0.18.0; post-plan additions released as v0.19.0** (2026-10-24) · previous baseline **v0.17.1**
 Phase 1 note: the `citation` tool shipped; the planned **Zotero bridge was
 removed** before release (decision — the local API ships off by default and
 the read-only bridge added little over `paper_download` + PaperMemory). See §6.2.
@@ -1237,7 +1237,7 @@ Release — v0.18.0, done 2026-10-24
   same `key_not_set` degrade as `journal_policy`. `versionInfo()` is shared
   from `journal-policy.js`.
 - Tests: `scripts/test-manuscript-tools.mjs`; the golden surface and CI steps
-  cover both tools. Release/version bump not yet made.
+  cover both tools. Released as v0.19.0.
 - **`remove-ai-signs` skill** — vendored from the user's local Qoder skill
   (guide adapted from Wikipedia WP:AICAT, CC BY-SA 4.0; see NOTICE), with the
   scanner path made workspace-relative. New `## Writing quality` prompt

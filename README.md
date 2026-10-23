@@ -7,7 +7,7 @@ Academic Harness as a **DeepSeek Harness** profile: the DSH web UI and DSH agent
 
 ## Install
 
-Academic Harness 0.18 requires **DeepSeek Harness 0.2.1 or later**. Install DSH first:
+Academic Harness 0.19 requires **DeepSeek Harness 0.2.1 or later**. Install DSH first:
 
 ```sh
 npm install -g @deepseek-ai/dsh
@@ -517,7 +517,7 @@ A subagent the top-level agent delegates to runs in its own DSH session, but its
 
 ## Release notes
 
-### Unreleased
+### 0.19.0
 
 - `remove-ai-signs` skill vendored into the plugin (style editing for machine-sounding prose; no detector-evasion or provenance-removal claims) and steered from a new `## Writing quality` prompt section.
 - `manuscript_citations` — manuscript ↔ `.bib` consistency for `.tex`/`.md`: missing, unused, and duplicate keys, undefined `\ref` targets, duplicate labels.
