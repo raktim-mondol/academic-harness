@@ -67,6 +67,46 @@ function render(value) {
   return [{ type: 'text', text: `${header}\n\n${body}` }]
 }
 
+export async function runOpenAlexSearch(args, exec) {
+  const entity = ENTITIES.includes(args.entity) ? args.entity : 'works'
+  if (args.entity && !ENTITIES.includes(args.entity)) {
+    return { error: `entity must be one of ${ENTITIES.join(', ')}` }
+  }
+  const [apiKey, mailto] = await Promise.all([
+    resolveEnv('OPENALEX_API_KEY'),
+    resolveEnv('CROSSREF_MAILTO').then((value) => value || resolveEnv('UNPAYWALL_EMAIL')),
+  ])
+  const params = buildParams({ ...args, entity }, apiKey, mailto)
+  const semantic = Boolean(args.query)
+  const limiter = getLimiter(semantic ? 'openalex-semantic' : 'openalex', {
+    minIntervalMs: semantic ? 1000 : (apiKey ? 34 : 100),
+  })
+  const url = `${API}/${entity}?${params}`
+  const result = await limiter.run(() => fetchJson(url, {
+    signal: exec?.signal,
+    headers: { 'User-Agent': searchUserAgent(mailto) },
+  }))
+  if (!result.ok) {
+    if (result.error === 'aborted') return { error: 'request cancelled' }
+    return { error: `OpenAlex API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
+  }
+  const data = result.data || {}
+  const meta = {
+    count: data.meta?.count ?? null,
+    page: data.meta?.page ?? null,
+    per_page: data.meta?.per_page ?? null,
+    cost_usd: data.meta?.cost_usd ?? null,
+    next_cursor: data.meta?.next_cursor ?? null,
+  }
+  if (args.group_by) {
+    return { entity, meta, groups: data.group_by || [], results: [] }
+  }
+  const results = entity === 'works'
+    ? (data.results || []).map(fromOpenAlexWork).filter(Boolean)
+    : (data.results || [])
+  return { entity, meta, results, next_cursor: meta.next_cursor }
+}
+
 export const name = 'academic-harness-openalex-search'
 export const inject = ['tools']
 
@@ -108,42 +148,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      const entity = ENTITIES.includes(args.entity) ? args.entity : 'works'
-      if (args.entity && !ENTITIES.includes(args.entity)) {
-        return { error: `entity must be one of ${ENTITIES.join(', ')}` }
-      }
-      const [apiKey, mailto] = await Promise.all([
-        resolveEnv('OPENALEX_API_KEY'),
-        resolveEnv('CROSSREF_MAILTO').then((value) => value || resolveEnv('UNPAYWALL_EMAIL')),
-      ])
-      const params = buildParams({ ...args, entity }, apiKey, mailto)
-      const semantic = Boolean(args.query)
-      const limiter = getLimiter(semantic ? 'openalex-semantic' : 'openalex', {
-        minIntervalMs: semantic ? 1000 : (apiKey ? 34 : 100),
-      })
-      const url = `${API}/${entity}?${params}`
-      const result = await limiter.run(() => fetchJson(url, {
-        signal: exec.signal,
-        headers: { 'User-Agent': searchUserAgent(mailto) },
-      }))
-      if (!result.ok) {
-        return { error: `OpenAlex API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
-      }
-      const data = result.data || {}
-      const meta = {
-        count: data.meta?.count ?? null,
-        page: data.meta?.page ?? null,
-        per_page: data.meta?.per_page ?? null,
-        cost_usd: data.meta?.cost_usd ?? null,
-        next_cursor: data.meta?.next_cursor ?? null,
-      }
-      if (args.group_by) {
-        return { entity, meta, groups: data.group_by || [], results: [] }
-      }
-      const results = entity === 'works'
-        ? (data.results || []).map(fromOpenAlexWork).filter(Boolean)
-        : (data.results || [])
-      return { entity, meta, results, next_cursor: meta.next_cursor }
+      return runOpenAlexSearch(args, exec)
     },
     presentCall(args) {
       const label = args.query || args.filter || args.group_by || args.entity || 'works'

@@ -82,6 +82,7 @@ const searchModules = {
   'crossref-lookup.js': 'crossref_lookup',
   'arxiv-search.js': 'arxiv_search',
   'pubmed-search.js': 'pubmed_search',
+  'literature-search.js': 'literature_search',
 }
 for (const [file, tool] of Object.entries(searchModules)) {
   const path = join(root, file)
@@ -103,11 +104,11 @@ for (const [file, tool] of Object.entries(searchModules)) {
 }
 
 const presetSource = readFileSync(join(root, 'presets/academic-harness/agent.cordis.yml'), 'utf8')
-for (const slug of ['paper-resolve', 'openalex-search', 'openalex-cite', 'semantic-scholar-search', 'crossref-lookup', 'arxiv-search', 'pubmed-search', 'parallel-extract', 'brave-search', 'tavily-search', 'exa-search', 'perplexity-search', 'jina-reader']) {
+for (const slug of ['paper-resolve', 'openalex-search', 'openalex-cite', 'semantic-scholar-search', 'crossref-lookup', 'arxiv-search', 'pubmed-search', 'literature-search', 'parallel-extract', 'brave-search', 'tavily-search', 'exa-search', 'perplexity-search', 'jina-reader', 'core-search', 'elicit-search', 'futurehouse-agent']) {
   check(presetSource.includes(`academic-harness/${slug}`), `preset missing row ${slug}`)
 }
 
-for (const marker of ['openalex_search', 's2_search', 'pubmed_search', 'arxiv_search', 'crossref_lookup', 'paper_resolve', 'openalex_citations', 'brave_search', 'parallel_extract', 'tavily_search', 'exa_search', 'perplexity_search', 'jina_read', 'Academic databases']) {
+for (const marker of ['literature_search', 'openalex_search', 's2_search', 'pubmed_search', 'arxiv_search', 'crossref_lookup', 'paper_resolve', 'openalex_citations', 'brave_search', 'parallel_extract', 'tavily_search', 'exa_search', 'perplexity_search', 'jina_read', 'core_search', 'elicit_search', 'futurehouse_agent', 'Academic databases']) {
   check(prompt.includes(marker), `prompt.js missing search marker: ${marker}`)
 }
 
@@ -122,7 +123,12 @@ const webModules = {
   'perplexity-search.js': 'perplexity_search',
   'jina-reader.js': 'jina_read',
 }
-for (const [file, tool] of Object.entries(webModules)) {
+const gatedModules = {
+  'core-search.js': 'core_search',
+  'elicit-search.js': 'elicit_search',
+  'futurehouse-agent.js': 'futurehouse_agent',
+}
+for (const [file, tool] of Object.entries({ ...webModules, ...gatedModules })) {
   const path = join(root, file)
   check(existsSync(path), `missing search module: ${file}`)
   if (!existsSync(path)) continue
@@ -135,7 +141,7 @@ for (const [file, tool] of Object.entries(webModules)) {
 }
 
 const settingsSource = readFileSync(join(root, 'settings-keys.js'), 'utf8')
-for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY']) {
+for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY', 'CORE_API_KEY', 'ELICIT_API_KEY', 'FUTUREHOUSE_API_KEY']) {
   check(settingsSource.includes(key), `settings-keys.js missing ${key}`)
 }
 

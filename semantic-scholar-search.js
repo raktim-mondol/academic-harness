@@ -54,6 +54,40 @@ function render(value) {
   return [{ type: 'text', text: `${header}\n\n${renderPapers(value.results || [])}` }]
 }
 
+export async function runS2Search(args, exec) {
+  if (!String(args.query || '').trim()) return { error: 'query is required' }
+  const mode = MODES.includes(args.mode) ? args.mode : 'relevance'
+  if (args.mode && !MODES.includes(args.mode)) return { error: `mode must be one of ${MODES.join(', ')}` }
+
+  const apiKey = await resolveEnv('S2_API_KEY')
+  const headers = { 'User-Agent': searchUserAgent() }
+  if (apiKey) headers['x-api-key'] = apiKey
+
+  const limiter = getLimiter('s2', { minIntervalMs: 1000 })
+  const result = await limiter.run(() => fetchJson(buildUrl(args, mode), {
+    signal: exec?.signal,
+    headers,
+  }))
+  if (!result.ok) {
+    if (result.error === 'aborted') return { error: 'request cancelled' }
+    const hint = result.status === 429
+      ? ' — keyless requests share a throttled pool; set S2_API_KEY for a dedicated 1 RPS bucket'
+      : ''
+    return { error: `Semantic Scholar API error ${result.status}${hint}`, status: result.status, detail: result.detail ?? result.error }
+  }
+
+  const data = result.data || {}
+  const results = mode === 'snippet'
+    ? (data.data || []).map(fromSemanticScholarSnippet).filter(Boolean)
+    : (data.data || []).map(fromSemanticScholarPaper).filter(Boolean)
+  return {
+    mode,
+    total: data.total ?? null,
+    token: data.token ?? null,
+    results,
+  }
+}
+
 export const name = 'academic-harness-semantic-scholar-search'
 export const inject = ['tools']
 
@@ -94,33 +128,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      if (!String(args.query || '').trim()) return { error: 'query is required' }
-      const mode = MODES.includes(args.mode) ? args.mode : 'relevance'
-      if (args.mode && !MODES.includes(args.mode)) return { error: `mode must be one of ${MODES.join(', ')}` }
-
-      const apiKey = await resolveEnv('S2_API_KEY')
-      const headers = { 'User-Agent': searchUserAgent() }
-      if (apiKey) headers['x-api-key'] = apiKey
-
-      const limiter = getLimiter('s2', { minIntervalMs: 1000 })
-      const result = await limiter.run(() => fetchJson(buildUrl(args, mode), {
-        signal: exec.signal,
-        headers,
-      }))
-      if (!result.ok) {
-        return { error: `Semantic Scholar API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
-      }
-
-      const data = result.data || {}
-      const results = mode === 'snippet'
-        ? (data.data || []).map(fromSemanticScholarSnippet).filter(Boolean)
-        : (data.data || []).map(fromSemanticScholarPaper).filter(Boolean)
-      return {
-        mode,
-        total: data.total ?? null,
-        token: data.token ?? null,
-        results,
-      }
+      return runS2Search(args, exec)
     },
     presentCall(args) {
       return { card: 'generic', title: `Semantic Scholar (${args.mode || 'relevance'}): ${args.query || ''}`, kind: 'search' }

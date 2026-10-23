@@ -87,6 +87,38 @@ function render(value) {
   return [{ type: 'text', text: `arXiv: ${value.total ?? value.results.length} total · showing ${value.results.length}\n\n${renderPapers(value.results || [], { abstractChars: 700 })}` }]
 }
 
+export async function runArxivSearch(args, exec) {
+  const ids = (args.ids || []).map((id) => String(id).trim()).filter(Boolean)
+  if (ids.length && String(args.query || '').trim()) {
+    return { error: 'give query or ids, not both' }
+  }
+  if (!ids.length && !String(args.query || '').trim()) return { error: 'give a query or ids' }
+  if (ids.length > 100) return { error: 'pass at most 100 arXiv IDs per call' }
+
+  const params = new URLSearchParams()
+  if (ids.length) params.set('id_list', ids.join(','))
+  else params.set('search_query', buildSearchQuery(args.query, args.field))
+  params.set('start', String(Math.max(0, Number(args.start) || 0)))
+  const fallbackMax = ids.length ? ids.length : 25
+  params.set('max_results', String(Math.min(Math.max(Number(args.max_results) || fallbackMax, 1), 200)))
+  params.set('sortBy', SORTS.includes(args.sort_by) ? args.sort_by : 'relevance')
+  params.set('sortOrder', ORDERS.includes(args.sort_order) ? args.sort_order : 'descending')
+
+  const email = await resolveEnv('UNPAYWALL_EMAIL')
+  const limiter = getLimiter('arxiv', { minIntervalMs: 3000, maxConcurrent: 1 })
+  const result = await limiter.run(() => fetchText(`${API}?${params}`, {
+    signal: exec?.signal,
+    headers: { 'User-Agent': searchUserAgent(email) },
+  }))
+  if (!result.ok) {
+    if (result.error === 'aborted') return { error: 'request cancelled' }
+    return { error: `arXiv API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
+  }
+  const parsed = parseAtom(result.data || '')
+  const results = parsed.entries.map(fromArxivEntry).filter(Boolean)
+  return { total: parsed.total, start: Number(params.get('start')), results }
+}
+
 export const name = 'academic-harness-arxiv-search'
 export const inject = ['tools']
 
@@ -121,34 +153,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      const ids = (args.ids || []).map((id) => String(id).trim()).filter(Boolean)
-      if (ids.length && String(args.query || '').trim()) {
-        return { error: 'give query or ids, not both' }
-      }
-      if (!ids.length && !String(args.query || '').trim()) return { error: 'give a query or ids' }
-      if (ids.length > 100) return { error: 'pass at most 100 arXiv IDs per call' }
-
-      const params = new URLSearchParams()
-      if (ids.length) params.set('id_list', ids.join(','))
-      else params.set('search_query', buildSearchQuery(args.query, args.field))
-      params.set('start', String(Math.max(0, Number(args.start) || 0)))
-      const fallbackMax = ids.length ? ids.length : 25
-      params.set('max_results', String(Math.min(Math.max(Number(args.max_results) || fallbackMax, 1), 200)))
-      params.set('sortBy', SORTS.includes(args.sort_by) ? args.sort_by : 'relevance')
-      params.set('sortOrder', ORDERS.includes(args.sort_order) ? args.sort_order : 'descending')
-
-      const email = await resolveEnv('UNPAYWALL_EMAIL')
-      const limiter = getLimiter('arxiv', { minIntervalMs: 3000, maxConcurrent: 1 })
-      const result = await limiter.run(() => fetchText(`${API}?${params}`, {
-        signal: exec.signal,
-        headers: { 'User-Agent': searchUserAgent(email) },
-      }))
-      if (!result.ok) {
-        return { error: `arXiv API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
-      }
-      const parsed = parseAtom(result.data || '')
-      const results = parsed.entries.map(fromArxivEntry).filter(Boolean)
-      return { total: parsed.total, start: Number(params.get('start')), results }
+      return runArxivSearch(args, exec)
     },
     presentCall(args) {
       return { card: 'generic', title: `arXiv: ${args.query || (args.ids || []).join(', ')}`, kind: 'search' }

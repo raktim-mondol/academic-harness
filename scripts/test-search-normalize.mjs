@@ -7,13 +7,19 @@ import { buildBody as buildTavilyBody } from '../tavily-search.js'
 import { buildBody as buildExaBody } from '../exa-search.js'
 import { buildBody as buildPerplexityBody } from '../perplexity-search.js'
 import { buildRequest as buildJinaRequest } from '../jina-reader.js'
+import { buildParams as buildCoreParams } from '../core-search.js'
+import { buildBody as buildElicitBody } from '../elicit-search.js'
+import { buildCreateBody as buildFutureHouseBody, summarizeTask } from '../futurehouse-agent.js'
 import {
   capText,
   canonicalArxivId,
   canonicalDoi,
   fromArxivEntry,
   fromBraveResult,
+  fromCoreResult,
   fromCrossrefWork,
+  fromElicitPaper,
+  fromElicitTrial,
   fromEuropePmcResult,
   fromNcbiSummary,
   fromOpenAlexWork,
@@ -24,6 +30,7 @@ import {
   fromSemanticScholarSnippet,
   identifierKind,
   mergePapers,
+  mergeRanked,
   normalizeTitle,
   reconstructAbstract,
   renderPapers,
@@ -311,12 +318,164 @@ assert.equal(jinaSearch.headers.Authorization, 'Bearer jina-key')
 assert.throws(() => buildJinaRequest({ mode: 'search' }, 'key'), /query is required/)
 assert.throws(() => buildJinaRequest({ url: 'ftp://example.org' }, null), /HTTP/)
 
+const corePaper = fromCoreResult({
+  id: 123,
+  doi: 'https://doi.org/10.1000/ABC.1',
+  pubmedId: '12345678',
+  arxivId: '2301.12345',
+  title: 'Core <b>Title</b>',
+  authors: [{ name: 'Ada Lovelace,' }, { name: 'Alan Turing' }],
+  yearPublished: 2022,
+  journals: [],
+  publisher: 'Repo Press',
+  abstract: 'Core abstract',
+  citationCount: 7,
+  downloadUrl: 'https://core.ac.uk/download/123.pdf',
+  links: [{ type: 'display', url: 'https://core.ac.uk/works/123' }],
+  fieldOfStudy: 'Article',
+  fullText: 'Full text body',
+}, { includeFullText: true })
+assert.equal(corePaper.source, 'core')
+assert.equal(corePaper.doi, '10.1000/abc.1')
+assert.equal(corePaper.pmid, '12345678')
+assert.equal(corePaper.arxiv_id, '2301.12345')
+assert.equal(corePaper.title, 'Core Title')
+assert.equal(corePaper.authors[0].name, 'Ada Lovelace')
+assert.equal(corePaper.venue, 'Repo Press')
+assert.equal(corePaper.oa_url, 'https://core.ac.uk/download/123.pdf')
+assert.equal(corePaper.url, 'https://core.ac.uk/works/123')
+assert.equal(corePaper.full_text, 'Full text body')
+assert.equal(fromCoreResult({ id: 1, title: 'T', fullText: 'body' }).full_text, undefined)
+assert.equal(
+  fromCoreResult({ id: 2, title: 'T', fullText: 'Not available for public API users.' }, { includeFullText: true }).full_text,
+  undefined,
+  'CORE keyless sentinel must not be stored as full text',
+)
+
+const elicitPaper = fromElicitPaper({
+  elicitId: 'elicit-1',
+  title: 'Elicit Title',
+  authors: ['Ada Lovelace', 'Alan Turing'],
+  year: 2024,
+  abstract: 'Elicit abstract',
+  doi: '10.1000/ABC.1',
+  pmid: '12345678',
+  venue: 'Journal of Tests',
+  citedByCount: 9,
+  urls: ['https://example.org/e'],
+  studyTypeTags: ['RCT'],
+  journalQuartile: 1,
+  fullTextUrl: 'https://example.org/e.pdf',
+})
+assert.equal(elicitPaper.source, 'elicit')
+assert.equal(elicitPaper.title, 'Elicit Title')
+assert.equal(elicitPaper.year, 2024)
+assert.equal(elicitPaper.journal_quartile, 1)
+assert.equal(elicitPaper.oa_url, null, 'fullTextUrl is not proof of open access')
+assert.equal(elicitPaper.url, 'https://example.org/e')
+assert.deepEqual(elicitPaper.fields, ['RCT'])
+
+const elicitTrial = fromElicitTrial({
+  nctId: 'NCT123',
+  title: 'Trial Title',
+  summary: 'Trial summary',
+  startDate: '2023-05-01',
+  leadSponsor: 'Sponsor',
+  url: 'https://clinicaltrials.gov/study/NCT123',
+  studyType: 'INTERVENTIONAL',
+  conditions: ['Obesity'],
+  overallStatus: 'RECRUITING',
+  phase: ['PHASE2'],
+  enrollmentCount: 100,
+  interventions: ['Drug'],
+  hasResults: false,
+  completionDate: '2025-01-01',
+})
+assert.equal(elicitTrial.source, 'elicit-trial')
+assert.equal(elicitTrial.year, 2023)
+assert.equal(elicitTrial.trial.nct_id, 'NCT123')
+assert.deepEqual(elicitTrial.trial.phase, ['PHASE2'])
+assert.deepEqual(elicitTrial.fields, ['Obesity'])
+
+const coreParams = buildCoreParams({ query: 'test', limit: 500, offset: 3 })
+assert.equal(coreParams.get('q'), 'test')
+assert.equal(coreParams.get('limit'), '100')
+assert.equal(coreParams.get('offset'), '3')
+
+const elicitBody = buildElicitBody({
+  kind: 'papers',
+  query: 'test',
+  type_tags: ['RCT', 'Meta-Analysis'],
+  min_year: 2020,
+  retracted: 'exclude_retracted',
+})
+assert.equal(elicitBody.endpoint, 'papers')
+assert.deepEqual(elicitBody.body.filters.typeTags, ['RCT', 'Meta-Analysis'])
+assert.equal(elicitBody.body.filters.minYear, 2020)
+assert.throws(() => buildElicitBody({ query: 'x', search_mode: 'keyword', max_year: 2024 }), /keyword/)
+assert.throws(() => buildElicitBody({ query: 'x', max_results: 5000 }), /at most 1000/)
+assert.throws(() => buildElicitBody({ query: 'x', min_year: 'abc' }), /must be a number/)
+
+const trialBody = buildElicitBody({
+  kind: 'trials',
+  query: 'obesity',
+  phase: ['PHASE2', 'PHASE3'],
+  recruitment_status: ['RECRUITING'],
+  has_results: true,
+})
+assert.equal(trialBody.endpoint, 'trials')
+assert.deepEqual(trialBody.body.trialFilters.phase, ['PHASE2', 'PHASE3'])
+
+const futureHouseBody = buildFutureHouseBody({ agent: 'quick_search', query: 'Has X been done?' })
+assert.equal(futureHouseBody.name, 'job-futurehouse-paperqa3')
+assert.equal(futureHouseBody.query, 'Has X been done?')
+assert.equal(buildFutureHouseBody({ agent: 'deep_search', query: 'x' }).name, 'job-futurehouse-paperqa3-high')
+assert.equal(buildFutureHouseBody({ agent: 'precedent_search', query: 'x' }).name, 'job-futurehouse-paperqa3-precedent')
+assert.throws(() => buildFutureHouseBody({ agent: 'unknown', query: 'x' }), /agent must be one of/)
+
+const summarized = summarizeTask({
+  status: 'success',
+  task: 'Has X been done?',
+  crow: 'job-futurehouse-paperqa3-precedent',
+  environment_frame: {
+    state: {
+      state: {
+        response: { answer: { answer: 'Yes.', formatted_answer: 'Yes, in 2020.', has_successful_answer: true } },
+        info: { usage: { total_cost: 0.12, total_queries: 3 } },
+      },
+    },
+  },
+})
+assert.equal(summarized.status, 'success')
+assert.equal(summarized.answer, 'Yes.')
+assert.equal(summarized.formatted_answer, 'Yes, in 2020.')
+assert.equal(summarized.total_queries, 3)
+
 const merged = mergePapers([openalex, crossref, semantic])
 assert.equal(merged.length, 1, 'DOI duplicates must collapse')
 assert.deepEqual(merged[0].sources.sort(), ['crossref', 'openalex', 's2'])
 assert.equal(merged[0].citation_count, 20, 'highest citation count wins')
 assert.equal(merged[0].authors.length, 2, 'longest author list wins')
 assert.equal(merged[0].abstract, 'A longer abstract', 'longest abstract wins')
+
+const otherPaper = fromOpenAlexWork({
+  id: 'https://openalex.org/W999',
+  doi: 'https://doi.org/10.1000/other',
+  title: 'Other Paper',
+  publication_year: 2024,
+  authorships: [],
+  cited_by_count: 1,
+  type: 'article',
+})
+const ranked = mergeRanked([
+  { source: 'openalex', results: [openalex, otherPaper] },
+  { source: 's2', results: [semantic] },
+  { source: 'crossref', results: [crossref] },
+])
+assert.equal(ranked.length, 2)
+assert.equal(ranked[0].doi, '10.1000/abc.1')
+assert.ok(ranked[0].rrf_score > ranked[1].rrf_score, 'a paper found in three sources should rank first')
+assert.deepEqual(ranked[0].sources.sort(), ['crossref', 'openalex', 's2'])
 
 const titleOnly = mergePapers([
   { source: 'a', sources: ['a'], title: 'Same Title', year: 2020, authors: [], fields: [], snippets: [] },

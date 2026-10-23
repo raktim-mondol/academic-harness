@@ -1,5 +1,7 @@
 node_modules/
 package-lock.json
+.archify/
+.qoder/
 .zvec-grep/
 .e2e/
 .dsh/

@@ -380,6 +380,23 @@
 - id: pubmed-search
   name: academic-harness/pubmed-search
 
+# Gated Phase 4 sources: CORE repository full texts (key optional), Elicit
+# paper/trial search (Pro+ key), and FutureHouse Crow/Falcon/Owl agents (async
+# start/status/cancel). Native REST tools; see core-search.js,
+# elicit-search.js, futurehouse-agent.js.
+- id: core-search
+  name: academic-harness/core-search
+- id: elicit-search
+  name: academic-harness/elicit-search
+- id: futurehouse-agent
+  name: academic-harness/futurehouse-agent
+
+# Multi-source discovery router: OpenAlex + Semantic Scholar by default,
+# PubMed/arXiv by domain, Crossref opt-in. Deduplicates and rank-fuses with
+# RRF. See literature-search.js.
+- id: literature-search
+  name: academic-harness/literature-search
+
 # Consensus is a plain REST tool (x-api-key auth), not an MCP client — see
 # consensus-search.js. Kept in this preset alongside the connectors above
 # rather than global, since it's specifically an academic-search capability.

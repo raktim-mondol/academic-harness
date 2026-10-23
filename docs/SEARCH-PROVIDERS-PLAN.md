@@ -1,6 +1,6 @@
 # Search Providers — gap analysis and implementation plan
 
-Status: **Phase 0–3 implemented** (2026-10-23); Phases 4–5 proposed · Baseline: plugin **v0.16.2**
+Status: **Phase 0–5 implemented** (2026-10-23; optional self-hosted providers deferred) · Released as plugin **v0.17.0**
 Source docs: `academic-harness_docs/Search Providers API Reference.md`,
 `academic-harness_docs/Claude Code Mods  Complete Tutorial + Research Harness.md`,
 `academic-harness_docs/Jev Delegation Routing for the Academic Research Harness.md`
@@ -454,7 +454,7 @@ These require paid or approved access and are lower priority.
 |---|---|---|---|---|
 | `core-search.js` | `core_search` | `https://api.core.ac.uk/v3/search/works` | `CORE_API_KEY` | Repository full texts; return inline `fullText` only on explicit `include_fulltext` |
 | `elicit-search.js` | `elicit_search` | `POST https://elicit.com/api/v2/search/papers` (+ `/search/trials`) | `ELICIT_API_KEY` | 138M papers, study-type/year/quartile filters, retractions excluded |
-| `futurehouse-agent.js` | `futurehouse_agent` | `https://platform.futurehouse.org/` | `FUTUREHOUSE_API_KEY` | `agent` = quick_search / deep_search / precedent_search; async task + poll |
+| `futurehouse-agent.js` | `futurehouse_agent` | `https://api.platform.edisonscientific.com` (formerly FutureHouse) | `FUTUREHOUSE_API_KEY` | `agent` = quick_search / deep_search / precedent_search; async task + poll |
 | `lens-search.js` (optional) | `lens_search` | `https://api.lens.org` | `LENS_TOKEN` | Patents + scholarly links |
 | `dimensions-search.js` (optional) | `dimensions_search` | `https://app.dimensions.ai/api/dsl/v2` | `DIMENSIONS_KEY` | DSL v2; 30 RPM; two-step auth |
 
@@ -620,6 +620,14 @@ Implementation notes / deviations:
 - Phase 2 adds `parallel_extract` and `brave_search`; `parallel_search` now also goes through the shared limiter/retry client.
 - Phase 3 adds `tavily_search`, `exa_search`, `perplexity_search`, and `jina_read`. Jina Reader works keyless at 20 RPM; Jina Search (`mode=search`) requires `JINA_API_KEY`.
 - Perplexity Search uses `search_type` values `web`/`fast`/`people` (verified against the 2026 API reference), not `standard`.
+- Phase 4 adds `core_search`, `elicit_search` (papers + ClinicalTrials.gov), and `futurehouse_agent` (async start/status/cancel). CORE works keyless at ~10 requests/minute (verified `X-RateLimit-Limit: 10`); `include_fulltext` requires a key. Elicit requires Pro+.
+- FutureHouse rebranded to Edison Scientific: the API is `https://api.platform.edisonscientific.com`, with PaperQA3 jobs (`job-futurehouse-paperqa3`, `-high`, `-precedent`), and auth is `POST /auth/login` then `/v0.1/crows` and `/v0.1/trajectories/{id}`. Verified against `edison-client` 0.17.0; an invalid key returns HTTP 403 from the live endpoint. A full task run still requires a valid key.
+- Elicit calls are serialized at 1000 ms and never retried, because exceeding 100 RPM blocks the IP for five minutes.
+- CORE requests use the trailing-slash endpoint (the non-slash URL returns a 301 that consumes quota) and are not retried.
+- Phase 5 adds `literature_search`: auto = OpenAlex + S2, plus PubMed for biomedical and arXiv for preprint/CS/physics queries; Crossref is opt-in because its relevance ranking is noisy. Results are deduplicated and fused with reciprocal-rank fusion.
+- The router converts free-text discovery queries into arXiv operator queries (`all:term AND ...`) instead of quoted phrases; quoted multi-word queries were returning zero arXiv results.
+- `paper_download` now tries Unpaywall -> Europe PMC -> CORE -> arXiv, accepts `arxiv_id`, and treats `UNPAYWALL_EMAIL` as recommended rather than required. Fallback resolution is lazy (it stops at the first PDF that downloads), URLs are HTTP(S)-only, every redirect is revalidated, loopback/private/link-local/ULA targets are rejected, downloads are capped at 120s/100MB, and all fallbacks still pass the PDF magic-byte check and PaperMemory ingest.
+- Self-hosted Crawl4AI/SearXNG integration is intentionally deferred (BYO infrastructure, not a default preset dependency).
 
 Phase 2 — done 2026-10-23
 - [x] `brave-search.js`
@@ -633,18 +641,20 @@ Phase 3 — done 2026-10-23 (core four; optional providers deferred)
 - [x] `jina-reader.js`
 - [ ] Optional: Linkup, You.com, Valyu, Serper, SerpApi
 
-Phase 4
-- [ ] `core-search.js`
-- [ ] `elicit-search.js`
-- [ ] `futurehouse-agent.js`
+Phase 4 — done 2026-10-23 (core three; Lens/Dimensions deferred)
+- [x] `core-search.js`
+- [x] `elicit-search.js`
+- [x] `futurehouse-agent.js`
 - [ ] Optional: Lens, Dimensions
 
-Phase 5
-- [ ] `literature-search.js` router
-- [ ] Full-text fallback chain in `paper_download`
+Phase 5 — done 2026-10-23 (optional self-hosted deferred)
+- [x] `literature-search.js` router
+- [x] Full-text fallback chain in `paper_download`
 - [ ] Optional self-hosted Crawl4AI / SearXNG (BYO URL only)
 
 Release
-- [ ] `npm run build:patch` + `npm run build`
-- [ ] `node scripts/test-phase7.mjs` and new search tests pass
-- [ ] Version bump, README, This plan's status updated to implemented
+- [x] `npm run build:patch` + `npm run build`
+- [x] `node scripts/test-phase7.mjs` and new search tests pass
+- [x] README and this plan's status updated
+- [x] Version bump to 0.17.0
+- [ ] Commit/push Phases 4–5; CI green

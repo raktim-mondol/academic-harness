@@ -113,6 +113,15 @@ async function searchNcbi(args, exec) {
   }
 }
 
+export async function runPubMedSearch(args, exec) {
+  if (!String(args.query || '').trim()) return { error: 'query is required' }
+  const source = SOURCES.includes(args.source) ? args.source : 'europepmc'
+  if (args.source && !SOURCES.includes(args.source)) {
+    return { error: `source must be one of ${SOURCES.join(', ')}` }
+  }
+  return source === 'ncbi' ? searchNcbi(args, exec) : searchEuropePmc(args, exec)
+}
+
 export const name = 'academic-harness-pubmed-search'
 export const inject = ['tools']
 
@@ -137,12 +146,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      if (!String(args.query || '').trim()) return { error: 'query is required' }
-      const source = SOURCES.includes(args.source) ? args.source : 'europepmc'
-      if (args.source && !SOURCES.includes(args.source)) {
-        return { error: `source must be one of ${SOURCES.join(', ')}` }
-      }
-      return source === 'ncbi' ? searchNcbi(args, exec) : searchEuropePmc(args, exec)
+      return runPubMedSearch(args, exec)
     },
     presentCall(args) {
       return { card: 'generic', title: `PubMed (${args.source || 'europepmc'}): ${args.query || ''}`, kind: 'search' }

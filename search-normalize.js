@@ -115,6 +115,7 @@ export function emptyPaper(source = 'unknown') {
     tldr: null,
     citation_count: null,
     influential_citation_count: null,
+    journal_quartile: null,
     oa_status: null,
     oa_url: null,
     url: null,
@@ -305,6 +306,89 @@ export function fromExaResult(result) {
   return paper
 }
 
+export function fromCoreResult(result, { includeFullText = false } = {}) {
+  if (!result || typeof result !== 'object' || !result.title) return null
+  const links = Array.isArray(result.links) ? result.links : []
+  const display = links.find((link) => link?.type === 'display')?.url
+  const download = links.find((link) => link?.type === 'download')?.url
+  const paper = emptyPaper('core')
+  paper.source_id = result.id != null ? String(result.id) : null
+  paper.doi = canonicalDoi(result.doi)
+  paper.pmid = stripPmid(result.pubmedId)
+  paper.arxiv_id = canonicalArxivId(result.arxivId)
+  paper.title = stripMarkup(result.title) || ''
+  paper.authors = (result.authors || [])
+    .map((author) => ({ name: String(author?.name || '').replace(/,\s*$/, '') }))
+    .filter((author) => author.name)
+  paper.year = yearOf(result.yearPublished)
+  paper.venue = (Array.isArray(result.journals) ? result.journals[0]?.title : null) || result.publisher || null
+  paper.abstract = stripMarkup(result.abstract)
+  paper.citation_count = Number.isFinite(result.citationCount) ? result.citationCount : null
+  paper.oa_url = result.downloadUrl
+    || (Array.isArray(result.sourceFulltextUrls) ? result.sourceFulltextUrls[0] : null)
+    || download
+    || null
+  paper.oa_status = paper.oa_url ? 'open' : null
+  paper.url = display || (result.id != null ? `https://core.ac.uk/works/${result.id}` : null)
+  paper.type = result.documentType || null
+  paper.fields = Array.isArray(result.fieldOfStudy)
+    ? result.fieldOfStudy
+    : (result.fieldOfStudy ? [result.fieldOfStudy] : [])
+  if (includeFullText
+    && typeof result.fullText === 'string'
+    && result.fullText.trim()
+    && !/not available for public api users/i.test(result.fullText)) {
+    paper.full_text = result.fullText
+  }
+  return paper
+}
+
+export function fromElicitPaper(result) {
+  if (!result || typeof result !== 'object' || !result.title) return null
+  const urls = Array.isArray(result.urls) ? result.urls : []
+  const paper = emptyPaper('elicit')
+  paper.source_id = result.elicitId || null
+  paper.doi = canonicalDoi(result.doi)
+  paper.pmid = stripPmid(result.pmid)
+  paper.title = stripMarkup(result.title) || ''
+  paper.authors = (result.authors || [])
+    .map((name) => ({ name: String(name || '').trim() }))
+    .filter((author) => author.name)
+  paper.year = yearOf(result.year)
+  paper.venue = result.venue || null
+  paper.abstract = stripMarkup(result.abstract)
+  paper.citation_count = Number.isFinite(result.citedByCount) ? result.citedByCount : null
+  paper.journal_quartile = Number.isFinite(result.journalQuartile) ? result.journalQuartile : null
+  paper.url = urls[0] || result.fullTextUrl || (paper.doi ? `https://doi.org/${paper.doi}` : null)
+  paper.type = Array.isArray(result.studyTypeTags) ? result.studyTypeTags[0] : null
+  paper.fields = Array.isArray(result.studyTypeTags) ? result.studyTypeTags.filter(Boolean) : []
+  return paper
+}
+
+export function fromElicitTrial(result) {
+  if (!result || typeof result !== 'object' || !result.title) return null
+  const paper = emptyPaper('elicit-trial')
+  paper.source_id = result.nctId || null
+  paper.title = stripMarkup(result.title) || ''
+  paper.abstract = stripMarkup(result.summary)
+  paper.year = yearFromDate(result.startDate)
+  paper.venue = result.leadSponsor || null
+  paper.url = result.url || (result.nctId ? `https://clinicaltrials.gov/study/${result.nctId}` : null)
+  paper.type = result.studyType || null
+  paper.fields = Array.isArray(result.conditions) ? result.conditions.filter(Boolean) : []
+  paper.trial = {
+    nct_id: result.nctId || null,
+    overall_status: result.overallStatus || null,
+    phase: Array.isArray(result.phase) ? result.phase : [],
+    enrollment_count: result.enrollmentCount ?? null,
+    interventions: Array.isArray(result.interventions) ? result.interventions : [],
+    has_results: result.hasResults ?? null,
+    start_date: result.startDate || null,
+    completion_date: result.completionDate || null,
+  }
+  return paper
+}
+
 export function fromPerplexityResult(result) {
   if (!result || typeof result !== 'object' || !result.url) return null
   const paper = emptyPaper('perplexity')
@@ -343,7 +427,8 @@ export function fromNcbiSummary(summary) {
 
 const SCALAR_FIELDS = [
   'source_id', 'doi', 'pmid', 'pmcid', 'arxiv_id', 'openalex_id', 's2_id',
-  'title', 'year', 'venue', 'tldr', 'oa_status', 'oa_url', 'url', 'type',
+  'title', 'year', 'venue', 'tldr', 'journal_quartile', 'oa_status', 'oa_url',
+  'url', 'type', 'full_text',
 ]
 
 function paperKeys(paper) {
@@ -436,6 +521,47 @@ export function mergePapers(papers) {
   return sortPapers(merged)
 }
 
+/**
+ * Reciprocal-rank fusion for multi-source results.
+ * `groups` is [{ source, results }] in provider-relevance order.
+ */
+export function mergeRanked(groups, { k = 60 } = {}) {
+  const merged = []
+  const index = new Map()
+  for (const group of groups) {
+    const results = Array.isArray(group?.results) ? group.results : []
+    results.forEach((paper, rank) => {
+      if (!paper || !paper.title) return
+      const score = 1 / (k + rank + 1)
+      const keys = paperKeys(paper)
+      let position = -1
+      for (const key of keys) {
+        if (index.has(key)) {
+          position = index.get(key)
+          break
+        }
+      }
+      if (position >= 0) {
+        mergeInto(merged[position], paper)
+        merged[position].rrf_score += score
+        for (const key of paperKeys(merged[position])) index.set(key, position)
+      } else {
+        const copy = {
+          ...paper,
+          sources: [...(paper.sources || [paper.source])],
+          authors: [...(paper.authors || [])],
+          fields: [...(paper.fields || [])],
+          snippets: [...(paper.snippets || [])],
+          rrf_score: score,
+        }
+        merged.push(copy)
+        for (const key of keys) index.set(key, merged.length - 1)
+      }
+    })
+  }
+  return merged.sort((a, b) => b.rrf_score - a.rrf_score)
+}
+
 function authorLine(authors, maxAuthors) {
   const names = (authors || []).map((author) => author.name).filter(Boolean)
   if (!names.length) return ''
@@ -449,7 +575,7 @@ export function capText(text, maxChars = 24_000) {
     : text
 }
 
-export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0 } = {}) {
+export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSources = false } = {}) {
   if (!Array.isArray(papers) || papers.length === 0) return 'No results.'
   return papers.map((paper, i) => {
     const bits = [`${i + 1}. **${paper.title || '(untitled)'}**`]
@@ -465,6 +591,7 @@ export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0 } = {})
     if (ids.length) bits.push(ids.join(' · '))
     if (paper.tldr) bits.push(paper.tldr)
     if (paper.url) bits.push(paper.url)
+    if (showSources && paper.sources?.length) bits.push(`sources: ${paper.sources.join(', ')}`)
     if (abstractChars > 0 && paper.abstract) {
       const text = paper.abstract.length > abstractChars
         ? `${paper.abstract.slice(0, abstractChars).trimEnd()}…`
