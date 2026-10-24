@@ -46,6 +46,11 @@
     "./manuscript-citations": "./manuscript-citations.js",
     "./integrity-check": "./integrity-check.js",
     "./review": "./review.js",
+    "./coscientist": "./coscientist.js",
+    "./coscientist-rank": "./coscientist-rank.js",
+    "./coscientist-store": "./coscientist-store.js",
+    "./coscientist-models": "./coscientist-models.js",
+    "./store-lock": "./store-lock.js",
     "./review-store": "./review-store.js",
     "./clinicaltrials": "./clinicaltrials.js",
     "./openfda": "./openfda.js",
@@ -77,7 +82,9 @@
     "./client": "./lib/client.js",
     "./icon": "./assets/icon.svg",
     "./locale/*.json": "./locale/*.json",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./coscientist-verify": "./coscientist-verify.js",
+    "./coscientist-embed": "./coscientist-embed.js"
   },
   "files": [
     "assets/icon.svg",
@@ -141,6 +148,13 @@
     "integrity-check.js",
     "review.js",
     "review-store.js",
+    "coscientist.js",
+    "coscientist-rank.js",
+    "coscientist-verify.js",
+    "coscientist-embed.js",
+    "coscientist-store.js",
+    "coscientist-models.js",
+    "store-lock.js",
     "clinicaltrials.js",
     "openfda.js",
     "dataset-search.js",
@@ -206,7 +220,8 @@
   "scripts": {
     "build": "node build-client.mjs",
     "build:patch": "node scripts/build-cordis-patch.mjs",
-    "test:rsi": "node scripts/test-rsi.mjs"
+    "test:rsi": "node scripts/test-rsi.mjs",
+    "test:coscientist": "node scripts/test-coscientist-models.mjs && node scripts/test-coscientist-store.mjs && node scripts/test-coscientist-tool.mjs && node scripts/test-coscientist-verify.mjs && node scripts/test-coscientist-embed.mjs && node scripts/test-coscientist-graph.mjs && node scripts/test-coscientist-routing.mjs"
   },
   "dependencies": {
     "@citation-js/core": "^0.9.0",

@@ -6,9 +6,10 @@
  * subagent writes safe and preserves an audit trail. No database, no server.
  */
 import {
-  appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync,
+  appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync,
 } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
+import { withLock } from './store-lock.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 
 export const SCREENING_STAGES = ['title_abstract', 'full_text']
@@ -89,37 +90,7 @@ function appendJsonl(file, rows) {
   appendFileSync(file, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`)
 }
 
-async function sleep(ms) {
-  await new Promise((resolveSleep) => setTimeout(resolveSleep, ms))
-}
-
-async function withLock(dir, fn) {
-  const lock = join(dir, '.lock')
-  const started = Date.now()
-  for (;;) {
-    try {
-      mkdirSync(lock)
-      try {
-        return await fn()
-      } finally {
-        rmSync(lock, { recursive: true, force: true })
-      }
-    } catch (error) {
-      if (error?.code !== 'EEXIST') throw error
-      try {
-        const age = Date.now() - statSync(lock).mtimeMs
-        if (age > 60_000) {
-          rmSync(lock, { recursive: true, force: true })
-          continue
-        }
-      } catch {
-        // lock disappeared between checks; retry
-      }
-      if (Date.now() - started > 10_000) throw new Error('review ledger is busy; retry the operation')
-      await sleep(25)
-    }
-  }
-}
+const withReviewLock = (dir, fn) => withLock(dir, fn, { label: 'review ledger' })
 
 export async function startReview({ cwd, slug, protocol = {}, resume = false }) {
   const dir = reviewDir(cwd, slug)
@@ -211,7 +182,7 @@ function recordIdNumber(record) {
 export async function addRecords({ cwd, slug, records = [], source = 'manual', query = null }) {
   const dir = ensureReview(cwd, slug)
   if (!Array.isArray(records)) throw new Error('records must be an array')
-  return withLock(dir, () => {
+  return withReviewLock(dir, () => {
     const existing = readJsonl(cwd, slug, 'records')
     const seen = new Set(existing.map(dedupeKey))
     let nextId = existing.reduce((max, record) => Math.max(max, recordIdNumber(record)), 0) + 1
@@ -270,7 +241,7 @@ export async function screenRecord({
   if ((decision === 'exclude' || decision === 'maybe') && !note) {
     throw new Error(`a reason is required for decision "${decision}"`)
   }
-  return withLock(dir, () => {
+  return withReviewLock(dir, () => {
     const records = readJsonl(cwd, slug, 'records')
     if (!records.some((record) => record.id === recordId)) throw new Error(`record ${recordId} not found`)
     const events = readJsonl(cwd, slug, 'screening')
@@ -311,7 +282,7 @@ export async function addEvidence({
   if (!claimText) throw new Error('claim is required')
   if (!quoteText) throw new Error('quote is required')
   if (!locationText) throw new Error('location is required')
-  return withLock(dir, () => {
+  return withReviewLock(dir, () => {
     const records = readJsonl(cwd, slug, 'records')
     if (!records.some((record) => record.id === recordId)) throw new Error(`record ${recordId} not found`)
     const latest = latestScreening(readJsonl(cwd, slug, 'screening'))

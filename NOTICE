@@ -90,6 +90,24 @@ mechanism→assay→candidate shape were rewritten for this plugin’s own
 tools. The existing `hypothesis-generator` specialist brief points at that
 skill; it is not a second copy of the procedure.
 
+The `co-scientist-tournament` skill (`skills/co-scientist-tournament`), the
+`coscientist` / `coscientist_rank` tools, and their backing modules
+(`coscientist-models.js`, `coscientist-store.js`, `store-lock.js`) port the
+algorithms and role prompts of the open-source `raktim-mondol/co-scientist`
+project (MIT License, © 2025 Raktim Mondol) — itself an implementation of the
+Gottweis et al. *Nature* (2026) paper cited above. No file from that repository
+was copied: its TypeScript was rewritten as this plugin's own ES modules, and
+its Bun / `bun:sqlite` / `sqlite-vec` / ONNX-embedding / MCP-OAuth / ink-TUI
+stack was deliberately left behind (docs/CO-SCIENTIST-INTEGRATION-PLAN.md §4).
+What is carried over is the deterministic core — the Glicko-2 update and
+review-score seeding, the citation-integrity penalty, both-order judge
+debiasing, the scheduling weight tables and termination rules, matchup
+selection, the save-time duplicate gate, the dual-use severity gate, and the
+experimental-feedback reward mapping — with the upstream constants kept so a
+run here stays comparable to a run there, plus subagent briefs written from its
+prompt templates. Upstream code is MIT; the *Nature* paper it implements is
+CC BY 4.0.
+
 The `scientific-figure-making` skill (`skills/scientific-figure-making`) is a
 fresh adaptation of the publication-figure workflow described in Chen Liu's
 `figures4papers` repository (CC BY-NC 4.0) —

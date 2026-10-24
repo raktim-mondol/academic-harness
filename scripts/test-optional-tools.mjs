@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import { apply as applyAuthor, normalizeOrcidRecord, normalizeOrcidSearch, normalizeRor, runAuthorLookup } from '../author-lookup.js'
 import { apply as applyOpenReview, normalizeReview, normalizeSubmission, runOpenReview } from '../openreview.js'
+import { apply as applyCoscVerify } from '../coscientist-verify.js'
 import { buildEuropePmcQuery, runPubMedSearch } from '../pubmed-search.js'
 import { chooseSources, parseSources } from '../literature-search.js'
 import { runDatasetSearch } from '../dataset-search.js'
@@ -17,6 +18,7 @@ import { runDatasetSearch } from '../dataset-search.js'
   const ctx = { tools: { register: (tool) => registered.push(tool.name) } }
   applyAuthor(ctx)
   applyOpenReview(ctx)
+  applyCoscVerify(ctx)
   assert.deepEqual(registered, [], 'optional tools must not register without the flag')
 }
 
@@ -26,7 +28,8 @@ import { runDatasetSearch } from '../dataset-search.js'
   const ctx = { tools: { register: (tool) => registered.push(tool.name) } }
   applyAuthor(ctx)
   applyOpenReview(ctx)
-  assert.deepEqual(registered, ['author_lookup', 'openreview'])
+  applyCoscVerify(ctx)
+  assert.deepEqual(registered, ['author_lookup', 'openreview', 'coscientist_verify'])
   delete process.env.AH_ENABLE_OPTIONAL_TOOLS
 }
 

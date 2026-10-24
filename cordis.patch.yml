@@ -452,6 +452,32 @@
           - id: review
             name: academic-harness/review
 
+          # Co-Scientist hypothesis tournament (docs/CO-SCIENTIST-INTEGRATION-PLAN.md,
+          # Phase 1): generate, review, rank, and evolve candidate hypotheses with state
+          # that outlives the context window. Append-only event logs under
+          # <cwd>/.dsh/coscientist/<slug>/, shared by the delegation tree the way the
+          # review ledger is. `coscientist` owns the ledger and the scheduling policy
+          # (`next` samples the next task, `status` says when to stop); `coscientist_rank`
+          # owns matchups and Glicko-2 rating updates with position-bias control. Neither
+          # calls a model: the session does the reasoning, usually through `subagent`.
+          # Rating math and thresholds live in coscientist-models.js, storage in
+          # coscientist-store.js, both dependency-free. No realm.
+          - id: coscientist
+            name: academic-harness/coscientist
+          - id: coscientist-rank
+            name: academic-harness/coscientist-rank
+
+          # Citation integrity and claim support for the tournament (Phase 3 of
+          # docs/CO-SCIENTIST-INTEGRATION-PLAN.md). GATED: the row is always present but
+          # `apply()` registers nothing unless AH_ENABLE_OPTIONAL_TOOLS is truthy, so the
+          # tool is absent from the prompt and tool list by default (mount-time decision,
+          # needs a restart). This is the only tournament module that reaches the network
+          # — Crossref for existence, reusing integrity-check for retraction status — and
+          # it shares one process-wide Crossref limiter with crossref_lookup. It never
+          # calls a model: `claims` records judgements a subagent already made.
+          - id: coscientist-verify
+            name: academic-harness/coscientist-verify
+
           # Clinical and regulatory evidence (Phase 4): ClinicalTrials.gov v2 trials and
           # posted results, plus openFDA adverse events/recalls/510(k)/labels/food events.
           # Free and keyless; OPENFDA_API_KEY only raises limits. Neither is a literature

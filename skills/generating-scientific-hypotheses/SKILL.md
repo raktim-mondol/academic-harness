@@ -5,8 +5,13 @@ description: >
   explanations, drug-repurposing or novel-target hypotheses, and discriminating
   experiments. Use when the user asks to propose or brainstorm hypotheses,
   explain a mechanism, suggest what to test, or rank/critique a hypothesis set,
-  and when they run /generating-scientific-hypotheses. Do not use for
-  confirmatory data analysis, literature reviews, or manuscript writing.
+  and when they run /generating-scientific-hypotheses. Trigger it for
+  problem-shaped asks too, where they describe an observation or a surprise and
+  want it accounted for: why does X happen, what could explain this result, I
+  expected A but got B, what is a novel target or mechanism for Y, what should I
+  test next, how could I falsify this, what drives this phenotype. Do not use for
+  confirmatory data analysis of a chosen outcome, literature reviews, or
+  manuscript writing.
 license: MIT
 metadata:
   version: "1.0"

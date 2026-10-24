@@ -950,6 +950,33 @@
     "requiresFiles": false
   },
   {
+    "id": "co-scientist-tournament",
+    "name": "Hypothesis Tournament",
+    "description": "Generate, review, debate, and rank hypotheses with a persistent Glicko-2 leaderboard",
+    "category": "literature",
+    "icon": "Trophy",
+    "suggestedSkills": [
+      "co-scientist-tournament",
+      "generating-scientific-hypotheses",
+      "literature-researcher",
+      "experiment-designer"
+    ],
+    "placeholders": [
+      {
+        "key": "goal",
+        "label": "Research goal",
+        "required": true
+      },
+      {
+        "key": "max_hypotheses",
+        "label": "Hypothesis cap",
+        "required": false
+      }
+    ],
+    "requiresFiles": false,
+    "prompt": "Run a Co-Scientist hypothesis tournament for: {goal}. Use the `coscientist` and `coscientist_rank` tools with the co-scientist-tournament skill, capped at {max_hypotheses} hypotheses (leave it blank for the default of 6). (1) Parse the goal into domain, keywords, desired attributes, an evaluation rubric, and 3-5 seed literature queries, then `coscientist start`. (2) Then do exactly what `next` samples, and only that, until it reports termination: generate candidates only from literature you actually searched (consensus_search plus parallel_search, with openalex_search/s2_search/pubmed_search for breadth), review each one through the five stages in order, judge every match in BOTH presentation orders so a verdict cannot follow the order it was shown, and evolve the top ideas through the mutation `next` names. (3) Verify every citation exists with crossref_lookup or paper_resolve; anything unresolved is unverified, never assumed. Never invent a reference, DOI, paper title, or number. (4) Withhold anything the dual-use screen rates high — it stays withheld until the user releases it by name. (5) When the ledger says stop, design the experimental protocol for the hypothesis the user chooses, write the research overview, `export` the ranked report, and log each kept hypothesis in the notebook. Report the leaderboard with rating, RD, and matches played: a rating is tournament performance, not scientific merit, and a generated hypothesis is recombined published knowledge, not a result. Present the ranked shortlist and stop for the scientist to select, veto, or add their own idea."
+  },
+  {
     "id": "citation-analysis",
     "name": "Citation Analysis",
     "description": "Analyze citation patterns and impact of a body of work",

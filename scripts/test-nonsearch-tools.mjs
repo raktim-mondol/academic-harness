@@ -139,4 +139,107 @@ for (const modulePath of ['../clinicaltrials.js', '../openfda.js', '../dataset-s
   assert.equal(typeof module.apply, 'function', `${modulePath} must export apply`)
 }
 
+// ── hypothesis tournament (docs/CO-SCIENTIST-INTEGRATION-PLAN.md) ────────────
+for (const modulePath of ['./coscientist', './coscientist-rank', './coscientist-verify', './coscientist-embed', './coscientist-store', './coscientist-models', './store-lock']) {
+  assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
+}
+for (const file of ['coscientist.js', 'coscientist-rank.js', 'coscientist-verify.js', 'coscientist-embed.js', 'coscientist-store.js', 'coscientist-models.js', 'store-lock.js']) {
+  assert.ok(pkg.files?.includes(file), `package files missing ${file}`)
+  assert.ok(existsSync(join(root, file)), `missing ${file}`)
+}
+for (const [id, tool] of [['coscientist', 'coscientist'], ['coscientist-rank', 'coscientist_rank']]) {
+  assert.match(preset, new RegExp(`- id: ${id}\\n  name: academic-harness/${id}`), `preset row missing ${id}`)
+  assert.ok(read(`${id}.js`).includes(`name: '${tool}'`), `${id}.js must register ${tool}`)
+}
+// The ledger and the ranker are preset-only and ungated: they must not
+// early-return like the optional tools. Verification is the opposite — it
+// reaches the network, so it stays behind AH_ENABLE_OPTIONAL_TOOLS.
+for (const file of ['coscientist.js', 'coscientist-rank.js']) {
+  assert.ok(!read(file).includes('optionalToolsEnabled'), `${file} must ship on by default`)
+}
+assert.match(read('coscientist-verify.js'), /optionalToolsEnabled\(\)/, 'coscientist-verify must stay gated')
+assert.match(preset, /- id: coscientist-verify\n  name: academic-harness\/coscientist-verify/, 'preset row missing coscientist-verify')
+assert.ok(read('coscientist-verify.js').includes("if (value?.error)"), 'a gated tool must still answer in band')
+// The tournament is reachable from the template catalogue.
+const templates = JSON.parse(read('workflows.json'))
+const tournament = templates.find((w) => w.id === 'co-scientist-tournament')
+assert.ok(tournament, 'workflows.json must carry the tournament template')
+assert.equal(tournament.category, 'literature')
+assert.ok(tournament.suggestedSkills.includes('co-scientist-tournament'), 'the template must route to the skill')
+assert.deepEqual(tournament.placeholders.map((p) => p.key), ['goal', 'max_hypotheses'])
+assert.match(tournament.prompt, /BOTH presentation orders/)
+assert.match(tournament.prompt, /never invent a reference|Never invent a reference/)
+// The lock is shared, not forked into a second implementation.
+assert.match(read('review-store.js'), /from '.\/store-lock\.js'/, 'review-store must use the shared lock')
+assert.match(read('coscientist-store.js'), /from '.\/store-lock\.js'/, 'coscientist-store must use the shared lock')
+assert.ok(!read('review-store.js').includes('async function withLock'), 'the lock must live in one module')
+// No new runtime dependency was pulled in for the port.
+for (const banned of ['drizzle', 'sqlite', 'bun:', 'transformers', 'p-queue', 'handlebars', 'ink']) {
+  assert.ok(!Object.keys(pkg.dependencies || {}).some((name) => name.includes(banned)), `dependency ${banned} must not be added`)
+}
+for (const key of ['CO_SCIENTIST_MAX_HYPOTHESES', 'CO_SCIENTIST_STEP_BUDGET', 'CO_SCIENTIST_DUP_THRESHOLD', 'CO_SCIENTIST_SEED']) {
+  assert.ok(settings.includes(`'${key}'`), `settings-keys.js missing ${key}`)
+  assert.ok(read('client/ApiKeysSection.jsx').includes(key), `Settings UI missing ${key}`)
+}
+assert.ok(existsSync(join(root, 'skills/co-scientist-tournament/SKILL.md')), 'missing co-scientist-tournament skill')
+for (const reference of ['briefs.md', 'tournament.md']) {
+  assert.ok(existsSync(join(root, 'skills/co-scientist-tournament/references', reference)), `missing skill reference ${reference}`)
+}
+for (const marker of ['## Hypothesis tournaments', 'co-scientist-tournament', 'coscientist_rank', 'verdict_ba', 'recombine published knowledge']) {
+  assert.ok(prompt.includes(marker), `prompt.js missing marker: ${marker}`)
+}
+assert.match(read('NOTICE'), /raktim-mondol\/co-scientist/, 'NOTICE must credit the upstream project')
+assert.match(read('README.md'), /^## Hypothesis tournaments$/m, 'README needs a tournament section')
+
+const models = await import('../coscientist-models.js')
+assert.equal(models.GLICKO2_DEFAULTS.rating, 1200, 'the ported defaults must match upstream')
+assert.equal(models.computeGlicko2Update(
+  { rating: 1200, rd: 350, volatility: 0.06 }, { rating: 1200, rd: 350, volatility: 0.06 }, 'A_wins',
+).newB.rating, 1038, 'a first match must reproduce the upstream update')
+
+const store = await import('../coscientist-store.js')
+assert.equal(typeof store.deriveState, 'function', 'state is derived from the log')
+assert.deepEqual(store.REVIEW_STAGES, ['initial', 'full', 'deep_verification', 'simulation', 'observation'])
+assert.deepEqual(store.VETO_STAGES, ['initial', 'full'])
+
+const coscientistTool = await import('../coscientist.js')
+assert.equal(typeof coscientistTool.apply, 'function')
+assert.equal(typeof coscientistTool.runCosc, 'function')
+
+const rankTool = await import('../coscientist-rank.js')
+assert.equal(typeof rankTool.apply, 'function')
+assert.equal(typeof rankTool.runCoscRank, 'function')
+
+// Phase 4: embeddings are opt-in, the graph renders, priors read siblings.
+const tournamentRegistrations = []
+coscientistTool.apply({ tools: { register: (tool) => tournamentRegistrations.push(tool) } })
+assert.deepEqual(tournamentRegistrations.map((tool) => tool.name), ['coscientist'])
+const tournamentParams = tournamentRegistrations[0].parameters.properties
+assert.equal(tournamentParams.action.enum.length, 14)
+for (const action of ['embed', 'priors', 'graph']) {
+  assert.ok(tournamentParams.action.enum.includes(action), `coscientist must expose ${action}`)
+}
+assert.ok(tournamentParams.format.enum.includes('mermaid'), 'export must accept mermaid')
+assert.ok(tournamentParams.query && tournamentParams.min_score, 'priors must be tunable from the tool')
+assert.match(read('coscientist-embed.js'), /x-goog-api-key/, 'the embedding key travels in a header, never a URL')
+assert.match(read('coscientist-embed.js'), /SEMANTIC_SIMILARITY/, 'embeddings compare like with like')
+assert.match(read('coscientist-store.js'), /tokenOverlap/, 'priors retrieve order-free')
+assert.match(read('coscientist-store.js'), /flowchart TD/, 'the graph is Mermaid')
+// Small-pool defaults and the stop rule they depend on.
+assert.match(read('coscientist-store.js'), /DEFAULT_MAX_HYPOTHESES = 5/, 'the default pool must survive two losses')
+assert.match(read('coscientist-store.js'), /DEFAULT_STEP_BUDGET = 36/, 'the default budget must finish a 5-pool')
+assert.match(read('coscientist-models.js'), /no_competitors/, 'a pool that cannot field a match must stop')
+assert.match(read('skills/co-scientist-tournament/references/tournament.md'), /no_competitors/, 'the skill must document the fourth stop reason')
+assert.match(read('prompt.js'), /ranked and kept/, 'the router must name the fork between one pass and a tournament')
+assert.match(read('coscientist-models.js'), /Cosine and Jaccard are different scales/, 'the two measures stay distinguishable')
+assert.match(read('coscientist-store.js'), /mixed embedding dimensions/, 'one tournament must use one embedding model')
+for (const suite of ['models', 'store', 'tool', 'verify', 'embed', 'graph', 'routing']) {
+  assert.ok(existsSync(join(root, `scripts/test-coscientist-${suite}.mjs`)), `missing test-coscientist-${suite}.mjs`)
+}
+
+const verifyTool = await import('../coscientist-verify.js')
+assert.equal(typeof verifyTool.apply, 'function')
+assert.equal(typeof verifyTool.runCoscVerify, 'function')
+assert.equal(verifyTool.TITLE_MATCH_THRESHOLD, 0.7, 'the title-match rule stays upstream\'s')
+
 console.log('nonsearch surface OK')
