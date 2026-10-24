@@ -22,7 +22,7 @@ import {
   GLICKO2_DEFAULTS,
   SAFETY_SEVERITIES, applyFeedbackAsGlicko2Match, citationPenalty, combineSwappedVerdicts,
   computeGlicko2Update, computeWeights, decideSafety, evolvedSeedRating,
-  extractRewardFromFeedback, feedbackSentiment, isNearDuplicate, mapPresentedVerdict,
+  extractRewardFromFeedback, feedbackSentiment, isNearDuplicate, mapPresentedVerdict, matchupKey,
   sampleNextTaskType, selectMatchup, similarityPairs, tokenOverlap,
   terminationCheck, verdictToMatchResult, seededRatingWithPenalty,
 } from './coscientist-models.js'
@@ -487,7 +487,7 @@ export function publicHypothesis(hyp) {
 
 const GOAL_FIELDS = ['goal', 'parsed_title', 'domain', 'evaluation_rubric']
 const LIST_PROTOCOL_FIELDS = ['constraints', 'keywords', 'hypothesis_attributes', 'search_queries', 'evaluation_criteria']
-const NUMBER_PROTOCOL_FIELDS = ['max_hypotheses', 'step_budget', 'dup_threshold', 'seed']
+const NUMBER_PROTOCOL_FIELDS = ['max_hypotheses', 'step_budget', 'max_matches', 'dup_threshold', 'seed']
 
 /**
  * Create a session, or amend an existing one under `resume`. On resume the goal
@@ -969,6 +969,7 @@ export async function setStatus({ cwd, slug, id, status, reason, overriddenBy })
 function policyStats(state) {
   const budget = number(state.protocol.step_budget) ?? DEFAULT_STEP_BUDGET
   const cap = number(state.protocol.max_hypotheses) ?? DEFAULT_MAX_HYPOTHESES
+  const matchCap = number(state.protocol.max_matches)
   return {
     totalHypotheses: state.counts.total,
     activeHypotheses: state.counts.active,
@@ -978,7 +979,36 @@ function policyStats(state) {
     tokensUsed: state.rounds,
     budgetTokens: budget,
     maxHypotheses: cap,
+    maxMatches: matchCap,
   }
+}
+
+/**
+ * Task types the current state can actually execute. The upstream weights are
+ * phase heuristics, not feasibility checks: at the cap with no review backlog
+ * they still put mass on `reflection` (nothing to review) and `evolution`
+ * (an `add` would be discarded by the cap). Sampling those burns a dispatch on
+ * a no-op and makes the caller override the policy, so they are zeroed here.
+ */
+function feasibleTaskTypes(state) {
+  const cap = number(state.protocol.max_hypotheses) ?? DEFAULT_MAX_HYPOTHESES
+  const total = state.counts.total
+  const active = state.counts.active
+  const live = state.hypotheses.filter((hyp) => hyp.status !== 'rejected').length
+  const types = new Set()
+  if (total < cap) {
+    types.add('generation')
+    if (active >= 1) types.add('evolution')
+  }
+  if (state.counts.pendingReview > 0) types.add('reflection')
+  if (active >= 2) {
+    types.add('ranking')
+    types.add('proximity')
+  } else if (live >= 2) {
+    types.add('proximity')
+  }
+  if (total > 0) types.add('meta_review')
+  return types
 }
 
 /** Live weights for the strategy view, without consuming a dispatch. */
@@ -999,7 +1029,17 @@ export async function nextTask({ cwd, slug, rand } = {}) {
     const state = deriveState(cwd, slug)
     const stats = { ...policyStats(state), currentRound: state.rounds + 1 }
     const weights = computeWeights(stats)
-    const task = sampleNextTaskType(weights, dispatchRand({ rand, state, protocol: state.protocol }))
+    const feasible = feasibleTaskTypes(state)
+    // The phase table may still put mass on a task the state cannot run. Zero
+    // those entries, then sample; a zero-total table falls back to a feasible
+    // task instead of the upstream 'generation' default.
+    const effective = Object.fromEntries(
+      Object.keys(weights).map((key) => [key, feasible.has(key) ? weights[key] : 0]),
+    )
+    const sampled = sampleNextTaskType(effective, dispatchRand({ rand, state, protocol: state.protocol }))
+    const fallback = ['ranking', 'generation', 'proximity', 'meta_review', 'reflection', 'evolution']
+      .find((type) => feasible.has(type))
+    const task = feasible.has(sampled) ? sampled : fallback
     const termination = terminationCheck(policyStats(state), state.eloHistory)
 
     appendEvents(dir, [{
@@ -1008,7 +1048,8 @@ export async function nextTask({ cwd, slug, rand } = {}) {
       type: 'dispatch',
       round: state.rounds + 1,
       task,
-      weights,
+      weights: effective,
+      feasible: [...feasible],
       avg_top_elo: Number(state.avgTopTenElo.toFixed(1)),
       terminate: termination.terminate,
       reason: termination.reason,
@@ -1019,10 +1060,12 @@ export async function nextTask({ cwd, slug, rand } = {}) {
     const budget = number(next.protocol.step_budget) ?? DEFAULT_STEP_BUDGET
     return {
       task,
-      weights,
+      weights: effective,
       round: next.rounds,
       steps_used: next.rounds,
       step_budget: budget,
+      matches_used: next.counts.totalMatches,
+      max_matches: number(next.protocol.max_matches),
       budget_warning: next.rounds >= budget * 0.8,
       terminate: termination.terminate,
       reason: termination.reason,
@@ -1096,17 +1139,32 @@ export function proposeMatch(cwd, slug, { rand } = {}) {
   const neighboursOf = (id) => edges
     .filter((edge) => edge.a === id || edge.b === id)
     .map((edge) => (edge.a === id ? edge.b : edge.a))
+  const activeIds = new Set(active.map((hyp) => hyp.id))
+  const playedPairs = state.matches
+    .filter((match) => activeIds.has(match.hypothesisAId) && activeIds.has(match.hypothesisBId))
+    .map((match) => matchupKey(match.hypothesisAId, match.hypothesisBId))
   const pick = selectMatchup(
     active.map((hyp) => ({ id: hyp.id, rating: hyp.rating, rd: hyp.rd, matchesPlayed: hyp.matchesPlayed })),
     neighboursOf,
     dispatchRand({ rand, state, protocol: state.protocol }),
+    { playedPairs },
   )
   if (!pick) return { error: 'no legal matchup' }
+
+  const pairKey = matchupKey(pick.primary.id, pick.opponent.id)
+  const pairMatchesPlayed = state.matches
+    .filter((match) => matchupKey(match.hypothesisAId, match.hypothesisBId) === pairKey)
+    .length
+  const activePairs = (active.length * (active.length - 1)) / 2
 
   return {
     a: publicHypothesis(state.byId.get(pick.primary.id)),
     b: publicHypothesis(state.byId.get(pick.opponent.id)),
     basis: pick.basis,
+    // A fresh pair is preferred until every active pair has met, so a small
+    // pool reaches a complete first ranking instead of replaying one matchup.
+    pair_matches_played: pairMatchesPlayed,
+    unplayed_pairs_remaining: Math.max(0, activePairs - new Set(playedPairs).size),
     // Both orientations must be judged: one ordering alone is position-biased.
     judge_as: [
       { presentation: 'A,B', first: pick.primary.id, second: pick.opponent.id },
@@ -1552,6 +1610,7 @@ export function leaderboard(cwd, slug) {
     steps_used: state.rounds,
     step_budget: stats.budgetTokens,
     max_hypotheses: stats.maxHypotheses,
+    max_matches: stats.maxMatches,
     avg_top_elo: Number(state.avgTopTenElo.toFixed(1)),
     top_elo: state.topEloRating,
     weights: computeWeights({ ...stats, currentRound: state.rounds + 1 }),

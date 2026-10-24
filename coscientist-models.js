@@ -367,6 +367,7 @@ export function terminationCheck(stats = {}, eloHistory = []) {
   const budgetTokens = Number(stats.budgetTokens ?? 0)
   const currentRound = Number(stats.currentRound ?? 0)
   const totalMatches = Number(stats.totalMatches ?? 0)
+  const maxMatches = Number(stats.maxMatches ?? 0)
   const activeHypotheses = Number(stats.activeHypotheses ?? 0)
   const pendingReview = Number(stats.pendingReview ?? 0)
   const totalHypotheses = Number(stats.totalHypotheses ?? 0)
@@ -374,6 +375,12 @@ export function terminationCheck(stats = {}, eloHistory = []) {
 
   if (budgetTokens > 0 && tokensUsed >= budgetTokens) {
     return { terminate: true, reason: 'budget_exhausted' }
+  }
+
+  // An explicit user stop bound wins over the phase rules below (including the
+  // round-10 floor), because it is a request, not a policy inference.
+  if (maxMatches > 0 && totalMatches >= maxMatches) {
+    return { terminate: true, reason: 'match_cap_reached' }
   }
 
   const atCap = maxHypotheses > 0 && totalHypotheses >= maxHypotheses
@@ -424,20 +431,53 @@ export { EVOLUTION_STRATEGIES }
 
 // ─── Matchup selection ────────────────────────────────────────────────────────
 
+/** Pair key independent of presentation order. */
+export function matchupKey(a, b) {
+  return [String(a), String(b)].sort().join('|')
+}
+
 /**
  * Pick the pair for the next match (upstream `ranking.ts:319-346`).
  *
- * Priority: an uncertain (high-RD) hypothesis against a similar one from the
- * proximity graph — that converges the uncertain rating fastest; then any
- * high-RD hypothesis against a random peer from the top-of-priority slice; and
- * never against itself. `neighboursOf(id)` returns similar ids.
+ * When `playedPairs` is supplied, a pair that has never met is chosen before a
+ * repeat, so every active pair meets at least once and a small pool yields a
+ * complete first ranking instead of replaying one matchup. Inside that fresh set
+ * the same uncertainty priority applies. Once every pair has met, selection is
+ * the upstream uncertainty-first rule: an uncertain (high-RD) hypothesis against
+ * a similar one from the proximity graph, then any high-RD hypothesis against a
+ * random peer from the top-of-priority slice; never against itself.
+ * `neighboursOf(id)` returns similar ids.
  */
-export function selectMatchup(hypotheses = [], neighboursOf = () => [], rand = Math.random) {
-  const active = hypotheses.filter((h) => h && h.id && h.id !== undefined)
+export function selectMatchup(hypotheses = [], neighboursOf = () => [], rand = Math.random, { playedPairs = [] } = {}) {
+  const active = hypotheses.filter((h) => h && h.id !== undefined)
   if (active.length < 2) return null
 
+  const priorityOf = (hyp) => (Number(hyp.rd ?? GLICKO2_DEFAULTS.rd)) / (Number(hyp.matchesPlayed ?? 0) + 1)
+  const played = new Set((playedPairs || []).map((pair) => {
+    const [a, b] = Array.isArray(pair) ? pair : String(pair).split('|')
+    return matchupKey(a, b)
+  }))
+
+  if (played.size > 0) {
+    const fresh = []
+    for (let i = 0; i < active.length; i += 1) {
+      for (let j = i + 1; j < active.length; j += 1) {
+        if (!played.has(matchupKey(active[i].id, active[j].id))) fresh.push([active[i], active[j]])
+      }
+    }
+    if (fresh.length > 0) {
+      const chosen = fresh
+        .map(([a, b]) => ({ a, b, priority: Math.max(priorityOf(a), priorityOf(b)) }))
+        .sort((x, y) => y.priority - x.priority || matchupKey(x.a.id, x.b.id).localeCompare(matchupKey(y.a.id, y.b.id)))[0]
+      const [primary, opponent] = priorityOf(chosen.a) >= priorityOf(chosen.b)
+        ? [chosen.a, chosen.b]
+        : [chosen.b, chosen.a]
+      return { primary, opponent, basis: 'unplayed_pair' }
+    }
+  }
+
   const scored = active
-    .map((hyp) => ({ hyp, priority: (Number(hyp.rd ?? GLICKO2_DEFAULTS.rd)) / (Number(hyp.matchesPlayed ?? 0) + 1) }))
+    .map((hyp) => ({ hyp, priority: priorityOf(hyp) }))
     .sort((a, b) => b.priority - a.priority)
 
   const primary = scored[0].hyp

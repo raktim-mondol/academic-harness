@@ -316,13 +316,47 @@ try {
   assert.equal(bootstrap.round, 1)
   assert.equal(bootstrap.weights.generation, 0.7, 'a bootstrap session must be generation-heavy')
   assert.equal(bootstrap.terminate, false, 'termination is refused before round 10')
-  const seen = new Set()
-  for (let i = 0; i < 11; i += 1) seen.add((await nextTask({ cwd, slug: 'schedule' })).task)
-  assert.ok(seen.size >= 2, 'the sampled schedule must not be a single task repeated')
+  const bootstrapTasks = new Set()
+  for (let i = 0; i < 11; i += 1) bootstrapTasks.add((await nextTask({ cwd, slug: 'schedule' })).task)
+  assert.deepEqual([...bootstrapTasks], ['generation'], 'with no hypotheses, generation is the only executable task')
   const drained = await nextTask({ cwd, slug: 'schedule' })
   assert.equal(drained.steps_used, 13)
   assert.equal(drained.terminate, true, 'the step budget must stop the loop')
   assert.equal(drained.reason, 'budget_exhausted')
+
+  // At the cap with nothing pending, the phase table still puts mass on
+  // reflection and evolution, but neither task can run. Dispatch must zero the
+  // impossible entries instead of sampling a no-op the caller has to override.
+  const cappedSession = await startTournament({ cwd, slug: 'capped', protocol: { goal: 'capped pool', max_hypotheses: 2, step_budget: 20, seed: 3 } })
+  assert.equal(cappedSession.protocol.max_hypotheses, 2)
+  const capA = await activate('capped', hypothesis(11))
+  const capB = await activate('capped', { ...hypothesis(12), title: 'Capped hypothesis two with a different mechanism' })
+  assert.deepEqual([capA.status, capB.status], ['active', 'active'])
+  const capDispatch = await nextTask({ cwd, slug: 'capped', rand: () => 0.999999 })
+  assert.equal(capDispatch.weights.generation, 0, 'the hypothesis cap blocks generation')
+  assert.equal(capDispatch.weights.reflection, 0, 'nothing is pending review')
+  assert.equal(capDispatch.weights.evolution, 0, 'an add at the cap would be discarded')
+  assert.ok(['ranking', 'proximity', 'meta_review'].includes(capDispatch.task), `unexpected task ${capDispatch.task}`)
+
+  // The first ranking is a complete round-robin: with two active hypotheses the
+  // only pair plays once and only then becomes eligible for a repeat.
+  const firstProposal = proposeMatch(cwd, 'capped')
+  assert.equal(firstProposal.pair_matches_played, 0)
+  assert.equal(firstProposal.unplayed_pairs_remaining, 1)
+  await recordMatch({
+    cwd, slug: 'capped', a: firstProposal.a.id, b: firstProposal.b.id,
+    verdictAb: 'A', verdictBa: 'B', rationale: 'A wins both presentation orders.',
+  })
+  const replayProposal = proposeMatch(cwd, 'capped')
+  assert.equal(replayProposal.pair_matches_played, 1, 'only a completed round-robin repeats a pair')
+  assert.equal(replayProposal.unplayed_pairs_remaining, 0)
+  const resumedWithCap = await startTournament({ cwd, slug: 'capped', resume: true, protocol: { max_matches: 1 } })
+  assert.equal(resumedWithCap.protocol.max_matches, 1)
+  const stopped = await nextTask({ cwd, slug: 'capped' })
+  assert.equal(stopped.terminate, true)
+  assert.equal(stopped.reason, 'match_cap_reached')
+  assert.equal(stopped.matches_used, 1)
+  assert.equal(stopped.max_matches, 1)
 
   const twinA = await startTournament({ cwd, slug: 'repro-a', protocol: { goal: 'a', seed: 99 } })
   const twinB = await startTournament({ cwd, slug: 'repro-b', protocol: { goal: 'b', seed: 99 } })

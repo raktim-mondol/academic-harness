@@ -55,7 +55,11 @@ not a disqualification — and a registry you could not reach is `unverified`, n
 LLM judges systematically prefer whichever hypothesis is shown first. Upstream
 compounds this because the matchup selector always places its priority candidate
 in slot A. So each match is judged twice, with the pair swapped, and each verdict
-names the *presented slot*:
+names the *presented slot*. Run the two orientations **sequentially**, one judge
+subagent at a time; a parallel pair doubles the chance of a startup failure and
+leaves no clean way to retry one orientation. The two briefs must be identical
+apart from the swapped slots, and a retry must reuse the identical brief — a
+shorter retry on one side makes the two verdicts incomparable:
 
 | A,B run says | B,A run says | Real verdict |
 |---|---|---|
@@ -76,16 +80,23 @@ only when a second judge genuinely cannot be run, and say so in the report.
 
 ## 4. Which pair plays next
 
-`propose` picks by **uncertainty first**, not by rating:
+`propose` completes the first ranking before it starts repeating pairs:
 
-1. The active hypothesis with the highest `RD / (matches played + 1)`.
-2. Its opponent: a *similar* one from the proximity graph if one exists, because a
-   match between nearby ideas resolves an uncertain rating fastest; otherwise a
-   random peer from the top-10 priority slice.
+1. While any two active hypotheses have never met, the fresh pair containing the
+   most uncertain hypothesis (`RD / (matches played + 1)`) plays first. With `n`
+   active hypotheses, that is at most `C(n,2)` matches to give every pair a
+   result.
+2. After every pair has met at least once, selection is upstream **uncertainty
+   first**: the active hypothesis with the highest `RD / (matches played + 1)`
+   plays a *similar* one from the proximity graph if one exists (nearby ideas
+   resolve an uncertain rating fastest), otherwise a random peer from the top-10
+   priority slice.
 3. Never against itself; never a rejected or withheld hypothesis.
 
-That is why a low-ranked hypothesis with few matches appears repeatedly: the
-tournament is spending its budget where it knows the least.
+That is why a low-ranked hypothesis with few matches appears repeatedly later:
+the tournament is spending its budget where it knows the least. `propose` reports
+`pair_matches_played` and `unplayed_pairs_remaining` so you can see which phase
+the policy is in.
 
 ## 5. Duplicates and similarity
 
@@ -128,12 +139,15 @@ Two measures, two scales, and the ledger always says which one produced a number
 | At cap, reviews pending | 0 | 0.70 | 0.15 | 0.05 | 0.05 | 0.05 |
 | At cap, drained | 0 | 0.10 | 0.55 | 0.25 | 0.05 | 0.05 |
 
-It stops for one of four reasons, reported in `terminate`/`reason`:
+It stops for one of five reasons, reported in `terminate`/`reason`:
 
 - **`budget_exhausted`** — dispatch rounds reached `step_budget`. The plan's
   honest deviation from upstream: a tool here cannot see subagent token spend, so
   the budget counts steps rather than tokens. Report steps used, not imagined
   tokens.
+- **`match_cap_reached`** — `max_matches` was set (for an explicit user stop
+  bound) and that many matches are recorded. It fires even before round 10,
+  because it is a request rather than a policy inference.
 - **`no_competitors`** — the cap is reached, nothing waits for review, and fewer
   than two hypotheses can still compete. A pool of five absorbs a review veto and
   a withholding and still ranks three; a smaller pool can be emptied by ordinary
@@ -146,8 +160,9 @@ It stops for one of four reasons, reported in `terminate`/`reason`:
   for review, and there are at least 3 matches per active hypothesis.
 
 Hitting the cap alone does **not** end a tournament: it only stops new ideas, and
-the policy spends the remaining budget ranking and evolving what exists. Never
-before round 10 does the loop stop for any reason other than budget.
+the policy spends the remaining budget ranking what exists. Never before round 10
+does the loop stop for any reason other than the step budget or an explicit match
+cap.
 
 ## 7. Where the state lives
 

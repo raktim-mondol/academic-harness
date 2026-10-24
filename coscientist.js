@@ -31,7 +31,7 @@ const ACTIONS = [
 const DISPATCH = {
   generation: () => 'Generate one hypothesis: search the literature first, then run one of the four generation strategies (literature_exploration while fewer than 3 are active, then rotating scientific_debate → assumption_chaining → research_expansion by round) and `add` the result.',
   reflection: () => 'Review one pending hypothesis through the five stages in order (`review`); verify its citations as you go with crossref_lookup / paper_resolve, and record what could not be resolved as unverified.',
-  ranking: () => 'Run one tournament match: `coscientist_rank propose`, judge both orientations with subagents, then `coscientist_rank record`.',
+  ranking: () => 'Run one tournament match: `coscientist_rank propose`, judge both orientations with one subagent at a time (same brief, slots swapped), then `coscientist_rank record`.',
   evolution: (round) => `Evolve a top hypothesis with the ${selectEvolutionStrategy(round)} mutation, then \`add\` it with parent_ids.`,
   proximity: () => 'Refresh similarity: `coscientist_rank similarity` on the live hypotheses; flag any duplicate pair for the scientist.',
   meta_review: () => 'Synthesize a cross-cutting critique of the current set, then `synthesize` it; it steers later generation.',
@@ -109,6 +109,7 @@ function compactBoard(view) {
     steps_used: view.steps_used,
     step_budget: view.step_budget,
     max_hypotheses: view.max_hypotheses,
+    max_matches: view.max_matches,
     avg_top_elo: view.avg_top_elo,
     top_elo: view.top_elo,
     termination: view.termination,
@@ -133,7 +134,7 @@ function renderStatus(value) {
         text: [
           `${value.resumed ? 'Resumed' : 'Started'} tournament \`${protocol.slug}\`.`,
           `Goal: ${protocol.goal}`,
-          `Budget: ${protocol.max_hypotheses} hypotheses, ${protocol.step_budget} steps. Duplicate gate: ${protocol.dup_threshold >= 1 ? 'off' : protocol.dup_threshold}.`,
+          `Budget: ${protocol.max_hypotheses} hypotheses, ${protocol.step_budget} steps.${protocol.max_matches ? ` Match cap: ${protocol.max_matches} (the loop stops there).` : ''} Duplicate gate: ${protocol.dup_threshold >= 1 ? 'off' : protocol.dup_threshold}.`,
           protocol.seed !== undefined ? `Schedule seed: ${protocol.seed}.` : '',
           'Ask `next` for the first task. Hypotheses are recombined published knowledge, not results.',
         ].filter(Boolean).join('\n'),
@@ -165,7 +166,7 @@ function renderStatus(value) {
           `Round ${value.round} — sampled task: ${value.task}.`,
           value.dispatch,
           `Weights in force: ${Object.entries(value.weights).map(([key, weight]) => `${key} ${weight}`).join(', ')}.`,
-          `Steps ${value.steps_used}/${value.step_budget}.${value.budget_warning ? ' ⚠ approaching the step budget.' : ''}`,
+          `Steps ${value.steps_used}/${value.step_budget}.${value.max_matches ? ` Matches ${value.matches_used}/${value.max_matches}.` : ''}${value.budget_warning ? ' ⚠ approaching the step budget.' : ''}`,
           value.terminate ? `STOP: ${value.reason}. Design the protocol for the top hypothesis, synthesize an overview, then export.` : '',
         ].filter(Boolean).join('\n'),
       }]
@@ -245,6 +246,7 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
       search_queries: listParam(args.search_queries),
       max_hypotheses: await settingOr('CO_SCIENTIST_MAX_HYPOTHESES', args.max_hypotheses, DEFAULT_MAX_HYPOTHESES),
       step_budget: await settingOr('CO_SCIENTIST_STEP_BUDGET', args.step_budget, DEFAULT_STEP_BUDGET),
+      max_matches: finiteOrUndefined(args.max_matches),
       dup_threshold: await settingOr('CO_SCIENTIST_DUP_THRESHOLD', args.dup_threshold, undefined),
       seed: await settingOr('CO_SCIENTIST_SEED', args.seed, undefined),
     }
@@ -319,6 +321,8 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
       round: dispatched.round,
       steps_used: dispatched.steps_used,
       step_budget: dispatched.step_budget,
+      matches_used: dispatched.matches_used,
+      max_matches: dispatched.max_matches,
       budget_warning: dispatched.budget_warning,
       terminate: dispatched.terminate,
       reason: dispatched.reason,
@@ -407,8 +411,8 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'coscientist',
     description: [
-      'Co-Scientist hypothesis tournament: generate, review, rank, and evolve candidate hypotheses with persistent state under `.dsh/coscientist/<slug>/`. Actions: `start` (goal, constraints, max_hypotheses, step_budget, seed — defaults 5 ideas / 36 steps), `add` (one hypothesis with title/summary/content plus rationale, experimental_plan, key_assumptions, citations, parent_ids), `review` (five stages in order: initial, full, deep_verification, simulation, observation), `safety` (record a dual-use classification and apply the withhold gate), `status` (ranked leaderboard), `next` (which task the scheduling policy samples now), `set_status` (reject or withhold; a reason is required), `lineage` (parentage and diff), `embed` (opt-in Gemini embeddings that switch the duplicate gate and similarity to cosine), `priors` (what sibling tournaments in this workspace already learned about similar ideas), `graph` (Mermaid knowledge graph of lineage, similarity, and claim support), `design_protocol` (steps for the chosen hypothesis), `synthesize` (meta-review critique and research overview), `export` (markdown, json, or mermaid report).',
-      'The tool decides, not the model: a near-duplicate `add` is discarded with its similarity score, a cap-reached `add` is discarded, review stages are refused out of order, a `fail` at initial or full rejects the hypothesis, a `safety` severity at or above the threshold withholds it, and `next` reports when the tournament should stop (step budget, no pair left to play, Elo plateau, cap ranked). Ratings are Glicko-2 with uncertainty (RD); see the co-scientist-tournament skill for the loop.',
+      'Co-Scientist hypothesis tournament: generate, review, rank, and evolve candidate hypotheses with persistent state under `.dsh/coscientist/<slug>/`. Actions: `start` (goal, constraints, max_hypotheses, step_budget, max_matches, seed — defaults 5 ideas / 36 steps; `max_matches` enforces an explicit user stop bound), `add` (one hypothesis with title/summary/content plus rationale, experimental_plan, key_assumptions, citations, parent_ids), `review` (five stages in order: initial, full, deep_verification, simulation, observation), `safety` (record a dual-use classification and apply the withhold gate), `status` (ranked leaderboard), `next` (which task the scheduling policy samples now), `set_status` (reject or withhold; a reason is required), `lineage` (parentage and diff), `embed` (opt-in Gemini embeddings that switch the duplicate gate and similarity to cosine), `priors` (what sibling tournaments in this workspace already learned about similar ideas), `graph` (Mermaid knowledge graph of lineage, similarity, and claim support), `design_protocol` (steps for the chosen hypothesis), `synthesize` (meta-review critique and research overview), `export` (markdown, json, or mermaid report).',
+      'The tool decides, not the model: a near-duplicate `add` is discarded with its similarity score, a cap-reached `add` is discarded, review stages are refused out of order, a `fail` at initial or full rejects the hypothesis, a `safety` severity at or above the threshold withholds it, and `next` reports when the tournament should stop (step budget, match cap, no pair left to play, Elo plateau, cap ranked). `next` never samples a task the ledger cannot execute. Ratings are Glicko-2 with uncertainty (RD); see the co-scientist-tournament skill for the loop.',
       'This is for a persistent, ranked, multi-round hypothesis set. For one pass of ideation use generating-scientific-hypotheses. Generated hypotheses recombine published knowledge — they are not results, and citations must be verified before use. Matches are judged with `coscientist_rank`.',
     ].join(' '),
     parameters: {
@@ -426,6 +430,7 @@ export function apply(ctx) {
       search_queries: { type: 'array', items: { type: 'string' }, description: 'Seed literature queries (start).' },
       max_hypotheses: { type: 'number', description: `Cap on hypotheses. Default ${DEFAULT_MAX_HYPOTHESES} (or CO_SCIENTIST_MAX_HYPOTHESES).` },
       step_budget: { type: 'number', description: `Cap on dispatch rounds. Default ${DEFAULT_STEP_BUDGET} (or CO_SCIENTIST_STEP_BUDGET).` },
+      max_matches: { type: 'number', description: 'Stop after this many recorded matches. Use for an explicit user stop bound, e.g. one match per active pair.' },
       dup_threshold: { type: 'number', description: 'Similarity at which an `add` is discarded (default 0.7). Set 1 to disable the gate.' },
       seed: { type: 'number', description: 'Reproducible scheduling seed. Unset = non-deterministic.' },
       resume: { type: 'boolean', description: 'Continue an existing tournament instead of failing (start).' },

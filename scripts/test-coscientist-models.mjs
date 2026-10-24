@@ -190,6 +190,16 @@ try {
   assert.equal(terminationCheck({ ...phases.lateRun, currentRound: 12, totalMatches: 30 }, moving).terminate, false, 'ratings still climbing is not a plateau')
   assert.equal(terminationCheck({ ...phases.atCapDrained, currentRound: 22, totalMatches: 18 }, new Array(10).fill(1300)).reason, 'cap_reached_and_ranked')
   assert.equal(terminationCheck({ ...phases.atCapDrained, currentRound: 22, totalMatches: 10, pendingReview: 1 }, new Array(10).fill(1300)).terminate, false, 'work still pending is not termination')
+  assert.equal(
+    terminationCheck({ ...phases.atCapDrained, currentRound: 3, totalMatches: 3, maxMatches: 3 }, []).reason,
+    'match_cap_reached',
+    'an explicit match cap stops even before round 10',
+  )
+  assert.equal(
+    terminationCheck({ ...phases.atCapDrained, currentRound: 3, totalMatches: 2, maxMatches: 3 }, []).terminate,
+    false,
+    'the match cap only fires when reached',
+  )
   assert.equal(terminationCheck({ ...phases.atCapDrained, currentRound: 22, totalMatches: 10 }, new Array(10).fill(1300)).terminate, false, 'ten matches over six hypotheses is not enough')
   assert.equal(terminationCheck({ maxHypotheses: 0, currentRound: 30, activeHypotheses: 3, pendingReview: 0, totalHypotheses: 3, totalMatches: 4 }, []).terminate, false, 'an unset cap must not terminate')
 
@@ -235,6 +245,21 @@ try {
   assert.equal(played.primary.id, 'h2', 'matches played divide the priority')
   const neverSelf = selectMatchup([{ id: 'h1', rd: 350, matchesPlayed: 0 }, { id: 'h2', rd: 350, matchesPlayed: 0 }], () => ['h1'])
   assert.notEqual(neverSelf.opponent.id, neverSelf.primary.id, 'a hypothesis is never its own opponent')
+
+  // A fresh pair is preferred until every active pair has met once. The order of
+  // ids inside a recorded pair must not matter.
+  const freshPair = selectMatchup([
+    { id: 'h1', rd: 340, matchesPlayed: 1 },
+    { id: 'h2', rd: 60, matchesPlayed: 1 },
+    { id: 'h3', rd: 60, matchesPlayed: 1 },
+  ], () => [], Math.random, { playedPairs: ['h1|h3', ['h3', 'h2']] })
+  assert.deepEqual([freshPair.primary.id, freshPair.opponent.id].sort(), ['h1', 'h2'], 'the unplayed pair must play')
+  assert.equal(freshPair.basis, 'unplayed_pair')
+  const replayPair = selectMatchup([
+    { id: 'h1', rd: 340, matchesPlayed: 1 },
+    { id: 'h2', rd: 60, matchesPlayed: 1 },
+  ], () => [], makeRand(1), { playedPairs: [['h2', 'h1']] })
+  assert.notEqual(replayPair.basis, 'unplayed_pair', 'a finished round-robin falls back to uncertainty-first')
 
   // ── similarity and duplicates ───────────────────────────────────────────────
   assert.equal(cosineSimilarity([1, 0], [1, 0]), 1)

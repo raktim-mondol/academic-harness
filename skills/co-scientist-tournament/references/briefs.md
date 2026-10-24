@@ -256,8 +256,10 @@ list is **fabricated**; a title nobody matched, or a registry that errored, is o
 ## 8. Judging a match
 
 `coscientist_rank propose` returns the pair and both presentation orders. Run
-**two** subagents in the same turn — the same brief, with A and B swapped — so the
-result does not depend on who was shown first. Specialist: `peer-reviewer`.
+**two sequential subagents, one at a time** — the same brief, with A and B
+swapped — so the result does not depend on who was shown first. Sequential, not
+parallel: a single judge at a time starts reliably, and a retry costs one child
+rather than two. Specialist: `peer-reviewer`.
 
 > Which hypothesis is scientifically superior?
 > HYPOTHESIS A: `<title, summary, rationale>`  ·  PROVENANCE FOR A: `<claim-support line>`
@@ -266,7 +268,15 @@ result does not depend on who was shown first. Specialist: `peer-reviewer`.
 > A contradicted claim is a significant weakness; a well-supported claim adds
 > credibility. Judge novelty, scientific soundness, evidence credibility,
 > testability, and potential impact.
+> Do not call tools or load skills; judge from the material above and answer in
+> your final message.
 > JSON only: `{"winner": "A | B | draw", "rationale": "2–3 sentences"}`
+
+The two runs must differ **only** in which hypothesis occupies slot A. If a child
+settles as `failed before it finished` with no closing message, retry the
+identical brief (same wording, same length); after two failures report that
+orientation as unavailable and record the match with one orientation instead of
+substituting a differently-worded run.
 
 For a debate match (the pair near the top of the leaderboard), use the advocate
 structure instead: strongest case for A, strongest case for B, cross-examination

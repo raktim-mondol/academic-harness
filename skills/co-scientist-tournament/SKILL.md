@@ -74,6 +74,8 @@ should continue.
 | Only `active` hypotheses compete; withheld ones cannot be matched | Quarantine is a human release, with a name and a reason |
 | Ratings move only through `record` and `feedback` | Prose praise changes nothing |
 | `next` samples the task; `status`/`next` say when to stop | You do not choose when the tournament ends |
+| `next` never samples a task the ledger cannot execute | At the cap there is no generation/evolution; reflection needs a pending review |
+| A pair that has never met plays before a repeat | Complete the first ranking instead of replaying one matchup |
 | Both presentation orders are needed, or the match is flagged | A single-order verdict is position-biased |
 
 `next` returns one sampled task and one line of guidance. The four generation
@@ -108,10 +110,14 @@ and termination rules are in `references/tournament.md`.
      (`AH_ENABLE_OPTIONAL_TOOLS=1`); otherwise do it by hand with
      `paper_resolve` / `crossref_lookup`, plus `integrity_check` for retraction.
      Anything you could not resolve is unverified — never counted as verified.
-   - `ranking` → `coscientist_rank propose`, then **two judge subagents in the
-     same turn, one per presentation order**, then `record` with both verdicts.
-     Report `verdict_ab` and `verdict_ba` as the *presented* slot that won, so
+   - `ranking` → `coscientist_rank propose`, then **two judge subagents, one at
+     a time**, one per presentation order, then `record` with both verdicts.
+     Use the **same brief** for both, swapping only the A/B slots. Report
+     `verdict_ab` and `verdict_ba` as the *presented* slot that won, so
      agreement is `A` + `B` — see `references/tournament.md` §3 before recording.
+     If a judge settles as failed with no closing message, retry the **identical**
+     brief (see Delegation); never shorten or rephrase one orientation relative
+     to the other, because that is what makes the two verdicts comparable.
    - `evolution` → run the named mutation brief on a top hypothesis, then `add`
      with `parent_ids` and `strategy: evolution:<name>`.
    - `proximity` → `coscientist_rank similarity`; surface any duplicate pair to
@@ -120,7 +126,11 @@ and termination rules are in `references/tournament.md`.
      steers later generation.
 3. **Stop when the tools say stop.** `next` returns `terminate` with a reason.
    Then: design the protocol for the top hypothesis, write the research overview,
-   export, and report.
+   export, and report. An explicit stop bound in the user's request is binding:
+   translate it to `max_matches` when you `start` — "first ranking" means one
+   match for every active pair, `C(n,2)` — and stop as soon as `next` reports
+   `match_cap_reached`. Do not continue into evolution, meta-review, or extra
+   matches because the step budget still has room.
 4. **Show the structure.** `coscientist graph` builds a Mermaid diagram from the
    ledger alone — solid arrows are parentage, dotted ones are similarity pairs, and
    a paper node exists only because a recorded claim judgement named it. Write it
@@ -161,10 +171,18 @@ hypotheses, and say what you withheld.
 ## Delegation
 
 `subagent` returns immediately and the answer arrives as a completion notice;
-never poll. The two orientations of one match are independent, so run them as
-two subagents in the same turn. Put the specialist name in `description` and the
-brief plus the concrete pair in `prompt` — a judge needs both hypotheses in full,
-the provenance line, and the rubric.
+never poll. Run the two orientations of one match **sequentially, one subagent at
+a time**, not as a parallel pair: concurrent children multiply the number of
+startup and provider failures, and a failed orientation then costs two retries
+instead of one. Put the specialist name in `description` and the brief plus the
+concrete pair in `prompt` — a judge needs both hypotheses in full, the provenance
+line, and the rubric.
+
+If a child settles as `failed before it finished` with no closing message, retry
+the **identical** brief. After two failures, report that orientation as
+unavailable (the match stays flagged `position_controlled: false`); do not invent
+a verdict, and do not re-run only one orientation with a different prompt and
+treat the pair as comparable.
 
 ## Read next
 
