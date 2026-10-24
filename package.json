@@ -93,6 +93,7 @@
     "sci-inspect.js",
     "latex-compile.js",
     "pdf-to-markdown.js",
+    "mermaid-render.js",
     "modal-run.js",
     "modal-instances.js",
     "runpod-run.js",
@@ -218,7 +219,8 @@
     "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4",
     "@firecrawl/pdf-inspector": "^1.17.0",
-    "adm-zip": "^0.6.0"
+    "adm-zip": "^0.6.0",
+    "pele": "^1.9.0"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0",

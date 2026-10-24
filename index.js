@@ -3,6 +3,7 @@ import { applyImageGenerate } from './image-generate.js'
 import { applySciInspect } from './sci-inspect.js'
 import { applyLatexCompile } from './latex-compile.js'
 import { applyPdfToMarkdown } from './pdf-to-markdown.js'
+import { applyMermaidRender } from './mermaid-render.js'
 import { applyModalRun } from './modal-run.js'
 import { applyRunpodRun } from './runpod-run.js'
 import { applyWorkflows } from './workflows.js'
@@ -29,6 +30,7 @@ export function apply(ctx, config) {
   applySciInspect(ctx)
   applyLatexCompile(ctx)
   applyPdfToMarkdown(ctx)
+  applyMermaidRender(ctx)
   applyModalRun(ctx)
   applyRunpodRun(ctx)
   applyWorkflows(ctx)

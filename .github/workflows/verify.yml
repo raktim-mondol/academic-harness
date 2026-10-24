@@ -73,6 +73,7 @@ jobs:
           node scripts/test-audits.mjs
           node scripts/test-grants.mjs
           node scripts/test-nonsearch-tools.mjs
+          node scripts/test-mermaid-render.mjs
 
       - name: Check rename identity and migration
         run: |
