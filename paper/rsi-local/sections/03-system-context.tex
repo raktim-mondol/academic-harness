@@ -1,0 +1,30 @@
+\section{System Context}
+\label{sec:context}
+
+\subsection{The Academic Harness plugin}
+\ah{} runs as a preset on \dsh{} \citep{academicharness2026,deepseek2026harness}. The preset supplies general research tools (literature and web search, academic database lookup, dataset and policy records, clinical and regulatory records), scientific file inspection, remote compute, a lab notebook, structured scientific results, and specialist subagents. It also mounts a paper-memory layer for papers, claims, and citations \citep{papermemory2026}, a systematic-review ledger, and integrity, citation, statistical, figure, and reproducibility audits. The tool surface is broad by design; the plugin's system prompt routes tasks to the appropriate tool or skill rather than relying on one general-purpose search loop.
+
+When a workspace contains an \texttt{ah.yaml} file, the plugin also activates the \ah{} writing engine. The engine is vendored inside the plugin and is not installed into the host. It parses the \LaTeX{} tree into units, inventories numbers, citations, facts, claims, and anchors, and runs a tiered audit: structure, numeric and fact consistency, bibliography and source registry, claim bindings, coherence, style, and authoring checks. Findings are recorded in a ledger with stable fingerprints and states (open, fixed, waived, decision-needed). A gate closes only when the current turn introduced no open blocker or major. The engine also exposes snapshots, word-level diffs, claim sidecars, provenance records, review items, and author-only decisions such as waiving a finding or approving a plan.
+
+Two properties of this design matter for self-improvement. First, the oracle is deterministic and inspectable. The same context produces the same findings; the engine has a determinism self-check and a report hash. Second, the oracle is already separated from the agent's authority. The agent can request a decision but cannot waive a finding, accept a fact, verify a claim, or approve a disclosure. The author remains the final authority for consequential writing decisions.
+
+\subsection{Mutable and immutable boundaries}
+\label{sec:boundaries}
+\system{} treats the following as immutable:
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+  \item plugin source, hooks, tool registrations, and the system prompt;
+  \item the vendored \texttt{ah} engine, its checks, ledger, and report hashing;
+  \item project files, protected paths, snapshots, facts, sources, and claim records;
+  \item the RSI evaluator, admission policy, benchmark manifests, and lint rules.
+\end{itemize}
+The only mutable state is a local store of short lesson texts and their statistics. This is a deliberate application of the fixed-evaluator principle: the candidate cannot edit the thing that grades it. It also keeps the plugin's release boundary intact. A lesson can be admitted between sessions; a code change cannot.
+
+The store lives under \texttt{\$DSH\_HOME/ah-rsi} by default and can be overridden with \texttt{AH\_RSI\_STORE}. It contains JSONL event and episode logs, append-only lesson snapshots, admission and retirement decisions, and benchmark records. It never contains the manuscript, the full user message, the paper ledger, or credentials. Events keep hashes, counts, tool names, structured signals, and task-class tags. Explicit preferences are stored as the short sentence the user asked to remember.
+
+\subsection{Why research tasks are different}
+Academic work differs from coding benchmarks in ways that constrain the learning loop. First, there is no compiler for a research argument. A deterministic audit can catch a missing citation or a number that does not match its fact, but it cannot decide whether the argument is original or whether the evidence supports the claim. The survey makes a similar point: internal critics and provisional verifiers may be useful, but they are not the final evaluator \citep{wei2026harnessrsi}. Second, errors have asymmetric costs. A fabricated citation, a retracted source presented as current evidence, or a statistic reported without its test and sample size can survive a fluent draft and damage a paper, a grant, or a review. Third, research data and manuscripts are often confidential; sending a full trajectory to a remote optimizer is not an acceptable default. Fourth, a researcher's workflow is personal and long-lived: naming conventions, statistical defaults, venues, funders, and review styles vary across projects and change over time.
+
+These constraints point away from offline prompt search and repository-level self-editing, and toward a small, local, reversible layer that learns from the user's own work. The layer should be autonomous enough to avoid a manual approval for every lesson, but bounded enough that a bad lesson cannot change the audit or the project. It should also be legible: the user must be able to see what was learned, why it was learned, and how to remove it.
+
+\subsection{The gap}
+The plugin already has feedback (audit findings, gate decisions, review items) and persistent state (ledger, snapshots, claim sidecars, paper memory), but it has no update mechanism that turns that feedback into a persistent harness change. The model does not automatically remember that the user always wants a DOI resolved before citing, that a particular project's numbers live in a fact macro, or that a class of statistics tasks repeatedly needs a pre-report audit. \system{} fills that gap with the smallest update that can persist across sessions and remain auditable: a scoped textual lesson.

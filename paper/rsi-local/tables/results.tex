@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Implementation validation summary. These results test the loop and its integration, not research-quality improvement.}
+\label{tab:results}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+Check & Result \\
+\midrule
+RSI automated checks & 96/96 pass. \\
+Plugin offline suites & 17/17 pass, including the existing writing-loop adapter. \\
+Synthetic pipeline & 10 lessons created; 14/14 cases pass, including promotion and rollback. \\
+Hook lifecycle & One episode per accepted user turn; empty steps and rejected pre-steps are ignored; gate decisions attach correctly. \\
+Latest-state scoring & A clean audit after a blocker clears blocking and finding counts; the turn scores as a success. \\
+Activation and cost & Reached-action proxy, injected-token count, oracle manifest, and risk metadata recorded; explicit rollback tested. \\
+Defect injection (scaffolded) & Four mutations; five check counts increased; original project unchanged; symlink skipped. \\
+Corpus experiment & Nine documents; 31/31 defects; 23/23 leave-one-project-out specific families; 56.7\% routing; 0.53 safety F1. \\
+Catalogue coverage & 0/5 with an empty store; 2/5 after adding one structure lesson; coverage is not behavior. \\
+\bottomrule
+\end{tabularx}
+\end{table}

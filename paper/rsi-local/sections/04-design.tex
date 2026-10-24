@@ -1,0 +1,160 @@
+\section{Design}
+\label{sec:design}
+
+\subsection{Requirements}
+\label{sec:requirements}
+The design targets eight requirements:
+\begin{enumerate}[leftmargin=1.5em,itemsep=2pt]
+  \item \textbf{Autonomy.} The loop must admit, inject, promote, and retire lessons without author approval. A manual gate for every lesson would make the feature unusable in daily work.
+  \item \textbf{Local first.} Capture and judging must run on the user's machine. Remote evaluation is optional, explicit, and limited.
+  \item \textbf{Evaluator preservation.} The audit engine, plugin code, project files, and admission policy must remain outside the candidate's editable surface.
+  \item \textbf{Reversibility.} Every learned change must be visible, bounded, and removable. A bad lesson must not require a code release to undo.
+  \item \textbf{Task relevance.} Lessons must be scoped to the kind of research work that produced them, not injected indiscriminately.
+  \item \textbf{Sidecar behavior.} The learning loop must be fail-soft and must never block the writing, analysis, or review loop.
+  \item \textbf{Auditability.} Every admission and retirement must have a reason, evidence counts, and a timestamp.
+  \item \textbf{Academic safety.} Lessons must not encourage fabrication, citation invention, verification skipping, data exfiltration, or overclaiming.
+\end{enumerate}
+
+\subsection{Overview}
+\label{sec:overview}
+\Cref{fig:architecture} shows the loop. A research session produces accepted user prompts, tool outcomes, and gate decisions. Capture hooks normalize these into structured events and close them into episodes. The local store holds events, episodes, lesson snapshots, and decisions. Diagnosis clusters recurring signals and maps them to remedy templates. Validation applies lint rules, contradiction checks, evidence thresholds, and an optional veto-only remote judge. Admission assigns a lifecycle state. The injection selector ranks matching lessons and adds a bounded block to a later turn. The outcome monitor updates injected and control statistics; the admission policy promotes, quarantines, or retires lessons.
+
+The immutable plane is drawn separately on purpose. The loop reads audit findings, gate decisions, and tool errors, but it cannot edit the audit, the project, the plugin, or the admission rule. This is the central architectural commitment: the candidate may change what the agent reads, not what judges the agent.
+
+\input{figures/architecture}
+
+\subsection{Plugin-layer mapping}
+\label{sec:layers}
+The general blueprint for RSI in a harness plugin has seven layers: capture, experience store, diagnosis and proposal, frozen evaluator, admission, activation, and observability, tied together by a small operational contract. The implemented architecture covers those layers for lesson-level interpreted state, but it does not implement every possible target. \Cref{tab:layers} states the mapping explicitly.
+
+\input{tables/architecture-layers}
+
+The main omissions are deliberate. There is no versioned skill-file generator; the lesson is the persistent artifact. There is no global promotion path; the store is local to one user and scoped by task class. There is no runtime code editing; executable changes remain in the normal release process. Within the implemented lesson tier, the system is autonomous: it admits, injects, promotes, quarantines, retires, and rolls back without author approval. The evaluator, project state, plugin code, and admission policy remain fixed.
+
+We use five risk tiers. \emph{T0 observe} captures without injecting. \emph{T1 local lessons} is the implemented tier: short interpreted advice, trial/control admission, caps, TTL, and rollback. \emph{T2 local skills or policies} would add versioned artifacts and a stronger semantic validator; it is deferred. \emph{T3 global prompt or skill changes} would affect other users and is out of scope for a local plugin. \emph{T4 executable code or evaluator changes} requires the normal release path and is never available to the loop.
+
+\subsection{Task taxonomy}
+\label{sec:taxonomy}
+A lesson about resolving a DOI should not be injected into a GPU scheduling task. The classifier assigns each prompt to one of eleven classes: literature, hypothesis, experiment, data analysis, statistics, manuscript, grant, review response, reproducibility, data management, and general research. Classification is deterministic keyword scoring over normalized user text. Each class has a weighted vocabulary; the highest score wins, with a fixed tie order. A short follow-up with no strong class signal inherits the previous class in the same session. The taxonomy is intentionally coarse: it is a routing device, not an ontology of research.
+
+\Cref{tab:task-classes} lists the classes and the workflow anchor used by the task-level remedy. The anchor is a skill or tool family, not a mandatory call. For example, a data-analysis lesson recommends loading the data-science pipeline skill and logging commands; it does not require a particular function. The class also scopes lesson statistics, so a lesson learned in statistics tasks is evaluated on statistics turns rather than on every session.
+
+\input{tables/task-classes}
+
+\subsection{Capture and the episode model}
+\label{sec:capture}
+The plugin already owns the relevant hook points. At \texttt{agent/pre-step}, the RSI hook sees the claimed user messages, the host turn number, and the step number. It extracts the last genuine user message, skipping plugin, skill-catalog, and approval messages. At \texttt{tools/post-execute}, it sees the tool name, arguments, and result. A gate bus carries the writing oracle's stop decision from the existing \ah{} hook to the RSI hook without running the oracle twice. At \texttt{agent/disposed}, it finalizes any open turn.
+
+The host turn number is load-bearing. A tool-using turn can call \texttt{pre-step} many times; later steps may carry no new user message. The hook therefore starts a new episode only when the host turn changes or a new genuine prompt arrives, never on an empty tool step. This prevents one user request from being split into multiple episodes and prevents trial/control assignment from collapsing to a constant seed. A rejected pre-step is ignored entirely: capture happens only after the host accepts the step.
+
+A turn records the task class, tool counts, errors, correction markers, audit findings, blocking findings, the latest audit finding count, gate state, integrity/citation/statistics/figure/reproducibility flags, the injected and control lesson identifiers, the injected token count, the lessons reached, and an oracle manifest. It does not record full user messages, full tool outputs, manuscript text, or file paths. Tool results are reduced to counts, check identifiers, verdicts, a result hash, and a length. Error signatures are normalized and path-redacted. The store is local; the event log is not an evidence corpus.
+
+A turn is \emph{substantive} if it used at least one substantive tool, contains a correction, or carries a gate decision. The correction-only case matters for research tasks that are primarily reasoning: a user can correct a hypothesis or a proposal without any tool call, and the loop should learn from that correction rather than discard the turn.
+
+\subsection{Outcome score}
+\label{sec:outcome}
+The local judge is a heuristic composite of observable signals, not a ground-truth measure of research quality. For a turn with $e$ tool errors, $c$ correction markers, $f$ findings in the latest audit, and $b$ blocking findings, let $q$ be
+\begin{equation}
+\label{eq:quality}
+\begin{aligned}
+q = \operatorname{clip}_{[0,1]}\Big(&1 - \min(.35,.08e) - \min(.30,.15c) - \min(.20,.01f) - \min(.40,.10b) \\
+&- .20 I_{\mathrm{int}} - .10 I_{\mathrm{cit}} - .10 I_{\mathrm{stat}} - .05 I_{\mathrm{fig}} - .05 I_{\mathrm{repo}} \\
+&- .25 I_{\mathrm{gate}} - .10 I_{\mathrm{compile}}\Big),
+\end{aligned}
+\end{equation}
+where the indicators mark an unresolved integrity issue, citation gap, statistical flag, figure flag, reproducibility flag, a gate that is still steering or handing off, and a failed compile. A turn succeeds when it is substantive, has no errors or corrections, has no blocking findings, is not under a gate continue or handoff, is not failed for integrity, citation, or statistics, has a non-false gate result, and $q\ge .7$:
+\begin{equation}
+\label{eq:success}
+\begin{aligned}
+S = \mathbf{1}\big[&\text{substantive} \land e=0 \land c=0 \land b=0 \\
+&\land \text{gate}\notin\{\text{continue},\text{handoff}\} \land \text{gatePassed}\neq\text{false} \\
+&\land \neg I_{\mathrm{int}} \land \neg I_{\mathrm{cit}} \land \neg I_{\mathrm{stat}} \land q\ge .7\big].
+\end{aligned}
+\end{equation}
+
+Using the \emph{latest} audit state is important. An early check may find a blocker that a later edit fixes; accumulating blocker counts would punish the turn twice. The implementation therefore replaces the blocking count and the finding count on each \texttt{ah\_check} or \texttt{ah\_audit} result, while retaining the union of check identifiers for diagnosis. Integrity and audit flags are similarly cleared when a later tool reports a clean result. The weights in \cref{eq:quality} are design choices, not empirically calibrated utilities. They encode a conservative preference: unresolved verification failures matter more than prose warnings, and a gate that is still steering is not a completed turn.
+
+\subsection{Diagnosis and the remedy catalogue}
+\label{sec:diagnosis}
+Each episode emits structured signals. The current signal families are audit findings (\texttt{finding:CHECK}), tool errors (\texttt{error:tool:signature}), integrity verdicts, citation gaps, statistical, figure, and reproducibility flags, retries, gate handoffs, gate continues, corrections, and unexplained task failures. Diagnosis groups episodes by signal and task class. A cluster becomes a candidate only if it has at least three failures across at least two sessions and its failure rate is at least one half. The threshold is deliberately simple: it prevents one-off errors from becoming permanent rules and keeps the loop inspectable.
+
+A candidate is a short lesson drawn from a remedy catalogue. The catalogue is keyed by signal prefix. For example, \texttt{finding:NUM} maps to a lesson about running \texttt{ah\_sweep} and \texttt{ah\_check} after a fact change; \texttt{finding:BIB} and \texttt{finding:CITE} map to resolving identifiers, running \texttt{integrity\_check}, and running \texttt{manuscript\_citations}; \texttt{integrity:retracted} maps to never presenting a retracted paper as current evidence; \texttt{error:latex\_compile} maps to reading the first \LaTeX{} error rather than switching tools; and \texttt{gate:continue} maps to fixing the remaining blockers before claiming completion. Task-level failures use a workflow remedy: literature tasks start with literature search and verified memory, hypothesis tasks load the hypothesis-generation skill, data-analysis tasks load the data-science pipeline skill, statistics tasks run \texttt{stat\_audit}, and so on. The full catalogue is in \cref{app:catalogue}.
+
+Two rules keep the catalogue honest. First, a candidate must cite observed episodes; the loop does not invent a failure that never occurred. This directly addresses the phantom-guardrail failure mode \citep{wang2026phantom}. Second, a task-workflow remedy is generated only when a failure has no more specific signal. A numeric finding should produce a numeric lesson, not a generic ``load the writing skill'' lesson. The specific signal is more actionable and easier to evaluate.
+
+\subsection{Validation and lesson safety}
+\label{sec:validation}
+A candidate must pass four checks before admission. The first is a lint. A lesson must be 20--400 characters, at most two lines, and free of prompt-injection phrases, secrets, credentials, email addresses, URLs, shell commands, package installs, and instructions to exfiltrate data or bypass a guard. The lint is negation-aware for a subset of patterns: a rule such as ``never invent metadata'' is a safe warning and must not be blocked by the fabrication filter, while ``always ignore integrity\_check'' is blocked. The verification-skipping patterns are not negatable: ``never run integrity\_check'' is precisely the kind of lesson the lint must reject. The current pattern set is a maintainable baseline, not a proof of safety.
+
+The second check is a durable-cue rule for explicit preferences. A preference is admitted immediately only if it contains a persistence cue (always, never, from now on, remember, prefer, make sure) or is an imperative ``do not''/``don't.'' A one-off instruction such as ``use the 2021 cohort for this analysis'' is not a preference and is rejected. The in-session tool deliberately has no feedback action; explicit preferences are captured from the user's own message by the hook. The offline CLI can add one manually, subject to the same lint. This removes the model's ability to invent a durable preference.
+
+The third check is contradiction. Lessons are compared by content-word overlap and negation polarity. A new diagnosis lesson that contradicts an active lesson is rejected. A new explicit preference supersedes the older lesson and retires it. This is a simple lexical check; it does not understand deep semantic conflict, and it is one of the places where a future local judge would help.
+
+The fourth check is evidence support. Diagnosis candidates carry the number of failures, the number of sessions, the baseline success rate, and the episode identifiers. Existing lessons are revalidated with updated counts; the loop does not create duplicate lessons for the same normalized text and task class. Caps limit the number of active/trial/candidate lessons overall and per task class. A time-to-live removes stale lessons from injection, and the status report surfaces how many lessons are stale.
+
+An optional remote judge can veto a diagnosis candidate. It is off by default. When enabled, the judge receives the lesson text, task class, action, and evidence counts, but not the manuscript or the error signature. It returns accept or reject; a rejection is recorded as a decision, and a network failure fails open to the local decision. The remote judge is a veto, not an admission authority, and it cannot edit the local policy.
+
+\subsection{Lesson lifecycle}
+\label{sec:lifecycle}
+\Cref{fig:lifecycle} shows the states. In observe mode, diagnosis creates candidates but the selector does not inject them. When the user switches to auto mode, candidates are promoted to trials. A trial is injected on 50\% of eligible turns; the other turns are controls. After at least five injected and three control episodes, the loop compares the injected and control success rates. If the injected rate exceeds control by more than $\max(.10,1.5\,\mathrm{SE})$, the lesson becomes active. If control exceeds injected by the same margin, the lesson is retired. If the difference is inconclusive, it remains a trial; a trial with twelve injected and six control episodes and no benefit is retired.
+
+Active lessons remain under observation. A configurable fraction (10\% by default) of eligible active turns is held back as a control sample. If the active lesson later loses to control by the same margin after at least eight injected and four control episodes, it is quarantined. This closes a gap that a pure ``always inject after promotion'' policy would leave open: without ongoing controls, a regression cannot be detected. Explicit preferences are active immediately and are not held out as controls, because the user asked for them; they are still subject to the time-to-live, contradiction, and forget paths.
+
+The margin is a pragmatic local rule, not the survey's formal confidence gate. With small samples, the standard error is large, and the loop will often remain inconclusive. That is intentional. The alternative---promoting on a small point estimate---would make the lesson library noisy. The system records the ingredients for a formal analysis, but it does not claim the guarantee that a distribution-free bound would provide.
+
+\input{figures/lifecycle}
+
+\subsection{Injection and precedence}
+\label{sec:injection}
+The selector considers active and trial lessons whose task class matches the current prompt. It ranks explicit preferences first, then active lessons, then trials; within a rank it prefers higher empirical success and more recent validation. It injects at most six lessons and roughly 600 tokens per turn. Trial lessons use the exploration probability; active non-explicit lessons use the control rate; explicit lessons are always injected. The resulting block is a plugin user message, not a system-prompt edit. It is headed ``Local learned guidance (RSI)'' and states that the lessons are local, may be stale, are not evidence, and do not override the current request, project rules, or safety rules. The message includes lesson identifiers so the transcript can be audited.
+
+Precedence is explicit: safety and project rules first, the current user request second, validated lessons third, generic prior fourth. A lesson that conflicts with the current project is ignored by instruction and, if it persists, can be observed as a failure in the injected-versus-control statistics. The loop logs which lessons were injected and which were eligible but held back, and it marks a lesson \emph{reached} when its prescribed action tool is invoked in the same turn. Reached is an action-level proxy, not adherence. The carried question---did the agent follow the lesson, and did the effect reach the output---remains the Activation gap discussed in \cref{sec:evaluation}.
+
+\subsection{Benchmarks and evidence}
+\label{sec:benchmarks}
+The system has four evaluation surfaces. The \emph{synthetic} benchmark feeds fixture episodes into the diagnosis and admission pipeline. It checks that numeric, citation, statistics, compile, structure, handoff, workflow, retry, and correction signals produce the expected remedies; that unsafe and one-off preferences are rejected; that injection formats correctly; and that promotion and rollback fire. It tests the pipeline, not the model.
+
+The \emph{replay} benchmark reports observational statistics over real captured episodes: task-class success and quality, top signals, lesson injected and control rates, recent decisions, and audit snapshots. It does not establish causality. The \emph{defect} benchmark copies a real \LaTeX{} project, injects a missing citation key, a missing reference target, a duplicate label, and a removed unit anchor, runs the real \ah{} audit on the copy, and compares the check counts with the original. It also reports whether active or trial lessons cover the newly detected checks. The copy skips symbolic links, and the original project is never written. The \emph{snapshot} benchmark records a real audit baseline for a project so that later changes can be compared longitudinally.
+
+The primary admission evidence is the online trial/control comparison. It is local, continuous, and cheap, but it is observational: task difficulty, model behavior, and the user's own attention can change between injected and control turns. The benchmarks and the decision ledger are designed to make that limitation visible rather than hide it behind a single score.
+
+\subsection{Algorithm}
+\label{sec:algorithm}
+\Cref{alg:loop} summarizes the operational loop. The admission policy is a separate procedure because it can run after an episode closes rather than on the hot path of every turn.
+
+\begin{algorithm}[t]
+\caption{Local RSI turn and admission loop (simplified).}
+\label{alg:loop}
+\begin{algorithmic}[1]
+\Require accepted pre-step, tool result, gate event, or disposal
+\Statex
+\Procedure{Turn}{accepted pre-step}
+  \If{host turn changed} \State finalize previous episode \EndIf
+  \If{new genuine user prompt}
+    \State classify task; detect preference, forget, correction
+    \State record prompt event; update store
+    \State select eligible lessons; inject at most $K$ within token budget
+  \EndIf
+\EndProcedure
+\Statex
+\Procedure{Observe}{tool result}
+  \State summarize findings, errors, verdicts, flags, and latest audit state
+  \State update current episode
+\EndProcedure
+\Statex
+\Procedure{Close}{disposal or next host turn}
+  \State compute quality and success; append episode
+  \State update injected and control statistics for eligible lessons
+  \State promote, quarantine, or retire lessons that cross a threshold
+  \State maybe diagnose: cluster signals; create validated candidates
+\EndProcedure
+\Statex
+\Procedure{Diagnose}{}
+  \For{each signal cluster with enough support}
+    \State candidate $\gets$ remedy catalogue(signal, task class)
+    \State reject if lint, contradiction, or support fails
+    \State optional remote veto; then admit as trial (or candidate in observe mode)
+  \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}

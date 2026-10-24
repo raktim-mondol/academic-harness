@@ -1,0 +1,23 @@
+\begin{table}[t]
+\centering
+\scriptsize
+\caption{Cold-start audit of nine real documents. All nine gates failed. \texttt{BIB-02} and \texttt{NUM-001} are expected in part because the migration overlay starts with an empty source registry and no bound facts; the table therefore measures the signal stream the RSI would see in a cold-start project, not final manuscript quality.}
+\label{tab:corpus-experiments}
+\begin{tabularx}{\linewidth}{@{}l l r r r r r >{\raggedright\arraybackslash}X@{}}
+\toprule
+Doc & Type & Units & Cites & Bib & Find. & Block. & Families \\
+\midrule
+M1 & manuscript & 20 & 79 & 85 & 147 & 45 & BIB, NUM, PRF \\
+M2 & manuscript & 118 & 53 & 36 & 251 & 3 & BIB, EVD, LAT, NUM, PRF, STY \\
+M3 & manuscript & 70 & 42 & 26 & 159 & 3 & BIB, EVD, LAT, NUM, PRF \\
+P1 & proposal & 39 & 54 & 29 & 53 & 12 & BIB, EVD, NUM, PRF, UNIT \\
+P2 & proposal & 116 & 134 & 61 & 173 & 11 & BIB, EVD, NUM, PRF \\
+P3 & proposal & 137 & 60 & 23 & 162 & 12 & BIB, EVD, NUM, PRF, STY, UNIT \\
+P4 & proposal & 44 & 59 & 14 & 48 & 12 & BIB, EVD, NUM, PRF, UNIT \\
+P5 & proposal & 66 & 63 & 21 & 49 & 12 & BIB, EVD, NUM, PRF, UNIT \\
+P6 & proposal & 80 & 40 & 21 & 116 & 12 & BIB, EVD, NUM, PRF, UNIT \\
+\midrule
+Total & 3M+6P & 690 & 584 & 316 & 1158 & 122 & BIB/NUM/PRF (9); EVD (8); UNIT (5); LAT/STY (2) \\
+\bottomrule
+\end{tabularx}
+\end{table}

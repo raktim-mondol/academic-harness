@@ -1,0 +1,120 @@
+\section{Implementation}
+\label{sec:implementation}
+
+\subsection{Plugin integration}
+\label{sec:plugin-integration}
+\system{} is implemented as a first-party module set in the \ah{} plugin. It does not modify the vendored \texttt{ah} engine. The preset mounts two additional rows: \texttt{academic-harness/rsi}, which registers the \texttt{ah\_rsi} tool, and \texttt{academic-harness/rsi-hooks}, which registers the lifecycle hooks. The package exports the new modules and exposes an offline binary, \texttt{academic-harness-rsi}. The preset patch is generated from \texttt{presets/academic-harness/agent.cordis.yml}; a stale patch fails the build check.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Implementation modules and responsibilities.}
+\label{tab:modules}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+Module & Responsibility \\
+\midrule
+\texttt{rsi-store.js} & Local paths, configuration, JSONL append and read, lock, atomic metadata, lesson identifiers, project keys, oracle manifest, risk metadata. \\
+\texttt{rsi-core.js} & Task classifier, prompt and tool summaries, outcome score, diagnosis, remedy catalogue, lint and contradiction checks, admission, injection, lifecycle statistics, remote veto, reports. \\
+\texttt{rsi-hooks.js} & Host lifecycle hooks, turn and episode state, preference and correction capture, gate subscription, lesson injection, injected-token and reached tracking, finalization, fail-soft behavior. \\
+\texttt{rsi-bus.js} & Minimal in-process gate event bus between the existing \ah{} hook and the RSI hook. \\
+\texttt{rsi.js} & \texttt{ah\_rsi} in-session tool, including explicit rollback. \\
+\texttt{rsi-benchmark.js} & Synthetic pipeline benchmark, replay, defect injection, audit snapshots. \\
+\texttt{academic-harness-rsi-cli.js} & Offline status, report, lessons, diagnose, feedback, forget, inject, benchmark, export, config, purge. \\
+\texttt{scripts/test-rsi.mjs} & 96 implementation checks. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Capture and host lifecycle}
+\label{sec:host-lifecycle}
+The existing plugin already mounts \texttt{agent/\allowbreak pre-step}, \texttt{tools/\allowbreak post-execute}, and \texttt{agent/\allowbreak turn-stopping} handlers for the writing oracle. The RSI hooks add their own handlers rather than changing the oracle handlers. The only change to the existing hook module is a single call that publishes the gate decision to the bus. This keeps the writing loop's behavior independent of RSI: if the RSI store is unavailable, the hook logs and disables itself; the paper-state card, guard, post-edit check, and gate continue to run.
+
+The host lifecycle has two subtle properties that shaped the implementation. First, \texttt{agent/\allowbreak pre-step} can run many times in one user turn. A tool step may carry no new user message. The hook uses the host turn number to decide when a turn starts, and it processes a new prompt only when genuine user text appears. A rejected pre-step is ignored. Without this, a tool-using turn can be split into an empty second episode, and the exploration seed for trial lessons becomes a constant. The synthetic tests include an empty tool step and a rejected pre-step specifically to prevent a regression.
+
+Second, the writing gate can steer the agent to continue, hand off, or pass. The gate events are published on the bus. The RSI turn remains open until the next user turn or agent disposal, so a gate continue followed by a later pass clears the gate state instead of leaving a stale failure. A turn is not closed at the first \texttt{turn-stopping} event, because that event can precede a gate-driven continuation. The implementation closes on the next host turn or on disposal; this preserves the whole turn and attaches gate events to the correct episode.
+
+Tool capture reduces results rather than storing them. For an \texttt{ah\_check} or \texttt{ah\_audit} result, the parser extracts finding identifiers and levels, the gate result, and the latest finding count. For an integrity check it extracts the verdict. For citation, statistics, figure, and reproducibility tools it extracts issue counts. For any error it stores a normalized, path-redacted signature. The event log records counts, identifiers, a result hash, and the tool name; it does not record the manuscript or the full output. A clean later audit replaces the blocking and finding counts, which is necessary for a fixed-then-passed turn to count as a success. Each episode now records an oracle manifest (plugin version, engine version, prompt/hook/audit hashes), the injected token count, and the set of lessons whose prescribed action was reached. A lesson is marked reached when its action tool is invoked in the same turn; this is an action-level proxy, not proof that the agent followed the lesson or that the outcome improved. Lessons carry a target, a risk tier, and a release requirement; current lessons are T1 advisory lessons with no release requirement. \texttt{ah\_rsi rollback} and the CLI \texttt{rollback} command retire a lesson explicitly.
+
+\subsection{Local store}
+\label{sec:store}
+The store is an append-only JSONL design under \texttt{\$DSH\_HOME/ah-rsi}. The top-level files are \texttt{events.jsonl}, \texttt{episodes.jsonl}, \texttt{lessons.jsonl}, and \texttt{decisions.jsonl}; benchmark records live under \texttt{benchmarks/}. Lesson snapshots are full records, and the current state is the latest snapshot per identifier. A short directory lock serializes admission and admission-related writes across sessions and the CLI. Configuration and metadata are written atomically. There is no database server and no network dependency.
+
+The store is intentionally small and boring. Append-only lessons preserve a full audit trail; a corrupted tail line is tolerated; decisions record why a lesson was admitted, rejected, promoted, quarantined, or retired. The CLI can export lessons, decisions, and summary counts without exporting raw events, and it can purge the store. A user-level store is the default because the plugin is used by one person across projects; lessons are scoped by task class rather than by a global model of all users.
+
+\begin{lstlisting}[style=json,caption={Abridged lesson record. The text is the only learned artifact; the rest is evidence and lifecycle state.},label={lst:lesson}]
+{
+  "id": "L7c1a0f2b9d",
+  "text": "When a data-derived fact changes, run ah_sweep and ah_check.",
+  "task_class": "manuscript",
+  "scope": "user",
+  "source": "diagnosis",
+  "target": "lesson", "risk_tier": 1, "requires_release": false,
+  "status": "trial",
+  "inject_probability": 0.5,
+  "evidence": { "support": 4, "total": 5, "sessions": 3,
+                "episode_ids": ["a1-0", "a1-1", "b2-0"] },
+  "stats": { "injected": 2, "injected_success": 1,
+             "control": 1, "control_success": 0,
+             "reached": 1, "reached_success": 1 }
+}
+\end{lstlisting}
+
+\subsection{Learning engine}
+\label{sec:engine}
+The classifier is a weighted keyword scorer over normalized user text. It is deliberately not a model call: it runs on every prompt, costs no tokens, and is deterministic. The scoring rules and class list are in \texttt{rsi-core.js}. The classifier returns a primary class and up to eight matched terms; short follow-ups inherit the previous class when no rule fires. The taxonomy is a routing heuristic, not a claim about the structure of research.
+
+The outcome scorer is a pure function over the turn state. It uses the latest audit state, the gate state, tool errors, correction markers, and the issue flags. It returns a quality score in $[0,1]$, a boolean success, a substantive flag, and a signal list. The signal list is the input to diagnosis. The score is intentionally conservative: a turn with a pending blocker or a gate continue is not a success even if its prose is otherwise clean.
+
+Diagnosis groups signals across the last 500 episodes. A candidate must meet the support, session, and failure-rate thresholds. The remedy catalogue is a static table; this is a deliberate limitation. The system does not ask a model to invent a lesson from a trace. A template is safer, easier to lint, and easier to audit. The task-level workflow remedies are longer and name a skill or tool family; the signal-level remedies are short and name a concrete action. The catalogue is extended by editing the module, which keeps lesson generation under normal code review.
+
+The lesson lifecycle is implemented as append-only snapshots plus decisions. Trial injection is deterministic per turn and lesson: the selector hashes the session identifier, lesson identifier, and turn hash to decide whether to inject. This makes the trial/control assignment reproducible for a given turn, while varying across turns. Active control sampling uses a separate salt. The promotion and quarantine thresholds are computed from the stored stats; no model is involved.
+
+\subsection{Tool and CLI}
+\label{sec:tool-cli}
+The in-session tool is intentionally small. It exposes status, report, lessons, diagnose, forget, inject preview, and config. It has no feedback action: explicit preferences are captured from the user's message by the hook, and the model cannot create a durable preference. It also has no author gate, because lesson admission is autonomous. The tool never exposes a purge or code-edit action.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Offline CLI commands. All commands operate on the local store; none sends manuscript text.}
+\label{tab:cli}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}X@{}}
+\toprule
+Command & Purpose \\
+\midrule
+\texttt{status}, \texttt{report} & Mode, store, episode counts, task classes, lesson states, stale lessons, recurring signals, decisions. \\
+\texttt{lessons}, \texttt{inject} & List lessons; preview the block that would be injected for a task class. \\
+\texttt{diagnose} & Run diagnosis and auto-admission; print created, revalidated, rejected, and retired lessons. \\
+\texttt{feedback}, \texttt{forget} & Manual durable preference; retire by identifier or pattern. \\
+\texttt{benchmark synthetic} & Fast deterministic test of the learning pipeline. \\
+\texttt{benchmark replay} & Observational statistics over real episodes. \\
+\texttt{benchmark defects} & Inject known \LaTeX{} defects into a copy and run the real audit. \\
+\texttt{benchmark snapshot} & Record a real audit baseline for a project. \\
+\texttt{export}, \texttt{config}, \texttt{purge} & Export lessons and decisions; show effective configuration; delete the store with \texttt{--yes}. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Benchmarks}
+\label{sec:benchmarks-impl}
+The synthetic benchmark constructs fixture episodes for each signal family, runs the real diagnosis and admission code in a temporary store, and asserts that the expected remedy appears, that unsafe and one-off preferences are rejected, that injection formats correctly, and that promotion and quarantine fire. It does not call a model. The replay benchmark reads the local episode log and reports task-class success, quality, top signals, injected and control rates, recent decisions, and audit snapshots. The defect benchmark copies a real project, skips symbolic links, injects four defects, runs the real \texttt{ah} audit on the copy, compares the check counts, and checks whether the lesson catalogue covers the new checks. The snapshot benchmark records a real audit baseline. The original project is never modified.
+
+\subsection{Tests and integration checks}
+\label{sec:tests}
+The RSI test script contains 96 checks. It covers:
+\begin{itemize}[leftmargin=1.4em,itemsep=1pt]
+  \item task classification and short-follow-up inheritance;
+  \item lesson linting, including prompt injection, shell, URL, email, fake verification, and negated safe rules;
+  \item durable-cue and one-off preference rejection;
+  \item tool-result parsing, path-redacted error signatures, and verdict scoping;
+  \item outcome scoring, including gate continue and correction-only reasoning turns;
+  \item synthetic diagnosis, admission, injection, promotion, quarantine, caps, and observe-mode promotion;
+  \item remote-veto integration and missing-URL fail-open;
+  \item hook behavior: one episode per user turn, empty tool steps, rejected pre-steps, gate attachment, latest-clean-audit clearing;
+  \item activation and cost: reached action matching, injected-token accounting, oracle manifest, risk metadata, and explicit rollback;
+  \item defect injection, symlink skipping, and outside-file integrity;
+  \item lock callback errors, non-Latin lesson identifiers, and CLI status/report/rollback/synthetic paths;
+  \item preset, package, prompt, skill, and documentation wiring.
+\end{itemize}
+The rest of the plugin's offline suites continue to pass. The implementation was also exercised on a scaffolded \ah{} project for the real defect benchmark, described in \cref{sec:results}.

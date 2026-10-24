@@ -1,0 +1,10 @@
+{"id":"HD01","text":"Always double-check the sample size before reporting power.","label":"durable"}
+{"id":"HD02","text":"Never cite a paper you have not opened.","label":"durable"}
+{"id":"HD03","text":"From now on, use the project's canonical glossary.","label":"durable"}
+{"id":"HD04","text":"Remember to run the integrity check on every DOI.","label":"durable"}
+{"id":"HD05","text":"Make sure the data availability statement names the repository.","label":"durable"}
+{"id":"HO01","text":"Use the second table for the main result.","label":"oneoff"}
+{"id":"HO02","text":"Run the model on GPU 2.","label":"oneoff"}
+{"id":"HO03","text":"Cite the 2023 review in the introduction.","label":"oneoff"}
+{"id":"HO04","text":"Check the figure on page 7.","label":"oneoff"}
+{"id":"HO05","text":"Use the attached bibliography for this draft.","label":"oneoff"}

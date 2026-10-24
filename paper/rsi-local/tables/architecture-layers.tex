@@ -1,0 +1,21 @@
+\begin{table}[t]
+\centering
+\scriptsize
+\caption{Mapping of the general harness-plugin RSI blueprint to the implemented system. The architecture implements the core layers for lesson-level interpreted state. It deliberately does not implement versioned skills, global promotion, or executable changes.}
+\label{tab:layers}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{0.28\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Layer & Implementation & Status \\
+\midrule
+Capture & Host hooks, gate bus, structured tool and outcome summaries & Implemented. Raw manuscripts and full tool outputs are not stored. \\
+Experience store & Append-only JSONL, lesson snapshots, decisions, oracle manifest, risk metadata & Implemented. No database server; local lock. \\
+Diagnosis and proposal & Signal clustering, remedy catalogue, task-workflow fallbacks & Implemented as a rule-based proposer. A learned proposer is deferred. \\
+Frozen evaluator & Deterministic \ah{} audit, synthetic and corpus benchmarks, oracle manifest & Implemented for deterministic checks. A formal held-out production gate is deferred. \\
+Admission & Trial/control, promotion, quarantine, retirement, caps, TTL, explicit rollback & Implemented with a heuristic margin. No formal PAC guarantee; no author approval by design. \\
+Activation & Task-class lesson injection, token budget, precedence, reached proxy & Implemented for lessons. Versioned skills and a semantic adherence metric are deferred. \\
+Observability & Status, report, cost, reached counts, risk tiers, decisions, export, purge & Implemented. A drift dashboard and encryption at rest are deferred. \\
+Contract & Hooks, \texttt{ah\_rsi} tool, CLI, \texttt{rollback} & Implemented. \texttt{diagnose} collapses propose, evaluate, and admit; manual capture is not exposed. \\
+Risk tiers & T0 observe; T1 local lessons; T2 local skills/policies; T3 global prompt/skill; T4 executable code & T0--T1 implemented and autonomous; T2 deferred; T3--T4 out of scope. \\
+\bottomrule
+\end{tabularx}
+\end{table}

@@ -1,0 +1,27 @@
+\begin{figure}[t]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  node distance=16mm and 24mm,
+  state/.style={draw, rounded corners=6pt, minimum width=26mm, minimum height=11mm, align=center, fill=white},
+  terminal/.style={state, fill=black!6},
+  arrow/.style={-{Latex[length=2mm]}, thick},
+  note/.style={font=\scriptsize, align=center}
+]
+  \node[state] (candidate) {candidate\\[1pt]\scriptsize observe mode};
+  \node[state, right=of candidate] (trial) {trial\\[1pt]\scriptsize 50\% injected / 50\% control};
+  \node[state, right=of trial] (active) {active\\[1pt]\scriptsize 90\% injected / 10\% control};
+  \node[state, below=of active] (quarantine) {quarantined\\[1pt]\scriptsize not injected};
+  \node[terminal, below=of trial] (retired) {retired\\[1pt]\scriptsize kept for audit};
+
+  \draw[arrow] (candidate) -- node[above, note] {auto mode} (trial);
+  \draw[arrow] (trial) -- node[above, note] {$\hat p_{\mathrm{inj}}-\hat p_{\mathrm{ctl}}>\delta$\\$n_{\mathrm{inj}}\ge5,n_{\mathrm{ctl}}\ge3$} (active);
+  \draw[arrow] (trial) -- node[left, note] {loss, no benefit,\\cap, forget, TTL} (retired);
+  \draw[arrow] (active) -- node[right, note] {degradation\\$n_{\mathrm{inj}}\ge8,n_{\mathrm{ctl}}\ge4$} (quarantine);
+  \draw[arrow] (active) -- node[above, note, sloped] {forget, TTL, cap} (retired);
+  \draw[arrow] (quarantine) -- node[below, note] {forget, cap} (retired);
+\end{tikzpicture}}
+\caption{Lesson lifecycle. Diagnosis lessons start as trials; explicit user preferences start active. Admission, quarantine, and retirement use the injected-versus-control success rate with a margin derived from the standard error. Caps, TTL, forget, and explicit contradictions also retire lessons.}
+\label{fig:lifecycle}
+\end{figure}

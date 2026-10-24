@@ -1,0 +1,52 @@
+\section{Evaluation}
+\label{sec:evaluation}
+
+\subsection{Questions and scope}
+\label{sec:questions}
+The evaluation asks five implementation questions:
+\begin{description}[leftmargin=1.5em,itemsep=2pt]
+  \item[RQ1 (capture).] Does the hook layer produce one episode per accepted user turn, tolerate empty tool steps and rejected pre-steps, and attach gate decisions correctly?
+  \item[RQ2 (diagnosis and safety).] Does diagnosis turn recurring signals into the expected remedies, and does the validator reject unsafe, one-off, contradictory, or unsupported lessons?
+  \item[RQ3 (lifecycle).] Do trials receive both injected and control episodes, and do promotion, quarantine, retirement, caps, and observe-mode promotion behave as specified?
+  \item[RQ4 (oracle integration).] Does the defect benchmark detect injected \LaTeX{} defects through the real audit, and does it reveal gaps in the lesson catalogue without modifying the original project?
+  \item[RQ5 (real corpus).] Does the loop operate on a multi-document corpus, detect injected defects, transfer lessons across documents, and what do routing and held-out safety tests show?
+\end{description}
+This is an implementation validation, not a controlled study of research quality. We did not run a live model session with a blinded human evaluation, and we do not claim that the lessons improve papers. The survey's criteria are used to state that boundary precisely.
+
+\subsection{Results}
+\label{sec:results}
+\Cref{tab:results} summarizes the validation. The RSI test script contains 96 checks and passes. The plugin's other 16 offline suites (including the academic-harness adapter, manuscript and non-search tools, citation formatting, integrity, grants, registries, review store, review tool, search normalization, and zg exclusions) also pass. These checks exercise the integration surfaces that the RSI rows touch: preset composition, package exports, prompt markers, tool registration, hook translation, and the existing writing loop. The real-corpus experiments follow in \cref{sec:corpus}.
+
+\input{tables/results}
+
+The synthetic pipeline benchmark creates fixture episodes for numeric findings, citation and integrity failures, statistical flags, compile errors, \LaTeX{} structure findings, gate handoffs, workflow failures, retries, and user corrections, plus explicit and unsafe preferences. On the current catalogue it creates ten lessons and passes all fourteen cases, including injection formatting, automatic promotion, and automatic rollback. This establishes that the diagnosis, admission, and lifecycle code executes its intended transitions on controlled inputs. It does not establish that the lessons are useful on real research tasks.
+
+The hook tests exercise the host lifecycle directly. A tool-using turn with an empty second step produces one episode, one user-turn event, and one injection event. A rejected pre-step produces no event. A gate continue attaches to the open episode and prevents a success verdict. A first audit with a blocker followed by a clean audit clears the blocking count and the latest finding count; the turn then scores as a success. This last check matters because an incremental writing gate is often run several times in one turn, and a fixed finding must not be counted forever. The activation/cost test injects a statistics lesson, invokes \texttt{stat\_audit}, and records the lesson as reached plus a positive injected-token count. This is an action-level proxy; it does not show that the agent followed the lesson or that the outcome improved.
+
+The defect benchmark was run on a scaffolded \ah{} project with a small introduction, a known bibliography key, and one unit anchor. The baseline audit reported six findings. After injecting a missing citation key, a missing \verb|\ref| target, a duplicate label, and a removed unit anchor, the audit on the temporary copy reported eleven findings. The newly detected checks were \texttt{BIB-01}, \texttt{BIB-05}, \texttt{TEX-02}, \texttt{TEX-03}, and \texttt{UNIT-01}. With an empty lesson store, coverage was 0/5; after adding one \LaTeX{} structure lesson, coverage was 2/5 (\texttt{TEX-02} and \texttt{TEX-03}). Coverage is a property of the active lesson set and the remedy catalogue, not evidence that the agent fixed the defects. The original project was not modified, and a symbolic link placed in the fixture was not copied.
+
+
+
+\input{sections/06b-corpus}
+
+\subsection{Self-assessment against the survey criteria}
+\label{sec:self-assessment}
+\Cref{tab:self-assessment} applies the survey's four claims to the evidence we can currently produce. The implementation is strongest on making the update process inspectable: every lesson has a source, evidence counts, a state, and a decision record. It is weakest on the claims that require a controlled comparison.
+
+\emph{Selection} is partial. The loop logs the episodes used to propose a lesson, the admission decision, and the trial/control outcomes. The corpus experiment adds a project-level leave-one-project-out split for lesson coverage: lessons learned from other documents are tested on the held-out document. That is stronger than a within-document test, but the same task stream can still influence proposal and admission, and there is no separate reporting partition or reusable holdout. A future study should reserve entire projects for reporting and log every access.
+
+\emph{Activation} is partial. The implementation logs that a lesson was eligible and injected, includes the lesson identifiers in the injected block, records the injected token count, and marks a lesson \emph{reached} when its prescribed action tool is invoked in the same turn. The corpus experiment measures the token budget and catalogue coverage. This is not \emph{carried} evidence: it does not show that the agent followed the lesson or that the effect reached the output. The survey's available/reached/carried distinction is the right vocabulary here; the system now has available and reached evidence, but no carried evidence \citep{wei2026harnessrsi}. Instrumenting adherence is the next natural step.
+
+\emph{Attribution} is partial. Injected and control turns share the same harness and task class, and the injection decision is randomized. But there are no repeated rollouts, no variance estimate, no matched inference budget, and no placebo arm. The corpus defect result is an oracle property---the audit detects injected defects---not an attribution of a lesson to a fixed defect. The user's task mix and attention can change between arms. The local comparison is useful for deciding whether to keep a lesson, but it is not a causal estimate.
+
+\emph{Improvement} is not established. The corpus experiment shows that the real audit detects injected defects and that leave-one-project-out lessons cover the specific check families; it does not show that the agent follows a lesson, fixes a defect, or improves a held-out paper. The routing and held-out safety results are negative: 56.7\% routing accuracy and 0.53 safety F1. A credible improvement claim requires a pre-registered evaluation with blinded human review, repeated runs, matched compute, and cost accounting.
+
+\input{tables/evaluation}
+
+\subsection{Threats to validity}
+\label{sec:threats}
+The main threat is the absence of a live model study. The current evidence is code-level and pipeline-level. A second threat is the local judge: the weights in \cref{eq:quality} are design choices, not calibrated utilities, and a different weighting could change promotion decisions. The judge is also blind to research quality: a fluent but unsupported paragraph can pass the tool checks, and a careful but slow analysis can accumulate errors. Third, the samples are small. The promotion and quarantine thresholds are heuristic, and the system may take many turns to reach a decision. Fourth, the task classifier is keyword-based and English-centric; a Chinese, Arabic, or highly technical prompt may fall into the general class. Fifth, the corpus is nine documents from one user's machine, and the audits are cold-start overlays: an empty source registry and no bound facts inflate \texttt{BIB-02} and \texttt{NUM-001}. The corpus findings therefore describe the cold-start signal stream, not final manuscript quality. Sixth, the 30 routing labels are hand-authored, and the safety held-out set is small (20 examples); both estimates are descriptive. Seventh, the PDF integrity sample is small and network-dependent. Eighth, the remote judge is optional and was not evaluated; its veto can only remove candidates, not improve them. Ninth, the implementation was tested on Linux; symbolic-link behavior and store locking on other platforms were not exercised. Finally, the system has no measure of user trust, over-reliance, or long-term skill drift.
+
+\subsection{What the results do and do not show}
+\label{sec:what-results-show}
+The results show that the loop is implemented end to end: it captures structured outcomes, diagnoses them, admits and injects lessons, tracks injected and control outcomes, and exposes the state through a tool and a CLI. On the nine-document corpus, all 31 injected defects were detected, leave-one-project-out lessons covered 23/23 specific finding families, and the specific lesson set cost about 3.9$\times$ a generic lesson. The development safety set is perfect, but the held-out paraphrase set is not (F1 0.53), and task routing is 56.7\%. These are genuine limits, not footnotes. They do not show that the lessons improve research; that claim is deliberately left to a controlled study, and the system now records the data such a study would need.

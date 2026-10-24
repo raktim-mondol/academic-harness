@@ -1,0 +1,486 @@
+\begin{thebibliography}{58}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[{Academic Harness Project}(2026)]{academicharness2026}
+{Academic Harness Project}.
+\newblock {Academic Harness}: A {DeepSeek} harness plugin for scientific
+  research.
+\newblock \url{https://github.com/raktim-mondol/academic-harness}, 2026.
+\newblock Version 0.21.0.
+
+\bibitem[Agrawal et~al.(2026)Agrawal, Tan, Soylu, Ziems, Khare, Opsahl-Ong,
+  Singhvi, Shandilya, Ryan, Jiang, Potts, Sen, Dimakis, Stoica, Klein, Zaharia,
+  and Khattab]{agrawal2026gepa}
+Lakshya~A Agrawal, Shangyin Tan, Dilara Soylu, Noah Ziems, Rishi Khare, Krista
+  Opsahl-Ong, Arnav Singhvi, Herumb Shandilya, Michael~J Ryan, Meng Jiang,
+  Christopher Potts, Koushik Sen, Alexandros~G. Dimakis, Ion Stoica, Dan Klein,
+  Matei Zaharia, and Omar Khattab.
+\newblock {GEPA}: Reflective prompt evolution can outperform reinforcement
+  learning.
+\newblock In \emph{The Fourteenth International Conference on Learning
+  Representations}, 2026.
+\newblock URL \url{https://openreview.net/forum?id=RQm2KQTM5r}.
+\newblock Oral.
+
+\bibitem[Aleithan et~al.(2024)Aleithan, Xue, Mohajer, Nnorom, Uddin, and
+  Wang]{aleithan2024swebenchplus}
+Reem Aleithan, Haoran Xue, Mohammad~Mahdi Mohajer, Elijah Nnorom, Gias Uddin,
+  and Song Wang.
+\newblock {SWE-Bench+}: Enhanced coding benchmark for {LLMs}, 2024.
+\newblock URL \url{https://arxiv.org/abs/2410.06992}.
+
+\bibitem[Asadolahi et~al.(2026)Asadolahi, Amini, Talebi, Farhadi, and
+  Zamanifar]{asadolahi2026inflation}
+Mohammad Asadolahi, Amir Amini, Samira Talebi, Amirfarhad Farhadi, and Azadeh
+  Zamanifar.
+\newblock Memory reward inflation in self-improving {LLM} agents, 2026.
+\newblock URL \url{https://arxiv.org/abs/2608.00017}.
+
+\bibitem[Blum and Hardt(2015)]{blum2015ladder}
+Avrim Blum and Moritz Hardt.
+\newblock The ladder: A reliable leaderboard for machine learning competitions.
+\newblock In \emph{International Conference on Machine Learning}, volume~37,
+  pages 1006--1014. PMLR, 2015.
+
+\bibitem[Cai et~al.(2026)Cai, Zhang, Jia, Zheng, Xue, Song, Tian, and
+  Guo]{cai2026moss}
+Qianshu Cai, Yonggang Zhang, Xianzhang Jia, Huajiang Zheng, Wei Xue, Jun Song,
+  Xinmei Tian, and Yike Guo.
+\newblock {MOSS}: Self-evolution through source-level rewriting in autonomous
+  agent systems, 2026.
+\newblock URL \url{https://arxiv.org/abs/2605.22794}.
+\newblock arXiv preprint.
+
+\bibitem[Cawley and Talbot(2010)]{cawley2010overfitting}
+Gavin~C Cawley and Nicola~LC Talbot.
+\newblock On over-fitting in model selection and subsequent selection bias in
+  performance evaluation.
+\newblock \emph{The Journal of Machine Learning Research}, 11:\penalty0
+  2079--2107, 2010.
+
+\bibitem[Chen et~al.(2026{\natexlab{a}})Chen, Wang, Liu, Wang, Zheng, and
+  Wang]{chen2026harnessfix}
+Mengzhuo Chen, Junjie Wang, Zhe Liu, Yawen Wang, Haiming Zheng, and Qing Wang.
+\newblock From failed trajectories to reliable {LLM} agents: Diagnosing and
+  repairing harness flaws, 2026{\natexlab{a}}.
+\newblock URL \url{https://arxiv.org/abs/2606.06324}.
+
+\bibitem[Chen et~al.(2026{\natexlab{b}})Chen, Lu, Zhao, Meng, Teng, Li, Li,
+  Liu, Liang, Zhang, Xie, Qu, Shao, and Luan]{chen2026harnessx}
+Tingyang Chen, Shuo Lu, Kang Zhao, Weicheng Meng, Hanlin Teng, Tianhao Li, Chao
+  Li, Xule Liu, Jian Liang, Zhizhong Zhang, Yuan Xie, Heng Qu, Kun Shao, and
+  Jian Luan.
+\newblock {HarnessX}: A composable, adaptive, and evolvable agent harness
+  foundry, 2026{\natexlab{b}}.
+\newblock URL \url{https://arxiv.org/abs/2606.14249}.
+\newblock arXiv preprint.
+
+\bibitem[{DeepSeek-AI}(2026)]{deepseek2026harness}
+{DeepSeek-AI}.
+\newblock {DeepSeek} harness developer preview.
+\newblock \url{https://www.deepseek.com/harness/en/}, 2026.
+\newblock Product/developer-preview page.
+
+\bibitem[Dwork et~al.(2015)Dwork, Feldman, Hardt, Pitassi, Reingold, and
+  Roth]{dwork2015reusable}
+Cynthia Dwork, Vitaly Feldman, Moritz Hardt, Toniann Pitassi, Omer Reingold,
+  and Aaron Roth.
+\newblock The reusable holdout: Preserving validity in adaptive data analysis.
+\newblock \emph{Science}, 349\penalty0 (6248):\penalty0 636--638, 2015.
+
+\bibitem[Fang et~al.(2026)Fang, Liang, Wang, Wu, Qiao, Xie, Huang, Chen, and
+  Zhang]{fang2026memp}
+Runnan Fang, Yuan Liang, Xiaobin Wang, Jialong Wu, Shuofei Qiao, Pengjun Xie,
+  Fei Huang, Huajun Chen, and Ningyu Zhang.
+\newblock Memp: Exploring agent procedural memory.
+\newblock In \emph{Findings of the Association for Computational Linguistics:
+  ACL 2026}, pages 17490--17502, San Diego, California, United States, July
+  2026. Association for Computational Linguistics.
+\newblock \doi{10.18653/v1/2026.findings-acl.866}.
+
+\bibitem[Guo et~al.(2026)Guo, Cao, Yuan, Wang, Wang, and
+  Wang]{guo2026selfverification}
+Diandian Guo, Cong Cao, Fangfang Yuan, Yingqi Wang, Yueshan Wang, and Dakui
+  Wang.
+\newblock Self-authored verification is unreliable in heuristic self-improving
+  agents, 2026.
+\newblock URL \url{https://arxiv.org/abs/2607.24300}.
+
+\bibitem[Hardt et~al.(2016)Hardt, Recht, and Singer]{hardt2016train}
+Moritz Hardt, Benjamin Recht, and Yoram Singer.
+\newblock Train faster, generalize better: Stability of stochastic gradient
+  descent.
+\newblock In \emph{International Conference on Machine Learning}, volume~48,
+  pages 1225--1234. PMLR, 2016.
+
+\bibitem[Hoeffding(1963)]{hoeffding1963probability}
+Wassily Hoeffding.
+\newblock Probability inequalities for sums of bounded random variables.
+\newblock \emph{Journal of the American Statistical Association}, 58\penalty0
+  (301):\penalty0 13--30, 1963.
+
+\bibitem[Kapoor et~al.(2025)Kapoor, Stroebl, Siegel, Nadgir, and
+  Narayanan]{kapoor2025matter}
+Sayash Kapoor, Benedikt Stroebl, Zachary~S. Siegel, Nitya Nadgir, and Arvind
+  Narayanan.
+\newblock {AI} agents that matter.
+\newblock \emph{Transactions on Machine Learning Research}, 2025.
+
+\bibitem[Khattab et~al.(2024)Khattab, Singhvi, Maheshwari, Zhang, Santhanam,
+  Vardhamanan, Haq, Sharma, Joshi, Moazam, Miller, Zaharia, and
+  Potts]{khattab2024dspy}
+Omar Khattab, Arnav Singhvi, Paridhi Maheshwari, Zhiyuan Zhang, Keshav
+  Santhanam, Sri Vardhamanan, Saiful Haq, Ashutosh Sharma, Thomas~T. Joshi,
+  Hanna Moazam, Heather Miller, Matei Zaharia, and Christopher Potts.
+\newblock {DSPy}: Compiling declarative language model calls into
+  state-of-the-art pipelines.
+\newblock In \emph{The Twelfth International Conference on Learning
+  Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=PFS4ffN9Yx}.
+
+\bibitem[Li et~al.(2026)Li, Zhou, Teng, Yang, Deng, Lyu, Dong, Chen, and
+  An]{li2026rightfit}
+Yixuan Li, Yiyun Zhou, Yao~Long Teng, Fuchao Yang, Yanchen Deng, Zhiyi Lyu,
+  Xuyu Dong, Feng Chen, and Bo~An.
+\newblock Finding the right fit: Model-harness interactions across agent tasks,
+  2026.
+\newblock URL \url{https://arxiv.org/abs/2610.00917}.
+
+\bibitem[Liu et~al.(2026)Liu, Yang, Jiang, Tang, Xiong, Luo, and
+  Li]{liu2026skillsvote}
+Hongyi Liu, Haoyan Yang, Tao Jiang, Bo~Tang, Feiyu Xiong, Yuyu Luo, and Zhiyu
+  Li.
+\newblock {SkillsVote}: Lifecycle governance of agent skills from collection,
+  recommendation to evolution, 2026.
+\newblock URL \url{https://arxiv.org/abs/2605.18401}.
+
+\bibitem[Luo et~al.(2026)Luo, Xue, Wang, Hu, and Deng]{luo2026harnessbank}
+Xiaotian Luo, Dizhan Xue, Fengxingyu Wang, Chuanrui Hu, and Yafeng Deng.
+\newblock {HarnessBank}: Semantic gene-bank search with gated verification for
+  agent-harness self-evolution, 2026.
+\newblock URL \url{https://arxiv.org/abs/2607.13683}.
+
+\bibitem[Ma et~al.(2026)Ma, Yang, Ji, Wang, Wang, Hu, Huang, and
+  Chu]{ma2026skillclaw}
+Ziyu Ma, Shidong Yang, Yuxiang Ji, Xucong Wang, Yong Wang, Yiming Hu, Tongwen
+  Huang, and Xiangxiang Chu.
+\newblock {SkillClaw}: Let skills evolve collectively with agentic evolver,
+  2026.
+\newblock URL \url{https://arxiv.org/abs/2604.08377}.
+\newblock arXiv preprint.
+
+\bibitem[Ni et~al.(2026)Ni, Liu, Liu, Sun, Zhou, Cheng, Wang, Zhao, Jiang, and
+  Jiang]{ni2026trace2skill}
+Jingwei Ni, Yihao Liu, Xinpeng Liu, Yutao Sun, Mengyu Zhou, Pengyu Cheng, Dexin
+  Wang, Erchao Zhao, Xiaoxi Jiang, and Guanjun Jiang.
+\newblock {Trace2Skill}: Distill trajectory-local lessons into transferable
+  agent skills, 2026.
+\newblock arXiv:2603.25158.
+
+\bibitem[Ouyang et~al.(2026)Ouyang, Yan, Hsu, Chen, Jiang, Wang, Han, Le,
+  Daruki, Tang, Tirumalashetty, Lee, Rofouei, Lin, Han, Lee, and
+  Pfister]{ouyang2026reasoningbank}
+Siru Ouyang, Jun Yan, I-Hung Hsu, Yanfei Chen, Ke~Jiang, Zifeng Wang, Rujun
+  Han, Long~T. Le, Samira Daruki, Xiangru Tang, Vishy Tirumalashetty, George
+  Lee, Mahsan Rofouei, Hangfei Lin, Jiawei Han, Chen-Yu Lee, and Tomas Pfister.
+\newblock {ReasoningBank}: Scaling agent self-evolving with reasoning memory.
+\newblock In \emph{The Fourteenth International Conference on Learning
+  Representations}, 2026.
+\newblock URL \url{https://openreview.net/forum?id=jL7fwchScm}.
+
+\bibitem[Pan et~al.(2024)Pan, He, Bowman, and Feng]{pan2024spontaneous}
+Jane Pan, He~He, Samuel~R. Bowman, and Shi Feng.
+\newblock Spontaneous reward hacking in iterative self-refinement, 2024.
+\newblock URL \url{https://arxiv.org/abs/2407.04549}.
+
+\bibitem[{PaperMemory Project}(2026)]{papermemory2026}
+{PaperMemory Project}.
+\newblock {PaperMemory}: Local academic memory for papers, claims, and
+  citations.
+\newblock \url{https://github.com/raktim-mondol/papermemory}, 2026.
+
+\bibitem[Razzhigaev et~al.(2026)Razzhigaev, Gritsaev, Kaznacheev, Dragunov,
+  Yampolskiy, and Kuznetsov]{razzhigaev2026ouroboros}
+Anton Razzhigaev, Andrei Gritsaev, Andrei Kaznacheev, Nikita Dragunov, Roman
+  Yampolskiy, and Andrei Kuznetsov.
+\newblock Ouroboros: A self-developing frontier coding agent with reviewed core
+  evolution, 2026.
+\newblock arXiv:2608.08311.
+
+\bibitem[Robeyns et~al.(2025)Robeyns, Szummer, and
+  Aitchison]{robeyns2025selfimproving}
+Maxime Robeyns, Martin Szummer, and Laurence Aitchison.
+\newblock A self-improving coding agent, 2025.
+\newblock URL \url{https://arxiv.org/abs/2504.15228}.
+\newblock arXiv preprint.
+
+\bibitem[Shalev-Shwartz et~al.(2010)Shalev-Shwartz, Shamir, Srebro, and
+  Sridharan]{shalev2010learnability}
+Shai Shalev-Shwartz, Ohad Shamir, Nathan Srebro, and Karthik Sridharan.
+\newblock Learnability, stability and uniform convergence.
+\newblock \emph{Journal of Machine Learning Research}, 11:\penalty0 2635--2670,
+  2010.
+
+\bibitem[Shang et~al.(2026)Shang, Xu, Sun, Xia, Hu, Xu, and
+  Zheng]{shang2026backfires}
+Linfang Shang, Ming Xu, Yiding Sun, Tianle Xia, Lingxiang Hu, Lan Xu, and Ning
+  Zheng.
+\newblock When self-evolution backfires: Pre-commit gating against skill
+  contamination in {LLM} agents, 2026.
+\newblock URL \url{https://arxiv.org/abs/2608.05810}.
+
+\bibitem[Shen(2026)]{shen2026dsheverything}
+Yifei Shen.
+\newblock {DSH Everything}: {Everything Is a Plugin} and runtime
+  self-evolution.
+\newblock Software repository and engineering protocols, 2026.
+\newblock URL
+  \url{https://github.com/yshenaw/dsh-everything/tree/dade643bb09c49d290340ee01f3a00dd20bf37fb}.
+\newblock README, EIP self-evolution protocol, and Codex case study; accessed
+  14 October 2026.
+
+\bibitem[Shen et~al.(2026)Shen, Li, and Zhang]{shen2026skilloptlite}
+Yifei Shen, Bo~Li, and Xinjie Zhang.
+\newblock {SkillOpt-Lite}: Better and faster agent self-evolution via one line
+  of vibe, 2026.
+\newblock Preprint, arXiv:2607.03451.
+
+\bibitem[Shinn et~al.(2023)Shinn, Cassano, Gopinath, Narasimhan, and
+  Yao]{shinn2023reflexion}
+Noah Shinn, Federico Cassano, Ashwin Gopinath, Karthik Narasimhan, and Shunyu
+  Yao.
+\newblock Reflexion: Language agents with verbal reinforcement learning.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~36, 2023.
+\newblock URL
+  \url{http://papers.nips.cc/paper_files/paper/2023/hash/1b44b878bb782e6954cd888628510e90-Abstract-Conference.html}.
+
+\bibitem[Suzgun et~al.(2026)Suzgun, Yuksekgonul, Bianchi, Jurafsky, and
+  Zou]{suzgun2026dynamic}
+Mirac Suzgun, Mert Yuksekgonul, Federico Bianchi, Dan Jurafsky, and James Zou.
+\newblock Dynamic cheatsheet: Test-time learning with adaptive memory.
+\newblock In \emph{Proceedings of the 19th Conference of the European Chapter
+  of the Association for Computational Linguistics (Volume 1: Long Papers)},
+  pages 7080--7106, Rabat, Morocco, March 2026. Association for Computational
+  Linguistics.
+\newblock \doi{10.18653/v1/2026.eacl-long.333}.
+\newblock URL \url{https://aclanthology.org/2026.eacl-long.333/}.
+
+\bibitem[Tan et~al.(2026)Tan, Agrawal, Sandadi, Klein, Sen, Dimakis, and
+  Zaharia]{tan2026gskill}
+Shangyin Tan, Lakshya~A. Agrawal, Rohit Sandadi, Dan Klein, Koushik Sen,
+  Alexandros~G. Dimakis, and Matei Zaharia.
+\newblock Automatically learning skills for coding agents.
+\newblock In \emph{Proceedings of the ACM Conference on AI and Agentic
+  Systems}, 2026.
+\newblock \doi{10.1145/3786335.3813196}.
+\newblock URL \url{https://doi.org/10.1145/3786335.3813196}.
+
+\bibitem[Tang et~al.(2025)Tang, Qin, Peng, Zhou, Shao, Du, Wei, Xia, Wu, Zhu,
+  Zhang, Liu, Wang, Hong, Wu, Cheng, Wang, and Zhou]{tang2025agentkb}
+Xiangru Tang, Tianrui Qin, Tianhao Peng, Ziyang Zhou, Daniel Shao, Tingting Du,
+  Xinming Wei, Peng Xia, Fang Wu, He~Zhu, Ge~Zhang, Jiaheng Liu, Xingyao Wang,
+  Sirui Hong, Chenglin Wu, Hao Cheng, Chi Wang, and Wangchunshu Zhou.
+\newblock {Agent} {KB}: Leveraging cross-domain experience for agentic problem
+  solving, 2025.
+\newblock URL \url{https://arxiv.org/abs/2507.06229}.
+
+\bibitem[Tian et~al.(2026)Tian, Hu, Wang, Lu, and Wu]{tian2026ceiling}
+Yuan Tian, Bing Hu, Hao Wang, Binghang Lu, and Fang Wu.
+\newblock Harness evolution hits a ceiling: When weight training should begin,
+  2026.
+\newblock URL \url{https://arxiv.org/abs/2610.11655}.
+
+\bibitem[Wang et~al.(2026{\natexlab{a}})Wang, Qian, Lin, Xu, Chen, Jiang, Liu,
+  and Yu]{wang2026phantom}
+Su~Wang, Pin Qian, Yifan Lin, Jingzhou Xu, Yihang Chen, Xiaochong Jiang, Lifei
+  Liu, and Haoran Yu.
+\newblock {Phantom} {Guardrails}: When self-improving agent harnesses fix
+  failures that never happened, 2026{\natexlab{a}}.
+\newblock URL \url{https://arxiv.org/abs/2607.13083}.
+
+\bibitem[Wang et~al.(2025{\natexlab{a}})Wang, Pi{\k{e}}kos, Nanbo, Laakom,
+  Chen, Ostaszewski, Zhuge, and Schmidhuber]{wang2025huxley}
+Wenyi Wang, Piotr Pi{\k{e}}kos, Li~Nanbo, Firas Laakom, Yimeng Chen, Mateusz
+  Ostaszewski, Mingchen Zhuge, and J{\"u}rgen Schmidhuber.
+\newblock Huxley-{G{\"o}del} machine: Human-level coding agent development by
+  an approximation of the optimal self-improving machine, 2025{\natexlab{a}}.
+\newblock URL \url{https://arxiv.org/abs/2510.21614}.
+
+\bibitem[Wang et~al.(2026{\natexlab{b}})Wang, Zhang, and
+  Shao]{wang2026tampering}
+Xing Wang, Xiaoyi Zhang, and Jie Shao.
+\newblock Auditing harness tampering in self-improving agents,
+  2026{\natexlab{b}}.
+\newblock URL \url{https://arxiv.org/abs/2609.00069}.
+
+\bibitem[Wang et~al.(2026{\natexlab{c}})Wang, Cheng, Li, Hao, Ramesh, Jung,
+  Tang, Wang, Zhou, Wu, Yao, Grama, Banburski-Fahey, Peng, Lanier, and
+  Gao]{wang2026valve}
+Yifan Wang, Hao Cheng, Xiaomin Li, Yuexing Hao, Hemanth~Neelgund Ramesh,
+  Dongwon Jung, Hao Tang, Keru Wang, Chenliang Zhou, Qianhui Wu, Wenlin Yao,
+  Ananth Grama, Andrzej Banburski-Fahey, Baolin Peng, Jaron Lanier, and
+  Jianfeng Gao.
+\newblock Certified long-horizon code agent evolution via validation-gated
+  skill optimization, 2026{\natexlab{c}}.
+\newblock URL \url{https://arxiv.org/abs/2609.32990}.
+
+\bibitem[Wang et~al.(2025{\natexlab{b}})Wang, Mao, Fried, and
+  Neubig]{wang2025workflow}
+Zora~Zhiruo Wang, Jiayuan Mao, Daniel Fried, and Graham Neubig.
+\newblock Agent workflow memory.
+\newblock In \emph{Proceedings of the 42nd International Conference on Machine
+  Learning}, volume 267 of \emph{Proceedings of Machine Learning Research},
+  pages 63897--63911. PMLR, 2025{\natexlab{b}}.
+
+\bibitem[Wei et~al.(2026{\natexlab{a}})Wei, Guan, Zhu, Zhou, He, Zhou, Chen,
+  and Shen]{wei2026harnessrsi}
+Chuyang Wei, Haoxiang Guan, Minghang Zhu, Kexin Zhou, Jiyan He, Xiren Zhou,
+  Huanhuan Chen, and Yifei Shen.
+\newblock {Harness Self-Evolution: Theory, Algorithms, Evaluation,
+  Applications, and Impact}.
+\newblock
+  \url{https://github.com/zgcagi/Harness-RSI/blob/main/paper/harness-self-evolution.pdf},
+  2026{\natexlab{a}}.
+\newblock Survey and companion materials.
+
+\bibitem[Wei et~al.(2026{\natexlab{b}})Wei, Guan, Zhu, Zhou, He, Zhou, Chen,
+  and Shen]{wei2026selfevolvingagentharness}
+Chuyang Wei, Haoxiang Guan, Minghang Zhu, Kexin Zhou, Jiyan He, Xiren Zhou,
+  Huanhuan Chen, and Yifei Shen.
+\newblock {Self-Evolving Agent Harness}, 2026{\natexlab{b}}.
+\newblock URL \url{https://arxiv.org/pdf/2610.18813}.
+
+\bibitem[Yang et~al.(2026{\natexlab{a}})Yang, Tian, Wang, Liu, Ye, and
+  Chen]{yang2026gse}
+Chen Yang, Jiashuo Tian, Ziqi Wang, Xinyin Liu, Meiru Ye, and Junjie Chen.
+\newblock Learning globally reusable skills for coding agents,
+  2026{\natexlab{a}}.
+\newblock URL \url{https://arxiv.org/abs/2608.06153}.
+
+\bibitem[Yang et~al.(2024)Yang, Wang, Lu, Liu, Le, Zhou, and
+  Chen]{yang2024large}
+Chengrun Yang, Xuezhi Wang, Yifeng Lu, Hanxiao Liu, Quoc~V. Le, Denny Zhou, and
+  Xinyun Chen.
+\newblock Large language models as optimizers.
+\newblock In \emph{The Twelfth International Conference on Learning
+  Representations}, 2024.
+\newblock URL \url{https://openreview.net/forum?id=Bb4VGOWELI}.
+
+\bibitem[Yang et~al.(2026{\natexlab{b}})Yang, Gong, Huang, Yang, Zhou, Huang,
+  Li, Gao, Dai, Liu, Qiu, Yang, Chen, Yang, and Luo]{yang2026skillopt}
+Yifan Yang, Ziyang Gong, Weiquan Huang, Qihao Yang, Ziwei Zhou, Zisu Huang, Yan
+  Li, Xuemei Gao, Qi~Dai, Bei Liu, Kai Qiu, Yuqing Yang, Dongdong Chen, Xue
+  Yang, and Chong Luo.
+\newblock {SkillOpt}: Executive strategy for self-evolving agent skills,
+  2026{\natexlab{b}}.
+\newblock Preprint, arXiv:2605.23904.
+
+\bibitem[Yuksekgonul et~al.(2025)Yuksekgonul, Bianchi, Boen, Liu, Lu, Huang,
+  Guestrin, and Zou]{yuksekgonul2025textgrad}
+Mert Yuksekgonul, Federico Bianchi, Joseph Boen, Sheng Liu, Pan Lu, Zhi Huang,
+  Carlos Guestrin, and James Zou.
+\newblock Optimizing generative {AI} by backpropagating language model
+  feedback.
+\newblock \emph{Nature}, 639\penalty0 (8055):\penalty0 609--616, 2025.
+\newblock \doi{10.1038/s41586-025-08661-4}.
+
+\bibitem[Zhang(2026)]{zhang2026agentdevel}
+Di~Zhang.
+\newblock {AgentDevel}: Reframing self-evolving {LLM} agents as release
+  engineering, 2026.
+\newblock URL \url{https://arxiv.org/abs/2601.04620}.
+
+\bibitem[Zhang et~al.(2026{\natexlab{a}})Zhang, Zhang, Li, Zhang, Chen, Zhang,
+  Bai, and Hu]{zhang2026selfharness}
+Hangfan Zhang, Shao Zhang, Kangcong Li, Chen Zhang, Yang Chen, Yiqun Zhang, Lei
+  Bai, and Shuyue Hu.
+\newblock Self-harness: Harnesses that improve themselves, 2026{\natexlab{a}}.
+\newblock Preprint, arXiv:2606.09498.
+
+\bibitem[Zhang et~al.(2026{\natexlab{b}})Zhang, Hu, Lu, Lange, and
+  Clune]{zhang2026darwin}
+Jenny Zhang, Shengran Hu, Cong Lu, Robert~Tjarko Lange, and Jeff Clune.
+\newblock Darwin {G{\"o}del} machine: Open-ended evolution of self-improving
+  agents.
+\newblock In \emph{The Fourteenth International Conference on Learning
+  Representations}, 2026{\natexlab{b}}.
+\newblock URL \url{https://openreview.net/forum?id=pUpzQZTvGY}.
+\newblock Poster.
+
+\bibitem[Zhang et~al.(2025)Zhang, Xiang, Yu, Teng, Chen, Chen, Zhuge, Cheng,
+  Hong, Wang, Zheng, Liu, Luo, and Wu]{zhang2025aflow}
+Jiayi Zhang, Jinyu Xiang, Zhaoyang Yu, Fengwei Teng, Xiong-Hui Chen, Jiaqi
+  Chen, Mingchen Zhuge, Xin Cheng, Sirui Hong, Jinlin Wang, Bingnan Zheng, Bang
+  Liu, Yuyu Luo, and Chenglin Wu.
+\newblock {AFlow}: Automating agentic workflow generation.
+\newblock In \emph{The Thirteenth International Conference on Learning
+  Representations}, Singapore, 2025.
+\newblock URL \url{https://openreview.net/forum?id=z5uVAKwmjf}.
+
+\bibitem[Zhang et~al.(2026{\natexlab{c}})Zhang, Zhou, Song, Chen, Tian, Yang,
+  Ma, Li, Feng, Li, Jin, and Xu]{zhang2026harnesscompass}
+Luan Zhang, Ruochen Zhou, Dandan Song, Zhengyu Chen, Yuhang Tian, Jun Yang,
+  Huipeng Ma, Chenhao Li, Guangyuan Feng, Xudong Li, Yizhou Jin, and Yan Xu.
+\newblock {HarnessCompass}: Guiding automatic harness evolution toward
+  generalizable and effective agent harnesses, 2026{\natexlab{c}}.
+\newblock URL \url{https://arxiv.org/abs/2608.01918}.
+
+\bibitem[Zhang et~al.(2026{\natexlab{d}})Zhang, Hu, Upasani, Ma, Hong,
+  Kamanuru, Rainton, Wu, Ji, Li, Thakker, Zou, and Olukotun]{zhang2026agentic}
+Qizheng Zhang, Changran Hu, Shubhangi Upasani, Boyuan Ma, Fenglu Hong,
+  Vamsidhar Kamanuru, Jay Rainton, Chen Wu, Mengmeng Ji, Hanchen Li, Urmish
+  Thakker, James Zou, and Kunle Olukotun.
+\newblock Agentic context engineering: Evolving contexts for self-improving
+  language models.
+\newblock In \emph{The Fourteenth International Conference on Learning
+  Representations}, 2026{\natexlab{d}}.
+\newblock URL \url{https://openreview.net/forum?id=eC4ygDs02R}.
+
+\bibitem[Zhang et~al.(2026{\natexlab{e}})Zhang, Cui, Wang, Li, Qiu, Zhu, and
+  He]{zhang2026librarydrift}
+Xing Zhang, Yanwei Cui, Guanghui Wang, Ziyuan Li, Wei Qiu, Bing Zhu, and
+  Peiyang He.
+\newblock {Library} {Drift}: Diagnosing and fixing a silent failure mode in
+  self-evolving {LLM} skill libraries, 2026{\natexlab{e}}.
+\newblock URL \url{https://arxiv.org/abs/2605.19576}.
+
+\bibitem[Zhang et~al.(2026{\natexlab{f}})Zhang, Cui, Wang, Li, Qiu, Zhu, and
+  He]{zhang2026ratchet}
+Xing Zhang, Yanwei Cui, Guanghui Wang, Ziyuan Li, Wei Qiu, Bing Zhu, and
+  Peiyang He.
+\newblock {Ratchet}: How reliable must an {LLM} judge be to retire a skill?,
+  2026{\natexlab{f}}.
+\newblock URL \url{https://arxiv.org/abs/2605.22148}.
+
+\bibitem[Zhang et~al.(2026{\natexlab{g}})Zhang, Dai, Tan, Yang, Mullur, Hoang,
+  Hu, Zhu, Mui, Savarese, Xu, and Chen]{zhang2026darwinx}
+Yifan Zhang, Yutong Dai, Juntao Tan, Luyu Yang, Rishi Mullur, Thai Hoang,
+  Zhiyuan Hu, James Zhu, Phil Mui, Silvio Savarese, Ran Xu, and Zeyuan Chen.
+\newblock {DarwinX}: Evolving agent harnesses through natural selection,
+  2026{\natexlab{g}}.
+\newblock URL \url{https://arxiv.org/abs/2608.07545}.
+\newblock arXiv preprint.
+
+\bibitem[Zhao et~al.(2024)Zhao, Huang, Xu, Lin, Liu, and Huang]{zhao2024expel}
+Andrew Zhao, Daniel Huang, Quentin Xu, Matthieu Lin, Yong-Jin Liu, and Gao
+  Huang.
+\newblock {ExpeL}: {LLM} agents are experiential learners.
+\newblock In \emph{Proceedings of the AAAI Conference on Artificial
+  Intelligence}, volume~38, pages 19632--19642. AAAI Press, 2024.
+\newblock \doi{10.1609/aaai.v38i17.29936}.
+
+\bibitem[Zhou et~al.(2023)Zhou, Muresanu, Han, Paster, Pitis, Chan, and
+  Ba]{zhou2023large}
+Yongchao Zhou, Andrei~Ioan Muresanu, Ziwen Han, Keiran Paster, Silviu Pitis,
+  Harris Chan, and Jimmy Ba.
+\newblock Large language models are human-level prompt engineers.
+\newblock In \emph{The Eleventh International Conference on Learning
+  Representations}, 2023.
+\newblock URL \url{https://openreview.net/forum?id=92gvk82DE-}.
+
+\end{thebibliography}

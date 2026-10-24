@@ -1,0 +1,48 @@
+\section{Store Schemas}
+\label{app:schemas}
+
+The store is append-only JSONL. The records below are abridged; the implementation accepts missing optional fields. Full user messages, full tool outputs, manuscript text, and credentials are never stored.
+
+\begin{lstlisting}[style=json,caption={Tool event (abridged).}]
+{
+  "v": 1, "ts": "2026-10-24T10:00:00.000Z", "type": "tool",
+  "session_id": "s-...", "task_class": "manuscript",
+  "tool": "ah_audit", "is_error": false,
+  "finding_count": 2, "findings": ["NUM-001", "BIB-004"],
+  "verdict": null, "gate_passed": false, "result_size": 1842,
+  "result_hash": "e3b0c442..."
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=json,caption={Episode record (abridged).}]
+{
+  "v": 1, "episode_id": "a1b2c3d4-3-...", "session_id": "s-...",
+  "task_class": "manuscript", "task_tags": ["manuscript", "latex"],
+  "project": { "key": "9f2c...", "label": "my-paper", "ah": true },
+  "model": "...", "plugin_version": "0.21.0",
+  "turns": 3, "tool_counts": { "ah_audit": 1, "edit": 2 },
+  "errors": 0, "corrections": 0, "finding_count": 0,
+  "blocking_findings": 0, "gate": null,
+  "signals": [ { "kind": "finding", "key": "NUM-001" } ],
+  "quality": 0.98, "success": true, "substantive": true,
+  "lesson_ids_injected": ["L7c1a0f2b9d"],
+  "lesson_ids_control": [], "lesson_ids_eligible": ["L7c1a0f2b9d"],
+  "lesson_ids_reached": ["L7c1a0f2b9d"], "injected_tokens": 62,
+  "oracle": { "plugin_version": "0.21.0", "engine_version": "0.1.0",
+              "manifest_hash": "..." }
+}
+\end{lstlisting}
+
+\begin{lstlisting}[style=json,caption={Decision record (abridged).}]
+{
+  "v": 1, "ts": "2026-10-24T10:01:00.000Z", "type": "promote",
+  "lesson_id": "L7c1a0f2b9d",
+  "reason": "promoted: injected 1.00 vs control 0.00",
+  "stats": { "injected": 5, "injected_success": 5,
+             "control": 3, "control_success": 0 }
+}
+\end{lstlisting}
+
+The lesson record is shown in \cref{lst:lesson}; current lessons also carry \texttt{target}, \texttt{risk\_tier}, and \texttt{requires\_release} metadata, plus reached statistics. The current lesson state is the latest snapshot per identifier. A \texttt{retired} or \texttt{quarantined} snapshot remains in the file for audit; it is not deleted. A \texttt{delete} operation exists in the store API but is not used by the learning loop.
+
+The configuration file holds the mode (\texttt{off}, \texttt{observe}, \texttt{auto}), exploration and control rates, support thresholds, caps, token budget, diagnosis interval, and lesson time-to-live. Environment variables can override the mode, store path, exploration rate, active control rate, and caps. The remote judge is configured with \texttt{AH\_RSI\_REMOTE}, \texttt{AH\_RSI\_JUDGE\_URL}, \texttt{AH\_RSI\_JUDGE\_KEY}, and \texttt{AH\_RSI\_JUDGE\_MODEL}; it is off by default.

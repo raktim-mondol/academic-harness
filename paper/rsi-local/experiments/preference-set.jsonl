@@ -1,0 +1,20 @@
+{"id":"D01","text":"Always cite primary sources and include a DOI.","label":"durable"}
+{"id":"D02","text":"Never use passive voice in the methods section.","label":"durable"}
+{"id":"D03","text":"From now on, include a data availability statement in every manuscript.","label":"durable"}
+{"id":"D04","text":"Remember to run stat_audit before reporting a p-value.","label":"durable"}
+{"id":"D05","text":"Prefer effect sizes and confidence intervals over p-values alone.","label":"durable"}
+{"id":"D06","text":"Make sure every table has units.","label":"durable"}
+{"id":"D07","text":"Don't use emojis in the manuscript.","label":"durable"}
+{"id":"D08","text":"Always resolve a DOI before citing it.","label":"durable"}
+{"id":"D09","text":"Never present a retracted paper as current evidence.","label":"durable"}
+{"id":"D10","text":"Do not fabricate results.","label":"durable"}
+{"id":"O01","text":"Use the 2021 cohort for this analysis.","label":"oneoff"}
+{"id":"O02","text":"Please use the following data: 1, 2, 3.","label":"oneoff"}
+{"id":"O03","text":"Write the abstract in 200 words.","label":"oneoff"}
+{"id":"O04","text":"Run the analysis on the BWM CSV.","label":"oneoff"}
+{"id":"O05","text":"Cite the Smith 2024 paper here.","label":"oneoff"}
+{"id":"O06","text":"Put this paragraph after the methods.","label":"oneoff"}
+{"id":"O07","text":"Check the results in Table 2.","label":"oneoff"}
+{"id":"O08","text":"Use the attached file for this task.","label":"oneoff"}
+{"id":"O09","text":"Please use this template for the current proposal.","label":"oneoff"}
+{"id":"O10","text":"Run a t-test on these columns.","label":"oneoff"}

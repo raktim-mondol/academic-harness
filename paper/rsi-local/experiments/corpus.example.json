@@ -1,0 +1,102 @@
+{
+  "documents": [
+    {
+      "id": "M1",
+      "label": "Systematic review (breast imaging AI)",
+      "source": "/path/to/research-corpus/M1",
+      "type": "manuscript",
+      "profile": "literature-review/systematic",
+      "task_class": "literature"
+    },
+    {
+      "id": "M2",
+      "label": "Empirical paper (coal-spoil categorisation)",
+      "source": "/path/to/research-corpus/M2",
+      "type": "manuscript",
+      "profile": "paper/conference",
+      "task_class": "manuscript"
+    },
+    {
+      "id": "M3",
+      "label": "Conference paper (ASD screening)",
+      "source": "/path/to/research-corpus/M3",
+      "type": "manuscript",
+      "profile": "paper/conference",
+      "task_class": "manuscript"
+    },
+    {
+      "id": "P1",
+      "label": "Proposal (medical imaging uncertainty)",
+      "source": "/path/to/research-corpus/P1",
+      "type": "proposal",
+      "profile": "grant/proposal",
+      "task_class": "grant"
+    },
+    {
+      "id": "P2",
+      "label": "Proposal (drug repurposing GNN)",
+      "source": "/path/to/research-corpus/P2",
+      "type": "proposal",
+      "profile": "grant/proposal",
+      "task_class": "grant"
+    },
+    {
+      "id": "P3",
+      "label": "Proposal (spatial multi-omics)",
+      "source": "/path/to/research-corpus/P3",
+      "type": "proposal",
+      "profile": "grant/proposal",
+      "task_class": "grant"
+    },
+    {
+      "id": "P4",
+      "label": "Proposal (LLM metacognition)",
+      "source": "/path/to/research-corpus/P4",
+      "type": "proposal",
+      "profile": "grant/proposal",
+      "task_class": "grant"
+    },
+    {
+      "id": "P5",
+      "label": "Proposal (causal EHR foundation)",
+      "source": "/path/to/research-corpus/P5",
+      "type": "proposal",
+      "profile": "grant/proposal",
+      "task_class": "grant"
+    },
+    {
+      "id": "P6",
+      "label": "Proposal (food microbiome immunology)",
+      "source": "/path/to/research-corpus/P6",
+      "type": "proposal",
+      "profile": "grant/proposal",
+      "task_class": "grant"
+    }
+  ],
+  "pdfs": [
+    {
+      "id": "PDF1",
+      "source": "/path/to/research-corpus/PDF1.pdf"
+    },
+    {
+      "id": "PDF2",
+      "source": "/path/to/research-corpus/PDF2.pdf"
+    },
+    {
+      "id": "PDF3",
+      "source": "/path/to/research-corpus/PDF3.pdf"
+    },
+    {
+      "id": "PDF4",
+      "source": "/path/to/research-corpus/PDF4.pdf"
+    },
+    {
+      "id": "PDF5",
+      "source": "/path/to/research-corpus/PDF5.pdf"
+    },
+    {
+      "id": "PDF6",
+      "source": "/path/to/research-corpus/PDF6.pdf"
+    }
+  ]
+}

@@ -281,6 +281,7 @@ You do **not** install Pi, and you do not install Academic Harness into DSH. The
 | `ah_build` / `ah_findings` / `ah_decision_request` | anyone | Compile with errors mapped to units; list ledger findings; hand a finding to the author |
 | `ah_review` / `ah_review_set` / `ah_review_respond` / `ah_snapshot` | anyone | Import/list reviewer items; map units; response letter from real diffs; save/diff unit snapshots |
 | `ah_provenance` / `ah_disclosure` | anyone | Who wrote each unit; draft an AI-use statement (author approves) |
+| `ah_rsi` | anyone | Inspect/steer the local self-improvement loop: status, report, lessons, diagnose, forget, rollback, inject preview. Records reached activation, token cost, oracle manifest, and risk tier. No approval gate. |
 | `ah_author` | you | Waive, accept/reject a fact, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure. DSH asks you to confirm. |
 
 Skills: `academic-harness` (router), `ah-write-unit`, `ah-plan-section`, `ah-fix-findings`, `ah-audit-section`, `ah-revise-from-review`.
@@ -292,6 +293,19 @@ In a project directory:
 3. Write through `ah-write-unit`. The gate keeps the agent on this turn's findings.
 
 T3 (does this cited clause match the source) is advisory and never a gate. Optional model backends in `ah.yaml` are `http` (OpenAI-compatible, including local Ollama) or `command`. The engine's unused `pi` backend is not required.
+
+## Local recursive self-improvement (RSI)
+
+The preset improves itself from local session outcomes. The loop captures tool errors, `ah` findings, gate handoffs, citation/integrity/statistics/figure/reproducibility flags, the task class, and explicit user preferences; diagnoses recurring research failures; admits short lessons automatically; injects matching lessons into later turns; compares injected against eligible control turns; and auto-promotes, keeps exploring, or quarantines the lesson. There is no approval step.
+
+- **Local-only.** The store is `$DSH_HOME/ah-rsi` (override `AH_RSI_STORE`). No network calls by default, no full message or manuscript text. The opt-in remote judge (`AH_RSI_REMOTE=1` + `AH_RSI_JUDGE_URL`) is veto-only and receives lesson text plus evidence counts, never manuscript text.
+- **Reversible.** `ah_rsi forget` / `rollback` or the matching CLI commands retire a lesson; `purge --yes` deletes the store. `AH_RSI=observe` captures without injection; `AH_RSI=off` disables the loop.
+- **Bounded.** Only lesson text is mutable. The loop never edits the plugin, `vendor/academic-harness`, the project, protected paths, or the audit/evaluation code. Executable changes stay in the normal release process.
+- **Observable.** Each episode records injected tokens, an oracle manifest (plugin/engine/prompt/hook/audit hashes), and a reached-action proxy; lessons carry a target, risk tier, release requirement, and reached statistics. Reached means the prescribed tool ran, not that the lesson was followed or that the outcome improved.
+- **Layer scope.** The plugin implements the seven core layers for lesson-level interpreted state: capture, experience store, diagnosis/proposal, frozen evaluator, admission, activation, and observability. Versioned skills and local policy proposals (T2) are deferred; global prompt/skill changes (T3) and executable/evaluator changes (T4) are out of scope.
+- **Research-wide.** Task classes cover literature, hypothesis, experiment, data analysis, statistics, manuscript, grant, review response, reproducibility, and data management; explicit preferences are remembered across projects.
+- **Inspect it.** Inside a session use `ah_rsi` `status|report|lessons|diagnose|forget|rollback|inject_preview`; explicit preferences are captured from the user's message automatically. Offline use `academic-harness-rsi` with `status`, `report`, `lessons`, `diagnose`, `feedback` (manual preference entry), `forget`, `rollback`, `inject`, and `benchmark synthetic|replay|defects|snapshot --project PATH`.
+- **Evaluation honesty.** `benchmark synthetic` tests the learning pipeline; `benchmark replay` reports observational statistics over captured turns; `benchmark defects --project PATH` injects known LaTeX defects into a copy and checks which ones the real audit catches and whether learned lessons cover them; the injected-versus-control comparison is a local heuristic, not causal proof. See [docs/RSI.md](docs/RSI.md) and the **OPAL** system paper with the corpus evaluation in [`paper/rsi-local/`](paper/rsi-local/).
 
 ## Paper memory
 
@@ -516,6 +530,21 @@ A subagent the top-level agent delegates to runs in its own DSH session, but its
 `research_template` browses (`action: "list"`, filterable by `category`/`query`) and retrieves (`action: "get"`, with `values` filling `{placeholder}` tokens) a catalogue of ~330 one-click research-task prompt templates across 22 disciplines, ported from Academic Harness's own template library. It is a different tool from DSH's `workflow` (Rhai multi-agent scripts); the Academic Harness preset mounts both, so they cannot share a name.
 
 ## Release notes
+
+### 0.21.0
+
+- RSI architecture instrumentation: reached-action activation, injected-token cost, oracle manifests, lesson risk metadata, and explicit `rollback`.
+- Seven-layer plugin-RSI mapping documented; versioned skills/global promotion/executable changes are explicitly deferred or out of scope.
+- 96 RSI checks; corpus experiment over nine real documents (31/31 injected defects, 23/23 leave-one-project-out coverage, 56.7% routing accuracy, 0.53 held-out safety F1).
+- System paper in [`paper/rsi-local/`](paper/rsi-local/).
+
+### 0.20.0
+
+- Local recursive self-improvement (RSI) for all research tasks: automatic capture, diagnosis, lesson admission, injection, injected-versus-control tracking, and quarantine/retirement.
+- `ah_rsi` in-session control surface and `academic-harness-rsi` offline CLI.
+- Synthetic pipeline benchmark, replay benchmark over real captured episodes, and real `ah audit` snapshot baseline.
+- Local-only store at `$DSH_HOME/ah-rsi`; `AH_RSI=off|observe|auto`; no author-approval step; no runtime edits to plugin, engine, project, or evaluator.
+- New `ah-rsi` skill and `docs/RSI.md`.
 
 ### 0.19.0
 

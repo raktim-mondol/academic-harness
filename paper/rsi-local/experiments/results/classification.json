@@ -1,0 +1,310 @@
+{
+  "rows": [
+    {
+      "id": "T01",
+      "text": "Write the abstract and introduction for a systematic review of AI in breast cancer imaging.",
+      "label": "manuscript",
+      "source": "M1",
+      "predicted": "manuscript"
+    },
+    {
+      "id": "T02",
+      "text": "Search OpenAlex and PubMed for randomized trials of AI mammography and resolve every DOI before citing.",
+      "label": "literature",
+      "source": "M1",
+      "predicted": "literature"
+    },
+    {
+      "id": "T03",
+      "text": "Draft the specific aims, significance, and budget justification for an NIH grant.",
+      "label": "grant",
+      "source": "P2",
+      "predicted": "grant"
+    },
+    {
+      "id": "T04",
+      "text": "Write a point-by-point response to reviewer 2 and map each comment to the revised units.",
+      "label": "review-response",
+      "source": "synthetic-corpus",
+      "predicted": "manuscript"
+    },
+    {
+      "id": "T05",
+      "text": "Create a one-command reproduction environment with a lockfile and a container.",
+      "label": "reproducibility",
+      "source": "M2",
+      "predicted": "reproducibility"
+    },
+    {
+      "id": "T06",
+      "text": "Write a data availability statement and choose a repository and license.",
+      "label": "data-management",
+      "source": "P1",
+      "predicted": "data-management"
+    },
+    {
+      "id": "T07",
+      "text": "Generate falsifiable hypotheses for drug repurposing in Alzheimer's disease.",
+      "label": "hypothesis",
+      "source": "P2",
+      "predicted": "hypothesis"
+    },
+    {
+      "id": "T08",
+      "text": "Design a randomized controlled experiment with a power analysis and decision rules.",
+      "label": "experiment",
+      "source": "synthetic-corpus",
+      "predicted": "experiment"
+    },
+    {
+      "id": "T09",
+      "text": "Pre-register the analysis plan and primary endpoint before looking at outcomes.",
+      "label": "experiment",
+      "source": "preregistration",
+      "predicted": "experiment"
+    },
+    {
+      "id": "T10",
+      "text": "Rank candidate hypotheses by novelty, testability, and mechanistic plausibility.",
+      "label": "hypothesis",
+      "source": "P4",
+      "predicted": "hypothesis"
+    },
+    {
+      "id": "T11",
+      "text": "Compare responder and non-responder differential expression and apply Benjamini-Hochberg correction.",
+      "label": "statistics",
+      "source": "immunotherapy CSV",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T12",
+      "text": "Train a classifier on the BWM label CSV and report AUROC with confidence intervals.",
+      "label": "data-analysis",
+      "source": "scandy CSV",
+      "predicted": "data-analysis"
+    },
+    {
+      "id": "T13",
+      "text": "Run a mixed-effects model on the longitudinal imaging measurements and report effect sizes.",
+      "label": "statistics",
+      "source": "synthetic-corpus",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T14",
+      "text": "Summarize the columns, missingness, and label distribution in the single-cell metadata.",
+      "label": "data-analysis",
+      "source": "seed-assets",
+      "predicted": "data-management"
+    },
+    {
+      "id": "T15",
+      "text": "Check GRIM consistency for the reported means and sample sizes.",
+      "label": "statistics",
+      "source": "synthetic-corpus",
+      "predicted": "statistics"
+    },
+    {
+      "id": "T16",
+      "text": "Normalize the npy arrays and compare the distributions across conditions.",
+      "label": "data-analysis",
+      "source": "enzyme-engineering npy",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T17",
+      "text": "Draft the methods section for the federated histopathology experiment.",
+      "label": "manuscript",
+      "source": "P3",
+      "predicted": "manuscript"
+    },
+    {
+      "id": "T18",
+      "text": "Design an ablation study for the sparse autoencoder interpretability pipeline.",
+      "label": "experiment",
+      "source": "P4",
+      "predicted": "experiment"
+    },
+    {
+      "id": "T19",
+      "text": "Estimate individualised treatment effects from longitudinal EHR data with doubly robust estimators.",
+      "label": "statistics",
+      "source": "P5",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T20",
+      "text": "Extract interpretable features from protein language models with sparse autoencoders.",
+      "label": "data-analysis",
+      "source": "P4",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T21",
+      "text": "Write a PRISMA flow diagram and search strategy appendix.",
+      "label": "literature",
+      "source": "M1",
+      "predicted": "literature"
+    },
+    {
+      "id": "T22",
+      "text": "Assess the risk of bias in the included clinical trials.",
+      "label": "literature",
+      "source": "M1",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T23",
+      "text": "Draft a funder-specific open-access compliance plan and budget justification.",
+      "label": "grant",
+      "source": "P1",
+      "predicted": "grant"
+    },
+    {
+      "id": "T24",
+      "text": "Write the results paragraph comparing AUROC across the ASD screening models.",
+      "label": "manuscript",
+      "source": "M3",
+      "predicted": "manuscript"
+    },
+    {
+      "id": "T25",
+      "text": "Audit the references for retractions and expressions of concern before submission.",
+      "label": "literature",
+      "source": "corpus",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T26",
+      "text": "Check the manuscript and .bib for missing, unused, and duplicate citation keys.",
+      "label": "manuscript",
+      "source": "M1",
+      "predicted": "literature"
+    },
+    {
+      "id": "T27",
+      "text": "Plan a systematic review protocol with inclusion and exclusion criteria.",
+      "label": "literature",
+      "source": "M1",
+      "predicted": "experiment"
+    },
+    {
+      "id": "T28",
+      "text": "Build a dataset card with provenance, license, and preprocessing steps.",
+      "label": "data-management",
+      "source": "seed-assets",
+      "predicted": "data-analysis"
+    },
+    {
+      "id": "T29",
+      "text": "Evaluate the calibration of the uncertainty estimates with ECE and reliability diagrams.",
+      "label": "statistics",
+      "source": "P4",
+      "predicted": "general-research"
+    },
+    {
+      "id": "T30",
+      "text": "Record the exact environment and one-command reproduction path for the analysis repository.",
+      "label": "reproducibility",
+      "source": "M2",
+      "predicted": "reproducibility"
+    }
+  ],
+  "metrics": {
+    "n": 30,
+    "accuracy": 0.5666666666666667,
+    "per_class": {
+      "data-analysis": {
+        "support": 4,
+        "tp": 1,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.5,
+        "recall": 0.25,
+        "f1": 0.3333333333333333
+      },
+      "data-management": {
+        "support": 2,
+        "tp": 1,
+        "fp": 1,
+        "fn": 1,
+        "precision": 0.5,
+        "recall": 0.5,
+        "f1": 0.5
+      },
+      "experiment": {
+        "support": 3,
+        "tp": 3,
+        "fp": 1,
+        "fn": 0,
+        "precision": 0.75,
+        "recall": 1,
+        "f1": 0.8571428571428571
+      },
+      "grant": {
+        "support": 2,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "hypothesis": {
+        "support": 2,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "literature": {
+        "support": 5,
+        "tp": 2,
+        "fp": 1,
+        "fn": 3,
+        "precision": 0.6666666666666666,
+        "recall": 0.4,
+        "f1": 0.5
+      },
+      "manuscript": {
+        "support": 4,
+        "tp": 3,
+        "fp": 1,
+        "fn": 1,
+        "precision": 0.75,
+        "recall": 0.75,
+        "f1": 0.75
+      },
+      "reproducibility": {
+        "support": 2,
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "review-response": {
+        "support": 1,
+        "tp": 0,
+        "fp": 0,
+        "fn": 1,
+        "precision": null,
+        "recall": 0,
+        "f1": null
+      },
+      "statistics": {
+        "support": 5,
+        "tp": 1,
+        "fp": 0,
+        "fn": 4,
+        "precision": 1,
+        "recall": 0.2,
+        "f1": 0.33333333333333337
+      }
+    }
+  }
+}

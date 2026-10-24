@@ -1,0 +1,30 @@
+{"id":"T01","text":"Write the abstract and introduction for a systematic review of AI in breast cancer imaging.","label":"manuscript","source":"M1"}
+{"id":"T02","text":"Search OpenAlex and PubMed for randomized trials of AI mammography and resolve every DOI before citing.","label":"literature","source":"M1"}
+{"id":"T03","text":"Draft the specific aims, significance, and budget justification for an NIH grant.","label":"grant","source":"P2"}
+{"id":"T04","text":"Write a point-by-point response to reviewer 2 and map each comment to the revised units.","label":"review-response","source":"synthetic-corpus"}
+{"id":"T05","text":"Create a one-command reproduction environment with a lockfile and a container.","label":"reproducibility","source":"M2"}
+{"id":"T06","text":"Write a data availability statement and choose a repository and license.","label":"data-management","source":"P1"}
+{"id":"T07","text":"Generate falsifiable hypotheses for drug repurposing in Alzheimer's disease.","label":"hypothesis","source":"P2"}
+{"id":"T08","text":"Design a randomized controlled experiment with a power analysis and decision rules.","label":"experiment","source":"synthetic-corpus"}
+{"id":"T09","text":"Pre-register the analysis plan and primary endpoint before looking at outcomes.","label":"experiment","source":"preregistration"}
+{"id":"T10","text":"Rank candidate hypotheses by novelty, testability, and mechanistic plausibility.","label":"hypothesis","source":"P4"}
+{"id":"T11","text":"Compare responder and non-responder differential expression and apply Benjamini-Hochberg correction.","label":"statistics","source":"immunotherapy CSV"}
+{"id":"T12","text":"Train a classifier on the BWM label CSV and report AUROC with confidence intervals.","label":"data-analysis","source":"scandy CSV"}
+{"id":"T13","text":"Run a mixed-effects model on the longitudinal imaging measurements and report effect sizes.","label":"statistics","source":"synthetic-corpus"}
+{"id":"T14","text":"Summarize the columns, missingness, and label distribution in the single-cell metadata.","label":"data-analysis","source":"seed-assets"}
+{"id":"T15","text":"Check GRIM consistency for the reported means and sample sizes.","label":"statistics","source":"synthetic-corpus"}
+{"id":"T16","text":"Normalize the npy arrays and compare the distributions across conditions.","label":"data-analysis","source":"enzyme-engineering npy"}
+{"id":"T17","text":"Draft the methods section for the federated histopathology experiment.","label":"manuscript","source":"P3"}
+{"id":"T18","text":"Design an ablation study for the sparse autoencoder interpretability pipeline.","label":"experiment","source":"P4"}
+{"id":"T19","text":"Estimate individualised treatment effects from longitudinal EHR data with doubly robust estimators.","label":"statistics","source":"P5"}
+{"id":"T20","text":"Extract interpretable features from protein language models with sparse autoencoders.","label":"data-analysis","source":"P4"}
+{"id":"T21","text":"Write a PRISMA flow diagram and search strategy appendix.","label":"literature","source":"M1"}
+{"id":"T22","text":"Assess the risk of bias in the included clinical trials.","label":"literature","source":"M1"}
+{"id":"T23","text":"Draft a funder-specific open-access compliance plan and budget justification.","label":"grant","source":"P1"}
+{"id":"T24","text":"Write the results paragraph comparing AUROC across the ASD screening models.","label":"manuscript","source":"M3"}
+{"id":"T25","text":"Audit the references for retractions and expressions of concern before submission.","label":"literature","source":"corpus"}
+{"id":"T26","text":"Check the manuscript and .bib for missing, unused, and duplicate citation keys.","label":"manuscript","source":"M1"}
+{"id":"T27","text":"Plan a systematic review protocol with inclusion and exclusion criteria.","label":"literature","source":"M1"}
+{"id":"T28","text":"Build a dataset card with provenance, license, and preprocessing steps.","label":"data-management","source":"seed-assets"}
+{"id":"T29","text":"Evaluate the calibration of the uncertainty estimates with ECE and reliability diagrams.","label":"statistics","source":"P4"}
+{"id":"T30","text":"Record the exact environment and one-command reproduction path for the analysis repository.","label":"reproducibility","source":"M2"}

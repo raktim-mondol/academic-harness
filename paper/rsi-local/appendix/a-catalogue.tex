@@ -1,0 +1,51 @@
+\section{Lesson Catalogue}
+\label{app:catalogue}
+
+The catalogue is a static table in \texttt{rsi-core.js}. A remedy is selected by the longest matching signal prefix. Task-level failures and corrections use the workflow anchor for the dominant task class only when no more specific signal exists. The table below is abridged; several prefixes map to the same lesson.
+
+\newcommand{\sigrow}[2]{{\scriptsize\sig{#1}\newline$\rightarrow$~\sig{#2}}}
+
+\footnotesize
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\begin{longtable}{@{}>{\raggedright\arraybackslash}p{0.32\linewidth}>{\raggedright\arraybackslash}p{0.64\linewidth}@{}}
+\toprule
+Signal $\rightarrow$ action & Lesson pattern \\
+\midrule
+\endfirsthead
+\toprule
+Signal $\rightarrow$ action & Lesson pattern \\
+\midrule
+\endhead
+\sigrow{finding:NUM}{ah\_sweep} & When a data-derived number or fact changes, sweep and re-check before finishing; never retype a computed value. \\
+\sig{finding:BIB},\newline\sig{finding:CITE}\newline$\rightarrow$~\sig{manuscript\_citations} & Resolve the identifier, run \sig{integrity\_check}, and check the manuscript/bibliography before calling the references done. \\
+\sig{finding:STR},\newline\sig{finding:UNIT}\newline$\rightarrow$~\sig{ah\_units} & Keep every \sig{\%\% @unit} line with its paragraph; re-sync anchors after moving prose. \\
+\sigrow{finding:TEX}{ah\_check} & Read the flagged file and line; fix the reference, label, or include; do not delete surrounding text to silence it. \\
+\sigrow{finding:COH}{ah\_source\_search} & Read the flagged coherence clause against its cited source; the T3 check is advisory. \\
+\sigrow{finding:STAT}{stat\_audit} & Audit the statistical claim before reporting it; include test, $N$, effect size, and interval. \\
+\sigrow{finding:FIG}{figure\_audit} & Audit DPI, duplicate panels, and caption/text consistency before finalizing a figure. \\
+\sigrow{finding:REPO}{repo\_audit} & Audit the environment and reproduction command before claiming reproducibility. \\
+\sig{error:latex\_compile},\newline\sig{error:ah\_build}\newline$\rightarrow$~compile & Read the first \LaTeX{} error and fix the source; do not switch to raw \texttt{pdflatex}. \\
+\sigrow{error:citation}{citation} & Validate the bibliography before export or submission. \\
+\sig{error:ah\_fact},\newline\sig{error:ah\_bind}\newline$\rightarrow$~\sig{ah\_fact, ah\_bind} & List facts and compute from data; bind literals instead of hand-editing facts. \\
+\sig{error:}\newline\sig{manuscript\_citations}\newline$\rightarrow$~\sig{manuscript\_citations} & Check missing and undefined keys before submission. \\
+\sig{error:}\newline\sig{integrity\_check}\newline$\rightarrow$~\sig{paper\_resolve} & Resolve the identifier; report unknown rather than clean if the registry cannot answer. \\
+\sigrow{integrity:retracted}{integrity\_check} & Never present a retracted paper as current evidence; report the notice DOI. \\
+\sig{integrity:}\newline\sig{expression\_of\_concern}\newline$\rightarrow$~\sig{integrity\_check} & Surface the expression of concern and its notice DOI; do not present the paper as settled. \\
+\sigrow{integrity:corrected}{integrity\_check} & Read the correction before relying on the paper and mention it to the user. \\
+\sigrow{integrity:unknown}{integrity\_check} & Report unknown and the failed source; never treat unknown as clean. \\
+\sigrow{integrity:not\_found}{paper\_resolve} & Verify the identifier and report not found; never treat it as a clean citation. \\
+\sigrow{integrity:ambiguous}{paper\_resolve} & Put ambiguous title candidates to the user; never silently pick one. \\
+\sigrow{citation\_gap}{manuscript\_citations} & Resolve missing keys rather than inventing them; run the cite check before finishing a section. \\
+\sigrow{stat\_flag}{stat\_audit} & Do not label a boundary $p$-value significant; report the full test summary. \\
+\sigrow{figure\_flag}{figure\_audit} & Check resolution, duplicates, and caption consistency. \\
+\sigrow{repo\_flag}{repo\_audit} & Record the exact environment and reproduction command. \\
+\sigrow{handoff:*}{ah\_check} & Audit once at the start; fix only findings your edits introduce. \\
+\sigrow{gate:continue}{ah\_findings} & The gate is still steering because blockers remain; fix them before claiming completion. \\
+\sigrow{retry:*}{read error} & Read the error and correct inputs; do not repeat the identical call. \\
+\sigrow{error:*}{read error} & Read the error and correct required inputs; do not switch tools without a reason. \\
+\sig{task\_failure:*},\newline\sig{correction:*}\newline$\rightarrow$~workflow anchor & Load the matching research workflow skill and restate the deliverable before the next attempt. \\
+\bottomrule
+\end{longtable}
+
+The workflow anchors are: literature search and PaperMemory for literature; the hypothesis-generation skill for hypotheses; the analysis-design or preregistration skill for experiments; the data-science pipeline skill for data analysis; \texttt{stat\_audit} for statistics; \texttt{academic-harness} for manuscripts; \texttt{funder\_policy} and \texttt{grant\_search} for grants; \texttt{ah\_review} and \texttt{ah\_review\_respond} for review responses; \texttt{repo\_audit} for reproducibility; and the dataset and policy tools for data management. A general-research failure gets a restate-and-verify lesson rather than a domain-specific anchor.

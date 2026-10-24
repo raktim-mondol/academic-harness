@@ -1,0 +1,32 @@
+\begin{figure}[t]
+\centering
+\resizebox{\linewidth}{!}{%
+\begin{tikzpicture}[
+  font=\small,
+  box/.style={draw, rounded corners=2pt, align=center, minimum height=11mm, text width=32mm, fill=white},
+  store/.style={box, fill=blue!5},
+  immutable/.style={draw, dashed, rounded corners=2pt, align=center, fill=black!3, text width=150mm, minimum height=14mm},
+  arrow/.style={-{Latex[length=2mm]}, thick}
+]
+  \node[box] (session) at (0,0) {Research session\\user turn, tools, gate};
+  \node[box] (capture) at (4.2,0) {Capture hooks\\pre-step, tools, gate};
+  \node[store] (store) at (8.4,0) {Local store\\events, episodes, lessons};
+  \node[box] (diagnose) at (8.4,-2.2) {Diagnosis\\signals $\rightarrow$ remedy};
+  \node[box] (validate) at (8.4,-4.4) {Validation\\lint, contradiction, support};
+  \node[box] (admit) at (4.2,-4.4) {Admission \& outcome\\trial vs.\ control};
+  \node[box] (inject) at (0,-4.4) {Injection selector\\task class, rank, cap};
+
+  \draw[arrow] (session) -- (capture);
+  \draw[arrow] (capture) -- (store);
+  \draw[arrow] (store) -- (diagnose);
+  \draw[arrow] (diagnose) -- (validate);
+  \draw[arrow] (validate) -- (admit);
+  \draw[arrow] (admit) -- (inject);
+  \draw[arrow] (inject) -- (session);
+  \node[font=\scriptsize, rotate=90, anchor=south] at (-0.45,-2.2) {inject lessons};
+
+  \node[immutable] (fixed) at (4.2,-6.6) {\textbf{Immutable evaluator plane}\\deterministic \texttt{ah} audit \quad project files and ledger \quad plugin source \quad admission policy \quad benchmark manifests\\read-only to the learning loop; executable changes require normal review and release};
+\end{tikzpicture}}
+\caption{Architecture of \system{}. The loop is clockwise: capture, store, diagnose, validate, admit, inject. Interpreted lesson state is the only mutable surface. The deterministic audit engine, project state, plugin code, admission policy, and benchmark manifests sit in the immutable plane.}
+\label{fig:architecture}
+\end{figure}

@@ -1,0 +1,627 @@
+[
+  {
+    "id": "M1",
+    "label": "Systematic review (breast imaging AI)",
+    "type": "manuscript",
+    "findings": 147,
+    "families": [
+      "BIB",
+      "NUM",
+      "PRF"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 1,
+    "loo_covered": 2,
+    "loo_rate": 1,
+    "any_rate": 1,
+    "heldin_lessons": 3,
+    "loo_lessons": 2,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L4867505cca",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "L9d950ca6c1",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      },
+      {
+        "id": "Lad7c681bd5",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L85b060de24",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "L9a36bdaf03",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  },
+  {
+    "id": "M2",
+    "label": "Empirical paper (coal-spoil categorisation)",
+    "type": "manuscript",
+    "findings": 251,
+    "families": [
+      "BIB",
+      "EVD",
+      "LAT",
+      "NUM",
+      "PRF",
+      "STY"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 1,
+    "loo_covered": 2,
+    "loo_rate": 1,
+    "any_rate": 0.3333333333333333,
+    "heldin_lessons": 2,
+    "loo_lessons": 3,
+    "injected_lessons": 2,
+    "injected_tokens": 62,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L85b060de24",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "L9a36bdaf03",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L85b060de24",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "L9d950ca6c1",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      },
+      {
+        "id": "Lad7c681bd5",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      }
+    ]
+  },
+  {
+    "id": "M3",
+    "label": "Conference paper (ASD screening)",
+    "type": "manuscript",
+    "findings": 159,
+    "families": [
+      "BIB",
+      "EVD",
+      "LAT",
+      "NUM",
+      "PRF"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 1,
+    "loo_covered": 2,
+    "loo_rate": 1,
+    "any_rate": 0.4,
+    "heldin_lessons": 2,
+    "loo_lessons": 3,
+    "injected_lessons": 2,
+    "injected_tokens": 62,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L85b060de24",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "L9a36bdaf03",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L85b060de24",
+        "status": "trial",
+        "task_class": "manuscript",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "L9d950ca6c1",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      },
+      {
+        "id": "Lad7c681bd5",
+        "status": "trial",
+        "task_class": "literature",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      }
+    ]
+  },
+  {
+    "id": "P1",
+    "label": "Proposal (medical imaging uncertainty)",
+    "type": "proposal",
+    "findings": 53,
+    "families": [
+      "BIB",
+      "EVD",
+      "NUM",
+      "PRF",
+      "UNIT"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM",
+      "UNIT"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 0.6666666666666666,
+    "loo_covered": 3,
+    "loo_rate": 1,
+    "any_rate": 0.8,
+    "heldin_lessons": 3,
+    "loo_lessons": 4,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "L89be81fa05",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Keep every %% @unit line with its paragraph; run ah_units after moving or merging prose."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  },
+  {
+    "id": "P2",
+    "label": "Proposal (drug repurposing GNN)",
+    "type": "proposal",
+    "findings": 173,
+    "families": [
+      "BIB",
+      "EVD",
+      "NUM",
+      "PRF"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 1,
+    "loo_covered": 2,
+    "loo_rate": 1,
+    "any_rate": 1,
+    "heldin_lessons": 3,
+    "loo_lessons": 4,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "L89be81fa05",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Keep every %% @unit line with its paragraph; run ah_units after moving or merging prose."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  },
+  {
+    "id": "P3",
+    "label": "Proposal (spatial multi-omics)",
+    "type": "proposal",
+    "findings": 162,
+    "families": [
+      "BIB",
+      "EVD",
+      "NUM",
+      "PRF",
+      "STY",
+      "UNIT"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM",
+      "UNIT"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 0.6666666666666666,
+    "loo_covered": 3,
+    "loo_rate": 1,
+    "any_rate": 0.8333333333333334,
+    "heldin_lessons": 3,
+    "loo_lessons": 4,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "L89be81fa05",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Keep every %% @unit line with its paragraph; run ah_units after moving or merging prose."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  },
+  {
+    "id": "P4",
+    "label": "Proposal (LLM metacognition)",
+    "type": "proposal",
+    "findings": 48,
+    "families": [
+      "BIB",
+      "EVD",
+      "NUM",
+      "PRF",
+      "UNIT"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM",
+      "UNIT"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 0.6666666666666666,
+    "loo_covered": 3,
+    "loo_rate": 1,
+    "any_rate": 0.8,
+    "heldin_lessons": 3,
+    "loo_lessons": 4,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "L89be81fa05",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Keep every %% @unit line with its paragraph; run ah_units after moving or merging prose."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  },
+  {
+    "id": "P5",
+    "label": "Proposal (causal EHR foundation)",
+    "type": "proposal",
+    "findings": 49,
+    "families": [
+      "BIB",
+      "EVD",
+      "NUM",
+      "PRF",
+      "UNIT"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM",
+      "UNIT"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 0.6666666666666666,
+    "loo_covered": 3,
+    "loo_rate": 1,
+    "any_rate": 0.8,
+    "heldin_lessons": 3,
+    "loo_lessons": 4,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "L89be81fa05",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Keep every %% @unit line with its paragraph; run ah_units after moving or merging prose."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  },
+  {
+    "id": "P6",
+    "label": "Proposal (food microbiome immunology)",
+    "type": "proposal",
+    "findings": 116,
+    "families": [
+      "BIB",
+      "EVD",
+      "NUM",
+      "PRF",
+      "UNIT"
+    ],
+    "specific_families": [
+      "BIB",
+      "NUM",
+      "UNIT"
+    ],
+    "heldin_covered": 2,
+    "heldin_rate": 0.6666666666666666,
+    "loo_covered": 3,
+    "loo_rate": 1,
+    "any_rate": 0.8,
+    "heldin_lessons": 3,
+    "loo_lessons": 4,
+    "injected_lessons": 3,
+    "injected_tokens": 82,
+    "generic_tokens": 20,
+    "heldin_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ],
+    "loo_lessons_detail": [
+      {
+        "id": "L08ef3c4364",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Run ah_check after the edit and address the specific finding before finishing."
+      },
+      {
+        "id": "L89be81fa05",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Keep every %% @unit line with its paragraph; run ah_units after moving or merging prose."
+      },
+      {
+        "id": "Lf03fc622f3",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "When a data-derived number or fact changes, run ah_sweep and ah_check before finishing; never retype a computed value."
+      },
+      {
+        "id": "Lfa78e796e2",
+        "status": "trial",
+        "task_class": "grant",
+        "text": "Before citing, resolve the identifier and run integrity_check; run manuscript_citations before calling the reference list done."
+      }
+    ]
+  }
+]

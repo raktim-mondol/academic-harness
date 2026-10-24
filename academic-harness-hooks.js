@@ -17,6 +17,7 @@
  * waits on the vendored venv's uv/pip timeout.
  */
 import { ahEnv, cliArgs, DSH_STATE_FOOTER, ensureAcademicHarnessInstalled, findAhRoot, LOG, run } from './academic-harness-cli.js'
+import { emitGate } from './rsi-bus.js'
 
 export const name = 'academic-harness-ah-hooks'
 export const inject = []
@@ -281,7 +282,11 @@ export function apply(ctx) {
       alreadyHandedOff: handedOff.has(sid),
       alreadyT3: t3Steered.has(sid),
     })
-    if (decision.kind === 'none') return
+    if (decision.kind === 'none') {
+      if (!handedOff.has(sid)) emitGate({ sessionId: sid, cwd, kind: 'none', at: Date.now() })
+      return
+    }
+    emitGate({ sessionId: sid, cwd, kind: decision.kind, at: Date.now() })
     const message = await pluginMessage(decision.text)
     if (decision.kind === 'handoff') handedOff.add(sid)
     if (decision.kind === 't3') t3Steered.add(sid)

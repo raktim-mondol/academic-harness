@@ -1,0 +1,538 @@
+[
+  {
+    "id": "M1",
+    "label": "Systematic review (breast imaging AI)",
+    "type": "manuscript",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "appendix_prisma2020.tex"
+      },
+      {
+        "type": "missing_ref",
+        "file": "appendix_prisma2020.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "appendix_prisma2020.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "appendix_prisma2020.tex"
+      }
+    ],
+    "before": 147,
+    "after": 152,
+    "newChecks": [
+      "BIB-01",
+      "TEX-02",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-02"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "appendix_prisma2020.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 85,
+        "after_family": 87
+      },
+      {
+        "type": "missing_ref",
+        "file": "appendix_prisma2020.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "duplicate_label",
+        "file": "appendix_prisma2020.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "removed_anchor",
+        "file": "appendix_prisma2020.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      }
+    ],
+    "seconds": 0.24
+  },
+  {
+    "id": "M2",
+    "label": "Empirical paper (coal-spoil categorisation)",
+    "type": "manuscript",
+    "mutations": [
+      {
+        "type": "missing_ref",
+        "file": "sections/discussion.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/conclusions.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/abstract.tex"
+      }
+    ],
+    "before": 251,
+    "after": 254,
+    "newChecks": [
+      "TEX-02",
+      "TEX-03",
+      "UNIT-01"
+    ],
+    "detected": [
+      {
+        "type": "missing_ref",
+        "file": "sections/discussion.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/conclusions.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/abstract.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      }
+    ],
+    "seconds": 0.297
+  },
+  {
+    "id": "M3",
+    "label": "Conference paper (ASD screening)",
+    "type": "manuscript",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/introduction.tex"
+      },
+      {
+        "type": "missing_ref",
+        "file": "sections/methodology.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/conclusion.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/conclusion.tex"
+      }
+    ],
+    "before": 159,
+    "after": 164,
+    "newChecks": [
+      "BIB-01",
+      "TEX-02",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-02"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/introduction.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 26,
+        "after_family": 28
+      },
+      {
+        "type": "missing_ref",
+        "file": "sections/methodology.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/conclusion.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/conclusion.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      }
+    ],
+    "seconds": 0.21
+  },
+  {
+    "id": "P1",
+    "label": "Proposal (medical imaging uncertainty)",
+    "type": "proposal",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex"
+      },
+      {
+        "type": "missing_ref",
+        "file": "sections/template-compute.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-compute.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex"
+      }
+    ],
+    "before": 53,
+    "after": 58,
+    "newChecks": [
+      "BIB-01",
+      "TEX-02",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-02"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 19,
+        "after_family": 21
+      },
+      {
+        "type": "missing_ref",
+        "file": "sections/template-compute.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-compute.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 1,
+        "after_family": 2
+      }
+    ],
+    "seconds": 0.212
+  },
+  {
+    "id": "P2",
+    "label": "Proposal (drug repurposing GNN)",
+    "type": "proposal",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/datasets.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/compute.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/compute.tex"
+      }
+    ],
+    "before": 173,
+    "after": 177,
+    "newChecks": [
+      "BIB-01",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-02"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/datasets.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 52,
+        "after_family": 54
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/compute.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/compute.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      }
+    ],
+    "seconds": 0.277
+  },
+  {
+    "id": "P3",
+    "label": "Proposal (spatial multi-omics)",
+    "type": "proposal",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-appendix.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-abstract.tex"
+      }
+    ],
+    "before": 162,
+    "after": 166,
+    "newChecks": [
+      "BIB-01",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-02"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 19,
+        "after_family": 21
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-appendix.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-abstract.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 1,
+        "after_family": 2
+      }
+    ],
+    "seconds": 0.275
+  },
+  {
+    "id": "P4",
+    "label": "Proposal (LLM metacognition)",
+    "type": "proposal",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-compute.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex"
+      }
+    ],
+    "before": 48,
+    "after": 51,
+    "newChecks": [
+      "BIB-01",
+      "TEX-03",
+      "UNIT-01"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 14,
+        "after_family": 15
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-compute.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 1,
+        "after_family": 2
+      }
+    ],
+    "seconds": 0.206
+  },
+  {
+    "id": "P5",
+    "label": "Proposal (causal EHR foundation)",
+    "type": "proposal",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-compute.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex"
+      }
+    ],
+    "before": 49,
+    "after": 53,
+    "newChecks": [
+      "BIB-01",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-05"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-datasets.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 21,
+        "after_family": 23
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-compute.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 1
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 1,
+        "after_family": 2
+      }
+    ],
+    "seconds": 0.212
+  },
+  {
+    "id": "P6",
+    "label": "Proposal (food microbiome immunology)",
+    "type": "proposal",
+    "mutations": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-gap-analysis.tex"
+      },
+      {
+        "type": "missing_ref",
+        "file": "sections/template-timeline.tex"
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-datasets.tex"
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex"
+      }
+    ],
+    "before": 116,
+    "after": 121,
+    "newChecks": [
+      "BIB-01",
+      "TEX-02",
+      "TEX-03",
+      "UNIT-01",
+      "BIB-02"
+    ],
+    "detected": [
+      {
+        "type": "missing_citation",
+        "file": "sections/template-gap-analysis.tex",
+        "expected_family": "BIB",
+        "detected": true,
+        "before_family": 18,
+        "after_family": 20
+      },
+      {
+        "type": "missing_ref",
+        "file": "sections/template-timeline.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "duplicate_label",
+        "file": "sections/template-datasets.tex",
+        "expected_family": "TEX",
+        "detected": true,
+        "before_family": 0,
+        "after_family": 2
+      },
+      {
+        "type": "removed_anchor",
+        "file": "sections/template-compute.tex",
+        "expected_family": "UNIT",
+        "detected": true,
+        "before_family": 1,
+        "after_family": 2
+      }
+    ],
+    "seconds": 0.221
+  }
+]

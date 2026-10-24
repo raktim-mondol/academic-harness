@@ -1,0 +1,60 @@
+{
+  "generated_at": "2026-10-24T05:47:38.943Z",
+  "documents": 9,
+  "prepared": 9,
+  "total_units": 690,
+  "total_citations": 584,
+  "total_bib_entries": 316,
+  "total_findings": 1158,
+  "defect_mutations": 31,
+  "defect_detected": 31,
+  "task_accuracy": 0.5666666666666667,
+  "safety_metrics": {
+    "tp": 20,
+    "fp": 0,
+    "tn": 20,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1,
+    "f1": 1,
+    "accuracy": 1,
+    "n": 40
+  },
+  "safety_heldout_metrics": {
+    "tp": 4,
+    "fp": 1,
+    "tn": 9,
+    "fn": 6,
+    "precision": 0.8,
+    "recall": 0.4,
+    "f1": 0.5333333333333333,
+    "accuracy": 0.65,
+    "n": 20
+  },
+  "preference_metrics": {
+    "tp": 10,
+    "fp": 0,
+    "tn": 10,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1,
+    "f1": 1,
+    "accuracy": 1,
+    "n": 20
+  },
+  "preference_heldout_metrics": {
+    "tp": 5,
+    "fp": 0,
+    "tn": 5,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1,
+    "f1": 1,
+    "accuracy": 1,
+    "n": 10
+  },
+  "pdf_verdicts": {
+    "clean": 7,
+    "corrected": 1
+  }
+}

@@ -1,0 +1,32 @@
+\section{Reproducibility}
+\label{app:reproducibility}
+
+The paper source is modular: \texttt{main.tex} inputs the sections, tables, figures, and appendices. The bibliography contains the survey bibliography plus entries for the survey and the Academic Harness project. To build:
+
+\begin{verbatim}
+cd paper/rsi-local
+latexmk -pdf -interaction=nonstopmode main.tex
+\end{verbatim}
+
+The implementation is in the plugin at version 0.21.0. The RSI checks and the offline plugin suites can be run from the repository root:
+
+\begin{verbatim}
+node scripts/test-rsi.mjs
+node scripts/test-academic-harness.mjs
+node scripts/build-cordis-patch.mjs --check
+academic-harness-rsi benchmark synthetic
+academic-harness-rsi benchmark replay
+academic-harness-rsi benchmark defects --project /path/to/ah/project
+academic-harness-rsi benchmark snapshot --project /path/to/ah/project
+\end{verbatim}
+
+The synthetic benchmark uses a temporary store and does not touch the user store. The defect benchmark copies the project, skips symbolic links, and runs the real audit on the copy; it does not modify the original. The snapshot benchmark writes a benchmark record to the local store. The remote judge is off by default and is not required for any of these commands.
+
+The corpus experiment is in \texttt{paper/rsi-local/experiments/}. Copy \texttt{corpus.example.json} to local \texttt{corpus.json} and replace the placeholder paths; the local manifest is gitignored. The runner copies the listed documents to a temporary work directory, overlays each with \texttt{ah migrate}, audits it, injects defects into a copy, diagnoses held-in and leave-one-project-out lessons, and runs the routing, safety, preference, and PDF-integrity checks. Media and datasets are excluded from the project copies. The originals are not modified.
+
+\begin{verbatim}
+node paper/rsi-local/experiments/run_experiments.mjs
+python3 paper/rsi-local/experiments/make_tables.py
+\end{verbatim}
+
+Results are written to \texttt{experiments/results/} and the paper tables are generated from those JSON files. The current run reports 96 RSI checks, 17 offline suites, nine documents (690 units, 584 citations, 1,158 findings), 31/31 injected defects, 23/23 leave-one-project-out specific-family coverage, 56.7\% routing accuracy, and 0.53 held-out safety F1. The corpus is local and user-specific; the results are descriptive and do not constitute a live model study.

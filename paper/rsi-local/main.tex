@@ -1,0 +1,93 @@
+\documentclass[11pt]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{placeins}
+\usepackage{seqsplit}
+\setlength{\emergencystretch}{2em}
+\newcommand{\sig}[1]{\texttt{\seqsplit{#1}}}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,backgrounds,calc}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[colorlinks=true,linkcolor=blue!55!black,citecolor=blue!55!black,urlcolor=blue!55!black]{hyperref}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\crefname{lstlisting}{listing}{listings}
+\crefname{algorithm}{algorithm}{algorithms}
+
+\lstdefinestyle{json}{
+  basicstyle=\ttfamily\footnotesize,
+  frame=single,
+  rulecolor=\color{black!30},
+  backgroundcolor=\color{black!2},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true
+}
+\lstdefinestyle{js}{
+  basicstyle=\ttfamily\footnotesize,
+  frame=single,
+  rulecolor=\color{black!30},
+  backgroundcolor=\color{black!2},
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  language=JavaScript
+}
+
+\newcommand{\system}{\textsc{OPAL}}
+\newcommand{\ah}{\textsc{Academic Harness}}
+\newcommand{\dsh}{\textsc{DeepSeek Harness}}
+
+\hypersetup{
+  pdftitle={OPAL: Oracle-Preserving Autonomous Lessons for Local Academic Harness Adaptation},
+  pdfauthor={Raktim Mondol},
+  pdfkeywords={oracle-preserving, autonomous lessons, local self-improvement, academic harness, evaluation}
+}
+
+\title{OPAL: Oracle-Preserving Autonomous Lessons for Local Academic Harness Adaptation}
+\author{Raktim Mondol\\Academic Harness Project}
+\date{October 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+\input{sections/00-abstract}
+\end{abstract}
+
+\input{sections/01-introduction}
+\input{sections/02-related-work}
+\input{sections/03-system-context}
+\input{sections/04-design}
+\input{sections/05-implementation}
+\input{sections/06-evaluation}
+\input{sections/07-discussion}
+\input{sections/08-limitations}
+\input{sections/09-conclusion}
+
+\appendix
+\input{appendix/a-catalogue}
+\input{appendix/b-schemas}
+\input{appendix/c-reproducibility}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

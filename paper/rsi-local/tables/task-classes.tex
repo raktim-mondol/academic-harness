@@ -1,0 +1,23 @@
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Research task classes used for lesson scoping. Classification is deterministic keyword scoring over the user prompt; short follow-ups inherit the previous class. The final column names the workflow anchor used by the task-level remedy, not a mandatory tool.}
+\label{tab:task-classes}
+\begin{tabularx}{\linewidth}{@{}>{\raggedright\arraybackslash}p{0.16\linewidth}>{\raggedright\arraybackslash}X>{\raggedright\arraybackslash}p{0.27\linewidth}@{}}
+\toprule
+Class & Typical signals & Workflow anchor \\
+\midrule
+Literature & papers, reviews, citations, DOI, bibliography, evidence synthesis & literature search; PaperMemory \\
+Hypothesis & hypotheses, mechanisms, predictions, discriminating tests & hypothesis skill \\
+Experiment & design, randomization, preregistration, endpoints, power & analysis-design skill \\
+Data analysis & datasets, notebooks, regression, ML, pipelines & data-pipeline skill \\
+Statistics & $p$-values, confidence intervals, effect sizes, multiplicity & \texttt{stat\_audit} \\
+Manuscript & drafting, sections, \LaTeX{}, revision, camera-ready & \texttt{academic-harness} \\
+Grant & aims, funder, budget justification, study section & \texttt{funder\_policy}; \texttt{grant\_search} \\
+Review response & reviewer comments, rebuttal, response letter & \texttt{ah\_review} \\
+Reproducibility & environments, containers, one-command reproduction & \texttt{repo\_audit} \\
+Data management & DMP, repository, metadata, license, accession & dataset/policy tools \\
+General research & no strong class signal & restate and verify \\
+\bottomrule
+\end{tabularx}
+\end{table}

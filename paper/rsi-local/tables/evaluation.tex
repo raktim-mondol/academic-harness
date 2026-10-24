@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Self-assessment against the survey's four evaluation claims \citep{wei2026harnessrsi}. The judgments describe the evidence currently produced by this implementation, not the design intent.}
+\label{tab:self-assessment}
+\begin{tabularx}{\linewidth}{@{}l>{\raggedright\arraybackslash}p{0.22\linewidth}>{\raggedright\arraybackslash}X@{}}
+\toprule
+Claim & Status & What the implementation provides, and what it lacks \\
+\midrule
+Selection & Partial & Episode signals, candidate evidence, admission decisions, and trial/control outcomes are logged. The corpus experiment adds a project-level leave-one-project-out split for lesson coverage. The online stream is still shared between proposal and admission, and there is no separate reporting partition or reusable holdout. \\
+Activation & Partial & Injection is logged with lesson identifiers and token counts; the lesson is inserted into the model input, and the system records a reached-action proxy when the prescribed tool is invoked. The corpus experiment measures injection budget and catalogue coverage. There is no carried/adherence measure showing that the agent followed the lesson or that the effect reached the output. \\
+Attribution & Partial & Injected and control turns share the same harness and task class, and the selector randomizes the injection decision. The defect result is an oracle property, not a lesson effect. There are no repeated runs, variance estimates, matched inference budgets, or a placebo arm, so the comparison is observational. \\
+Improvement & Not established & The corpus experiment validates oracle detection and leave-one-project-out catalogue coverage; the routing and held-out safety tests are negative (56.7\% and 0.53 F1). No live model or blinded human evaluation yet shows that research quality improves. \\
+\bottomrule
+\end{tabularx}
+\end{table}

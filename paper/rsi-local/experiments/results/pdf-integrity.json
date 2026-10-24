@@ -1,0 +1,109 @@
+{
+  "skipped": false,
+  "pdfs": [
+    {
+      "id": "PDF1",
+      "file": "s41592-024-02201-0.pdf",
+      "doi_count": 0,
+      "error": "Syntax Warning: May not be a PDF file (continuing anyway)\nSyntax Error (2): Illegal character <21> in hex string\nSyntax Error (4): Illegal character <4f> in hex string\nSyntax Error (6): Illegal charac"
+    },
+    {
+      "id": "PDF2",
+      "file": "s41596-025-01220-1.pdf",
+      "doi_count": 0,
+      "error": "Syntax Warning: May not be a PDF file (continuing anyway)\nSyntax Error (2): Illegal character <21> in hex string\nSyntax Error (4): Illegal character <4f> in hex string\nSyntax Error (6): Illegal charac"
+    },
+    {
+      "id": "PDF3",
+      "file": "stair-2609.03874.pdf",
+      "doi_count": 0,
+      "error": null
+    },
+    {
+      "id": "PDF4",
+      "file": "harness-self-evolution.pdf",
+      "doi_count": 11,
+      "error": null
+    },
+    {
+      "id": "PDF5",
+      "file": "self-evolving-agent-harness.pdf",
+      "doi_count": 4,
+      "error": null
+    },
+    {
+      "id": "PDF6",
+      "file": "research-template.pdf",
+      "doi_count": 9,
+      "error": null
+    }
+  ],
+  "verdicts": [
+    {
+      "doi": "10.18653/v1/2024.emnlp-main.525",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "Optimizing Instructions and Demonstrations for Multi-Stage Language Model Programs",
+      "error": null,
+      "seconds": 0.717
+    },
+    {
+      "doi": "10.1038/s41586-025-08661-4",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "Optimizing generative AI by backpropagating language model feedback",
+      "error": null,
+      "seconds": 0.273
+    },
+    {
+      "doi": "10.18653/v1/2026.findings-acl.866",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "Memp: Exploring Agent Procedural Memory",
+      "error": null,
+      "seconds": 0.323
+    },
+    {
+      "doi": "10.1145/3786335.3813196",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "Automatically Learning Skills for Coding Agents",
+      "error": null,
+      "seconds": 0.273
+    },
+    {
+      "doi": "10.1145/3805712.3808466",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "SkillForge: Forging Domain-Specific, Self-Evolving Agent Skills in Cloud Technical Support",
+      "error": null,
+      "seconds": 0.298
+    },
+    {
+      "doi": "10.18653/v1/2026.eacl-long.333",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "Dynamic Cheatsheet: Test-Time Learning with Adaptive Memory",
+      "error": null,
+      "seconds": 0.273
+    },
+    {
+      "doi": "10.1016/j.aiopen.2025.11.004",
+      "pdf": "PDF4",
+      "verdict": "corrected",
+      "title": "Symbolic learning enables self-evolving agents",
+      "error": null,
+      "seconds": 0.284
+    },
+    {
+      "doi": "10.18653/v1/2025.acl-long.1354",
+      "pdf": "PDF4",
+      "verdict": "clean",
+      "title": "Gödel Agent: A Self-Referential Agent Framework for Recursively Self-Improvement",
+      "error": null,
+      "seconds": 0.288
+    }
+  ],
+  "unique_dois": 21,
+  "sampled": 8
+}

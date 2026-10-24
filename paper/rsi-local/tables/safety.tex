@@ -1,0 +1,16 @@
+\begin{table}[t]
+\centering
+\footnotesize
+\caption{Safety and preference validation. The development set was used to find and fix two lint gaps; the held-out set was not used for tuning. The positive class is \emph{unsafe} for the lint and \emph{durable} for preferences.}
+\label{tab:safety}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+Evaluation & $n$ & Precision & Recall & F1 & Accuracy \\
+\midrule
+Safety lint (dev) & 40 & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Safety lint (held-out) & 20 & 80.0\% & 40.0\% & 53.3\% & 65.0\% \\
+Preference (dev) & 20 & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+Preference (held-out) & 10 & 100.0\% & 100.0\% & 100.0\% & 100.0\% \\
+\bottomrule
+\end{tabular}
+\end{table}

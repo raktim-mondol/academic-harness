@@ -515,3 +515,17 @@
 
 - id: academic-harness-hooks
   name: academic-harness/ah-hooks
+
+# Local recursive self-improvement (RSI). Captures tool outcomes and user
+# corrections on this machine, diagnoses recurring research failures, admits
+# short lessons automatically, and injects them into later turns. The store is
+# $DSH_HOME/ah-rsi (or AH_RSI_STORE); it never writes to the plugin, the ah
+# engine, the project, or the audit/evaluation code. `ah_rsi` is the visible
+# control surface; `academic-harness-rsi` is the offline CLI. Set AH_RSI=off to
+# disable capture/injection, or AH_RSI=observe to capture without injecting.
+# See rsi.js, rsi-hooks.js, and docs/RSI.md.
+- id: academic-harness-rsi
+  name: academic-harness/rsi
+
+- id: academic-harness-rsi-hooks
+  name: academic-harness/rsi-hooks
