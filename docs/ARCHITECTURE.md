@@ -88,7 +88,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Clinical, datasets, policy | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js` |
 | Workspace and notebook | `notebook.js`, `notebook-export.js`, `notebook-zip.js`, `zvec-grep.js`, `zvec-index.js`, `zvec-index-engine.js`, `fold-core.js`, `fold-text.js`, `scientific-result.js` |
 | Figures and file formats | `image-generate.js`, `image-gen-client.js`, `mermaid-render.js`, `sci-inspect.js`, `latex-compile.js`, `python-helpers/` |
-| Remote compute | `modal-run.js`, `modal-instances.js`, `runpod-run.js`, `runpod-client.js`, `runpod-instances.js`, `vastai-run.js`, `vastai-client.js`, `vastai-instances.js`, `ssh-client.js` |
+| Remote compute | `modal-run.js`, `modal-runtime.js`, `modal-instances.js`, `runpod-run.js`, `runpod-client.js`, `runpod-instances.js`, `vastai-run.js`, `vastai-client.js`, `vastai-instances.js`, `ssh-client.js`, `workspace-path.js`, `pnpm-workspace.js` |
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |

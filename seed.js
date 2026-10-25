@@ -2,6 +2,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, w
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { patchAcademicHarnessProfiles } from './pnpm-workspace.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 
@@ -81,4 +82,8 @@ export function seed() {
   migrateLegacyNotebookSkill(dest)
   copyMissing(join(here, 'skills'), dest)
   refreshStaleSkills(dest)
+  const patched = patchAcademicHarnessProfiles(home)
+  if (patched.length) {
+    console.warn(`[academic-harness] pnpm: set allowBuilds for the Modal SDK's optional native deps in ${patched.length} profile(s)`)
+  }
 }

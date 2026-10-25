@@ -22,13 +22,9 @@ Pick by job shape: Runpod for a predictable pod and a curated GPU list; Modal fo
 
 `runpod_run` and `vastai_run` also need `ssh`, `scp`, and `ssh-keygen` on `PATH` (OpenSSH client tools).
 
-`modal_run` additionally needs the optional Modal SDK, which Academic Harness deliberately does not install so that Add Plugin never blocks on native build scripts. Install it into the profile and restart DSH:
+`modal_run` also needs the Modal SDK, but no manual step is required: on first use it loads the SDK from the profile if present, otherwise installs a pinned copy into `$DSH_HOME/modal-sdk` (with pnpm's build-script policy pre-configured) and uses it immediately — no DSH restart. The first call therefore takes a few extra seconds while npm/pnpm fetches it.
 
-```sh
-dsh plugin --profile <profile> add modal
-```
-
-Without it, `modal_run` returns an `sdk_missing` message with the same instruction; the other two tools remain available.
+Set `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` to disable that managed install. If the SDK is unavailable, `modal_run` returns an `sdk_missing`/`sdk_install_failed` message with the manual command (`dsh plugin --profile <profile> add modal`, then restart); the other two tools remain available. Academic Harness also writes `allowBuilds: {cbor-extract: false, protobufjs: false}` into each profile that depends on it, so a manual profile install exits 0 under pnpm 11 instead of failing with `ERR_PNPM_IGNORED_BUILDS`.
 
 Vast.ai requires an SSH key on the account **before** an instance exists. `vastai_run` handles that itself: it registers a temporary per-call key and removes it during teardown. Pass `ssh_key_path` to use an already-registered key instead.
 

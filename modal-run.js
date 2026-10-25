@@ -6,6 +6,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_MODAL_INSTANCE_ID, MODAL_INSTANCE_IDS, resolveModalInstance } from './modal-instances.js'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './workspace-path.js'
+import { ModalSdkError, ensureModalSdk } from './modal-runtime.js'
 
 const APP_NAME = 'academic-harness'
 const WORKDIR = '/workspace'
@@ -85,7 +86,7 @@ export function applyModalRun(ctx) {
       `Pick an instance by GPU need (one of: ${MODAL_INSTANCE_IDS.join(', ')}; default "${DEFAULT_MODAL_INSTANCE_ID}").`,
       'Upload inputs with files_in (workspace-relative; files or directories) and name expected outputs in files_out — they are copied back into the local workspace.',
       'GPU instances default to a CUDA/PyTorch image; override with image_base. Pass volume_name to mount a persistent Modal Volume at /workspace so data survives between calls.',
-      'Requires MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (https://modal.com/settings) and the optional `modal` SDK in this profile. Always terminates the sandbox when done.',
+      'Requires MODAL_TOKEN_ID and MODAL_TOKEN_SECRET (https://modal.com/settings). The Modal SDK is installed into $DSH_HOME/modal-sdk on first use, so no profile install or restart is needed. Always terminates the sandbox when done.',
     ].join(' '),
     parameters: {
       command: { type: 'string', required: true, description: 'Shell command to run remotely (via sh -lc) in /workspace.' },
@@ -127,18 +128,19 @@ export function applyModalRun(ctx) {
 
       let ModalClient
       try {
-        ({ ModalClient } = await import('modal'))
+        ({ ModalClient } = await ensureModalSdk({ signal: exec.signal }))
       } catch (error) {
-        const code = error?.code
-        if (code === 'ERR_MODULE_NOT_FOUND' || code === 'MODULE_NOT_FOUND') {
-          return {
-            error: 'sdk_missing',
-            text: 'The optional Modal SDK is not installed in this DSH profile. '
-              + 'Install it with `dsh plugin --profile <profile> add modal`, then restart dsh; '
-              + 'or use `runpod_run` / `vastai_run` instead.',
-          }
+        if (exec.signal?.aborted) return { error: 'aborted', text: 'Modal run was cancelled while preparing the SDK.' }
+        if (error instanceof ModalSdkError && error.code === 'sdk_missing') {
+          return { error: 'sdk_missing', text: error.message }
         }
-        throw error
+        const msg = error instanceof Error ? error.message : String(error)
+        return {
+          error: 'sdk_install_failed',
+          text: `The Modal SDK could not be prepared: ${msg}\n`
+            + 'Retry, or install it into the profile with `dsh plugin --profile <profile> add modal` and restart dsh; '
+            + '`runpod_run` / `vastai_run` remain available.',
+        }
       }
       const root = workspaceRoot(exec)
       let inFiles

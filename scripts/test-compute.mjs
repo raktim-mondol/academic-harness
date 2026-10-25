@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -26,6 +26,7 @@ import {
 import { KEY_FIELDS } from '../settings-keys.js'
 import { resolveWorkspacePath } from '../workspace-path.js'
 import { tarDownloadDir, tarUploadDir } from '../ssh-client.js'
+import { patchAcademicHarnessProfiles, patchAllowBuilds } from '../pnpm-workspace.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 let checks = 0
@@ -210,6 +211,72 @@ await check('failed transfers reject and leave the previous output intact', asyn
   }
 })
 
+await check('pnpm allowBuilds patch handles block, inline, and idempotent cases', () => {
+  const empty = patchAllowBuilds('')
+  assert.match(empty.text, /cbor-extract: false/)
+  assert.match(empty.text, /protobufjs: false/)
+
+  const block = patchAllowBuilds('packages:\n  - .\n\nallowBuilds:\n  cbor-extract: true\n')
+  assert.match(block.text, /cbor-extract: true/, 'existing decision is preserved')
+  assert.match(block.text, /protobufjs: false/)
+  assert.equal(patchAllowBuilds(block.text).changed, false, 'block patch is idempotent')
+
+  const inline = patchAllowBuilds('allowBuilds: { cbor-extract: false }\n')
+  assert.match(inline.text, /cbor-extract: false/)
+  assert.match(inline.text, /protobufjs: false/)
+  assert.equal(patchAllowBuilds(inline.text).changed, false, 'inline patch is idempotent')
+
+  const fourSpace = patchAllowBuilds('allowBuilds:\n    cbor-extract: false\n')
+  assert.match(fourSpace.text, /^    protobufjs: false$/m, 'inserted entries follow the existing indentation')
+
+  const unrelated = patchAllowBuilds('packages:\n  - .\n')
+  assert.match(unrelated.text, /^packages:/)
+  assert.match(unrelated.text, /allowBuilds:/)
+})
+
+await check('profile patch touches only academic-harness profiles and is idempotent', () => {
+  const home = mkdtempSync(join(tmpdir(), 'ah-pnpm-profiles-'))
+  try {
+    mkdirSync(join(home, 'profiles', 'ah'), { recursive: true })
+    mkdirSync(join(home, 'profiles', 'other'), { recursive: true })
+    writeFileSync(join(home, 'profiles', 'ah', 'package.json'), JSON.stringify({
+      dependencies: { 'academic-harness': 'github:raktim-mondol/academic-harness' },
+    }))
+    writeFileSync(join(home, 'profiles', 'other', 'package.json'), JSON.stringify({ dependencies: { other: '1.0.0' } }))
+    const first = patchAcademicHarnessProfiles(home)
+    assert.deepEqual(first, [join(home, 'profiles', 'ah')])
+    assert.ok(existsSync(join(home, 'profiles', 'ah', 'pnpm-workspace.yaml')))
+    assert.ok(!existsSync(join(home, 'profiles', 'other', 'pnpm-workspace.yaml')))
+    assert.deepEqual(patchAcademicHarnessProfiles(home), [], 'second pass is a no-op')
+  } finally {
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+await check('managed Modal runtime respects the skip-install switch', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'ah-modal-runtime-'))
+  const prevHome = process.env.DSH_HOME
+  const prevSkip = process.env.ACADEMIC_HARNESS_MODAL_SKIP_INSTALL
+  process.env.DSH_HOME = home
+  process.env.ACADEMIC_HARNESS_MODAL_SKIP_INSTALL = '1'
+  try {
+    const { ensureModalSdk } = await import('../modal-runtime.js')
+    try {
+      const sdk = await ensureModalSdk()
+      assert.equal(typeof sdk.ModalClient, 'function', 'profile-installed SDK is used when present')
+    } catch (error) {
+      assert.equal(error.code, 'sdk_missing', 'skip switch reports sdk_missing, not an install')
+    }
+    assert.ok(!existsSync(join(home, 'modal-sdk')), 'skip switch must not install anything')
+  } finally {
+    if (prevHome === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = prevHome
+    if (prevSkip === undefined) delete process.env.ACADEMIC_HARNESS_MODAL_SKIP_INSTALL
+    else process.env.ACADEMIC_HARNESS_MODAL_SKIP_INSTALL = prevSkip
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
 await check('remote-compute credentials are registered in settings', () => {
   for (const field of ['MODAL_TOKEN_ID', 'MODAL_TOKEN_SECRET', 'RUNPOD_API_KEY', 'VAST_API_KEY']) {
     assert.ok(KEY_FIELDS.includes(field), `${field} missing from Settings`)
@@ -222,11 +289,11 @@ await check('package.json ships every compute module and exports the tools', () 
     'modal-run.js', 'modal-instances.js',
     'runpod-run.js', 'runpod-client.js', 'runpod-instances.js',
     'vastai-run.js', 'vastai-client.js', 'vastai-instances.js',
-    'ssh-client.js', 'workspace-path.js',
+    'ssh-client.js', 'workspace-path.js', 'modal-runtime.js', 'pnpm-workspace.js',
   ]) {
     assert.ok(pkg.files.includes(file), `${file} missing from files[]`)
   }
-  for (const key of ['./modal-run', './runpod-run', './vastai-run', './ssh-client', './workspace-path']) {
+  for (const key of ['./modal-run', './runpod-run', './vastai-run', './ssh-client', './workspace-path', './modal-runtime', './pnpm-workspace']) {
     assert.ok(pkg.exports[key], `${key} missing from exports`)
   }
   assert.ok(pkg.peerDependencies.modal.startsWith('^0.11'), 'modal peer dependency is stale')

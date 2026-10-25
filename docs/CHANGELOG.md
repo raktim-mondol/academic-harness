@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.25.1
+
+- **Modal SDK install friction is gone.** `modal_run` now loads the SDK from the profile when present, otherwise installs a pinned `modal@0.11.1` into `$DSH_HOME/modal-sdk` on first use and uses it without restarting dsh. The managed install pre-configures pnpm's `allowBuilds` for its two optional native deps, and `seed.js` writes the same policy into every existing profile that depends on Academic Harness — so a manual `dsh plugin add modal` no longer fails with `ERR_PNPM_IGNORED_BUILDS` under pnpm 11. `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` keeps the manual-only path.
+
 ## 0.25.0
 
 - **Vast.ai joins the remote-compute tools.** `vastai_run` searches live marketplace offers for a GPU class, rents the cheapest verified machine, uploads `files_in`, runs a command, copies `files_out` back, and destroys the instance. It supports spot bidding (`bid_price`), a pinned `offer_id`, multiple GPUs (`num_gpus`), an existing `volume_id`, and a price cap (`max_price_dph`). Its SSH key is registered per call and removed during teardown. New `vastai` skill, `VAST_API_KEY` in Settings, and [Compute](COMPUTE.md) coverage.

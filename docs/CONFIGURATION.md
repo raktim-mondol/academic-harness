@@ -99,7 +99,7 @@ The Academic Harness preset mounts once as a **standing composition** for the li
 | `SUBAGENT_MODEL_COMPLEX`, `SUBAGENT_MODEL_VISION` | After a `dsh` restart |
 | `ZVEC_GREP_EMBEDDING`, `ZVEC_GREP_API_KEY` | After a `dsh` restart (fed into `zg server on`) |
 | `AH_ENABLE_OPTIONAL_TOOLS` | After a `dsh` restart; the preset rows exist either way |
-| Modal SDK (`dsh plugin --profile <profile> add modal`) | After a `dsh` restart; `modal_run` is unavailable until then |
+| Modal SDK | No restart: the first `modal_run` call installs it into `$DSH_HOME/modal-sdk` (unless `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1`); a manual profile install still needs a restart |
 | `PAPERMEMORY_CLI`, `TEXTFOLD_*`, `ACADEMIC_HARNESS_CLI` | After a `dsh` restart (the MCP/runtime mount is standing) |
 | `paper_mcp` server registrations | Tools appear as `mcp__<serverName>__*`; if a mount does not appear, restart `dsh` |
 
