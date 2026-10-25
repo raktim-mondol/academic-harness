@@ -100,7 +100,7 @@ zg server off
 
 The Academic Harness profile's bundle patch sets `agent-preset-registry` `default: academic-harness` and inserts only `preset-academic-harness` (DSH 0.2+ no longer reads `$DSH_HOME/.agent-presets/`). New chats on this profile start on **Academic Harness**, and the selector lists no legacy preset. Confirm the preset selector at the top of the message box reads "Academic Harness"; if it still says Standard/PTC, the profile patch did not apply.
 
-The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation`, `manuscript_citations`, `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy`/`funder_policy` (datasets and venue/funder policy), and the optional `author_lookup`/`openreview` are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, image_generate, sci_inspect, latex_compile, mermaid_render, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
+The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), `paper_fold`, PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation`, `manuscript_citations`, `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy`/`funder_policy` (datasets and venue/funder policy), and the optional `author_lookup`/`openreview` are only present on this preset — a session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`. The general-purpose tools below (notebook, fold_text, image_generate, sci_inspect, latex_compile, mermaid_render, pdf_to_markdown, modal_run/runpod_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
 
 ## What it adds
 
@@ -122,6 +122,7 @@ The persona, the longer research system prompt (notebook discipline, specialist 
   `ACADEMIC_HARNESS_SKILLS_DIR` (or a `~/scientific-agent-skills/skills` checkout) still works as an override if you want a different catalogue instead — available on every preset; the old `RESEARCHCRAFT_SKILLS_DIR` name is still honored as a fallback
 - `notebook` tool — log, read, and export a living lab notebook (JSONL under `<cwd>/.dsh/notebook/`), shared across a subagent delegation tree, with a zip-bundle export alongside the plain Markdown one — every preset
 - `scientific_result` tool — a structured, schema-validated "final finding" card (table or statistical-test), distinct from the notebook's running log — every preset
+- `fold_text` tool — deletion-only Markdown folding at five levels (Full, Brief, Points, Outline, Gist), with no model call or network. Short texts come back unchanged; code and tables are kept at Brief/Points and dropped at Outline/Gist — every preset — see [Reply folding](#reply-folding)
 - Specialist briefs (code-reviewer, literature-researcher, …) for the DSH `subagent` tool, plus `subagent_pro` and `subagent_vision` — two more delegation tools pinned to a different model for unusually heavy reasoning and image-reading tasks respectively — see [Subagent model routing](#subagent-model-routing) — every preset
 - `image_generate` tool for conceptual scientific figures (Gemini "nano banana" by default) — every preset
 - `sci_inspect` tool for scientific file formats (chemistry, structure, mass spec, arrays, imaging, AnnData) — every preset
@@ -129,6 +130,7 @@ The persona, the longer research system prompt (notebook discipline, specialist 
 - `mermaid_render` tool (Mermaid text → SVG, via [Pele](https://github.com/obsidianmd/pele), no browser or mermaid-cli) — every preset
 - [Academic Harness engine](docs/ACADEMIC-HARNESS-ENGINE.md) — writing oracle for LaTeX papers, grants, theses, literature reviews, and rebuttals: native `ah_*` tools, paper-state card, protected-path guard, post-edit checks, and a gate that settles a writing turn. The engine is vendored inside this plugin (`vendor/academic-harness`); Pi is not required. Inactive outside a tree with `ah.yaml` — **Academic Harness preset only** — see [Academic Harness engine](#academic-harness-engine)
 - `pdf_to_markdown` tool (PDF → Markdown, via [pdf-inspector](https://github.com/firecrawl/pdf-inspector)) for literature-survey conversion of downloaded papers — every preset
+- `paper_fold` tool — map-first paper reading through [TextFold](https://github.com/chenxiachan/textfold) (Apache-2.0): section map first, then one section at a time. Local first-sentence levels by default with no model call; model-written levels only with `generate: true` and a TextFold provider. Installs a pinned Python runtime under `$DSH_HOME/textfold` on first preset start. **Academic Harness preset only** — see [Read at the right level](#read-at-the-right-level)
 - `runpod_run` (works with its API key) and `modal_run` (needs the optional `modal` SDK installed in the profile) for remote GPU/CPU compute offload, plus bundled `modal`/`runpod` skills covering the rest of each CLI (Serverless endpoints, volumes/secrets, Hub templates, …) — see [Remote compute](#remote-compute) — every preset
 - `research_template` tool over a ~330-template research-task catalogue (not DSH's Rhai `workflow` orchestrator) — every preset
 - Literature and web search: a `literature_search` multi-source router plus OpenAlex, Semantic Scholar, Crossref, arXiv, PubMed/Europe PMC, CORE, Elicit, FutureHouse, Consensus, Parallel, Brave, Tavily, Exa, Perplexity, and Jina Reader (native REST tools), plus Parallel, Firecrawl, and Scite (MCP connectors), `parallel_extract` (URL extraction), and `paper_download` (Unpaywall open-access PDF resolver) — **Academic Harness preset only**
@@ -340,6 +342,8 @@ The SQLite store is PaperMemory's default: `~/.local/share/papermemory/papermemo
 
 `paper_download` calls ingest on the saved PDF (and DOI metadata when a DOI was given); `pdf_to_markdown write_to` auto-ingests the converted markdown (page-subset conversions are deliberately not ingested) and forwards converter/OCR signals. The agent is steered to `recap` on paper-writing tasks, to cite only memory hits, to check `supports_statement`/`degradation`, and to `cite_check` before treating a section as finished. Load the bundled `papermemory` skill (`skills/papermemory`) for the full workflow.
 
+`paper_fold` is the orientation layer in front of that: a section map from the author's first sentences, not evidence. Do not cite a `paper_fold` line as a quote; use `quote_check`, `trace`, or `get` on the stored paper, and keep citation keys from `cite`.
+
 **Auto-ingest project scope.** Both auto-ingest paths pass the workspace root (`cwd`) to PaperMemory and let it resolve the project, in this order: `PAPERMEMORY_PROJECT` (slugified) → nearest `ah.yaml` ancestor → a manuscript whose `root_path` equals the workspace → `unassigned`. Explicit ingest uses the same resolution (`papermemory_ingest` with `cwd`, or CLI `papermemory ingest --cwd PATH`); an explicit `--project` wins over `cwd` and is slugified. Set `PAPERMEMORY_PROJECT` to override the detected project.
 
 **Project-key migration.** Papers ingested before v0.15.0 were tagged with the workspace directory slug. After upgrading, a new auto-ingest in the same workspace may land under the manuscript or `ah.yaml` slug instead, so one project can temporarily split across two keys. Set `PAPERMEMORY_PROJECT` to the old slug for new ingests, or re-ingest the affected papers under the canonical project; there is no automatic `project rekey` command.
@@ -514,7 +518,38 @@ The tool finds `python-helpers/.venv` automatically. Override with `ACADEMIC_HAR
 
 ## Downloading and reading papers
 
-Two tools cover the full loop for actually reading a paper rather than just its abstract: `paper_download` (Academic Harness preset only — see [Academic and web search](#academic-and-web-search)) gets the PDF onto disk, and `pdf_to_markdown` (every preset) turns it into readable text. A successful `paper_download` is also ingested into PaperMemory (see [Paper memory](#paper-memory)).
+Three tools cover the full loop for actually reading a paper rather than just its abstract: `paper_fold` (Academic Harness preset only) gives a map-first orientation, `paper_download` (Academic Harness preset only — see [Academic and web search](#academic-and-web-search)) gets the PDF onto disk, and `pdf_to_markdown` (every preset) turns it into readable text. A successful `paper_download` is also ingested into PaperMemory (see [Paper memory](#paper-memory)).
+
+### Read at the right level
+
+`paper_fold` turns a known paper (DOI, arXiv/PMC/bioRxiv ID, URL, or workspace file) into a section map, then lets the agent open one section at a time. It is powered by [TextFold](https://github.com/chenxiachan/textfold); the Python package is an optional runtime, not vendored.
+
+| Action | What it returns |
+|---|---|
+| `map` | the whole document's section map: titles, section ids, and first-sentence takeaways (default `level: "takeaway"`) |
+| `section` | one section at `topic`/`takeaway`/`key`/`brief`/`full` (default `key`); use an id or number from the map |
+| `doc` | TextFold's `textfold/doc` JSON, written to `write_to` |
+| `export` | Markdown at the requested level, written to `write_to` |
+| `status` | the installed version, data directory, and install state |
+
+```text
+paper_fold action=map ref=2501.12345
+paper_fold action=section ref=2501.12345 section=S2 level=key
+paper_fold action=doc ref=2501.12345 write_to=literature/paper.json
+```
+
+**Local levels are the default.** TextFold builds them from the author's own first sentences, so `map` and `section` work with no model call and no quota spend. `generate: true` is opt-in and asks TextFold to write its five levels; that needs TextFold's own provider (Claude Code, Codex, Pi, or an OpenAI-compatible endpoint in `~/.textfold/settings.json`). DSH's model route is not automatically visible to TextFold, so the tool never assumes it and returns `model-required` if no provider answers.
+
+**Runtime and storage.** The first preset start installs `textfold==0.10.31` into `$DSH_HOME/textfold/venv` with `uv` (else `python -m venv` + pip). Documents live in `$DSH_HOME/textfold/data`. The install runs in the background; the first `paper_fold` call waits for it. Overrides are environment-only:
+
+| Variable | Effect |
+|---|---|
+| `TEXTFOLD_SKIP_INSTALL=1` | never install the managed runtime |
+| `TEXTFOLD_PYTHON=/path/to/python` | use an interpreter that already has `textfold` |
+| `TEXTFOLD_CLI=/path/to/textfold` | use a TextFold executable directly |
+| `TEXTFOLD_DATA=/path` | a different document store (absolute path recommended) |
+
+**Boundaries.** `paper_fold` is orientation, not evidence: `paper_fold` lines are not quotes. Quotes, numbers, claims, and citation keys come from PaperMemory (`quote_check`, `trace`, `cite`). Use `pdf_to_markdown` for the full text, for a scanned PDF, for a PaperMemory ingest, or when a PDF's map is shallow. HTML/JATS sources (arXiv, PMC) produce better maps than PDFs. Scanned PDFs are not handled by `paper_fold`: it returns `scanned-pdf` and the agent routes them to `pdf_to_markdown`'s OCR path or `subagent_vision`. `paper_fold` is not a discovery tool — use `literature_search`, `openalex_search`, `s2_search`, and the other academic databases.
 
 ### PDF to Markdown
 
@@ -560,11 +595,38 @@ A subagent the top-level agent delegates to runs in its own DSH session, but its
 
 `scientific_result` is a structured, schema-validated card for a *terminal* finding — a results table (`kind: "table"`) or a statistical-test summary (`kind: "statistical_test"`) — with up to 20 linked workspace-relative artifacts (`role`: figure/table/script/report/data/log). Use it once you have a concrete finding to report; use `notebook` for the running log on the way there. It has no separate storage — the call and its result are already part of the session transcript.
 
+## Reply folding
+
+`fold_text` folds long Markdown without a model call or network. It only deletes: the surviving words are the words that were written, so a fold never paraphrases or adds a claim.
+
+| Level | What remains |
+|---|---|
+| `full` | the text as written |
+| `brief` | the first one or two sentences of each paragraph, one per list item |
+| `points` | the first sentence of each paragraph and list item |
+| `outline` | headings plus the first sentence under each (and an opening paragraph before the first heading); falls back to `points` when there are no headings |
+| `gist` | the first sentence |
+
+In the DSH chat, a completed reply long enough to fold shows a **Read folded:** row under the turn, with Full / Brief / Points / Outline / Gist. Choosing a level opens a folded panel below the reply; the original message stays above it and is never replaced. The row is additive — it is a `conversation.chat.turnTail` contribution, not a replacement for the assistant renderer — and it appears only when the fold hides at least a quarter of the reply. Tool output and reasoning are not folded. The last chosen level is remembered in the browser.
+
+From the row, **Open in sidebar** opens the same reply in the right dock as a larger reading pane. The pane has its own level buttons (Full shows all of the reply's prose there), keeps the selected level, and is a session view: after a page reload, reopen it from the row. Opening another reply updates the same tab. The inline row remains the primary view.
+
+A text under about 80 words, or one where a fold would hide less than a quarter, comes back unchanged (`folded: false`). Code blocks and tables are kept at `brief` and `points`, dropped at `outline` and `gist`; a code block longer than eight lines becomes a one-line marker. CJK text is measured by reading effort, and Chinese/Japanese stops (`。！？`) end sentences without a following space.
+
+Use it on a long report, note, or reply before handing the text to another tool. Pass `write_to` to save the folded Markdown in the workspace instead of returning it inline. The tool is available on every preset. The Academic Harness preset also asks the model to lead with the point in each paragraph (the separate `academic-harness-response-shape` prompt section); that makes the folds read better but is not required — the tool deletes prefixes either way.
+
 ## Workflow templates
 
 `research_template` browses (`action: "list"`, filterable by `category`/`query`) and retrieves (`action: "get"`, with `values` filling `{placeholder}` tokens) a catalogue of ~330 one-click research-task prompt templates across 22 disciplines, ported from Academic Harness's own template library. It is a different tool from DSH's `workflow` (Rhai multi-agent scripts); the Academic Harness preset mounts both, so they cannot share a name.
 
 ## Release notes
+
+### 0.23.0
+
+- `fold_text` folds Markdown at five levels (Full, Brief, Points, Outline, Gist) with no model call, preserving the original words and leaving short texts whole. The Academic Harness preset now also asks for point-first replies in a separate, preset-scoped response-shape section, so a fold keeps the answer.
+- A completed chat reply long enough to fold shows a **Read folded:** row in the turn tail; choosing a level opens a folded panel below the untouched original. The row uses the same shared fold engine, keeps the last level in the browser, and never calls a model. **Open in sidebar** opens the same reply in a larger right-dock pane with its own level controls.
+- `paper_fold` adds map-first paper reading to the Academic Harness preset: a section map from the author's first sentences, then one section at a time, with no model call by default. TextFold is installed as a pinned optional Python runtime (`textfold==0.10.31`) under `$DSH_HOME/textfold`; `generate:true` asks TextFold's own provider for written levels. PaperMemory remains the evidence layer, and scanned PDFs stay on `pdf_to_markdown`/`subagent_vision`.
+- Removed the bundled `paper2agent-paper` reference skill and its 5.7 MB figure/table assets. The `paper2agent`, `paper2skill`, and `paper2mcp` conversion skills are unchanged, and the package is about 5 MB smaller.
 
 ### 0.22.1
 
@@ -628,9 +690,16 @@ The tool tests are plain Node scripts and need no network (the Python-helper cas
 
 ```sh
 for t in citation-format review-store review-tool integrity registries \
-         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render; do
+         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold; do
   node scripts/test-$t.mjs
 done
+```
+
+`paper_fold` also has a live integration test. It installs nothing and uses an existing TextFold:
+
+```sh
+python -m pip install 'textfold==0.10.31'
+TEXTFOLD_SKIP_INSTALL=1 TEXTFOLD_PYTHON="$(command -v python)" node scripts/test-paper-fold-live.mjs
 ```
 
 ## License

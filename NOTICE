@@ -192,5 +192,20 @@ adapted from Wikipedia's "Signs of AI writing" (WP:AICAT) and is licensed
 CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). It is a prose
 style-editing aid; it makes no detector-evasion or provenance-removal claim.
 
+The reply-folding engine in `fold-core.js` is adapted from TextFold's
+`plugins/textfold/hooks/fold.ts` (Apache License 2.0), part of
+https://github.com/chenxiachan/textfold — version 0.10.31, commit 2182d9a,
+© 2026 Xia Chen. Changes for this plugin: string level names, structured blocks
+for the browser panel, removal of Pi-specific drawing-row detection, and
+DSH-oriented tests. The deletion-only fold, sentence splitter, word-count gate,
+and CJK reading-effort accounting are retained. TextFold is not vendored; its
+Python package is not used by `fold_text`.
+
+The preset-only `paper_fold` tool uses TextFold as an optional runtime
+dependency: on first preset start it installs `textfold==0.10.31` from PyPI into
+`$DSH_HOME/textfold` and calls the documented `get --json` CLI. The package is
+not vendored, and no TextFold source is copied for this tool; `TEXTFOLD_PYTHON`,
+`TEXTFOLD_CLI`, and `TEXTFOLD_SKIP_INSTALL` let a user supply or skip it.
+
 ResearchCraft branding and content © ResearchCraft.
 Site: https://researchcraft.dev

@@ -34,7 +34,6 @@ Route by the supplied inputs and requested outcome. DSH's skill catalog is one l
 - For paper PDFs and associated files, load `paper2skill` with the `skill` tool.
 - For a research code repository, load `paper2mcp` with the `skill` tool.
 - When both outputs are requested, load both.
-- For questions about Paper2Agent's methods, results, figures, or supplementary material, load `paper2agent-paper`.
 
 Resolve each component's scripts and references relative to **that skill's** directory (the `skill` tool prints it); bind `SKILL_ROOT` to that component. Keep their work directories separate. Independent paper and code tasks may run concurrently within host limits. Every MCP tool must bind to existing repository code.
 

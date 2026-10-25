@@ -1,4 +1,5 @@
 import { applyNotebook } from './notebook.js'
+import { applyFoldText } from './fold-text.js'
 import { applyImageGenerate } from './image-generate.js'
 import { applySciInspect } from './sci-inspect.js'
 import { applyLatexCompile } from './latex-compile.js'
@@ -26,6 +27,7 @@ export function apply(ctx, config) {
   seed()
   registerKeysSettings(ctx, config)
   applyNotebook(ctx)
+  applyFoldText(ctx)
   applyImageGenerate(ctx)
   applySciInspect(ctx)
   applyLatexCompile(ctx)

@@ -236,7 +236,6 @@ const { seed } = await import('../seed.js')
   ok('skill SKILL.md exists', existsSync(join(skill, 'SKILL.md')))
   ok('paper2skill is a catalog skill', existsSync(join(ROOT, 'skills', 'paper2skill', 'SKILL.md')))
   ok('paper2mcp is a catalog skill', existsSync(join(ROOT, 'skills', 'paper2mcp', 'SKILL.md')))
-  ok('paper2agent-paper is a catalog skill', existsSync(join(ROOT, 'skills', 'paper2agent-paper', 'SKILL.md')))
   ok('LICENSE vendored', existsSync(join(skill, 'LICENSE')))
   ok('no openai.yaml', !existsSync(join(ROOT, 'skills', 'paper2mcp', 'agents', 'openai.yaml')))
   const body = readFileSync(join(skill, 'SKILL.md'), 'utf8')
@@ -258,9 +257,6 @@ const { seed } = await import('../seed.js')
   ok('patch sets registry default', /id: agent-preset-registry[\s\S]*default: academic-harness/.test(patch))
   ok('patch has no legacy preset', !patch.includes('preset-researchcraft-legacy'))
   ok('patch inlines paper-mcp plugins', patch.includes('name: academic-harness/paper-mcp'))
-  const ignore = readFileSync(join(ROOT, '.gitignore'), 'utf8')
-  ok('gitignore nested clone', ignore.includes('paper2agent/Paper2Agent/') || /^\/paper2agent\/$/m.test(ignore))
-
   const fakeHome = mkdtempSync(join(tmpdir(), 'p2a-seed-'))
   const prev = process.env.DSH_HOME
   process.env.DSH_HOME = fakeHome

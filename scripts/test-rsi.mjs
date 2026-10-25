@@ -182,7 +182,7 @@ try {
   ok('explicit lesson active', preference.status === 'active' && preference.source === 'explicit')
   ok('lesson risk metadata', preference.risk_tier === 1 && preference.target === 'lesson' && preference.requires_release === false)
   const oracle = store.oracleManifest()
-  ok('oracle manifest', oracle.plugin_version === '0.22.1' && oracle.engine_version !== 'unknown' && Boolean(oracle.manifest_hash))
+  ok('oracle manifest', oracle.plugin_version === '0.23.0' && oracle.engine_version !== 'unknown' && Boolean(oracle.manifest_hash))
   const preview = core.rsiInjectPreview({ dir, taskClass: 'literature' })
   ok('explicit lesson injected', preview.injected.some((lesson) => lesson.id === preference.id))
   ok('injection message marked', /Local learned guidance/.test(preview.message || ''))
@@ -521,7 +521,7 @@ try {
 
   // ── wiring ───────────────────────────────────────────────────────────────
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
-  ok('version 0.22.1', pkg.version === '0.22.1')
+  ok('version 0.23.0', pkg.version === '0.23.0')
   ok('package exports rsi', pkg.exports['./rsi'] === './rsi.js' && pkg.exports['./rsi-hooks'] === './rsi-hooks.js')
   ok('package bin', pkg.bin?.['academic-harness-rsi'] === './academic-harness-rsi-cli.js')
   ok('package files', ['rsi.js', 'rsi-hooks.js', 'rsi-core.js', 'rsi-store.js', 'rsi-benchmark.js', 'rsi-bus.js'].every((file) => pkg.files.includes(file)))

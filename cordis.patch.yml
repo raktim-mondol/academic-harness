@@ -434,6 +434,14 @@
           - id: paper-download
             name: academic-harness/paper-download
 
+          # Map-first paper reading through TextFold (pin 0.10.31, optional Python
+          # runtime under $DSH_HOME/textfold). Local first-sentence levels by default;
+          # model-written levels require generate:true and TextFold's own provider.
+          # PaperMemory remains the source for quotes and citation keys. See
+          # paper-fold.js and docs/FOLD-INTEGRATION-PLAN.md.
+          - id: paper-fold
+            name: academic-harness/paper-fold
+
           # Citation formatting/export/validation (Phase 1 of docs/NON-SEARCH-TOOLS-PLAN.md).
           # Native, preset-only, local tool: citation-js + CSL styles under styles/.
           # See citation.js and citation-format.js.

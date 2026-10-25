@@ -6,13 +6,32 @@
  */
 import { ApiKeysSection } from './ApiKeysSection.jsx'
 import { ZvecIndexHeaderAction, ZvecIndexToolView } from './ZvecIndexProgress.jsx'
+import { FoldPane } from './FoldPane.js'
+import { ReplyFold } from './ReplyFold.jsx'
+import { FOLD_TAB_ID } from './reply-fold.js'
 
 const ENTRY_ID = 'academic-harness'
 
-export const inject = ['slots', 'configForms']
+export const inject = ['slots', 'configForms', 'sidebarRight', 'sidebarRightTabs']
 
 export function apply(ctx) {
   const scope = ctx.configForms.get(ENTRY_ID)
+
+  const openFoldPane = ({ text, level }) => {
+    ctx.sidebarRight.openTab(FOLD_TAB_ID, { params: { text, level } })
+  }
+
+  ctx.effect(() => ctx.sidebarRightTabs.register({
+    id: FOLD_TAB_ID,
+    kind: FOLD_TAB_ID,
+    title: () => 'Read folded',
+    keepMounted: true,
+  }), 'academic-harness: reply fold pane type')
+
+  ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
+    name: 'sidebar.right.pane.tab',
+    key: FOLD_TAB_ID,
+  }, FoldPane))
 
   ctx.effect(() => ctx.configForms.whileServed([ENTRY_ID], () => ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
@@ -34,4 +53,11 @@ export function apply(ctx) {
     key: 'zvec_index',
     inject: () => ({ scope }),
   }, ZvecIndexToolView))
+
+  ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
+    name: 'conversation.chat.turnTail',
+    id: 'academic-harness-reply-fold',
+    order: 40,
+    inject: () => ({ openFoldPane }),
+  }, ReplyFold))
 }

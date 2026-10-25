@@ -81,6 +81,10 @@ never present another project's papers as this project's evidence.
 
 ## Reading and ingest
 
+When `paper_fold` is available, use it for a first orientation map. It is not
+a source of evidence: do not quote or cite its lines. Ingest and read the paper
+through the steps below.
+
 1. Prefer markdown per paper. `pdf_to_markdown` with `write_to` ingests
    automatically (unless a page subset was converted); scanned/OCR output is
    marked `ocr-recovered` and claims from it are capped below `verified`.

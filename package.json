@@ -1,6 +1,6 @@
 {
   "name": "academic-harness",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "Academic Harness as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",
@@ -30,6 +30,8 @@
     "./futurehouse-agent": "./futurehouse-agent.js",
     "./literature-search": "./literature-search.js",
     "./paper-download": "./paper-download.js",
+    "./paper-fold": "./paper-fold.js",
+    "./textfold-runtime": "./textfold-runtime.js",
     "./search-normalize": "./search-normalize.js",
     "./search-http": "./search-http.js",
     "./paper-resolve": "./paper-resolve.js",
@@ -93,6 +95,8 @@
     "notebook.js",
     "notebook-export.js",
     "notebook-zip.js",
+    "fold-core.js",
+    "fold-text.js",
     "scientific-result.js",
     "image-generate.js",
     "image-gen-client.js",
@@ -130,6 +134,8 @@
     "futurehouse-agent.js",
     "literature-search.js",
     "paper-download.js",
+    "paper-fold.js",
+    "textfold-runtime.js",
     "search-normalize.js",
     "search-http.js",
     "paper-resolve.js",
@@ -213,13 +219,17 @@
       "platform": "web",
       "inject": [
         "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-ui-slots"
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-sidebar-right"
       ]
     }
   },
   "scripts": {
     "build": "node build-client.mjs",
     "build:patch": "node scripts/build-cordis-patch.mjs",
+    "test:fold": "node scripts/test-fold.mjs",
+    "test:paper-fold": "node scripts/test-paper-fold.mjs",
+    "test:reply-fold": "node scripts/test-reply-fold.mjs",
     "test:rsi": "node scripts/test-rsi.mjs",
     "test:coscientist": "node scripts/test-coscientist-models.mjs && node scripts/test-coscientist-store.mjs && node scripts/test-coscientist-tool.mjs && node scripts/test-coscientist-verify.mjs && node scripts/test-coscientist-embed.mjs && node scripts/test-coscientist-graph.mjs && node scripts/test-coscientist-routing.mjs"
   },
@@ -248,7 +258,9 @@
     }
   },
   "devDependencies": {
-    "esbuild": "^0.25.0"
+    "esbuild": "^0.25.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
   },
   "engines": {
     "dsh": ">=0.2.1-rc.2 <0.3.0"

@@ -37,6 +37,13 @@ rather than treating it as raw bytes. When surveying several papers, pass
 `write_to` so each conversion is saved to its own Markdown file in the
 workspace instead of flooding context with the full text of every paper.
 
+Before reading a paper in full, call `paper_fold` with `action: "map"` to get
+the section map built from the author's first sentences. Then read only the
+sections that matter with `action: "section"` and `level: "key"`. `paper_fold`
+is orientation, not evidence: quotes, numbers, and citation keys come from
+PaperMemory. Use `pdf_to_markdown` for the full text, a scanned PDF, or a deep
+read when the map is shallow.
+
 When a claim needs the full text rather than an abstract, call
 `paper_download` with the DOI to pull an open-access copy into the workspace
 before reading it — don't reason from a search snippet alone when the actual
