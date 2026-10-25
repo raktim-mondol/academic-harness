@@ -234,7 +234,7 @@ ok('prompt shape section', read('prompt-section.js').includes("name: 'academic-h
   ok('shape is scoped as its own section', sections[1]?.name === 'academic-harness-response-shape' && sections[1]?.order === 21)
   ok('shape section text', sections[1]?.text.includes('Open with the answer or decision'))
 }
-ok('README section', read('README.md').includes('## Reply folding') && read('README.md').includes('fold_text'))
+ok('docs section', read('docs/WORKSPACE.md').includes('## Reply folding') && read('docs/WORKSPACE.md').includes('fold_text'))
 ok('NOTICE attribution', read('NOTICE').includes('plugins/textfold/hooks/fold.ts') && read('NOTICE').includes('Apache License 2.0'))
 ok('CI test', read('.github/workflows/verify.yml').includes('test-fold.mjs'))
 

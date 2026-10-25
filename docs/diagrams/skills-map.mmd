@@ -1,0 +1,21 @@
+flowchart TD
+  sources[Skill sources] --> catalogue[skills/ catalogue<br/>729 skills]
+  s1[scientific-agent-skills<br/>140 domain skills] --> sources
+  s2[science-superpowers<br/>16 methodology skills] --> sources
+  s3[scientific-agents<br/>503 expert profiles] --> sources
+  s4[drug-discovery-agent-skills<br/>23 therapeutics skills] --> sources
+  s5[first-party and adapted<br/>writing, figures, agents, compute] --> sources
+
+  catalogue --> loader[skill tool<br/>filesystem discovery]
+  env[ACADEMIC_HARNESS_SKILLS_DIR] -. override .-> loader
+  loader --> preset[Academic Harness preset]
+  preset --> session[Chat session]
+
+  classDef source fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+  classDef catalogue fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef env fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef step fill:#eef2ff,stroke:#6366f1,color:#312e81
+  class s1,s2,s3,s4,s5 source
+  class catalogue,preset step
+  class env env
+  class loader,session,sources step

@@ -1,0 +1,22 @@
+flowchart TD
+  pick[Academic Harness preset] --> init[ah_init or ah_migrate<br/>ah.yaml overlay]
+  init --> plan[ah_brief_new or ah_plan<br/>author approves the plan]
+  plan --> write[ah-write-unit<br/>%% @unit anchors]
+  write --> hooks[Protected-path guard<br/>post-edit checks<br/>paper-state card]
+  hooks --> check[ah_check and ah_audit<br/>findings + ledger]
+  check --> gate{Gate: open blocker<br/>or major this turn?}
+  gate -->|yes| fix[ah_findings<br/>ah-fix-findings]
+  fix --> write
+  gate -->|no| snap[ah_snapshot<br/>unit hashes]
+  snap --> review[ah_review and ah_review_respond<br/>response letter from real diffs]
+  review --> write
+
+  check --> RSI[Local RSI<br/>captures recurring findings]
+  RSI -. lessons .-> write
+
+  classDef engine fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef gate fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef loop fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  class init,plan,write,hooks,check,snap,review engine
+  class gate gate
+  class fix,RSI loop

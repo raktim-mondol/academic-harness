@@ -6,6 +6,10 @@ Status: implemented in v0.20.0. Local-only, autonomous, reversible. The loop
 learns short lessons about how to do research work; it does not rewrite the
 plugin or the evaluator.
 
+![RSI loop](assets/diagrams/rsi-loop.svg)
+
+Part of the [Academic Harness documentation](README.md). For the in-session tool and the offline CLI, see [Commands](#commands); for the writing engine that produces many of the signals, see [Writing](WRITING.md#academic-harness-engine).
+
 ## What it does
 
 The academic preset captures structured outcome signals from every turn:
@@ -144,6 +148,9 @@ label, removed `%% @unit` anchor), runs the real `ah audit` on the copy, and
 reports the new check ids plus whether the active/trial lessons cover them.
 It tests the oracle and the remedy catalogue, not the model's ability to fix
 the defects, and it never modifies the original project.
+
+The system paper and corpus evaluation live in
+[`paper/rsi-local/`](../paper/rsi-local/).
 
 ## Commands
 

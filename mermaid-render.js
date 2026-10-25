@@ -59,7 +59,7 @@ const INNERMOST_VAR = /var\(\s*(--[\w-]+)\s*(?:,\s*([^(),]*))?\)/g
  * and rasterize the file to a blank image. Flattening loses the `--pele-*`
  * theming hook, so it is only done for files written to disk.
  */
-function flattenColors(svg) {
+export function flattenColors(svg) {
   const props = new Map()
   for (const match of svg.matchAll(/(--[\w-]+)\s*:\s*([^;}"]+)/g)) {
     if (!props.has(match[1])) props.set(match[1], match[2].trim())

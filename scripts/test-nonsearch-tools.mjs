@@ -189,7 +189,8 @@ for (const marker of ['## Hypothesis tournaments', 'co-scientist-tournament', 'c
   assert.ok(prompt.includes(marker), `prompt.js missing marker: ${marker}`)
 }
 assert.match(read('NOTICE'), /raktim-mondol\/co-scientist/, 'NOTICE must credit the upstream project')
-assert.match(read('README.md'), /^## Hypothesis tournaments$/m, 'README needs a tournament section')
+assert.match(read('docs/RESEARCH.md'), /^## Hypothesis tournaments$/m, 'docs/RESEARCH.md needs a tournament section')
+assert.ok(read('README.md').includes('docs/RESEARCH.md'), 'README must link the tournament docs')
 
 const models = await import('../coscientist-models.js')
 assert.equal(models.GLICKO2_DEFAULTS.rating, 1200, 'the ported defaults must match upstream')

@@ -1,0 +1,29 @@
+flowchart TB
+  subgraph host[DSH host]
+    direction LR
+    ui[Web UI / TUI] --> agent[Agent session] --> model[Model route]
+  end
+
+  bundle[Plugin bundle - every preset<br/>notebook · fold_text · scientific_result<br/>image_generate · sci_inspect · latex_compile<br/>pdf_to_markdown · mermaid_render<br/>modal_run · runpod_run · research_template<br/>Settings - API keys, model ids, index options]
+
+  preset[Academic Harness preset<br/>persona + research prompt<br/>search and evidence<br/>writing oracle and citation<br/>review and hypothesis ledgers<br/>workspace search, skills, subagents<br/>clinical and policy tools, local RSI]
+
+  providers[External providers<br/>REST APIs and MCP servers]
+  state[Local state<br/>DSH_HOME: papermemory · textfold · zvec-grep · ah-rsi<br/>workspace: .dsh/ · .zvec-grep/ · papers · ah.yaml]
+
+  host ==> bundle
+  host ==> preset
+  bundle ==> state
+  preset ==> providers
+  preset ==> state
+
+  classDef host fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef bundle fill:#f8fafc,stroke:#64748b,color:#0f172a
+  classDef preset fill:#ecfdf5,stroke:#10b981,color:#064e3b
+  classDef state fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef external fill:#fdf2f8,stroke:#db2777,color:#831843
+  class ui,agent,model host
+  class bundle bundle
+  class preset preset
+  class state state
+  class providers external

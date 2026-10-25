@@ -1,0 +1,30 @@
+flowchart TB
+  dsh[Install DeepSeek Harness 0.2.1+<br/>npm install -g @deepseek-ai/dsh] --> route{Choose install route}
+  route -->|Web UI| web[Plugins → Add plugin<br/>github:raktim-mondol/academic-harness]
+  route -->|CLI profile| cli[dsh plugin --profile academic-harness add<br/>github:raktim-mondol/academic-harness]
+  web --> first[Start the first Academic Harness chat]
+  cli --> first
+
+  first --> setup[Background runtime setup on first preset mount]
+  setup --> zg[zvec-grep<br/>npm install + zg server on]
+  setup --> pm[PaperMemory<br/>vendored venv + stdio MCP]
+  setup --> tf[TextFold<br/>pinned Python runtime]
+  setup --> ah[Writing engine<br/>plugin-local venv]
+
+  first --> preset{Preset selector reads<br/>Academic Harness?}
+  preset -->|yes| ready[Ready: search, papers, writing, reviews]
+  preset -->|no| fix[Restart dsh and start a new chat<br/>the preset mounts once per process]
+  fix --> ready
+  ready --> keys[Optional: Settings → Academic Harness API keys]
+
+  zg -. fail-soft .-> ready
+  pm -. fail-loud .-> ready
+  tf -. first call waits .-> ready
+  ah -. first ah_* call waits .-> ready
+
+  classDef step fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef optional fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef decision fill:#ecfdf5,stroke:#10b981,color:#064e3b
+  class dsh,web,cli,first,setup,ready step
+  class keys optional
+  class route,preset decision

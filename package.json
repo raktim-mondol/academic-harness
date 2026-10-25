@@ -1,6 +1,6 @@
 {
   "name": "academic-harness",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "Academic Harness as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",
@@ -227,6 +227,7 @@
   "scripts": {
     "build": "node build-client.mjs",
     "build:patch": "node scripts/build-cordis-patch.mjs",
+    "docs:diagrams": "node scripts/build-docs-diagrams.mjs",
     "test:fold": "node scripts/test-fold.mjs",
     "test:paper-fold": "node scripts/test-paper-fold.mjs",
     "test:reply-fold": "node scripts/test-reply-fold.mjs",

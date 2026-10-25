@@ -1,0 +1,24 @@
+flowchart TD
+  start[coscientist start<br/>goal, rubric, max_hypotheses,<br/>step_budget, seed] --> gen[Generate hypotheses]
+  gen --> dup{Duplicate gate<br/>lexical or cosine}
+  dup -->|near-duplicate| drop[Discard with similarity]
+  dup -->|novel| review[Five-stage review<br/>initial → full → deep verification<br/>→ simulation → observation]
+  review -->|fail| reject[Rejected]
+  review -->|pass| pool[Active pool]
+
+  pool --> next[coscientist next or<br/>coscientist_rank propose]
+  next --> match[Pairwise match<br/>both presentation orders]
+  match --> rate[Glicko-2 update<br/>rating, RD, volatility]
+  rate --> stop{Stop?<br/>budget, plateau,<br/>no competitors, match cap}
+  stop -->|no| next
+  stop -->|yes| export[Export ranked shortlist<br/>Markdown, JSON, or Mermaid]
+
+  pool --> evolve[Evolve or feedback]
+  evolve --> gen
+
+  classDef step fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef gate fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef stop fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  class start,gen,review,pool,next,match,rate,evolve step
+  class dup,stop gate
+  class drop,reject,export stop

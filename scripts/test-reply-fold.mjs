@@ -186,7 +186,7 @@ ok('built bundle has the pane', read('lib/client.js').includes(FOLD_TAB_ID))
 ok('test script', pkg.scripts?.['test:reply-fold'] === 'node scripts/test-reply-fold.mjs')
 ok('React test deps', Boolean(pkg.devDependencies?.react) && Boolean(pkg.devDependencies?.['react-dom']))
 ok('sidebar client inject', pkg.dsh?.client?.inject?.includes('@deepseek-ai/dsh-client-ui-sidebar-right'))
-ok('README row', read('README.md').includes('Read folded:') && read('README.md').includes('turn tail') && read('README.md').includes('Open in sidebar'))
+ok('docs row', read('docs/WORKSPACE.md').includes('Read folded:') && read('docs/WORKSPACE.md').includes('turnTail') && read('docs/WORKSPACE.md').includes('Open in sidebar'))
 ok('CI test', read('.github/workflows/verify.yml').includes('test-reply-fold.mjs'))
 
 console.log(`reply-fold tests OK: ${passed} checks`)

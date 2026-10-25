@@ -32,7 +32,7 @@ export function applySciInspect(ctx) {
     description: [
       'Summarize a scientific file: chemistry (SMILES/MOL/SDF), structure (PDB/CIF), mass spec (mzML/etc.),',
       'arrays (npy/npz/parquet/hdf5), imaging (TIFF/NIfTI/DICOM), or AnnData (h5ad).',
-      'Returns JSON from a Python helper. Requires the helper venv (see the plugin README — python-helpers/, uv sync).',
+      'Returns JSON from a Python helper. Requires the helper venv (see docs/WORKSPACE.md — python-helpers/, uv sync).',
       'Prefer this over guessing binary scientific formats or reading them as text.',
     ].join(' '),
     parameters: {

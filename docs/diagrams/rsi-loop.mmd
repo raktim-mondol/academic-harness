@@ -1,0 +1,26 @@
+flowchart TD
+  turn[Substantive turn] --> capture[Capture<br/>tool outcomes, findings,<br/>flags, preferences, task class]
+  capture --> store[(ah-rsi store<br/>append-only JSONL)]
+  capture --> diagnose[Diagnose recurring failures]
+  diagnose --> lesson[Short lesson candidate]
+  lesson --> lint[Lint + contradiction<br/>+ support check]
+  lint --> admit[Admit as trial<br/>50% injection]
+  admit --> inject[Inject into matching<br/>later turns]
+  inject --> compare[Compare injected<br/>against eligible control]
+  compare -->|wins| promote[Promote to active]
+  compare -->|loses by margin| quarantine[Quarantine]
+  compare -->|inconclusive| explore[Keep exploring]
+  quarantine --> retire[Retire or rollback]
+  promote --> inject
+
+  note[Fixed-evaluator rule: only lesson text is mutable.<br/>The plugin, engine, project, and evaluator stay outside the loop.]
+  lesson -.-> note
+
+  classDef step fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef store fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef outcome fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef note fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+  class turn,capture,diagnose,lesson,lint,admit,inject,compare,explore step
+  class store,quarantine,retire store
+  class promote outcome
+  class note note

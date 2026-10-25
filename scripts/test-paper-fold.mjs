@@ -332,7 +332,7 @@ try {
   ok('prompt section', read('prompt.js').includes('## Reading papers at the right level') && read('prompt.js').includes('paper_fold'))
   ok('literature skill', read('skills/literature-researcher/SKILL.md').includes('paper_fold'))
   ok('memory skill', read('skills/papermemory/SKILL.md').includes('paper_fold'))
-  ok('README section', read('README.md').includes('### Read at the right level') && read('README.md').includes('TEXTFOLD_SKIP_INSTALL'))
+  ok('docs section', read('docs/PAPERS.md').includes('## Read at the right level') && read('docs/PAPERS.md').includes('TEXTFOLD_SKIP_INSTALL'))
   ok('NOTICE runtime', read('NOTICE').includes('paper_fold') && read('NOTICE').includes('textfold==0.10.31'))
   ok('CI fake test', read('.github/workflows/verify.yml').includes('test-paper-fold.mjs'))
   ok('CI live test', read('.github/workflows/verify.yml').includes('test-paper-fold-live.mjs'))

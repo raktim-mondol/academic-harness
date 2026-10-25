@@ -36,7 +36,7 @@ export function applyPdfToMarkdown(ctx) {
       'short excerpt, since a literature survey converting many PDFs will otherwise flood the conversation with',
       'full-paper text. write_to also ingests the Markdown into PaperMemory, merging onto the paper_download',
       'record for the same PDF when one exists. Scanned/image-based pages come back without markdown unless ocr is set to true, which',
-      'requires the PDFium and ONNX Runtime shared libraries to be installed locally (see the plugin README);',
+      'requires the PDFium and ONNX Runtime shared libraries to be installed locally (see docs/PAPERS.md);',
       'without them, pass ocr:true anyway to see which pages were flagged as needing OCR, then fall back to',
       'subagent_vision on rendered page images for those pages.',
     ].join(' '),

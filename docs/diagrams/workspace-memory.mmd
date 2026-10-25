@@ -1,0 +1,25 @@
+flowchart LR
+  subgraph zg[zvec-grep - where to look]
+    files[Workspace files] --> index[On-disk index<br/>BM25 + local vectors]
+    index --> zsearch[mcp__zvec_grep__zvec_grep_search]
+  end
+
+  subgraph pm[PaperMemory - what can be claimed]
+    ingested[Ingested papers] --> chunks[Content-addressed markdown<br/>and byte-slice chunks]
+    chunks --> claims[Claims anchored<br/>to exact quote spans]
+    claims --> evidence[quote_check · trace · cite]
+  end
+
+  zsearch --> agent[Agent]
+  evidence --> agent
+  agent --> answer[Answer, notebook,<br/>or manuscript]
+
+  note[zvec-grep is fail-soft: no daemon means no search tool.<br/>PaperMemory is fail-loud: a broken store is surfaced,<br/>never read as an empty memory.]
+  note -.-> agent
+
+  classDef discovery fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef evidence fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef note fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  class files,index,zsearch discovery
+  class ingested,chunks,claims,evidence,agent,answer evidence
+  class note note

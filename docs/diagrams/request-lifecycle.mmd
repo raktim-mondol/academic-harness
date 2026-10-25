@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  actor U as Researcher
+  participant UI as DSH web UI
+  participant A as Academic Harness agent
+  participant T as Preset tools
+  participant P as External provider
+  participant W as Workspace and memory
+
+  U->>UI: Ask a research question
+  UI->>A: Prompt + preset context
+  A->>T: literature_search / openalex_search / consensus_search
+  T->>P: REST or MCP request
+  P-->>T: Normalized records
+  T-->>A: Ranked results with stable identifiers
+  A->>T: paper_resolve + integrity_check
+  T-->>A: One identity + publication status
+  A->>W: paper_download → PaperMemory ingest
+  A->>T: quote_check / trace
+  T-->>A: Verbatim evidence + provenance
+  A-->>UI: Answer with verified citations
+  A->>W: notebook entry / scientific_result

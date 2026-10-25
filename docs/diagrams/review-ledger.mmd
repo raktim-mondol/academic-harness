@@ -1,0 +1,20 @@
+flowchart TD
+  start[review start<br/>question, databases,<br/>inclusion and exclusion criteria] --> protocol[protocol.json<br/>write-once]
+  protocol --> add[add records<br/>DOI, PMID, arXiv,<br/>normalized title and year]
+  add --> screen1[Title / abstract screen]
+  screen1 -->|include| screen2[Full-text screen]
+  screen1 -->|exclude or maybe<br/>with reason| excluded[Excluded or pending]
+  screen2 -->|include| evidence[Evidence<br/>claim + verbatim quote + location]
+  screen2 -->|exclude with reason| excluded
+  evidence --> status[review status<br/>PRISMA-style counts<br/>exclusion reasons]
+  status --> export[export<br/>Markdown, CSV, or JSON]
+
+  add -. every event appended .-> log[(.dsh/review/slug/<br/>event logs)]
+  screen1 -.-> log
+  screen2 -.-> log
+  evidence -.-> log
+
+  classDef step fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef store fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  class start,add,screen1,screen2,evidence,status,export step
+  class protocol,log,excluded store

@@ -1,0 +1,28 @@
+flowchart TD
+  discover[Discovery<br/>literature_search and databases] --> resolve[paper_resolve<br/>one stable identity]
+  resolve --> integrity[integrity_check<br/>retracted, corrected, clean, unknown]
+  resolve --> download[paper_download<br/>Unpaywall and OA fallbacks]
+
+  download -->|open-access PDF| ingest[PaperMemory ingest<br/>content-addressed markdown]
+  download -->|paywalled| paywall[Report paywalled<br/>list every source tried]
+  download --> convert[pdf_to_markdown<br/>headings, tables, reading order]
+  convert -->|text-based| ingest
+  convert -->|scanned| vision[OCR or subagent_vision]
+
+  ingest --> fold[paper_fold<br/>section map first]
+  ingest --> quote[quote_check and trace<br/>verbatim evidence]
+  fold --> read[Read one section at a time]
+  read --> quote
+
+  quote --> cite[cite and manuscript_citations<br/>keys only from memory]
+  integrity --> cite
+  ingest --> agent[Paper2Agent<br/>optional: paper skill + MCP server]
+
+  classDef discovery fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef evidence fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef warn fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef optional fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+  class discover,download,convert,fold,read discovery
+  class ingest,quote,cite evidence
+  class paywall,vision warn
+  class resolve,integrity,agent optional

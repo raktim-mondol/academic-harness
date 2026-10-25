@@ -1,0 +1,18 @@
+flowchart TD
+  local[Local workspace] -->|files_in| run[modal_run or runpod_run]
+  run --> remote[Remote CPU or GPU<br/>Modal app or Runpod pod]
+  remote -->|files_out| local
+  remote --> stop[Always terminate<br/>when the call returns]
+
+  run -. optional .-> volume[(Runpod network volume<br/>mounted at /workspace)]
+  volume -. reattach on reuse .-> remote
+
+  note[Anything not named in files_out is gone.<br/>A named volume persists and keeps costing storage<br/>until deleted from the Runpod console.]
+  stop -.-> note
+
+  classDef step fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef store fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef note fill:#ecfdf5,stroke:#059669,color:#064e3b
+  class local,run,remote,stop step
+  class volume store
+  class note note
