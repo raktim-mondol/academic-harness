@@ -46,6 +46,14 @@ modal billing                   # workspace billing info
 
 Async Python against the SDK should use Modal's `.aio()` interface (e.g. `await modal.Function.remote.aio(...)`) rather than wrapping sync calls.
 
+## Troubleshooting `modal_run` and its SDK
+
+- `modal_run` loads the `modal` npm SDK from the profile when present. Otherwise it installs a pinned copy into `$DSH_HOME/modal-sdk` on first use and loads it immediately — **do not** add the SDK to the profile or restart dsh just to make `modal_run` work.
+- `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` disables that managed install. Then the SDK must be installed into the profile explicitly (`dsh plugin --profile <profile> add modal`) and dsh restarted.
+- Under pnpm 11, installing the SDK can exit nonzero with `ERR_PNPM_IGNORED_BUILDS` for `cbor-extract` and `protobufjs` (optional native deps). Academic Harness already writes `allowBuilds: {cbor-extract: false, protobufjs: false}` into every profile that depends on it. If a profile still reports the error, add those two keys to that profile's `pnpm-workspace.yaml`. Do **not** put `allowBuilds` in `academic-harness/package.json` — pnpm ignores dependency-level build policy for supply-chain safety.
+- Prefer denying those builds (`false`); `cbor-x` has a JS fallback and Modal works without them. Avoid `pnpm approve-builds --all`, which would approve every pending script rather than these two.
+- A failed managed install surfaces as `sdk_install_failed`; report it and use `runpod_run`/`vastai_run` or the manual install path rather than retrying in a loop.
+
 ## Choosing a lane
 
 - One-shot command on remote compute, with the plugin handling upload/download/cleanup: `modal_run`.

@@ -2,6 +2,12 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.25.2
+
+- The `modal` skill now documents the managed SDK runtime (`$DSH_HOME/modal-sdk`), `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL`, and the pnpm 11 `ERR_PNPM_IGNORED_BUILDS` workaround — including why `allowBuilds` belongs in the profile's `pnpm-workspace.yaml`, not in `academic-harness/package.json`.
+- The system prompt routes a failed manual Modal install to that skill before profile config is edited, and prefers denying the two optional native builds over `pnpm approve-builds --all`.
+- The docs index changelog range now tracks the current release.
+
 ## 0.25.1
 
 - **Modal SDK install friction is gone.** `modal_run` now loads the SDK from the profile when present, otherwise installs a pinned `modal@0.11.1` into `$DSH_HOME/modal-sdk` on first use and uses it without restarting dsh. The managed install pre-configures pnpm's `allowBuilds` for its two optional native deps, and `seed.js` writes the same policy into every existing profile that depends on Academic Harness — so a manual `dsh plugin add modal` no longer fails with `ERR_PNPM_IGNORED_BUILDS` under pnpm 11. `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` keeps the manual-only path.
