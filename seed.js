@@ -46,10 +46,11 @@ function migrateLegacyNotebookSkill(dest) {
  * known stale marker are replaced, so local edits to other skills survive.
  */
 const STALE_SKILLS = [
-  { dir: 'runpod', stale: /ResearchCraft API keys/ },
-  { dir: 'modal', stale: /ResearchCraft API keys/ },
-  { dir: 'modal-usage', stale: /^name: modal$/m },
-  { dir: 'academic-harness-notebook', stale: /ResearchCraft/ },
+  { dir: 'runpod', stale: (text) => /ResearchCraft API keys/.test(text) || !text.includes('## API version') },
+  { dir: 'modal', stale: (text) => /ResearchCraft API keys/.test(text) || !text.includes('modal-sdk') },
+  { dir: 'vastai', stale: (text) => !text.includes('## Pitfalls that break agent runs') },
+  { dir: 'modal-usage', stale: (text) => /^name: modal$/m.test(text) },
+  { dir: 'academic-harness-notebook', stale: (text) => /ResearchCraft/.test(text) },
 ]
 
 function refreshStaleSkills(dest) {
@@ -65,7 +66,7 @@ function refreshStaleSkills(dest) {
     } catch {
       continue
     }
-    if (shipped !== installed && stale.test(installed)) writeFileSync(to, shipped)
+    if (shipped !== installed && stale(installed)) writeFileSync(to, shipped)
   }
 }
 

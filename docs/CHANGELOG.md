@@ -2,6 +2,11 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.25.3
+
+- The seeder now refreshes first-party briefs that predate the current guidance (Modal SDK troubleshooting, Runpod REST v2, Vast.ai pitfalls), so existing installs receive skill updates without deleting the seeded directories. It still only replaces known-old content, leaving local edits to other skills untouched.
+- `scripts/test-academic-harness.mjs` covers the stale-brief refresh.
+
 ## 0.25.2
 
 - The `modal` skill now documents the managed SDK runtime (`$DSH_HOME/modal-sdk`), `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL`, and the pnpm 11 `ERR_PNPM_IGNORED_BUILDS` workaround — including why `allowBuilds` belongs in the profile's `pnpm-workspace.yaml`, not in `academic-harness/package.json`.

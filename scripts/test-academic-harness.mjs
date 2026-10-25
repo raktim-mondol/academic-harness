@@ -191,9 +191,12 @@ try {
   const fakeHome = mkdtempSync(join(tmpdir(), 'ah-seed-'))
   const prev = process.env.DSH_HOME
   process.env.DSH_HOME = fakeHome
+  mkdirSync(join(fakeHome, 'skills', 'modal'), { recursive: true })
+  writeFileSync(join(fakeHome, 'skills', 'modal', 'SKILL.md'), '---\nname: modal\n---\n\n# modal\n\nOld brief without the current guidance.\n')
   seed()
   ok('seed copies academic-harness skill', existsSync(join(fakeHome, 'skills', 'academic-harness', 'SKILL.md')))
   ok('seed copies ah-write-unit', existsSync(join(fakeHome, 'skills', 'ah-write-unit', 'SKILL.md')))
+  ok('seed refreshes an outdated first-party brief', readFileSync(join(fakeHome, 'skills', 'modal', 'SKILL.md'), 'utf8').includes('Troubleshooting `modal_run`'))
   if (prev === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = prev
   rmSync(fakeHome, { recursive: true, force: true })
