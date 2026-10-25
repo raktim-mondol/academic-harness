@@ -106,8 +106,9 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `modal_run` | Every preset | Offload a command to a Modal CPU/GPU instance; terminate when done | [Compute](COMPUTE.md) |
+| `modal_run` | Every preset | Offload a command to a Modal CPU/GPU instance; optional Volume; terminate when done | [Compute](COMPUTE.md) |
 | `runpod_run` | Every preset | Offload a command to a Runpod pod; optional network volume | [Compute](COMPUTE.md) |
+| `vastai_run` | Every preset | Rent the cheapest matching Vast.ai offer, run a command, destroy it; spot bids and volumes | [Compute](COMPUTE.md) |
 | `subagent` | DSH built-in | Ordinary delegated work; inherits the parent session's model. The preset adds `subagent_pro`/`subagent_vision` alongside it. | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_fork` | DSH built-in | Fork delegation that inherits the parent preset and history | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_pro` | Academic Harness preset | Delegation pinned to `SUBAGENT_MODEL_COMPLEX` for difficult reasoning | [Agents](AGENTS.md#subagent-model-routing) |

@@ -162,7 +162,7 @@ A full repository conversion is long (many `subagent` specialists plus independe
 
 `paper_mcp` writes `<cwd>/.dsh/paper-mcps.json` (interpreter, server script, env **names** — never secrets) and tries to mount the server over stdio so tools appear as `mcp__<serverName>__*`. Those mounts are standing for the life of `dsh`, same as Parallel/Scite: if tools do not appear, restart `dsh`. A different workspace that reuses the same `serverName` also needs a restart.
 
-Do not run `claude mcp add`. GPU papers use `runpod_run` / `modal_run` rather than a silent CPU fallback.
+Do not run `claude mcp add`. GPU papers use `runpod_run` / `modal_run` / `vastai_run` rather than a silent CPU fallback.
 
 ## Scope summary
 

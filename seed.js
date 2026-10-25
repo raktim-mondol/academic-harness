@@ -39,6 +39,36 @@ function migrateLegacyNotebookSkill(dest) {
 }
 
 /**
+ * Refresh first-party/renamed skill briefs that shipped with known-stale
+ * content. `copyMissing` never overwrites an existing directory, so without
+ * this an upgraded install keeps the old brief forever. Only files carrying a
+ * known stale marker are replaced, so local edits to other skills survive.
+ */
+const STALE_SKILLS = [
+  { dir: 'runpod', stale: /ResearchCraft API keys/ },
+  { dir: 'modal', stale: /ResearchCraft API keys/ },
+  { dir: 'modal-usage', stale: /^name: modal$/m },
+  { dir: 'academic-harness-notebook', stale: /ResearchCraft/ },
+]
+
+function refreshStaleSkills(dest) {
+  for (const { dir, stale } of STALE_SKILLS) {
+    const from = join(here, 'skills', dir, 'SKILL.md')
+    const to = join(dest, dir, 'SKILL.md')
+    if (!existsSync(from) || !existsSync(to)) continue
+    let shipped
+    let installed
+    try {
+      shipped = readFileSync(from, 'utf8')
+      installed = readFileSync(to, 'utf8')
+    } catch {
+      continue
+    }
+    if (shipped !== installed && stale.test(installed)) writeFileSync(to, shipped)
+  }
+}
+
+/**
  * Install first-party skills into DSH home. The Academic Harness agent preset is
  * a `@deepseek-ai/dsh-agent-preset` declaration in `cordis.patch.yml` (DSH
  * 0.2.0+); `$DSH_HOME/.agent-presets/` is not read. Scientific catalogue
@@ -50,4 +80,5 @@ export function seed() {
   const dest = join(home, 'skills')
   migrateLegacyNotebookSkill(dest)
   copyMissing(join(here, 'skills'), dest)
+  refreshStaleSkills(dest)
 }

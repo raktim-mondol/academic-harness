@@ -22,9 +22,9 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Writing, citation, and figures](WRITING.md) | The `ah_*` writing oracle, bibliography tools, LaTeX, figures, `image_generate`, `mermaid_render` |
 | [Reviews, hypotheses, and records](RESEARCH.md) | Systematic reviews, hypothesis tournaments, clinical/regulatory records, dataset and policy tools |
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
-| [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, volumes, and the Modal/Runpod skills |
+| [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 729-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 730-skill catalogue, its sources, and workflow skills |
 | [Optional tools](OPTIONAL-TOOLS.md) | The tools behind `AH_ENABLE_OPTIONAL_TOOLS=1` |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 
@@ -32,7 +32,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 
 | Page | What it covers |
 |---|---|
-| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 to 0.23.0 |
+| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 to 0.25.0 |
 | [Development](DEVELOPMENT.md) | Build, tests, docs diagrams, bundle patch, repository layout |
 | [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) | Why the writing engine is vendored and the open decision about its home |
 | [Co-Scientist integration](CO-SCIENTIST-INTEGRATION-PLAN.md) | Tournament design and implementation record |

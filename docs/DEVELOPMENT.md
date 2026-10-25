@@ -17,9 +17,10 @@ The tool tests are plain Node scripts and need no network (the Python-helper cas
 
 ```sh
 for t in citation-format review-store review-tool integrity registries \
-         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold; do
+         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold compute; do
   node scripts/test-$t.mjs
 done
+node scripts/test-compute-http.mjs
 ```
 
 The full CI matrix also runs the search-provider tests, the PaperMemory test suite, and a real DSH boot; see [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
@@ -64,7 +65,7 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `presets/academic-harness/` | Preset source |
 | `prompt.js`, `prompt-section.js` | Research system prompt |
 | `client/` | Settings page source; `lib/client.js` is the committed build |
-| `skills/` | 729 bundled skills |
+| `skills/` | 730 bundled skills |
 | `python-helpers/` | Python helpers for `sci_inspect` |
 | `vendor/academic-harness/` | Vendored writing engine |
 | `vendor/papermemory/` | Vendored PaperMemory package |

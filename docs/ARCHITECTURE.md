@@ -9,7 +9,7 @@ Academic Harness is one plugin with two planes: a **bundle** that is mounted for
 | Layer | Mounted | What it owns |
 |---|---|---|
 | **DSH host** | Always | Web UI / TUI, agent session, model route, tool registry, sandbox and approval stack, persistence |
-| **Academic Harness bundle** | Every preset | General-purpose tools (`notebook`, `fold_text`, `scientific_result`, `image_generate`, `sci_inspect`, `latex_compile`, `pdf_to_markdown`, `mermaid_render`, `modal_run`, `runpod_run`, `research_template`) and the **Settings → Academic Harness API keys** page |
+| **Academic Harness bundle** | Every preset | General-purpose tools (`notebook`, `fold_text`, `scientific_result`, `image_generate`, `sci_inspect`, `latex_compile`, `pdf_to_markdown`, `mermaid_render`, `modal_run`, `runpod_run`, `vastai_run`, `research_template`) and the **Settings → Academic Harness API keys** page |
 | **Academic Harness preset** | Once per `dsh` process; every session that joins it shares the mount | Persona and research prompt, academic search and evidence tools, PaperMemory, zvec-grep, `paper_fold`, citation and manuscript tools, review and hypothesis ledgers, clinical/regulatory and policy tools, subagent routing, and local RSI |
 
 The split matters when something is missing. A general-purpose tool is present in every session. Everything academic is only present on a session whose preset selector reads **Academic Harness**; on Standard/PTC the same call fails with `tools[name] is not a function`. See [Install → Confirm the preset](INSTALL.md#4-confirm-the-preset).
@@ -88,11 +88,11 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Clinical, datasets, policy | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js` |
 | Workspace and notebook | `notebook.js`, `notebook-export.js`, `notebook-zip.js`, `zvec-grep.js`, `zvec-index.js`, `zvec-index-engine.js`, `fold-core.js`, `fold-text.js`, `scientific-result.js` |
 | Figures and file formats | `image-generate.js`, `image-gen-client.js`, `mermaid-render.js`, `sci-inspect.js`, `latex-compile.js`, `python-helpers/` |
-| Remote compute | `modal-run.js`, `runpod-run.js`, `runpod-client.js`, `modal-instances.js`, `runpod-instances.js` |
+| Remote compute | `modal-run.js`, `modal-instances.js`, `runpod-run.js`, `runpod-client.js`, `runpod-instances.js`, `vastai-run.js`, `vastai-client.js`, `vastai-instances.js`, `ssh-client.js` |
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (729 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (730 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

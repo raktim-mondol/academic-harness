@@ -2,7 +2,7 @@
 
 Academic Harness reads credentials and preferences from two places:
 
-1. **Settings → Academic Harness API keys** in the DSH web UI. Values are persisted in the profile's `settings.yaml`.
+1. **Settings → Academic Harness API keys** in the DSH web UI. DSH 0.2.x stores these as volatile fields on the plugin's Loader row, persisted in the profile's `cordis.patch.yml` — not in a separate `settings.yaml`.
 2. **Shell environment variables.** A non-empty env var wins over the stored value.
 
 No credential is required to install or boot. Each connector or tool stays disabled or returns a clear "key not set" error until its key is present. PaperMemory, notebook, `fold_text`, `paper_fold` local levels, `latex_compile`, and the academic databases' keyless tiers need no key.
@@ -63,6 +63,7 @@ Both subagent-model fields default to `deepseek-flash` (DeepSeek-V4.1-Flash). Th
 |---|---|---|
 | `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET` | `modal_run` | <https://modal.com/settings> |
 | `RUNPOD_API_KEY` | `runpod_run` | <https://console.runpod.io/user/settings> |
+| `VAST_API_KEY` | `vastai_run` | <https://cloud.vast.ai/manage-keys/> |
 
 ### Hypothesis tournaments
 
@@ -98,10 +99,11 @@ The Academic Harness preset mounts once as a **standing composition** for the li
 | `SUBAGENT_MODEL_COMPLEX`, `SUBAGENT_MODEL_VISION` | After a `dsh` restart |
 | `ZVEC_GREP_EMBEDDING`, `ZVEC_GREP_API_KEY` | After a `dsh` restart (fed into `zg server on`) |
 | `AH_ENABLE_OPTIONAL_TOOLS` | After a `dsh` restart; the preset rows exist either way |
+| Modal SDK (`dsh plugin --profile <profile> add modal`) | After a `dsh` restart; `modal_run` is unavailable until then |
 | `PAPERMEMORY_CLI`, `TEXTFOLD_*`, `ACADEMIC_HARNESS_CLI` | After a `dsh` restart (the MCP/runtime mount is standing) |
 | `paper_mcp` server registrations | Tools appear as `mcp__<serverName>__*`; if a mount does not appear, restart `dsh` |
 
-The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_run`, `runpod_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`, `integrity_check`, `citation`, `review`, `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy`, `author_lookup`, and `coscientist`.
+The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_run`, `runpod_run`, `vastai_run`, `consensus_search`, `parallel_search`, `parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, `futurehouse_agent`, `paper_download`, `openalex_search`, `openalex_citations`, `s2_search`, `crossref_lookup`, `arxiv_search`, `pubmed_search`, `paper_resolve`, `integrity_check`, `citation`, `review`, `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy`, `author_lookup`, and `coscientist`.
 
 ## Environment-only variables
 
@@ -137,7 +139,7 @@ The old `RESEARCHCRAFT_*` names are honored as fallbacks. The old `RESEARCHCRAFT
 - A blank Settings field means **keep the current value**; **Clear** removes it.
 - Keys are write-only in the UI: the page never populates a stored value into the input.
 - A shell variable with the same name wins over the stored value.
-- Settings values live in the profile's `settings.yaml`; there is no separate keychain integration.
+- Settings values live in the profile's `cordis.patch.yml` (the `academic-harness` Loader row); there is no separate keychain integration.
 - Keys entered in Settings reach per-call tools without a restart; MCP connectors and model-id mounts do not. Check the matrix above before concluding a key "doesn't work".
 
 See [Search](SEARCH.md), [Papers](PAPERS.md), [Compute](COMPUTE.md), and [Optional tools](OPTIONAL-TOOLS.md) for what each key unlocks.

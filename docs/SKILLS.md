@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **729 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **730 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -23,7 +23,7 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`Paper2Agent`](https://github.com/jmiao24/Paper2Agent) | 1 vendored skill | `paper2agent` — turn a paper and/or its code repo into a reviewed paper skill and a tested FastMCP server. See [Paper agents](PAPERS.md#paper-agents-paper2agent) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The rest of the catalogue is the local workflow and tool skills described below; the total on disk is 729.
+The rest of the catalogue is the local workflow and tool skills described below; the total on disk is 730.
 
 ## Workflow and tool skills
 
@@ -37,7 +37,7 @@ The rest of the catalogue is the local workflow and tool skills described below;
 | `papermemory` | The PaperMemory workflow; see [Paper memory](PAPERS.md#paper-memory) |
 | `zvec-grep` | Install, index, and routing details for workspace search; see [Workspace search](WORKSPACE.md#workspace-search) |
 | `agent-browser` | Driving a real browser through the agent-browser CLI; see [Browsing the web](AGENTS.md#browsing-the-web) |
-| `runpod`, `modal` | The rest of each CLI: Serverless, volumes, secrets, Hub templates, GPU availability; see [Remote compute](COMPUTE.md#beyond-the-two-tools) |
+| `runpod`, `modal`, `vastai` | The rest of each CLI: Serverless, volumes, secrets, Hub templates, GPU availability, Vast.ai bids/volumes; see [Remote compute](COMPUTE.md#beyond-the-tools) |
 | `paper2agent`, `paper2skill`, `paper2mcp` | Turning a paper or repo into a skill and an MCP server; see [Paper agents](PAPERS.md#paper-agents-paper2agent) |
 | `remove-ai-signs` | Style editing for machine-sounding prose; it does not evade detection or remove provenance |
 | `scientific-figure-making`, `diagram-design`, `generating-scientific-hypotheses` | Figure and ideation workflows; see [Writing](WRITING.md#figures) and [Research](RESEARCH.md) |

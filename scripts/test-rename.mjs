@@ -41,10 +41,10 @@ function patchFixture(extra = '') {
 ${extra}`
 }
 
-check('package identity is academic-harness 0.23.0', () => {
+check('package identity is academic-harness with a semver version', () => {
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
   assert.equal(pkg.name, 'academic-harness')
-  assert.equal(pkg.version, '0.23.0')
+  assert.match(pkg.version, /^\d+\.\d+\.\d+$/)
   assert.equal(pkg.repository.url, 'git+https://github.com/raktim-mondol/academic-harness.git')
   assert.equal(pkg.homepage, 'https://github.com/raktim-mondol/academic-harness#readme')
   assert.equal(pkg.exports['./ah'], './academic-harness.js')

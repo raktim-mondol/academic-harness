@@ -82,6 +82,8 @@ jobs:
           node scripts/test-fold.mjs
           node scripts/test-reply-fold.mjs
           node scripts/test-paper-fold.mjs
+          node scripts/test-compute.mjs
+          node scripts/test-compute-http.mjs
           node scripts/test-mermaid-render.mjs
 
       - name: Check rename identity and migration

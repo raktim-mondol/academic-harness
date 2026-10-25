@@ -61,7 +61,7 @@ starting with the layers that unblock daily writing and citation work.
 | LaTeX | `latex_compile` | `latex-compile.js` |
 | Scientific files | `sci_inspect` (chemistry, structures, arrays, imaging, AnnData) | `sci-inspect.js` |
 | Figures | `image_generate` + figure skills | `image-generate.js` |
-| Compute | `modal_run`, `runpod_run` | `modal-run.js`, `runpod-run.js` |
+| Compute | `modal_run`, `runpod_run`, `vastai_run` | `modal-run.js`, `runpod-run.js`, `vastai-run.js` |
 | Lab log / result cards | `notebook`, `scientific_result` | `notebook.js`, `scientific-result.js` |
 | Workspace search | `zvec_grep`, native `grep`/`glob` | `zvec-grep.js`, preset |
 | Skills-only capabilities | `clinicaltrials`, `citation-management`, `patent-landscape`, `research-grants`, `statistical-*` | `skills/` |

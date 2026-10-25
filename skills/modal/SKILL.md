@@ -5,9 +5,11 @@ description: "Use Modal for GPU/CPU remote compute beyond what the modal_run too
 
 # modal
 
-Load this before any Modal task that is more than "run one command remotely and get the result back" — that narrower case is already covered by the built-in `modal_run` tool (upload inputs, run `command` on a remote CPU/GPU instance, download outputs, always terminates the instance).
+Load this before any Modal task that is more than "run one command remotely and get the result back" — that narrower case is already covered by the built-in `modal_run` tool (upload inputs, run `command` on a remote CPU/GPU instance, download outputs, always terminates the instance; pass `volume_name` to mount a persistent Modal Volume at `/workspace`).
 
 Reach beyond `modal_run` — via the `bash` tool and the `modal` CLI — for anything it doesn't do: deploying a persistent app or web endpoint, managing a `modal.Volume`/`modal.Secret`/`modal.Queue`/`modal.Dict` directly, hot-reloading a Modal app during development, or inspecting logs/billing for an existing deployment.
+
+Modal also ships official agent skills and reference docs through the CLI (`modal skills install --claude -g -y`, `modal skills show`); install them only if a task needs the full upstream guide, since this brief plus the bundled `modal-usage` catalogue skill already cover the common paths.
 
 ## Prerequisites
 

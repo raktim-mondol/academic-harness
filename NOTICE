@@ -12,9 +12,12 @@ and are retained for attribution.
 Scientific skills are seeded from the open-source catalogue
 `K-Dense-AI/scientific-agent-skills` (MIT License) — the full catalogue
 (140 skills) is vendored under `skills/` alongside this plugin's own
-first-party skills. Its `modal` skill (general Modal usage) was renamed to
-`modal-usage` here to avoid colliding with this plugin's own `modal` skill
-(specific to the bundled `modal_run` tool); no other content was changed.
+first-party skills. Its `modal` skill (general Modal usage) is vendored as
+`skills/modal-usage`, and since v0.25.0 its frontmatter `name` is also
+`modal-usage`, so it does not collide with this plugin's own first-party
+`modal` skill (specific to the bundled `modal_run` tool). The skill body is
+otherwise unchanged; the file carries its own `Apache-2.0` license header as
+published upstream, which takes precedence for that bundle.
 
 Research-discipline skills (framing-research-questions, preregistering-analysis,
 verifying-results-before-claiming, requesting-red-team-review, and 12 more) are

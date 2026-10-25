@@ -1,13 +1,13 @@
 flowchart TD
-  local[Local workspace] -->|files_in| run[modal_run or runpod_run]
-  run --> remote[Remote CPU or GPU<br/>Modal app or Runpod pod]
+  local[Local workspace] -->|files_in| run[runpod_run · modal_run · vastai_run]
+  run --> remote[Remote CPU or GPU<br/>Runpod pod · Modal sandbox · Vast.ai instance]
   remote -->|files_out| local
   remote --> stop[Always terminate<br/>when the call returns]
 
-  run -. optional .-> volume[(Runpod network volume<br/>mounted at /workspace)]
+  run -. optional .-> volume[(Runpod network volume<br/>Modal Volume · Vast.ai volume<br/>mounted at /workspace)]
   volume -. reattach on reuse .-> remote
 
-  note[Anything not named in files_out is gone.<br/>A named volume persists and keeps costing storage<br/>until deleted from the Runpod console.]
+  note[Anything not named in files_out is gone.<br/>A named volume persists and keeps costing storage<br/>until deleted at the provider.]
   stop -.-> note
 
   classDef step fill:#eef2ff,stroke:#6366f1,color:#312e81

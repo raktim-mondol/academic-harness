@@ -45,6 +45,10 @@ runpodctl send <file> / receive <code>  # ad hoc file transfer outside a runpod_
 
 Old `runpodctl` builds silently lack newer flags and produce confusing errors — if a command behaves unexpectedly, check `runpodctl version` before assuming the task is wrong.
 
+## API version
+
+`runpod_run` and the REST examples in this repository follow **REST API v2** (`https://api.runpod.io/v2`, OpenAPI at `/v2/openapi.json`). REST v1 (`https://rest.runpod.io/v1`) retires on **2026-11-15** — do not add new v1 calls, and migrate any legacy snippet you find. v2 wraps list responses (`{"pods": [...]}`), nests the GPU/CPU request (`gpu: {id, count}` / `cpu: {id, vcpuCount}`), uses `PATCH` for updates, `POST /v2/pods/{id}/action` for start/stop/restart/terminate, and returns RFC 9457 errors (`{title, status, detail, errors}`). Network volumes use `dataCenter` (not `dataCenterId`) and live under `/v2/network-volumes`.
+
 ## Choosing a lane
 
 - One-shot command on a GPU, with the plugin handling upload/download/cleanup: `runpod_run`.
