@@ -2,6 +2,11 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.25.4
+
+- Fixed `paper_fold` failing preset validation on current DSH/Cordis: the plugin registered through `ctx.tools` without `export const inject = ['tools']`, so every new session failed with `agent-preset/invalid: paper-fold ... cannot get property "tools" without inject`. New sessions and `paper_fold` work again after restart.
+- `paper_fold` tests still pass (85 checks).
+
 ## 0.25.3
 
 - The seeder now refreshes first-party briefs that predate the current guidance (Modal SDK troubleshooting, Runpod REST v2, Vast.ai pitfalls), so existing installs receive skill updates without deleting the seeded directories. It still only replaces known-old content, leaving local edits to other skills untouched.

@@ -361,6 +361,8 @@ export async function paperFold(args = {}, { cwd = process.cwd(), signal } = {})
 }
 
 /** Register the paper-reading tool. `prepare:false` is for tests only. */
+export const inject = ['tools']
+
 export function apply(ctx, config = {}) {
   ctx.tools.register(defineTool({
     name: 'paper_fold',
