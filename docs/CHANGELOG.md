@@ -2,6 +2,12 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.27.3
+
+- **A project-bound collection keeps its project scope on every export.** Passing an explicit `out` used to drop the collection's project, so re-checking a correct project `.bib` after a key rekey could report `out_of_date` or expect the wrong key. The collection's project is now inferred whenever a collection is named, for every format and destination; the default `.bib` destination remains BibTeX/BibLaTeX-only. An explicit `project` still overrides, and a collection with no project still exports canonical keys.
+- **Prompt, skill, and tool description agree.** The reference-library rules now state the project-scope behavior; the `papermemory` skill also corrects `resolve` (`project_keys` is reported only with `project_keys: true`). The seeder refreshes existing 0.27.1 briefs that predate the rule.
+- **Regression coverage and a managed-install refresh.** `test_library_export.py::test_a_collections_project_scope_survives_an_explicit_out` and `scripts/test-reference-library.mjs` cover the explicit-`out` case after a rekey. `BUNDLE_REV` is now `dsh17`, so the vendored PaperMemory is reinstalled on the next DSH start.
+
 ## 0.27.2
 
 - **Fixed turns failing with `format v4 message requires a producer-owned source kind`.** The hooks tagged the messages they inject (the RSI lesson block, the Academic Harness state card, the stop-gate hand-off) with the retired `{ kind: 'plugin', plugin }` wrapper, which DSH 0.2.1-rc.2's session format refuses. The turn that carried an injected message failed outright; a session with no lesson selected and no Academic Harness project never noticed. They now use the producer-owned kinds `plugin:academic-harness-ah` and `plugin:academic-harness-rsi`. Found by driving a real DSH web session through a browser: the third prompt of a session failed the moment a lesson was injected.

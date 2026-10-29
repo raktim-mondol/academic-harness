@@ -1,7 +1,12 @@
 Vendored from https://github.com/raktim-mondol/papermemory
 Commit: 5f39434282daa8ac5b566f5717bb414f7edf6892 (tag v0.3.1, pushed)
 Version: 0.3.1
-Upstream exceptions: none.
+Upstream exceptions:
+- library_export.py: a collection's project scopes every export even when
+  --out is given (a collection's project is inferred whenever it is named;
+  the default .bib destination is still used only for BibTeX/BibLaTeX).
+  Regression: tests/test_library_export.py::
+  test_a_collections_project_scope_survives_an_explicit_out.
 
 Tests are the upstream tests (vendor/papermemory/tests, tests/test_phase0.py …
 test_phase7.py), run by CI. The upstream skill is not copied; the plugin's

@@ -392,3 +392,33 @@ def test_a_bound_collection_only_defaults_to_its_bib_for_bibtex_formats(store, t
     assert export_library(store, collection="refs", fmt="biblatex", cwd=str(ws))["written"]  # BibLaTeX still goes to the .bib
     # asking again for CSL-JSON after the .bib exists must not trip over the existing file
     assert json.loads(export_library(store, collection="refs", fmt="csl-json", cwd=str(ws))["text"])[0]["citation-key"] == "he2016deep"
+
+
+def test_a_collections_project_scope_survives_an_explicit_out(store, tmp_path):
+    from papermemory import library_keys
+
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    library_org.create_collection(store, "refs", project="thesis", bib_path="refs/thesis.bib")
+    library_org.add_to_collection(store, "refs", ["he2016deep"])
+    library_org.create_collection(store, "plain")
+    library_org.add_to_collection(store, "plain", ["he2016deep"])
+    library_keys.rekey(store, "he2016deep", to="he2016resnet", reason="clearer", apply=True)
+
+    bound = export_library(store, collection="refs", cwd=str(ws))
+    assert bound["project"] == "thesis" and bound["written"]
+    assert "@article{he2016deep," in (ws / "refs" / "thesis.bib").read_text()
+
+    # `out` changes the destination, not the collection's project scope
+    copy = export_library(store, collection="refs", out="refs/thesis-copy.bib", cwd=str(ws))
+    assert copy["project"] == "thesis" and copy["written"]
+    assert "@article{he2016deep," in (ws / "refs" / "thesis-copy.bib").read_text()
+    assert export_library(store, collection="refs", out="refs/thesis-copy.bib", check=True, cwd=str(ws))["status"] == "in_sync"
+
+    inline = json.loads(export_library(store, collection="refs", fmt="csl-json", cwd=str(ws))["text"])
+    assert inline[0]["citation-key"] == "he2016deep"
+
+    # a collection with no project still exports the canonical key
+    plain = export_library(store, collection="plain", out="refs/plain.bib", cwd=str(ws))
+    assert plain["project"] is None
+    assert "@article{he2016resnet," in (ws / "refs" / "plain.bib").read_text()
