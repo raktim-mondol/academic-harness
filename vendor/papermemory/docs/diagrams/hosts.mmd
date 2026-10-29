@@ -1,0 +1,14 @@
+flowchart TB
+  TOOLS["Plugin tools that use the library<br/>citation · manuscript_citations ·<br/>literature_search · integrity_check"]
+  PLUG["<b>Academic Harness plugin</b><br/>reference_library<br/>knows the session's workspace"]
+  MCP["<b>MCP server</b><br/>papermemory_library<br/>you pass cwd"]
+  CLI["<b>papermemory CLI</b><br/>papermemory library ..."]
+  OTHER["Other agents<br/>for example Grok"]
+  DB[("PaperMemory database<br/>~/.local/share/papermemory")]
+
+  TOOLS --> PLUG
+  PLUG --> DB
+  OTHER --> MCP
+  MCP --> DB
+  CLI --> DB
+  PLUG -. "hides this copy<br/>PAPERMEMORY_HIDE_TOOLS" .-> MCP

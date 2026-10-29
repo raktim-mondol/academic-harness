@@ -1,0 +1,19 @@
+stateDiagram-v2
+  direction LR
+  [*] --> NoKey: paper is stored
+  NoKey --> Keyed: import keeps the file's key<br/>or one is generated
+  Keyed --> Frozen: written to a .bib<br/>(export freezes it)
+  Frozen --> Frozen: exported again, unchanged
+  Keyed --> DryRun: keys rekey
+  Frozen --> DryRun: keys rekey
+  DryRun --> Keyed: you stop here, nothing changed
+  DryRun --> Renamed: apply, with a reason
+  Renamed --> Keyed: new key, old key kept as an alias
+  note right of DryRun
+    Lists the manuscripts
+    that cite the old key
+  end note
+  note right of Renamed
+    Old manuscripts still
+    resolve the old key
+  end note

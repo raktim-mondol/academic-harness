@@ -1,0 +1,13 @@
+flowchart TD
+  F["A .bib, .ris or .json file, or pasted text"] --> P["Read it tolerantly<br/>macros, ( ) entries, quoted values<br/>an entry missing its closing brace<br/>is reported and recovered"]
+  P --> N["Normalise to CSL-JSON<br/>every other field kept under its own name"]
+  N --> I{"Paper already stored?<br/>DOI, arXiv, PMID, title + year"}
+  I -- no --> NEW["Create it"]
+  I -- yes --> SAME["Merge into it"]
+  NEW --> V["Keep this version for its project<br/>the most complete version becomes the main record"]
+  SAME --> V
+  V --> K{"Is the file's key free?"}
+  K -- yes --> KO["Keep the key as written"]
+  K -- "taken by another paper" --> KS["Add a letter, for example smith2020a<br/>and remember the project's own key"]
+  KO --> OUT["Report: added, merged, failed,<br/>parse problems, key collisions"]
+  KS --> OUT

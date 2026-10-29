@@ -1,0 +1,18 @@
+flowchart TD
+  S["library export --out references.bib"] --> E{"State of the file"}
+
+  E -- "does not exist" --> W1["Write it<br/>header + managed block"]
+  E -- "managed, nothing changed" --> W2["Do nothing<br/>the file is not touched"]
+  E -- "managed, library has changed" --> W3["Rewrite only the managed block<br/>keep everything after the hand-added marker"]
+  E -- "managed, you edited inside the block" --> H{"--force?"}
+  E -- "an existing .bib PaperMemory did not write" --> A{"--adopt?"}
+
+  H -- no --> X1["Refuse and list the edited keys"]
+  H -- yes --> W4["Back it up, then rewrite the block"]
+  A -- no --> X2["Refuse and list the keys it would absorb"]
+  A -- yes --> W5["Back it up, move your entries below the marker,<br/>write the managed block above"]
+
+  W1 --> F["Freeze the keys that were written"]
+  W3 --> F
+  W4 --> F
+  W5 --> F

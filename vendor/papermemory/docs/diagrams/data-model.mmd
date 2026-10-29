@@ -1,0 +1,36 @@
+erDiagram
+  PAPERS ||--o| REFERENCE_META : "main record"
+  PAPERS ||--o{ REFERENCE_VARIANTS : "every imported version"
+  PAPERS ||--o| BIB_KEYS : "one unique key"
+  PAPERS ||--o{ BIB_KEY_ALIASES : "other names"
+  PAPERS ||--o{ PAPER_TAGS : has
+  PAPERS ||--o{ COLLECTION_PAPERS : "member of"
+  COLLECTIONS ||--o{ COLLECTION_PAPERS : contains
+  PAPERS ||--o| INTEGRITY : "retraction status"
+
+  PAPERS {
+    text id
+    text title
+    text doi
+    text bibtex_key
+  }
+  REFERENCE_META {
+    json csl_json
+    json extra_json
+    text raw_bibtex
+  }
+  REFERENCE_VARIANTS {
+    text project_key
+    text source
+    json csl_json
+  }
+  BIB_KEYS {
+    text key UK
+    bool frozen
+    text policy
+  }
+  BIB_KEY_ALIASES {
+    text key
+    text project_key
+    text source
+  }

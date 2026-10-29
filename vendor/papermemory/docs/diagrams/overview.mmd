@@ -1,0 +1,30 @@
+flowchart TB
+  subgraph IN["What you give it"]
+    A1["PDFs and notes"]
+    A2["DOI or arXiv id"]
+    A3["BibTeX, BibLaTeX, RIS,<br/>CSL-JSON files"]
+    A4["Your manuscript"]
+  end
+
+  subgraph DB["One local SQLite database, no cloud"]
+    EV["<b>Evidence memory</b><br/>papers as verbatim markdown<br/>claims anchored to exact quotes<br/>manuscripts, notes, lessons"]
+    LIB["<b>Reference library</b><br/>full record, no field dropped<br/>stable citation keys<br/>tags, collections, notes<br/>every imported version"]
+  end
+
+  subgraph OUT["What you get back"]
+    O1["Search and cite only<br/>what is stored"]
+    O2["cite-check: every<br/>cited key exists"]
+    O3["BibTeX, RIS, CSL-JSON,<br/>CSV exports"]
+    O4["A project .bib that never<br/>overwrites your edits"]
+  end
+
+  A1 --> EV
+  A2 --> EV
+  A2 --> LIB
+  A3 --> LIB
+  A4 --> EV
+  EV <--> LIB
+  EV --> O1
+  EV --> O2
+  LIB --> O3
+  LIB --> O4
