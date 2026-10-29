@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "papermemory"
-version = "0.3.0"
+version = "0.3.1"
 description = "Persistent academic memory for paper understanding and paper writing"
 readme = "README.md"
 requires-python = ">=3.10"

@@ -52,7 +52,7 @@ assert.match(readFileSync(join(root, 'papermemory.js'), 'utf8'), /EXPECTED_TOOL_
 const hidden = JSON.parse(spawnSync(wrapper, ['tools', '--json'], { encoding: 'utf8', env: { ...process.env, PAPERMEMORY_HIDE_TOOLS: 'papermemory_library' } }).stdout)
 assert.equal(hidden.length, 14, 'the plugin hides the MCP library tool')
 assert.ok(!hidden.includes('papermemory_library'))
-assert.match(readFileSync(join(vendor, 'pyproject.toml'), 'utf8'), /version = "0\.3\.0"/)
+assert.match(readFileSync(join(vendor, 'pyproject.toml'), 'utf8'), /version = "0\.3\.1"/)
 
 // ---- the CLI bridge
 assert.equal(pm('library', 'import', src, '--project', 'thesis').status, 0)
@@ -80,6 +80,12 @@ const formatted = await runCitation({ action: 'format', library: { query: 'year:
 assert.equal(formatted.count, 1)
 assert.match(formatted.bibliography, /Graph networks for molecules/)
 await assert.rejects(runCitation({ action: 'format', library: {} }, exec), /needs a scope/)
+// a collection bound to a .bib must still be readable as records (regression: it used to try to write into the .bib)
+assert.equal(pm('library', 'collection', 'create', 'bound', '--project', 'thesis', '--bib-path', 'bound.bib').status, 0)
+assert.equal(pm('library', 'collection', 'add', 'bound', 'lee2020graph', 'roe2021vision').status, 0)
+const viaCollection = await runCitation({ action: 'format', library: { collection: 'bound' }, style: 'apa' }, exec)
+assert.equal(viaCollection.count, 2)
+assert.ok(!existsSync(join(ws, 'bound.bib')), 'reading a bound collection as records must not write its .bib')
 process.env.PAPERMEMORY_CLI = join(work, 'does-not-exist')
 await assert.rejects(runCitation({ action: 'format', library: { all: true } }, exec), /reference library unavailable/)
 process.env.PAPERMEMORY_CLI = wrapper

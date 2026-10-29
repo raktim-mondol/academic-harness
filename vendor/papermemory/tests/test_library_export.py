@@ -378,3 +378,17 @@ def test_merge_moves_variants_and_export_tables_round_trip(tmp_path):
     assert fresh.conn.execute("SELECT COUNT(*) FROM reference_variants").fetchone()[0] == 2
     s.close()
     fresh.close()
+
+
+def test_a_bound_collection_only_defaults_to_its_bib_for_bibtex_formats(store, tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    library_org.create_collection(store, "refs", project="thesis", bib_path="refs/thesis.bib")
+    library_org.add_to_collection(store, "refs", ["he2016deep"])
+    for fmt in ("csl-json", "ris", "json", "csv"):
+        result = export_library(store, collection="refs", fmt=fmt, cwd=str(ws))
+        assert "text" in result and not result.get("written"), fmt  # returned inline, nothing written
+    assert not (ws / "refs").exists()
+    assert export_library(store, collection="refs", fmt="biblatex", cwd=str(ws))["written"]  # BibLaTeX still goes to the .bib
+    # asking again for CSL-JSON after the .bib exists must not trip over the existing file
+    assert json.loads(export_library(store, collection="refs", fmt="csl-json", cwd=str(ws))["text"])[0]["citation-key"] == "he2016deep"

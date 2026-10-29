@@ -360,8 +360,9 @@ def export_library(
 ) -> dict[str, Any]:
     if fmt not in FORMATS:
         raise ExportError("bad-format", f"format must be one of {', '.join(FORMATS)}")
-    # A collection bound to a project and a .bib exports there by default.
-    if collection and not out:
+    # A collection bound to a project and a .bib exports there by default, but only as BibTeX/BibLaTeX: asking
+    # for RIS, CSL-JSON, JSON, or CSV (the harness reads CSL-JSON this way) must never write into the .bib.
+    if collection and not out and fmt in FILE_FORMATS:
         row = store.conn.execute("SELECT * FROM collections WHERE slug=?", (slugify(collection),)).fetchone()
         if row and row["bib_path"]:
             out = row["bib_path"]

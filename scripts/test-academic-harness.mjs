@@ -193,7 +193,11 @@ try {
   process.env.DSH_HOME = fakeHome
   mkdirSync(join(fakeHome, 'skills', 'modal'), { recursive: true })
   writeFileSync(join(fakeHome, 'skills', 'modal', 'SKILL.md'), '---\nname: modal\n---\n\n# modal\n\nOld brief without the current guidance.\n')
+  mkdirSync(join(fakeHome, 'skills', 'papermemory'), { recursive: true })
+  writeFileSync(join(fakeHome, 'skills', 'papermemory', 'SKILL.md'), '---\nname: papermemory\n---\n\n# PaperMemory\n\nAn older brief that predates the reference library.\n')
   seed()
+  ok('seed refreshes the papermemory skill to the reference-library brief', readFileSync(join(fakeHome, 'skills', 'papermemory', 'SKILL.md'), 'utf8').includes('`reference_library`'))
+  ok('seed installs the power-and-sample-size skill', existsSync(join(fakeHome, 'skills', 'power-and-sample-size', 'SKILL.md')))
   ok('seed copies academic-harness skill', existsSync(join(fakeHome, 'skills', 'academic-harness', 'SKILL.md')))
   ok('seed copies ah-write-unit', existsSync(join(fakeHome, 'skills', 'ah-write-unit', 'SKILL.md')))
   ok('seed refreshes an outdated first-party brief', readFileSync(join(fakeHome, 'skills', 'modal', 'SKILL.md'), 'utf8').includes('Troubleshooting `modal_run`'))

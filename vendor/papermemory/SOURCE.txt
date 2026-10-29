@@ -1,6 +1,6 @@
 Vendored from https://github.com/raktim-mondol/papermemory
-Commit: 80406bfc39e0f17817c1c50595c6223920ac7713 (tag v0.3.0, pushed)
-Version: 0.3.0
+Commit: 5f39434282daa8ac5b566f5717bb414f7edf6892 (tag v0.3.1, pushed)
+Version: 0.3.1
 Upstream exceptions: none.
 
 Tests are the upstream tests (vendor/papermemory/tests, tests/test_phase0.py …
