@@ -2,6 +2,13 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.27.0
+
+- **New `power_analysis` tool** for planning a study before data exist: sample size, power, smallest detectable effect, or alpha (`power`, `sensitivity`); effect-size conversion and computation (`effect_size`); Bonferroni, Holm, Hochberg, Benjamini–Hochberg, and Benjamini–Yekutieli adjustment and per-test alpha planning (`correct`); seeded Monte-Carlo power (`simulate`); and sample size for sensitivity/specificity precision (`diagnostic_precision`). Covers t, proportion, ANOVA, chi-square, correlation, regression, log-rank, equivalence (TOST), and non-inferiority designs.
+- **Integrity rules built in.** An assumed effect size needs `effect_source` (pilot, literature with a `source_ref`, smallest effect of interest, or convention); a convention is labelled as one. Post-hoc power from the study's own observed effect is refused. The unrounded and rounded n are both reported, dropout and clustering inflate the enrolment target separately, and every result echoes its assumptions and method.
+- Runs on NumPy and SciPy through `python-helpers/power_helper.py`; no new dependency (`statsmodels` is not used). Preset-only, no key, no network.
+- New `power-and-sample-size` skill (731 skills). `scripts/test-power.mjs` (`npm run test:power`) checks closed-form results against published values, that every solve mode inverts the others, the refusal rules, reproducible simulation, and registration.
+
 ## 0.26.0
 
 - **PaperMemory is now the reference manager.** The vendored PaperMemory moves to 0.3.0 (schema 2100) and adds a reference library: lossless records, unique stable citation keys, tags, collections, notes, import of BibTeX/BibLaTeX/RIS/CSL-JSON, export to BibTeX/BibLaTeX/RIS/CSL-JSON/JSON/CSV, a managed project `.bib` that never overwrites hand edits, duplicate detection, a field-level merge preview, and a library `doctor`. It is one new tool, `mcp__papermemory__papermemory_library`, so PaperMemory exposes **15 tools** (the start-up drift check now expects 15). Nothing was added for Zotero; PaperMemory replaces the need for it.

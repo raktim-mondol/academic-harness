@@ -1,0 +1,32 @@
+{
+  "note": "Reference values for the closed-form power calculations. 'unrounded' is the continuous n the solver returns; 'n' is the integer sample size. Sources are published tables / package documentation that report these figures, or a hand derivation from the cited formula.",
+  "solve_n": [
+    {"name": "two-sample t, d=0.5", "request": {"test": "t_two_sample", "effect_size": 0.5, "power": 0.8}, "n": 64, "unrounded": 63.7656, "tolerance": 0.01, "source": "Cohen (1988) power tables; G*Power 3.1 and R pwr::pwr.t.test report n = 63.77 per group, rounded up to 64"},
+    {"name": "two-sample t, d=0.8", "request": {"test": "t_two_sample", "effect_size": 0.8, "power": 0.8}, "n": 26, "unrounded": 25.5246, "tolerance": 0.01, "source": "pwr::pwr.t.test(d=0.8, power=0.8) documents n = 25.52"},
+    {"name": "two-sample t, d=0.2", "request": {"test": "t_two_sample", "effect_size": 0.2, "power": 0.8}, "n": 394, "unrounded": 393.4057, "tolerance": 0.05, "source": "pwr::pwr.t.test(d=0.2, power=0.8) documents n = 393.41"},
+    {"name": "one-sample t, d=0.5", "request": {"test": "t_one_sample", "effect_size": 0.5, "power": 0.8}, "n": 34, "unrounded": 33.3671, "tolerance": 0.01, "source": "pwr::pwr.t.test(type='one.sample', d=0.5, power=0.8) documents n = 33.37"},
+    {"name": "one-way ANOVA, 3 groups, f=0.25", "request": {"test": "anova_oneway", "effect_size": 0.25, "power": 0.8, "options": {"groups": 3}}, "n": 53, "unrounded": 52.3966, "tolerance": 0.01, "source": "pwr::pwr.anova.test(k=3, f=0.25, power=0.8) documents n = 52.40 per group (G*Power total N = 159)"},
+    {"name": "regression, f2=0.15, 3 predictors", "request": {"test": "regression", "effect_size": 0.15, "power": 0.8, "options": {"predictors": 3}}, "n": 77, "unrounded": 76.7058, "tolerance": 0.05, "source": "pwr::pwr.f2.test(u=3, f2=0.15, power=0.8) gives v = 72.71, N = v + u + 1; G*Power reports total N = 77"},
+    {"name": "chi-square, w=0.3, df=1", "request": {"test": "chisq", "effect_size": 0.3, "power": 0.8, "options": {"df": 1}}, "n": 88, "unrounded": 87.21, "tolerance": 0.05, "source": "pwr::pwr.chisq.test(w=0.3, df=1, power=0.8) documents N = 87.21"},
+    {"name": "two proportions, h=0.3", "request": {"test": "proportion_two", "effect_size": 0.3, "power": 0.8}, "n": 175, "unrounded": 174.4191, "tolerance": 0.05, "source": "pwr::pwr.2p.test(h=0.3, power=0.8) documents n = 174.42 per group"},
+    {"name": "log-rank, HR=0.5, 1:1", "request": {"test": "logrank", "effect_size": 0.5, "power": 0.8}, "n": 66, "unrounded": 65.3455, "tolerance": 0.05, "source": "Schoenfeld (1981): events = 4 (z_0.975 + z_0.8)^2 / ln(HR)^2 = 4 * 7.849 / 0.4805 = 65.35"},
+    {"name": "equivalence (TOST), margin 0.5 sd, true difference 0", "request": {"test": "equivalence_means", "effect_size": 0, "power": 0.8, "options": {"margin": 0.5}}, "n": 70, "unrounded": 69.2, "tolerance": 1.0, "source": "Chow, Shao & Wang: n = 2 (z_0.95 + z_0.9)^2 / 0.5^2 = 68.5 per group; the exact-t TOST figure is slightly larger"}
+  ],
+  "solve_effect": [
+    {"name": "smallest detectable d at n=50 per group", "request": {"test": "t_two_sample", "n": 50, "power": 0.8}, "effect_size": 0.5659, "tolerance": 0.002, "source": "G*Power 3.1 sensitivity analysis, two-sample t, n1 = n2 = 50, power 0.8: d = 0.566"}
+  ],
+  "correct": [
+    {"name": "Holm", "p": [0.01, 0.04, 0.03, 0.005], "method": "holm", "adjusted": [0.03, 0.06, 0.06, 0.02], "source": "hand derivation: sorted 0.005,0.01,0.03,0.04 times 4,3,2,1 = 0.02,0.03,0.06,0.04; running maximum 0.02,0.03,0.06,0.06"},
+    {"name": "Benjamini-Hochberg", "p": [0.01, 0.04, 0.03, 0.005], "method": "bh", "adjusted": [0.02, 0.04, 0.04, 0.02], "source": "hand derivation: p*m/rank = 0.02,0.02,0.04,0.04; running minimum from the largest"},
+    {"name": "Bonferroni", "p": [0.01, 0.04, 0.03, 0.005], "method": "bonferroni", "adjusted": [0.04, 0.16, 0.12, 0.02], "source": "p * 4"},
+    {"name": "Hochberg", "p": [0.01, 0.04, 0.03, 0.005], "method": "hochberg", "adjusted": [0.03, 0.04, 0.04, 0.02], "source": "hand derivation: sorted p times 4,3,2,1 = 0.02,0.03,0.06,0.04; running minimum from the largest = 0.02,0.03,0.04,0.04"}
+  ],
+  "effect_size": [
+    {"name": "d to r", "request": {"from": "d", "inputs": {"d": 0.5}}, "field": "r", "value": 0.24254, "tolerance": 0.0001, "source": "r = d / sqrt(d^2 + 4) for equal groups"},
+    {"name": "Hedges g", "request": {"from": "means", "inputs": {"m1": 10, "m2": 8, "sd1": 4, "sd2": 4, "n1": 30, "n2": 30}}, "field": "hedges_g", "value": 0.49351, "tolerance": 0.0001, "source": "g = d * (1 - 3 / (4 df - 1)), d = 0.5, df = 58"},
+    {"name": "odds ratio to d", "request": {"from": "odds_ratio", "inputs": {"odds_ratio": 2.4766}}, "field": "d", "value": 0.5, "tolerance": 0.001, "source": "d = ln(OR) sqrt(3) / pi"}
+  ],
+  "diagnostic": [
+    {"name": "sensitivity 0.9 +- 0.05", "request": {"expected": 0.9, "width": 0.05, "prevalence": 0.2}, "cases_needed": 139, "total_participants": 695, "source": "Buderer (1996): n = z^2 p (1 - p) / w^2 = 1.96^2 * 0.09 / 0.0025 = 138.3"}
+  ]
+}

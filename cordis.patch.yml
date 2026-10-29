@@ -509,6 +509,13 @@
           - id: funder-policy
             name: academic-harness/funder-policy
 
+          # Study planning: power, sample size, effect sizes, multiplicity correction, and
+          # simulation for designing a study before data exist. Local (numpy + scipy via
+          # python-helpers/power_helper.py), no key, no network. Requires effect_source for
+          # any assumed effect size and refuses post-hoc power. See power-analysis.js.
+          - id: power-analysis
+            name: academic-harness/power-analysis
+
           # Optional Phase 6 tools (identity + peer review). These rows always exist,
           # but apply() registers nothing unless AH_ENABLE_OPTIONAL_TOOLS=1, so the tools
           # are absent from the base tool list and prompt by default. Changing the flag

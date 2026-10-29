@@ -351,6 +351,12 @@ Acceptance: closed-form results match the reference tables within stated toleran
 
 Reference values come from S7 and are stored in `scripts/fixtures/power/` with the source cited next to each value. The helper's tests skip themselves when SciPy is absent, like the other helper tests.
 
+### 6.7 Implementation status (Phase 5 — done)
+
+Built on branch `power-analysis` as plugin v0.27.0: `power-analysis.js`, `python-helpers/power_helper.py` (NumPy + SciPy only), `skills/power-and-sample-size`, preset row, prompt section "Study planning", `scripts/test-power.mjs` with reference fixtures in `scripts/fixtures/power/reference.json`. Every acceptance item above is covered by a test.
+
+Differences from the plan as written: `preregistering-analysis` is vendored third-party material, so it was not edited; the new skill points to it instead. Closed-form results match the published figures to the stated tolerance (for example two-sample t at d = 0.5 gives n = 63.77, rounded to 64; ANOVA, regression f², chi-square, two-proportion, and log-rank also match). The correlation test uses Fisher's z with the small-sample correction and can differ from G*Power's exact test by one subject, so its test accepts 84 or 85.
+
 ## 7. Settings, environment, and docs
 
 New Settings keys (`KEY_FIELDS`, `client/ApiKeysSection.jsx` group "Domain sources"):

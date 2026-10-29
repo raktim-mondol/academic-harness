@@ -3,7 +3,7 @@
 [![verify](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml/badge.svg)](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml)
 ![DeepSeek Harness 0.2.1+](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1%2B-5b7bd5)
 
-**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review and hypothesis ledgers, 730 scientific skills, and local self-improvement, all inside the DSH web UI.
+**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review and hypothesis ledgers, 731 scientific skills, and local self-improvement, all inside the DSH web UI.
 
 Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset with a research persona and academic tools, and keeps the general-purpose tools available on every preset.
 
@@ -53,10 +53,11 @@ Full instructions, migration from `researchcraft`, troubleshooting, and the "one
 | **Papers and evidence** | `paper_download`, `paper_fold`, `pdf_to_markdown`, PaperMemory's 15 tools (including the reference library), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
 | **Writing and citation** | `ah_*` writing oracle and gate, `citation`, `manuscript_citations`, LaTeX, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
 | **Reviews and hypotheses** | `review` PRISMA-style ledger, `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors | [Research](docs/RESEARCH.md) |
+| **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
 | **Workspace and notebook** | zvec-grep semantic search, lab notebook, `scientific_result`, `fold_text`, `research_template`, `sci_inspect` | [Workspace](docs/WORKSPACE.md) |
 | **Compute and delegation** | `runpod_run`/`modal_run`/`vastai_run`, `subagent_pro`, `subagent_vision`, specialist briefs, `agent-browser` | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) |
-| **Skills** | 730 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
+| **Skills** | 731 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
 | **Self-improvement** | Local RSI: capture, diagnose, admit, inject, compare against control, promote or quarantine | [RSI](docs/RSI.md) |
 | **Configuration** | Settings → Academic Harness API keys; every credential is optional at install | [Configuration](docs/CONFIGURATION.md) |
 
