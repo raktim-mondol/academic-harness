@@ -56,7 +56,7 @@ Findings:
 |---|---|---|
 | `code-reviewer` | `code-reviewer.md` | Keep; read-only |
 | `statistical-reviewer` | `statistician.md` | Pick one canonical name; alias the other |
-| `math-checker` | — | Add; route to `subagent` by default, or `subagent_pro` when a custom endpoint/model route is configured |
+| `math-checker` | — | Add; route to `subagent` by default, or `subagent_pro` only when the user explicitly asks for Pro or says a custom Pro route is configured |
 | `ml-auditor` | — | Add |
 | `data-validator` | `data-scientist.md` | Split validator from analyst, or alias |
 | `reproducibility-auditor` | — | Add; owns `repo_audit` |
@@ -119,8 +119,9 @@ Add full briefs for: `ml-auditor`, `math-checker`, `methodology-reviewer`,
 `fact-checker`, `ethics-reviewer`, `protocol-writer`, `results-interpreter`.
 Route `math-checker`, `methodology-reviewer`, and `ml-auditor` to
 `subagent` by default; they are difficulty-bound rather than length-bound.
-Use `subagent_pro` only when a custom endpoint/model route is configured for
-heavy tasks.
+Use `subagent_pro` only when the user explicitly asks for the Pro route or says
+a custom endpoint/model route is configured for heavy tasks; otherwise use
+`subagent`.
 
 Defer or drop:
 
@@ -259,7 +260,7 @@ tools.
 | Routing | Agents |
 |---|---|
 | `subagent` (default) | `submission-compliance-editor`, `data-steward`, `reference-librarian`, `prisma-auditor`, `math-checker`, `methodology-reviewer`, `ml-auditor`, `research-integrity-auditor` (hard forensic judgment) |
-| `subagent_pro` (when a custom endpoint/model route is configured) | The same difficulty-bound agents above |
+| `subagent_pro` (only when the user asks for Pro or says a custom route is configured) | The same difficulty-bound agents above |
 | `subagent_vision` | Figure-panel comparison, microscopy/gel review, compiled-PDF layout audits |
 | `subagent_fork` | Continuity only; never for independent verification |
 

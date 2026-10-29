@@ -12,7 +12,7 @@ Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-har
 |---|---|---|---|
 | `subagent` | Delegated work, including difficulty-bound specialist calls | — (inherits the parent session's model) | — |
 | `subagent_fork` | Forked delegation that inherits the parent preset and history | — (inherits the parent) | — |
-| `subagent_pro` | Difficulty-bound work: a hard proof/derivation, a causal-inference or experimental-design critique, tracing a subtle methodological flaw, multi-step reaction/pathway reasoning, a large multi-file refactor | Pro endpoint URL + model + API key (Settings) | Inherit session model |
+| `subagent_pro` | Difficulty-bound work, only when the user explicitly asks for the Pro route or says a custom Pro route is configured | Pro endpoint URL + model + API key (Settings) | Inherit session model |
 | `subagent_vision` | Tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | Vision endpoint URL + model + API key (Settings) | Inherit session model |
 
 Both routes are optional. Set the endpoint URL, model, and API key to register a custom OpenAI/Anthropic-compatible route; with none set they inherit the session model (DeepSeek-V4.1-Flash by default). A partial set is ignored. The endpoint URL selects Anthropic Messages when it contains `anthropic` (for example `https://api.deepseek.com/anthropic`) and OpenAI Chat Completions otherwise. The plugin registers the route on the host's pi-ai adapter and stores the key in the credential service. The legacy model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
@@ -23,7 +23,7 @@ All four delegation tools use DSH 0.2.1's managed activations: a call returns a 
 
 ### What gets routed to `subagent_pro`
 
-When a custom route is configured, the system prompt steers `subagent_pro` toward difficulty, not length. With no route, `subagent` is the same delegation on the session model:
+The system prompt steers `subagent_pro` toward difficulty, not length, but **only when the user explicitly asks for the Pro route or says a custom route is configured**. Otherwise use `subagent`; never infer that a Pro route exists. With no route, `subagent` is the same delegation on the session model:
 
 - verifying a mathematical derivation step-by-step,
 - propagating uncertainty through a multi-stage calculation,
