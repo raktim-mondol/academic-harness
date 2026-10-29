@@ -16,7 +16,7 @@ npm run build # after any client/ change — rebuilds lib/client.js
 The tool tests are plain Node scripts and need no network (the Python-helper cases skip themselves when SciPy/Pillow are unavailable):
 
 ```sh
-for t in citation-format review-store review-tool integrity registries \
+for t in citation-format review-store review-tool reporting-check integrity registries \
          optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold compute library power reference-library; do
   node scripts/test-$t.mjs
 done
@@ -65,7 +65,7 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `presets/academic-harness/` | Preset source |
 | `prompt.js`, `prompt-section.js` | Research system prompt |
 | `client/` | Settings page source; `lib/client.js` is the committed build |
-| `skills/` | 743 bundled skills |
+| `skills/` | 744 bundled skills |
 | `python-helpers/` | Python helpers for `sci_inspect` and `power_analysis` |
 | `vendor/academic-harness/` | Vendored writing engine |
 | `vendor/papermemory/` | Vendored PaperMemory package |

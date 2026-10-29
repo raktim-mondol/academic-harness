@@ -1,0 +1,123 @@
+{
+  "id": "prisma-s",
+  "name": "PRISMA-S 2021",
+  "version": "2021",
+  "study_designs": ["systematic review", "meta-analysis", "scoping review"],
+  "source_url": "https://www.prisma-statement.org/prisma-s",
+  "license_note": "Item ids follow the published extension. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "An extension to PRISMA 2020 for reporting literature searches. It can also be used alongside PRISMA-ScR.",
+  "items": [
+    {
+      "id": "1",
+      "section": "Information sources",
+      "short_prompt": "The names of all databases and registers searched are reported.",
+      "cues": ["database", "register", "PubMed", "Embase", "MEDLINE", "Web of Science", "Scopus"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "2",
+      "section": "Information sources",
+      "short_prompt": "Which databases and registers were searched, and which were not, is made clear.",
+      "cues": ["database", "not searched", "searched", "information source"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "3",
+      "section": "Information sources",
+      "short_prompt": "Any study registries searched are named.",
+      "cues": ["registry", "ClinicalTrials.gov", "trial register", "ISRCTN"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "4",
+      "section": "Search strategy",
+      "short_prompt": "The full search strategies for each database or register are reported.",
+      "cues": ["search strategy", "search string", "boolean", "search terms"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "5",
+      "section": "Search strategy",
+      "short_prompt": "How the search strategy was developed or validated is described.",
+      "cues": ["search strategy", "librarian", "information specialist", "peer review", "validated"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "6",
+      "section": "Search strategy",
+      "short_prompt": "Any limits or restrictions applied to the search are reported.",
+      "cues": ["limit", "restriction", "date limit", "language limit", "publication type"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "7",
+      "section": "Search strategy",
+      "short_prompt": "Any search filters used are reported, including their source or validation.",
+      "cues": ["filter", "hedge", "validated filter", "search filter"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "8",
+      "section": "Search strategy",
+      "short_prompt": "Whether the search strategy was peer reviewed, and by whom, is reported.",
+      "cues": ["peer review", "PRESS", "information specialist", "librarian reviewed"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "9",
+      "section": "Search strategy",
+      "short_prompt": "The date the search was last run is reported.",
+      "cues": ["search date", "searched on", "last searched", "search was run"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "10",
+      "section": "Search strategy",
+      "short_prompt": "How records were kept and managed is described.",
+      "cues": ["records", "reference manager", "deduplicat", "export", "EndNote", "Zotero"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "11",
+      "section": "Search strategy",
+      "short_prompt": "Any search updates are reported, including their dates and yield.",
+      "cues": ["search update", "updated search", "re-run", "last searched"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "12",
+      "section": "Search strategy",
+      "short_prompt": "The number of records identified by each database or register is reported.",
+      "cues": ["records identified", "number of records", "yield", "per database"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "13",
+      "section": "Search strategy",
+      "short_prompt": "Full search strategies are included in the report or supplementary material.",
+      "cues": ["supplementary", "appendix", "full search strategy", "S1"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "14",
+      "section": "Search strategy",
+      "short_prompt": "Deduplication methods are described.",
+      "cues": ["deduplicat", "duplicates", "reference manager", "Bramer"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "15",
+      "section": "Search strategy",
+      "short_prompt": "The search documentation is retrievable or archived.",
+      "cues": ["documentation", "archived", "available", "repository", "OSF"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    },
+    {
+      "id": "16",
+      "section": "Search strategy",
+      "short_prompt": "Any deviations from the search protocol are reported.",
+      "cues": ["deviation", "protocol", "amendment", "change to the search"],
+      "source_url": "https://www.prisma-statement.org/prisma-s"
+    }
+  ]
+}

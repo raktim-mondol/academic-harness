@@ -191,6 +191,16 @@ If the MCP tools are absent (startup failure is loud; the tools disappear), the 
 
 Every screening decision and reason must come from the user or the stated criteria — never infer, batch, or invent one. \`screen\` enforces the funnel: \`full_text\` needs a prior \`title_abstract\` include, and an exclude/maybe needs a non-empty reason. Add \`evidence\` only after a full-text include, quoting verbatim with a location (page/section); the ledger records the quote but does not verify it — PaperMemory \`quote_check\`/\`trace\` remains the verifier. Run \`status\` before reporting counts, and investigate \`included_without_evidence\` rather than presenting a clean PRISMA table. Produce the deliverable with \`export\` (markdown report skeleton + PRISMA counts, evidence CSV, or JSON); exports refuse to overwrite unless \`overwrite: true\`. Load the \`systematic-review-ledger\` skill for the full workflow.
 
+## Reporting checklists
+
+\`reporting_check\` checks a manuscript against a reporting guideline (CONSORT, STROBE, PRISMA 2020/PRISMA-S/PRISMA-ScR, ARRIVE 2.0, TRIPOD+AI, CARE, STARD). Use it for a submission checklist or a co-author's reporting audit, not as a general peer review. \`suggest\` returns candidate guidelines and the design terms that matched; it never selects one, so confirm the design with the user before \`start\`. \`start\` snapshots the manuscript hash (a workspace path or a PaperMemory id); \`items\` lists the checklist, \`candidates\` ranks passages for one item, and \`judge\` records one verdict.
+
+- \`reported\` and \`partial\` need a verbatim quote. The tool re-finds it in the manuscript after whitespace normalisation; a fabricated or paraphrased quote is rejected and not stored. \`not_reported\` is an advisory claim of absence and needs the terms or sections \`searched\`; \`not_applicable\` needs a \`reason\` a reader can challenge.
+
+- Read the passage in context before judging. A candidate passage is a reading aid, not a decision. If the manuscript changes, run \`status\`: quotes that no longer match become stale, and a re-judgement needs \`override: true\` with a reason (both events stay in the log).
+
+- Report the export as evidence, never as a verdict: "N of M items have verified evidence", plus unassessed and stale counts. Never call a manuscript compliant, and never say an export guarantees submission readiness. Load \`reporting-guidelines\` for the workflow and the subagent-batch discipline.
+
 ## Study planning
 
 \`power_analysis\` plans a study before data exist: \`power\` solves for n, power, the smallest detectable effect, or alpha (t, proportions, ANOVA, chi-square, correlation, regression, log-rank, equivalence and non-inferiority); \`effect_size\` converts between d, r, f, f², η², odds ratio, h, w and computes them from means, t, F, or χ²; \`correct\` adjusts p-values (Bonferroni, Holm, Hochberg, Benjamini–Hochberg, Benjamini–Yekutieli) or gives the per-test alpha to plan with; \`simulate\` estimates power by Monte Carlo (a seed is required); \`diagnostic_precision\` sizes a sensitivity/specificity study. Do not compute these by hand or from memory.

@@ -27,7 +27,7 @@ function sanitize(id) {
  * last resolvable hop, and to this session's own id when there is no parent —
  * unchanged behavior for a plain top-level session.
  */
-function sessionKey(exec) {
+export function sessionKey(exec) {
   let id = exec.agent?.session?.header?.id ?? exec.agent?.session?.id ?? exec.agent?.sessionId
   if (typeof id !== 'string' || id.length === 0) return 'default'
   const visited = new Set([id])
@@ -42,7 +42,7 @@ function sessionKey(exec) {
   return sanitize(id)
 }
 
-function notebookFile(exec) {
+export function notebookFile(exec) {
   return join(workspaceRoot(exec), '.dsh', 'notebook', `${sessionKey(exec)}.jsonl`)
 }
 

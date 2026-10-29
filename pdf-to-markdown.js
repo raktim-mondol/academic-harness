@@ -23,6 +23,38 @@ function loadPdfInspector() {
   return pdfInspectorPromise
 }
 
+/**
+ * Convert a PDF buffer to Markdown. Shared by the `pdf_to_markdown` tool and
+ * `reporting_check`, which needs the manuscript text without exposing a second
+ * PDF parser or writing an intermediate file.
+ */
+export async function convertPdfMarkdown(buffer, { pages, ocr = false } = {}) {
+  let inspector
+  try {
+    inspector = await loadPdfInspector()
+  } catch (error) {
+    return {
+      success: false,
+      error: `pdf-inspector native module not available (${error?.message ?? error}). Run "npm install" in the plugin so its platform-specific optionalDependency binary is installed (Linux x64/ARM64, macOS ARM64, Windows x64).`,
+    }
+  }
+  try {
+    const result = ocr
+      ? await inspector.processPdfWithOcr(buffer, { mode: 'Auto', pageNumbers: pages })
+      : await inspector.processPdfAsync(buffer, pages)
+    return {
+      success: true,
+      pdf_type: result.pdfType,
+      page_count: result.pageCount,
+      confidence: typeof result.confidence === 'number' ? result.confidence : undefined,
+      pages_needing_ocr: result.pagesNeedingOcr ?? result.pagesRecommendedForOcr ?? [],
+      markdown: result.markdown ?? '',
+    }
+  } catch (error) {
+    return { success: false, error: `PDF conversion failed: ${error?.message ?? error}` }
+  }
+}
+
 /** Register the PDF-to-Markdown conversion tool. */
 export function applyPdfToMarkdown(ctx) {
   ctx.tools.register(defineTool({
@@ -89,36 +121,10 @@ export function applyPdfToMarkdown(ctx) {
       const target = resolveWorkspacePath(cwd, args.path)
       if (!existsSync(target)) return { success: false, error: `file not found: ${args.path}` }
 
-      let inspector
-      try {
-        inspector = await loadPdfInspector()
-      } catch (error) {
-        return {
-          success: false,
-          error: `pdf-inspector native module not available (${error?.message ?? error}). Run "npm install" in the plugin so its platform-specific optionalDependency binary is installed (Linux x64/ARM64, macOS ARM64, Windows x64).`,
-        }
-      }
-
       const buffer = readFileSync(target)
       const pages = Array.isArray(args.pages) && args.pages.length > 0 ? args.pages : undefined
-
-      let result
-      try {
-        result = args.ocr
-          ? await inspector.processPdfWithOcr(buffer, { mode: 'Auto', pageNumbers: pages })
-          : await inspector.processPdfAsync(buffer, pages)
-      } catch (error) {
-        return { success: false, error: `PDF conversion failed: ${error?.message ?? error}` }
-      }
-
-      const out = {
-        success: true,
-        pdf_type: result.pdfType,
-        page_count: result.pageCount,
-        confidence: typeof result.confidence === 'number' ? result.confidence : undefined,
-        pages_needing_ocr: result.pagesNeedingOcr ?? result.pagesRecommendedForOcr ?? [],
-        markdown: result.markdown ?? '',
-      }
+      const out = await convertPdfMarkdown(buffer, { pages, ocr: Boolean(args.ocr) })
+      if (!out.success) return out
 
       if (args.write_to) {
         const outAbs = resolveWorkspacePath(cwd, args.write_to)

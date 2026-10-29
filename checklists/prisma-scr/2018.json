@@ -1,0 +1,165 @@
+{
+  "id": "prisma-scr",
+  "name": "PRISMA-ScR 2018",
+  "version": "2018",
+  "study_designs": ["scoping review"],
+  "source_url": "https://www.prisma-statement.org/prisma-scr",
+  "license_note": "Item ids follow the published extension. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "For scoping reviews. It adapts PRISMA for reviews that map evidence rather than estimate an effect; the two optional items are included.",
+  "items": [
+    {
+      "id": "1",
+      "section": "Title",
+      "short_prompt": "The title identifies the report as a scoping review.",
+      "cues": ["scoping review", "scoping study", "mapping review"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "2",
+      "section": "Abstract",
+      "short_prompt": "The abstract gives a structured summary of the review.",
+      "cues": ["abstract", "structured summary", "methods", "results", "conclusions"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "3",
+      "section": "Introduction",
+      "short_prompt": "The rationale for the review is stated.",
+      "cues": ["rationale", "background", "what is known"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "4",
+      "section": "Introduction",
+      "short_prompt": "The review objectives and questions are stated.",
+      "cues": ["objective", "question", "aim"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "5",
+      "section": "Methods",
+      "short_prompt": "The review protocol and registration are reported, including amendments.",
+      "cues": ["protocol", "registration", "OSF", "amendment"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "6",
+      "section": "Methods",
+      "short_prompt": "Inclusion and exclusion criteria are specified.",
+      "cues": ["eligib", "inclusion", "exclusion", "criteria"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "7",
+      "section": "Methods",
+      "short_prompt": "All information sources searched are listed with dates.",
+      "cues": ["database", "information source", "searched", "PubMed", "Embase", "Web of Science"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "8",
+      "section": "Methods",
+      "short_prompt": "The full search strategy is reported.",
+      "cues": ["search strategy", "search terms", "boolean", "search string"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "9",
+      "section": "Methods",
+      "short_prompt": "The process for selecting sources of evidence is described.",
+      "cues": ["selection", "screened", "reviewer", "title and abstract", "full text"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "10",
+      "section": "Methods",
+      "short_prompt": "The data charting process is described.",
+      "cues": ["charting", "data extraction", "extracted", "form", "pilot"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "11",
+      "section": "Methods",
+      "short_prompt": "The data items charted are defined.",
+      "cues": ["data item", "variable", "charted", "participants", "intervention", "outcome"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "12",
+      "section": "Methods",
+      "short_prompt": "Methods for critical appraisal of individual sources are described, if done.",
+      "cues": ["critical appraisal", "risk of bias", "quality", "not appraised"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "13",
+      "section": "Methods",
+      "short_prompt": "Methods for summarising and synthesising results are described.",
+      "cues": ["synthesis", "summar", "narrative", "mapping", "chart"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "14",
+      "section": "Results",
+      "short_prompt": "The numbers of records identified, screened, and included are reported, ideally with a flow diagram.",
+      "cues": ["flow diagram", "records identified", "records screened", "included"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "15",
+      "section": "Results",
+      "short_prompt": "The characteristics of included sources are presented.",
+      "cues": ["characteristics", "included studies", "table", "country", "population"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "16",
+      "section": "Results",
+      "short_prompt": "Critical appraisal results are presented, if appraisal was done.",
+      "cues": ["critical appraisal", "quality assessment", "risk of bias", "not appraised"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "17",
+      "section": "Results",
+      "short_prompt": "Results of individual sources are presented where relevant.",
+      "cues": ["individual", "each study", "results", "findings"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "18",
+      "section": "Results",
+      "short_prompt": "The synthesis results are presented.",
+      "cues": ["synthesis", "mapping", "themes", "categories", "summary"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "19",
+      "section": "Discussion",
+      "short_prompt": "A summary of the evidence is given in relation to the review questions.",
+      "cues": ["summary of evidence", "key findings", "review question", "in summary"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "20",
+      "section": "Discussion",
+      "short_prompt": "Limitations of the review and the evidence are discussed.",
+      "cues": ["limitation", "bias", "gap", "evidence base"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "21",
+      "section": "Discussion",
+      "short_prompt": "Conclusions and implications for practice, policy, or research are given.",
+      "cues": ["conclusion", "implication", "practice", "policy", "future research"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    },
+    {
+      "id": "22",
+      "section": "Other information",
+      "short_prompt": "Funding and competing interests are reported.",
+      "cues": ["funding", "funder", "competing interest", "conflict of interest"],
+      "source_url": "https://www.prisma-statement.org/prisma-scr"
+    }
+  ]
+}

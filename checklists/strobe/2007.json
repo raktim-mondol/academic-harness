@@ -1,0 +1,249 @@
+{
+  "id": "strobe",
+  "name": "STROBE 2007",
+  "version": "2007",
+  "study_designs": ["cohort", "case-control", "cross-sectional"],
+  "source_url": "https://www.strobe-statement.org/checklists/",
+  "license_note": "Item ids follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "A combined checklist for cohort, case-control, and cross-sectional observational studies. State which design the paper uses; some items apply only to one design.",
+  "items": [
+    {
+      "id": "1a",
+      "section": "Title and abstract",
+      "short_prompt": "The title or abstract identifies the study design.",
+      "cues": ["cohort", "case.control", "cross.sectional", "observational", "study design"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "1b",
+      "section": "Title and abstract",
+      "short_prompt": "The abstract gives a balanced summary of what was done and found.",
+      "cues": ["abstract", "summary", "conclusions"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "2",
+      "section": "Introduction",
+      "short_prompt": "The scientific background and rationale are explained.",
+      "cues": ["background", "rationale", "prior evidence", "what is known"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "3",
+      "section": "Introduction",
+      "short_prompt": "Specific objectives, including any prespecified hypotheses, are stated.",
+      "cues": ["objective", "hypothes", "aim", "we examined", "we investigated"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "4",
+      "section": "Methods",
+      "short_prompt": "The study design is presented early in the paper.",
+      "cues": ["study design", "cohort study", "case.control study", "cross.sectional study"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "5",
+      "section": "Methods",
+      "short_prompt": "The setting, locations, and relevant dates are described.",
+      "cues": ["setting", "location", "recruit", "follow.up", "between (January|February|March|April|May|June|July|August|September|October|November|December)", "\\b(19|20)\\d{2}\\b"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "6a",
+      "section": "Methods",
+      "short_prompt": "Eligibility criteria, sources, and selection methods for participants are given.",
+      "cues": ["eligib", "inclusion", "exclusion", "selection", "sampling", "consecutive"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "6b",
+      "section": "Methods",
+      "short_prompt": "For matched studies, matching criteria and the number of controls per case are given.",
+      "cues": ["match", "controls? per case", "matched"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "7",
+      "section": "Methods",
+      "short_prompt": "All variables of interest are clearly defined, including exposures, outcomes, predictors, and confounders.",
+      "cues": ["variable", "exposure", "outcome", "predictor", "confounder", "covariate"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "8",
+      "section": "Methods",
+      "short_prompt": "Data sources and measurement methods are described for each variable.",
+      "cues": ["data source", "measured", "measurement", "questionnaire", "record", "assay", "instrument"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "9",
+      "section": "Methods",
+      "short_prompt": "Efforts to address potential sources of bias are described.",
+      "cues": ["bias", "confound", "adjust", "sensitivity analysis", "missing data", "selection bias"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "10",
+      "section": "Methods",
+      "short_prompt": "How the study size was arrived at is explained.",
+      "cues": ["study size", "sample size", "power", "precision", "number of participants"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "11",
+      "section": "Methods",
+      "short_prompt": "How quantitative variables were handled in the analysis is explained.",
+      "cues": ["continuous variable", "categor", "quartile", "tertile", "linear", "non-linear", "per unit"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "12a",
+      "section": "Methods",
+      "short_prompt": "All statistical methods, including confounder control, are described.",
+      "cues": ["statistical method", "regression", "model", "adjust", "confound"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "12b",
+      "section": "Methods",
+      "short_prompt": "Subgroup and interaction analyses are described.",
+      "cues": ["subgroup", "interaction", "effect modification", "stratified"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "12c",
+      "section": "Methods",
+      "short_prompt": "How missing data were addressed is explained.",
+      "cues": ["missing data", "complete.case", "imput", "multiple imputation"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "12d",
+      "section": "Methods",
+      "short_prompt": "For cohort, case-control, or cross-sectional designs, the analytical method accounts for the sampling strategy.",
+      "cues": ["matching", "sampling", "weighting", "stratified analysis", "conditional logistic"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "12e",
+      "section": "Methods",
+      "short_prompt": "Any sensitivity analyses are described.",
+      "cues": ["sensitivity analysis", "robustness"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "13a",
+      "section": "Results",
+      "short_prompt": "The numbers of individuals at each stage of the study are reported.",
+      "cues": ["flow", "number of participants", "screened", "eligible", "included", "excluded"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "13b",
+      "section": "Results",
+      "short_prompt": "Reasons for non-participation at each stage are given.",
+      "cues": ["non.participation", "refused", "reasons? for exclusion", "not eligible"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "13c",
+      "section": "Results",
+      "short_prompt": "A flow diagram is considered where appropriate.",
+      "cues": ["flow diagram", "flow chart", "figure 1"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "14a",
+      "section": "Results",
+      "short_prompt": "Participant characteristics and the number with missing data are reported.",
+      "cues": ["characteristics", "table 1", "missing data", "demographic"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "14b",
+      "section": "Results",
+      "short_prompt": "The number of outcome events or summary measures is reported.",
+      "cues": ["number of events", "summary measure", "incidence", "cases"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "14c",
+      "section": "Results",
+      "short_prompt": "For cohort studies, follow-up time is summarised.",
+      "cues": ["follow.up", "person.years", "median follow", "duration of follow"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "15",
+      "section": "Results",
+      "short_prompt": "Outcome data are reported for each group of interest.",
+      "cues": ["outcome data", "events", "incidence", "risk", "by group"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "16a",
+      "section": "Results",
+      "short_prompt": "Unadjusted and adjusted estimates are given, with confounders identified.",
+      "cues": ["crude", "unadjusted", "adjusted", "confounder", "odds ratio", "hazard ratio"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "16b",
+      "section": "Results",
+      "short_prompt": "How missing data were handled in the analysis is reported.",
+      "cues": ["missing data", "complete case", "imput", "included in the analysis"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "16c",
+      "section": "Results",
+      "short_prompt": "For matched studies, matching factors are reported.",
+      "cues": ["matched", "matching factor", "matched analysis"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "17",
+      "section": "Results",
+      "short_prompt": "Other analyses, such as subgroup or interaction analyses, are reported.",
+      "cues": ["subgroup", "interaction", "sensitivity analysis", "secondary analysis"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "18",
+      "section": "Discussion",
+      "short_prompt": "Key results are summarised with reference to the study objectives.",
+      "cues": ["key results", "main finding", "objective", "in summary"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "19",
+      "section": "Discussion",
+      "short_prompt": "Limitations are discussed, including bias, imprecision, and generalisability.",
+      "cues": ["limitation", "bias", "imprecision", "generaliz"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "20",
+      "section": "Discussion",
+      "short_prompt": "The interpretation is cautious and considers the study design and similar research.",
+      "cues": ["interpretation", "cautio", "consistent with", "other studies", "causal"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "21",
+      "section": "Discussion",
+      "short_prompt": "The generalisability of the results is discussed.",
+      "cues": ["generaliz", "external validity", "applicab", "population"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    },
+    {
+      "id": "22",
+      "section": "Other information",
+      "short_prompt": "Funding and the role of funders are reported.",
+      "cues": ["funding", "funder", "grant", "financial support"],
+      "source_url": "https://www.strobe-statement.org/checklists/"
+    }
+  ]
+}

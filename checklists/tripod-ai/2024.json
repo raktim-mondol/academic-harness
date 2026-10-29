@@ -1,0 +1,200 @@
+{
+  "id": "tripod-ai",
+  "name": "TRIPOD+AI 2024",
+  "version": "2024",
+  "study_designs": ["prediction model", "machine learning", "artificial intelligence"],
+  "source_url": "https://www.tripod-statement.org/",
+  "license_note": "Item ids follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "For studies that develop, evaluate, or update a prediction model, including machine-learning and AI models. TRIPOD+AI supersedes the 2015 TRIPOD statement for AI work.",
+  "items": [
+    {
+      "id": "1",
+      "section": "Title",
+      "short_prompt": "The title identifies the study as developing, evaluating, or updating a prediction model and names the target population or outcome.",
+      "cues": ["prediction model", "prognostic model", "machine learning", "artificial intelligence", "risk model"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "2",
+      "section": "Abstract",
+      "short_prompt": "The abstract summarises the model, data, performance, and limitations.",
+      "cues": ["abstract", "summary", "performance", "limitations"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "3",
+      "section": "Introduction",
+      "short_prompt": "The background and rationale for the model are described.",
+      "cues": ["background", "rationale", "clinical need", "existing model"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "4",
+      "section": "Introduction",
+      "short_prompt": "The objectives, including whether the study develops, evaluates, or updates a model, are stated.",
+      "cues": ["objective", "develop", "evaluate", "validate", "update"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "5",
+      "section": "Methods",
+      "short_prompt": "The data sources, study setting, and dates are described.",
+      "cues": ["data source", "dataset", "setting", "study period", "cohort"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "6",
+      "section": "Methods",
+      "short_prompt": "Participant eligibility, recruitment, and the data flow are described.",
+      "cues": ["eligib", "inclusion", "exclusion", "recruit", "participants"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "7",
+      "section": "Methods",
+      "short_prompt": "The outcome to be predicted is defined, including how and when it was measured.",
+      "cues": ["outcome", "predicted", "definition", "measured", "follow.up"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "8",
+      "section": "Methods",
+      "short_prompt": "The predictors, including any feature engineering, are defined.",
+      "cues": ["predictor", "feature", "covariate", "variable", "input"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "9",
+      "section": "Methods",
+      "short_prompt": "The sample size and events per variable are justified.",
+      "cues": ["sample size", "events per variable", "power", "number of events"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "10",
+      "section": "Methods",
+      "short_prompt": "Missing data are described and handled explicitly.",
+      "cues": ["missing data", "imput", "complete case", "multiple imputation"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "11",
+      "section": "Methods",
+      "short_prompt": "The model development process, including algorithm choice and hyperparameter tuning, is described.",
+      "cues": ["model development", "algorithm", "training", "hyperparameter", "cross.validation", "feature selection"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "12",
+      "section": "Methods",
+      "short_prompt": "The model performance measures and internal validation are described.",
+      "cues": ["performance", "discrimination", "calibration", "AUC", "C.statistic", "internal validation", "bootstrap"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "13",
+      "section": "Methods",
+      "short_prompt": "External validation or evaluation is described when performed.",
+      "cues": ["external validation", "validation cohort", "temporal validation", "geographic validation"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "14",
+      "section": "Methods",
+      "short_prompt": "Fairness, subgroup performance, and potential bias are assessed.",
+      "cues": ["fairness", "subgroup", "bias", "equity", "disparit", "protected characteristic"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "15",
+      "section": "Methods",
+      "short_prompt": "Model updating, recalibration, or revision is described when performed.",
+      "cues": ["model update", "recalibrat", "revision", "re-estimat"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "16",
+      "section": "Results",
+      "short_prompt": "The final model is presented with its coefficients or architecture and enough detail to reproduce it.",
+      "cues": ["final model", "coefficient", "equation", "architecture", "hyperparameter", "reproduc"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "17",
+      "section": "Results",
+      "short_prompt": "Model performance results, including calibration and discrimination, are reported.",
+      "cues": ["performance", "AUC", "calibration", "Brier", "sensitivity", "specificity"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "18",
+      "section": "Results",
+      "short_prompt": "Subgroup and fairness results are reported.",
+      "cues": ["subgroup", "fairness", "equity", "performance by"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "19",
+      "section": "Discussion",
+      "short_prompt": "The interpretation and clinical implications are discussed.",
+      "cues": ["interpretation", "clinical implication", "decision", "utility"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "20",
+      "section": "Discussion",
+      "short_prompt": "Limitations, including risk of bias and applicability, are discussed.",
+      "cues": ["limitation", "risk of bias", "applicab", "overfitting"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "21",
+      "section": "Other information",
+      "short_prompt": "The study or model registration is reported.",
+      "cues": ["registration", "registered", "protocol", "PROBAST"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "22",
+      "section": "Other information",
+      "short_prompt": "Data and code availability are reported.",
+      "cues": ["data availability", "code availability", "repository", "github", "open source"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "23",
+      "section": "Other information",
+      "short_prompt": "Funding sources and the role of funders are reported.",
+      "cues": ["funding", "funder", "grant", "sponsor"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "24",
+      "section": "Other information",
+      "short_prompt": "Competing interests are declared.",
+      "cues": ["competing interest", "conflict of interest", "declaration"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "25",
+      "section": "Other information",
+      "short_prompt": "Patient and public involvement in the study is described.",
+      "cues": ["patient and public involvement", "PPI", "stakeholder", "public involvement"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "26",
+      "section": "Other information",
+      "short_prompt": "The intended clinical use and decision threshold are described.",
+      "cues": ["clinical use", "intended use", "threshold", "decision curve", "net benefit"],
+      "source_url": "https://www.tripod-statement.org/"
+    },
+    {
+      "id": "27",
+      "section": "Other information",
+      "short_prompt": "The model's AI-specific components, such as training data and model type, are described precisely.",
+      "cues": ["neural network", "transformer", "large language model", "training data", "model type", "deep learning"],
+      "source_url": "https://www.tripod-statement.org/"
+    }
+  ]
+}

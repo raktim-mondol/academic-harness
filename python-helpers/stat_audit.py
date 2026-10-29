@@ -14,20 +14,13 @@ import json
 import math
 import re
 import sys
-import zipfile
-try:
-    from defusedxml import ElementTree
-except Exception:  # defusedxml is optional; fall back to stdlib with a size cap
-    from xml.etree import ElementTree
 
-MAX_DOCX_XML_BYTES = 50 * 1024 * 1024
+from document_text import read_source
 
 try:
     from scipy import stats as scipy_stats
 except Exception:  # pragma: no cover - surfaced to the caller
     scipy_stats = None
-
-WORD_NS = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 
 STAT_PATTERNS = [
     ("t", re.compile(r"(?<![\w.])t\s*\(\s*(?P<df1>\d+(?:\.\d+)?)\s*\)\s*=\s*(?P<stat>[-+]?\d+(?:\.\d+)?)", re.I)),
@@ -40,36 +33,6 @@ P_VALUE = re.compile(r"\bp\s*(?P<op><|>|=|≤|≥)\s*(?P<p>\d+\.\d+|0?\.\d+|[01]
 MEAN = re.compile(r"\b(?:M|Mean|mean)\s*=\s*(?P<mean>-?\d+\.\d+)\b")
 SAMPLE_N = re.compile(r"\b[Nn]\s*=\s*(?P<n>\d+)\b")
 GRIM_SCALES = [(1, 5), (1, 7), (0, 10), (1, 10), (0, 4), (1, 100), (0, 100)]
-
-
-def docx_text(path):
-    with zipfile.ZipFile(path) as archive:
-        info = archive.getinfo("word/document.xml")
-        if info.file_size > MAX_DOCX_XML_BYTES:
-            raise ValueError("docx document.xml is too large to audit safely")
-        xml = archive.read(info)
-    root = ElementTree.fromstring(xml)
-    lines = []
-    for paragraph in root.iter(f"{WORD_NS}p"):
-        text = "".join(node.text or "" for node in paragraph.iter(f"{WORD_NS}t"))
-        lines.append(text)
-    return "\n".join(lines)
-
-
-def read_source(request):
-    text = request.get("text")
-    path = request.get("path")
-    if text:
-        return None, str(text)
-    if not path:
-        raise ValueError("give a path or text")
-    lower = path.lower()
-    if lower.endswith(".docx"):
-        return path, docx_text(path)
-    if not lower.endswith((".tex", ".md", ".markdown", ".txt", ".text")):
-        raise ValueError("path must end in .tex, .md, .txt, or .docx")
-    with open(path, "r", encoding="utf-8", errors="replace") as handle:
-        return path, handle.read()
 
 
 def recompute_p(kind, statistic, df1, df2):

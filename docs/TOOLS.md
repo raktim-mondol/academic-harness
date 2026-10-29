@@ -68,6 +68,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 |---|---|---|---|
 | `citation` | Academic Harness preset | Format APA/Vancouver/Harvard/IEEE/Chicago/MLA; BibTeX/RIS export; DOI→BibTeX; validation | [Writing](WRITING.md#references-and-citation) |
 | `manuscript_citations` | Academic Harness preset | Manuscript ↔ `.bib` consistency, undefined `\ref`, duplicate labels | [Writing](WRITING.md#references-and-citation) |
+| `reporting_check` | Academic Harness preset | Auditable reporting-guideline check: CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, STARD; verified quotes, stale detection, evidence-only exports | [Writing](WRITING.md#reporting-checklists) |
 | `latex_compile` | Every preset | `.tex` → PDF through `latexmk`, with a `pdflatex`/`xelatex`/`lualatex` fallback | [Writing](WRITING.md#latex) |
 | `image_generate` | Every preset | Conceptual scientific images through Gemini "nano banana" or an OpenAI-compatible Images API | [Writing](WRITING.md#image-generation) |
 | `mermaid_render` | Every preset | Mermaid text → SVG through Pele, in-process, no browser | [Writing](WRITING.md#mermaid-diagrams) |

@@ -1,6 +1,6 @@
 # Reporting-guideline checker and risk-of-bias appraisal — implementation plan
 
-Status: **proposed, not implemented** · baseline **v0.28.0** · targets **v0.29.0** (Phase 3) and **v0.30.0** (Phase 4).
+Status: **Phase 3 implemented in v0.29.0; Phase 4 proposed** · baseline **v0.28.0** · shipped **v0.29.0** (Phase 3), target **v0.30.0** (Phase 4).
 
 This document covers the two evidence-quality phases that remain after the reference-library work:
 
@@ -39,6 +39,8 @@ Both phases follow the same rule: **the model proposes, the tool verifies, the h
 7. **Workspace-confined paths.** Manuscript paths, ledgers, and exports stay inside the session workspace and reject symlink escapes.
 
 ## 4. Phase 3 — reporting-guideline checker (`reporting_check`)
+
+**Shipped in v0.29.0.** Implementation notes and the deviations from this plan are at the end of this section.
 
 ### 4.1 Actions
 
@@ -132,6 +134,18 @@ Modified:
 - Item ids in an export match the checklist file.
 - `suggest` returns reasons and never selects a guideline itself.
 - The export never contains a "compliant" label.
+
+### 4.8 Implementation record (v0.29.0)
+
+Shipped files: `reporting-check.js`, `reporting-store.js`, `checklists/<id>/<version>.json`, `skills/reporting-guidelines/SKILL.md`, `scripts/test-reporting-check.mjs`, plus `python-helpers/document_text.py` and `python-helpers/reporting_text.py` for DOCX extraction. The PDF path reuses `pdf_to_markdown` through the exported `convertPdfMarkdown()` rather than adding a parser.
+
+Decisions taken during implementation:
+
+- **Checklist set.** Nine checklists shipped in the first release: CONSORT 2010 (38 numbered entries), STROBE 2007 (34), PRISMA 2020 (44), PRISMA-S 2021 (16), PRISMA-ScR 2018 (22), ARRIVE 2.0 (25), TRIPOD+AI 2024 (27), CARE 2013 (31), STARD 2015 (30). Counts are derived from the item arrays; ids follow the published numbering and prompts are paraphrases with links to the official source.
+- **PaperMemory input.** A paper id is read through `papermemory mcp` (`papermemory_get`) and assembled from its indexed chunks. This avoids a second SQLite reader and keeps the plugin working with whichever PaperMemory install is resolved. The snapshot records that the source was chunks, and truncation is surfaced in the ledger.
+- **Line and unit locations.** LaTeX is masked with spaces rather than deleted, so search offsets, lines, and `%% @unit` ids stay aligned with the original file. DOCX and PaperMemory locations refer to the extracted text, as the tool says in the check notes.
+- **Stale semantics.** An evidence verdict becomes stale only when its quote no longer appears in the current manuscript. A `not_reported`/`not_applicable` verdict is marked stale whenever the manuscript hash changes, because an absence claim based on the old text must be rechecked. The export reports stale counts and never treats them as current.
+- **Exports.** Markdown, CSV, and a `longtable` LaTeX fragment. Every format reports "N of M items have verified evidence" and contains no compliance label.
 
 ## 5. Phase 4 — risk-of-bias and appraisal ledger (extends `review`)
 

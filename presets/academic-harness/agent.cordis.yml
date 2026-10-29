@@ -446,6 +446,15 @@
 - id: review
   name: academic-harness/review
 
+# Reporting-guideline checker (Phase 3 of docs/REPORTING-AND-APPRAISAL-PLAN.md):
+# list/suggest/start/items/candidates/judge/status/export against versioned
+# CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, and STARD checklists. The
+# ledger is append-only under <cwd>/.dsh/reporting/<slug>/; every reported quote
+# is re-found in the manuscript, and exports report verified evidence rather
+# than a compliance verdict. See reporting-check.js and reporting-store.js.
+- id: reporting-check
+  name: academic-harness/reporting-check
+
 # Co-Scientist hypothesis tournament (docs/CO-SCIENTIST-INTEGRATION-PLAN.md,
 # Phase 1): generate, review, rank, and evolve candidate hypotheses with state
 # that outlives the context window. Append-only event logs under

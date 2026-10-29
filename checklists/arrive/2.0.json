@@ -1,0 +1,186 @@
+{
+  "id": "arrive",
+  "name": "ARRIVE 2.0",
+  "version": "2.0",
+  "study_designs": ["animal study", "in vivo experiment"],
+  "source_url": "https://arriveguidelines.org/arrive-guidelines",
+  "license_note": "Item ids and the essential/recommended split follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "For research using live animals. Items 1-10 are the Essential 10; items 11-21 are the Recommended set. The checklist adapts to the study, so an item can legitimately be not applicable with a reason.",
+  "items": [
+    {
+      "id": "1a",
+      "section": "Study design",
+      "short_prompt": "The study design is described, including groups and experimental units.",
+      "cues": ["study design", "experimental group", "control group", "randomi[sz]ed", "experimental unit"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "1b",
+      "section": "Study design",
+      "short_prompt": "The experimental unit and the number of units per group are stated.",
+      "cues": ["experimental unit", "number of animals", "per group", "n ="],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "2a",
+      "section": "Sample size",
+      "short_prompt": "The sample size is justified, including a power analysis or other rationale.",
+      "cues": ["sample size", "power analysis", "power calculation", "effect size", "number of animals"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "2b",
+      "section": "Sample size",
+      "short_prompt": "Any reduction in sample size or exclusion of animals is explained.",
+      "cues": ["excluded", "removed", "reduction", "attrition", "welfare"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "3",
+      "section": "Inclusion and exclusion criteria",
+      "short_prompt": "Inclusion and exclusion criteria for animals, data points, or observations are stated.",
+      "cues": ["inclusion criteria", "exclusion criteria", "included", "excluded"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "4a",
+      "section": "Randomisation",
+      "short_prompt": "Whether and how animals were randomised to groups is stated.",
+      "cues": ["randomi[sz]", "random allocation", "assigned to groups"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "4b",
+      "section": "Randomisation",
+      "short_prompt": "The method used to generate the random allocation is described.",
+      "cues": ["random number", "computer.generated", "randomisation list", "allocation sequence"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "5a",
+      "section": "Blinding",
+      "short_prompt": "Whether investigators, animal carers, or outcome assessors were blinded is stated.",
+      "cues": ["blind", "mask", "outcome assessor", "not blinded"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "5b",
+      "section": "Blinding",
+      "short_prompt": "The blinding procedure is described.",
+      "cues": ["blinding procedure", "coded", "allocation conceal", "masked"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "6",
+      "section": "Outcome measures",
+      "short_prompt": "All outcome measures are defined, including how and when they were assessed.",
+      "cues": ["outcome measure", "primary outcome", "measured", "assessed", "endpoint"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "7",
+      "section": "Statistical methods",
+      "short_prompt": "The statistical methods and software are described.",
+      "cues": ["statistical method", "statistical analysis", "software", "regression", "ANOVA"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "8",
+      "section": "Experimental animals",
+      "short_prompt": "The species, strain, sex, age, and source of animals are reported.",
+      "cues": ["species", "strain", "sex", "age", "supplier", "mice", "rats"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "9",
+      "section": "Experimental procedures",
+      "short_prompt": "Experimental procedures are described in enough detail to replicate them.",
+      "cues": ["procedure", "anaesthesia", "surgery", "dose", "injection", "protocol"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "10",
+      "section": "Results",
+      "short_prompt": "Results are reported for each group, including effect sizes and precision where appropriate.",
+      "cues": ["results", "effect size", "confidence interval", "per group", "mean"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "11",
+      "section": "Abstract",
+      "short_prompt": "The abstract gives a summary of the objectives, methods, results, and conclusions.",
+      "cues": ["abstract", "summary", "objectives", "conclusions"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "12",
+      "section": "Introduction",
+      "short_prompt": "The background and rationale for the study are described.",
+      "cues": ["background", "rationale", "prior work"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "13",
+      "section": "Introduction",
+      "short_prompt": "The objectives and hypotheses are stated.",
+      "cues": ["objective", "hypothes", "aim"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "14",
+      "section": "Methods",
+      "short_prompt": "An ethical statement is provided, including approvals and animal welfare considerations.",
+      "cues": ["ethical", "ethics committee", "IACUC", "approval", "welfare", "3Rs"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "15",
+      "section": "Methods",
+      "short_prompt": "Housing and husbandry conditions are described.",
+      "cues": ["housing", "husbandry", "cage", "light cycle", "temperature", "enrichment"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "16",
+      "section": "Methods",
+      "short_prompt": "Animal care and monitoring, including humane endpoints, are described.",
+      "cues": ["humane endpoint", "monitoring", "welfare", "euthan", "adverse"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "17",
+      "section": "Discussion",
+      "short_prompt": "The interpretation and scientific implications are discussed.",
+      "cues": ["interpretation", "scientific implication", "consistent with", "mechanism"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "18",
+      "section": "Discussion",
+      "short_prompt": "The generalisability and translational relevance are discussed.",
+      "cues": ["generaliz", "translat", "clinical relevance", "limitation"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "19",
+      "section": "Other information",
+      "short_prompt": "The protocol registration details are reported.",
+      "cues": ["protocol registration", "registered", "preregistered", "OSF", "repository"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "20",
+      "section": "Other information",
+      "short_prompt": "Data access and availability are stated.",
+      "cues": ["data availability", "data access", "repository", "available on request"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    },
+    {
+      "id": "21",
+      "section": "Other information",
+      "short_prompt": "Declarations of interest and funding are reported.",
+      "cues": ["competing interest", "conflict of interest", "funding", "funder"],
+      "source_url": "https://arriveguidelines.org/arrive-guidelines"
+    }
+  ]
+}

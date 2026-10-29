@@ -1,0 +1,277 @@
+{
+  "id": "consort",
+  "name": "CONSORT 2010",
+  "version": "2010",
+  "study_designs": ["randomised controlled trial"],
+  "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010",
+  "license_note": "Item ids follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "Use for parallel-group randomised trials. Randomised crossover, cluster, non-inferiority, and pilot trials have separate CONSORT extensions that this base checklist does not cover.",
+  "items": [
+    {
+      "id": "1a",
+      "section": "Title",
+      "short_prompt": "The title identifies the report as a randomised trial.",
+      "cues": ["randomi[sz]ed", "trial"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "1b",
+      "section": "Abstract",
+      "short_prompt": "The abstract gives a structured summary of design, methods, results, and conclusions.",
+      "cues": ["abstract", "structured summary", "trial registration", "conclusions"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "2a",
+      "section": "Introduction",
+      "short_prompt": "The introduction states the scientific background and rationale.",
+      "cues": ["background", "rationale", "evidence", "prior stud"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "2b",
+      "section": "Introduction",
+      "short_prompt": "The introduction states specific objectives or hypotheses.",
+      "cues": ["objective", "hypothes", "aim", "we tested"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "3a",
+      "section": "Methods",
+      "short_prompt": "The methods describe the trial design, including allocation ratio and non-inferiority or superiority framing.",
+      "cues": ["parallel", "crossover", "factorial", "superiority", "equivalence", "non-inferiority", "allocation ratio", "trial design"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "3b",
+      "section": "Methods",
+      "short_prompt": "Important changes to methods or outcomes after the trial began are reported with reasons.",
+      "cues": ["protocol change", "amendment", "after (the )?trial (commenced|began|started)", "changes? to (the )?(methods|outcomes)"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "4a",
+      "section": "Methods",
+      "short_prompt": "Participant eligibility criteria are stated.",
+      "cues": ["eligib", "inclusion", "exclusion", "participants were"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "4b",
+      "section": "Methods",
+      "short_prompt": "The settings and locations where data were collected are described.",
+      "cues": ["setting", "location", "hospital", "clinic", "centre", "center", "conducted (at|in)"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "5",
+      "section": "Methods",
+      "short_prompt": "The interventions for each group are described in enough detail to replicate them.",
+      "cues": ["intervention", "control group", "placebo", "dose", "duration", "administered"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "6a",
+      "section": "Methods",
+      "short_prompt": "Primary and secondary outcome measures are completely defined, including how and when they were assessed.",
+      "cues": ["primary outcome", "secondary outcome", "outcome measure", "measured", "endpoint"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "6b",
+      "section": "Methods",
+      "short_prompt": "Any changes to trial outcomes after the trial began are reported with reasons.",
+      "cues": ["outcome.*(chang|amend)", "after (the )?trial (commenced|began|started)", "post hoc outcome"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "7a",
+      "section": "Methods",
+      "short_prompt": "How the sample size was determined is explained.",
+      "cues": ["sample size", "power", "effect size", "alpha", "detectable"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "7b",
+      "section": "Methods",
+      "short_prompt": "Interim analyses and stopping guidelines are explained, when applicable.",
+      "cues": ["interim analysis", "stopping rule", "stopping guideline", "data monitoring committee", "early termination"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "8a",
+      "section": "Methods",
+      "short_prompt": "The method used to generate the random allocation sequence is described.",
+      "cues": ["random sequence", "random number", "computer.*generat", "randomi[sz]ation list", "random allocation"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "8b",
+      "section": "Methods",
+      "short_prompt": "The type of randomisation and any restrictions are described.",
+      "cues": ["block randomi", "stratified", "allocation ratio", "permuted block", "minimi[sz]ation", "cluster randomi"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "9",
+      "section": "Methods",
+      "short_prompt": "The mechanism used to conceal the allocation sequence is described.",
+      "cues": ["allocation conceal", "sequentially numbered", "opaque", "sealed envelope", "central randomi[sz]ation"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "10",
+      "section": "Methods",
+      "short_prompt": "Who generated the sequence, who enrolled participants, and who assigned them are described.",
+      "cues": ["generated the (allocation )?sequence", "enrolled participants", "assigned participants", "allocation was performed"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "11a",
+      "section": "Methods",
+      "short_prompt": "Whether participants, care providers, and outcome assessors were blinded is stated.",
+      "cues": ["blind", "mask", "double-blind", "single-blind", "outcome assessor"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "11b",
+      "section": "Methods",
+      "short_prompt": "If blinding was used, the interventions are described as indistinguishable.",
+      "cues": ["identical", "matching placebo", "similar (appearance|taste)", "indistinguishable"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "12a",
+      "section": "Methods",
+      "short_prompt": "The statistical methods used for primary and secondary outcomes are described.",
+      "cues": ["statistical method", "primary outcome", "intention.to.treat", "analysis of covariance", "mixed model", "regression"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "12b",
+      "section": "Methods",
+      "short_prompt": "Methods for additional analyses such as subgroup or adjusted analyses are described.",
+      "cues": ["subgroup", "interaction", "adjusted analysis", "per.protocol", "sensitivity analysis"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "13a",
+      "section": "Results",
+      "short_prompt": "Participant flow through each stage is reported with numbers.",
+      "cues": ["flow diagram", "randomly assigned", "allocated to", "participant flow", "screened"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "13b",
+      "section": "Results",
+      "short_prompt": "Losses and exclusions after randomisation are reported with reasons.",
+      "cues": ["lost to follow.up", "discontinued", "withdrew", "excluded after randomi", "did not receive"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "14a",
+      "section": "Results",
+      "short_prompt": "Dates defining recruitment and follow-up are reported.",
+      "cues": ["recruit", "enrol", "follow.up period", "between (January|February|March|April|May|June|July|August|September|October|November|December)", "\\b(19|20)\\d{2}\\b"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "14b",
+      "section": "Results",
+      "short_prompt": "Why the trial ended or was stopped is reported.",
+      "cues": ["trial (was )?stopped", "terminated early", "stopping", "ended early", "futility"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "15",
+      "section": "Results",
+      "short_prompt": "A table of baseline demographic and clinical characteristics is provided for each group.",
+      "cues": ["baseline", "demographic", "clinical characteristics", "table 1"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "16a",
+      "section": "Results",
+      "short_prompt": "The number of participants analysed in each group is reported.",
+      "cues": ["number analyzed", "included in (the )?analysis", "per group", "analysed"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "16b",
+      "section": "Results",
+      "short_prompt": "Whether the analysis followed the assigned groups is stated.",
+      "cues": ["intention.to.treat", "as assigned", "excluded from analysis", "modified intention"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "17a",
+      "section": "Results",
+      "short_prompt": "For each primary and secondary outcome, results are reported with effect sizes and confidence intervals.",
+      "cues": ["effect size", "confidence interval", "primary outcome", "estimate", "difference in means", "hazard ratio"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "17b",
+      "section": "Results",
+      "short_prompt": "For binary outcomes, both absolute and relative effect sizes are reported.",
+      "cues": ["absolute", "relative", "risk ratio", "odds ratio", "number needed to treat", "risk difference"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "18",
+      "section": "Results",
+      "short_prompt": "Ancillary analyses are reported, distinguishing prespecified from exploratory analyses.",
+      "cues": ["ancillary analysis", "subgroup analysis", "exploratory", "prespecified", "post hoc"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "19",
+      "section": "Results",
+      "short_prompt": "All important harms or unintended effects are reported for each group.",
+      "cues": ["adverse event", "harm", "side effect", "toxicity", "serious adverse", "unintended"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "20",
+      "section": "Discussion",
+      "short_prompt": "Trial limitations are discussed, including sources of bias, imprecision, and multiplicity.",
+      "cues": ["limitation", "bias", "imprecision", "multiple comparison"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "21",
+      "section": "Discussion",
+      "short_prompt": "The generalisability of the findings is discussed.",
+      "cues": ["generaliz", "external validity", "applicab", "real-world"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "22",
+      "section": "Discussion",
+      "short_prompt": "The interpretation is consistent with the results and balanced against other evidence.",
+      "cues": ["interpretation", "consistent with", "explanation", "in line with", "taken together"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "23",
+      "section": "Other information",
+      "short_prompt": "The trial registration number and registry are reported.",
+      "cues": ["registration", "trial registration", "registry", "NCT\\d+", "ISRCTN", "ACTRN"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "24",
+      "section": "Other information",
+      "short_prompt": "Where the full protocol can be accessed is stated.",
+      "cues": ["protocol", "full protocol", "access", "available (online|from)"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    },
+    {
+      "id": "25",
+      "section": "Other information",
+      "short_prompt": "Sources of funding and the role of funders are reported.",
+      "cues": ["funding", "funder", "financial support", "grant", "role of the funder"],
+      "source_url": "https://www.consort-statement.org/checklists/view/32-consort-2010"
+    }
+  ]
+}

@@ -1,0 +1,319 @@
+{
+  "id": "prisma",
+  "name": "PRISMA 2020",
+  "version": "2020",
+  "study_designs": ["systematic review", "meta-analysis"],
+  "source_url": "https://www.prisma-statement.org/prisma-2020-checklist",
+  "license_note": "Item ids follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "For systematic reviews of health, social, and other interventions. Use PRISMA-S for the search-reporting extension and PRISMA-ScR for scoping reviews.",
+  "items": [
+    {
+      "id": "1",
+      "section": "Title",
+      "short_prompt": "The title identifies the report as a systematic review.",
+      "cues": ["systematic review", "meta.analysis", "meta analysis"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "2",
+      "section": "Abstract",
+      "short_prompt": "The abstract gives a structured summary including registration, methods, results, and conclusions.",
+      "cues": ["abstract", "registration", "methods", "results", "conclusions"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "3",
+      "section": "Introduction",
+      "short_prompt": "The rationale for the review is stated in the context of existing knowledge.",
+      "cues": ["rationale", "background", "existing", "what is known"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "4",
+      "section": "Introduction",
+      "short_prompt": "The review objectives or questions are stated explicitly.",
+      "cues": ["objective", "question", "aim", "we asked"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "5",
+      "section": "Methods",
+      "short_prompt": "Inclusion and exclusion criteria are specified, including how studies, reports, and outcomes were grouped.",
+      "cues": ["eligib", "inclusion", "exclusion", "criteria"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "6",
+      "section": "Methods",
+      "short_prompt": "All databases, registers, websites, organisations, and other sources searched are listed with dates.",
+      "cues": ["database", "register", "searched", "information source", "PubMed", "Embase", "Web of Science"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "7",
+      "section": "Methods",
+      "short_prompt": "The full search strategies, including any filters and limits, are reported.",
+      "cues": ["search strategy", "search string", "boolean", "search terms", "filter"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "8",
+      "section": "Methods",
+      "short_prompt": "The methods for deciding which records to include are described, including how many reviewers screened.",
+      "cues": ["selection process", "screened", "two reviewers", "independently", "title and abstract", "full text"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "9",
+      "section": "Methods",
+      "short_prompt": "The methods for collecting data from reports are described, including reviewer independence and automation.",
+      "cues": ["data collection", "data extraction", "independently", "extracted", "reviewer"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "10a",
+      "section": "Methods",
+      "short_prompt": "All outcomes sought are listed and defined, and which results were sought for each outcome is stated.",
+      "cues": ["outcome", "primary outcome", "secondary outcome", "defined"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "10b",
+      "section": "Methods",
+      "short_prompt": "Other variables sought from each study are listed, such as participants, interventions, comparators, and funding.",
+      "cues": ["data item", "variable", "participant", "intervention", "comparator", "funding"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "11",
+      "section": "Methods",
+      "short_prompt": "The methods for assessing risk of bias in included studies are described.",
+      "cues": ["risk of bias", "quality assessment", "Cochrane", "ROB", "Newcastle", "appraisal"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "12",
+      "section": "Methods",
+      "short_prompt": "The effect measures used for each outcome are defined.",
+      "cues": ["effect measure", "risk ratio", "odds ratio", "mean difference", "standardized mean", "hazard ratio"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "13a",
+      "section": "Methods",
+      "short_prompt": "The methods for deciding which studies were eligible for each synthesis are described.",
+      "cues": ["synthesis", "eligible for synthesis", "pooled", "meta.analysis", "narrative synthesis"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "13b",
+      "section": "Methods",
+      "short_prompt": "The methods for preparing data for synthesis are described.",
+      "cues": ["data preparation", "converted", "imputed", "standardized", "extracted effect"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "13c",
+      "section": "Methods",
+      "short_prompt": "The methods used to tabulate or visually display results are described.",
+      "cues": ["forest plot", "tabular", "summary table", "display"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "13d",
+      "section": "Methods",
+      "short_prompt": "Methods for assessing heterogeneity and exploring it are described.",
+      "cues": ["heterogeneity", "I2", "I²", "tau", "subgroup", "meta.regression"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "13e",
+      "section": "Methods",
+      "short_prompt": "Sensitivity analyses are described.",
+      "cues": ["sensitivity analysis", "robustness", "leave.one.out"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "13f",
+      "section": "Methods",
+      "short_prompt": "Methods for assessing reporting bias are described.",
+      "cues": ["reporting bias", "publication bias", "funnel plot", "Egger"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "14",
+      "section": "Methods",
+      "short_prompt": "Methods for assessing the risk of bias due to missing results are described.",
+      "cues": ["reporting bias", "missing results", "publication bias", "funnel plot", "Egger"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "15",
+      "section": "Methods",
+      "short_prompt": "Methods for assessing certainty in the body of evidence are described.",
+      "cues": ["certainty", "GRADE", "confidence in the evidence", "quality of evidence"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "16a",
+      "section": "Results",
+      "short_prompt": "The number of records identified, included, and excluded is reported, ideally with a flow diagram.",
+      "cues": ["flow diagram", "records identified", "records screened", "duplicates removed", "excluded"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "16b",
+      "section": "Results",
+      "short_prompt": "Reports excluded at full-text stage are listed with reasons for exclusion.",
+      "cues": ["excluded", "reasons? for exclusion", "full.text", "not eligible"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "17",
+      "section": "Results",
+      "short_prompt": "The characteristics of included studies are cited and presented.",
+      "cues": ["characteristics of included studies", "table of studies", "participants", "country", "sample size"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "18",
+      "section": "Results",
+      "short_prompt": "Risk-of-bias judgements are presented for each included study.",
+      "cues": ["risk of bias", "low risk", "some concerns", "high risk"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "19",
+      "section": "Results",
+      "short_prompt": "For each included study, the relevant results and effect estimates are presented.",
+      "cues": ["effect estimate", "confidence interval", "results of each study", "individual study"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "20a",
+      "section": "Results",
+      "short_prompt": "A summary of the results of each synthesis is presented.",
+      "cues": ["pooled", "summary estimate", "synthesis", "summary effect"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "20b",
+      "section": "Results",
+      "short_prompt": "Heterogeneity between studies is presented and discussed.",
+      "cues": ["heterogeneity", "I2", "I²", "tau", "inconsistency"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "20c",
+      "section": "Results",
+      "short_prompt": "Subgroup and sensitivity analyses are presented.",
+      "cues": ["subgroup", "sensitivity analysis", "meta.regression", "robustness"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "20d",
+      "section": "Results",
+      "short_prompt": "Assessments of reporting bias are presented.",
+      "cues": ["reporting bias", "publication bias", "funnel plot", "Egger"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "21",
+      "section": "Results",
+      "short_prompt": "Any assessments of reporting bias across studies are reported.",
+      "cues": ["reporting bias", "publication bias", "missing results"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "22",
+      "section": "Results",
+      "short_prompt": "The certainty of evidence is presented for each outcome assessed.",
+      "cues": ["certainty of evidence", "GRADE", "high certainty", "low certainty"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "23a",
+      "section": "Discussion",
+      "short_prompt": "The interpretation discusses the certainty of evidence and the balance of benefits and harms.",
+      "cues": ["benefit", "harm", "certainty", "trade.off"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "23b",
+      "section": "Discussion",
+      "short_prompt": "Limitations of the evidence included in the review are discussed.",
+      "cues": ["limitation", "risk of bias", "imprecision", "inconsistency"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "23c",
+      "section": "Discussion",
+      "short_prompt": "Limitations of the review process are discussed.",
+      "cues": ["limitation", "search", "screening", "review process"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "23d",
+      "section": "Discussion",
+      "short_prompt": "Implications for practice, policy, and future research are discussed.",
+      "cues": ["implication", "practice", "policy", "future research"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "24a",
+      "section": "Other information",
+      "short_prompt": "The review's registration details are reported.",
+      "cues": ["registration", "PROSPERO", "OSF", "registered"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "24b",
+      "section": "Other information",
+      "short_prompt": "Where the review protocol can be accessed is stated.",
+      "cues": ["protocol", "available", "access", "registered"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "24c",
+      "section": "Other information",
+      "short_prompt": "Amendments to the protocol are described with reasons.",
+      "cues": ["amendment", "protocol change", "deviation", "registered report"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "25a",
+      "section": "Other information",
+      "short_prompt": "Sources of financial support are reported.",
+      "cues": ["funding", "grant", "financial support"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "25b",
+      "section": "Other information",
+      "short_prompt": "Providers of non-financial support are reported.",
+      "cues": ["non.financial", "support", "in-kind", "data provider"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "25c",
+      "section": "Other information",
+      "short_prompt": "The role of funders in the review is described.",
+      "cues": ["role of the funder", "funder", "had no role", "sponsor"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "26",
+      "section": "Other information",
+      "short_prompt": "Competing interests are declared.",
+      "cues": ["competing interest", "conflict of interest", "declaration", "none declared"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    },
+    {
+      "id": "27",
+      "section": "Other information",
+      "short_prompt": "Availability of data, code, and other materials is stated.",
+      "cues": ["data availability", "code", "materials", "openly available", "repository"],
+      "source_url": "https://www.prisma-statement.org/prisma-2020-checklist"
+    }
+  ]
+}

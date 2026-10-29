@@ -1,0 +1,228 @@
+{
+  "id": "care",
+  "name": "CARE 2013",
+  "version": "2013",
+  "study_designs": ["case report", "case series"],
+  "source_url": "https://www.care-statement.org/checklist",
+  "license_note": "Item ids follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "For case reports. A case report is a narrative account of one patient; this checklist is not a quality score and does not establish causality.",
+  "items": [
+    {
+      "id": "1",
+      "section": "Title",
+      "short_prompt": "The title identifies the article as a case report and describes the focus.",
+      "cues": ["case report", "case series", "we report", "a case of"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "2",
+      "section": "Keywords",
+      "short_prompt": "Two to five keywords identify the case and its context.",
+      "cues": ["keywords", "key words"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "3a",
+      "section": "Abstract",
+      "short_prompt": "The abstract introduces what makes the case unique.",
+      "cues": ["abstract", "unique", "unusual", "rare"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "3b",
+      "section": "Abstract",
+      "short_prompt": "The abstract reports the main symptoms and clinical findings.",
+      "cues": ["abstract", "symptoms", "clinical findings", "presented with"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "3c",
+      "section": "Abstract",
+      "short_prompt": "The abstract reports the main diagnoses, interventions, and outcomes.",
+      "cues": ["abstract", "diagnosis", "intervention", "outcome"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "3d",
+      "section": "Abstract",
+      "short_prompt": "The abstract states the conclusion, including take-away lessons.",
+      "cues": ["abstract", "conclusion", "lesson"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "4",
+      "section": "Introduction",
+      "short_prompt": "The introduction gives brief background on why the case matters.",
+      "cues": ["introduction", "background", "rare", "why this case"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "5a",
+      "section": "Patient information",
+      "short_prompt": "De-identified demographic information is given.",
+      "cues": ["year.old", "male", "female", "demographic", "de.identified"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "5b",
+      "section": "Patient information",
+      "short_prompt": "The patient's main concerns and symptoms are reported.",
+      "cues": ["complaint", "concern", "symptom", "presented with"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "5c",
+      "section": "Patient information",
+      "short_prompt": "Relevant medical, family, and psychosocial history is reported.",
+      "cues": ["medical history", "family history", "psychosocial", "past history"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "5d",
+      "section": "Patient information",
+      "short_prompt": "Relevant past interventions and their outcomes are reported.",
+      "cues": ["past intervention", "previous treatment", "prior therapy", "medication"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "6",
+      "section": "Clinical findings",
+      "short_prompt": "The relevant physical examination and clinical findings are described.",
+      "cues": ["physical examination", "clinical findings", "examination revealed", "vital signs"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "7",
+      "section": "Timeline",
+      "short_prompt": "The case timeline is provided.",
+      "cues": ["timeline", "day [0-9]", "months later", "follow.up", "figure 1"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "8a",
+      "section": "Diagnostic assessment",
+      "short_prompt": "The diagnostic methods are described.",
+      "cues": ["diagnostic", "imaging", "biopsy", "laboratory", "test"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "8b",
+      "section": "Diagnostic assessment",
+      "short_prompt": "Diagnostic challenges, including differential diagnoses, are described.",
+      "cues": ["differential diagnosis", "diagnostic challenge", "initially thought", "ruled out"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "8c",
+      "section": "Diagnostic assessment",
+      "short_prompt": "The diagnosis, including subtype or stage, is stated.",
+      "cues": ["diagnosis", "confirmed", "stage", "subtype"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "8d",
+      "section": "Diagnostic assessment",
+      "short_prompt": "Prognostic characteristics are described where relevant.",
+      "cues": ["prognos", "prognostic", "expected course"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "9a",
+      "section": "Therapeutic intervention",
+      "short_prompt": "The types of intervention are described.",
+      "cues": ["intervention", "treatment", "therapy", "surgery", "drug"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "9b",
+      "section": "Therapeutic intervention",
+      "short_prompt": "The administration of the intervention, including dose and duration, is described.",
+      "cues": ["dose", "duration", "administered", "regimen"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "9c",
+      "section": "Therapeutic intervention",
+      "short_prompt": "Changes in the intervention and the reasons for them are described.",
+      "cues": ["changed", "modified", "discontinued", "switched", "due to"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "10a",
+      "section": "Follow-up and outcomes",
+      "short_prompt": "Clinician-assessed outcomes are reported.",
+      "cues": ["follow.up", "outcome", "improved", "resolved", "remission"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "10b",
+      "section": "Follow-up and outcomes",
+      "short_prompt": "Patient-assessed outcomes are reported where relevant.",
+      "cues": ["patient reported", "quality of life", "satisfaction", "symptom"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "10c",
+      "section": "Follow-up and outcomes",
+      "short_prompt": "Important follow-up test results are reported.",
+      "cues": ["follow.up test", "repeat imaging", "laboratory", "reassessment"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "10d",
+      "section": "Follow-up and outcomes",
+      "short_prompt": "Intervention adherence and tolerability are reported.",
+      "cues": ["adherence", "tolerated", "compliance", "side effect"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "10e",
+      "section": "Follow-up and outcomes",
+      "short_prompt": "Adverse events and unanticipated events are reported.",
+      "cues": ["adverse event", "complication", "unanticipated", "harm"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "11a",
+      "section": "Discussion",
+      "short_prompt": "The strengths and limitations of the case are discussed.",
+      "cues": ["strength", "limitation", "single case"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "11b",
+      "section": "Discussion",
+      "short_prompt": "The relevant literature is discussed.",
+      "cues": ["literature", "published", "previous reports", "similar cases"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "11c",
+      "section": "Discussion",
+      "short_prompt": "The rationale for the conclusions is explained.",
+      "cues": ["conclusion", "rationale", "therefore", "we believe"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "11d",
+      "section": "Discussion",
+      "short_prompt": "The main take-away lessons are stated.",
+      "cues": ["lesson", "take.away", "educational", "clinicians should"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "12",
+      "section": "Patient perspective",
+      "short_prompt": "The patient's perspective on the care received is reported where appropriate.",
+      "cues": ["patient perspective", "the patient felt", "informed consent", "patient reported"],
+      "source_url": "https://www.care-statement.org/checklist"
+    },
+    {
+      "id": "13",
+      "section": "Informed consent",
+      "short_prompt": "Informed consent from the patient for publication is stated.",
+      "cues": ["informed consent", "written consent", "consent for publication"],
+      "source_url": "https://www.care-statement.org/checklist"
+    }
+  ]
+}

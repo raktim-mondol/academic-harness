@@ -1,0 +1,221 @@
+{
+  "id": "stard",
+  "name": "STARD 2015",
+  "version": "2015",
+  "study_designs": ["diagnostic accuracy study"],
+  "source_url": "https://www.equator-network.org/reporting-guidelines/stard/",
+  "license_note": "Item ids follow the published checklist. Every prompt here is a paraphrase; the official wording is linked, not bundled.",
+  "notes": "For studies of diagnostic accuracy. The checklist asks for enough detail to judge applicability and risk of bias; it does not prescribe a single design.",
+  "items": [
+    {
+      "id": "1",
+      "section": "Title",
+      "short_prompt": "The title identifies the study as a diagnostic accuracy study.",
+      "cues": ["diagnostic accuracy", "sensitivity and specificity", "index test", "diagnostic test"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "2",
+      "section": "Abstract",
+      "short_prompt": "The abstract summarises the design, methods, results, and conclusions.",
+      "cues": ["abstract", "summary", "results", "conclusions"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "3",
+      "section": "Introduction",
+      "short_prompt": "The scientific and clinical background is stated.",
+      "cues": ["background", "clinical", "rationale"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "4",
+      "section": "Introduction",
+      "short_prompt": "The study objectives and hypotheses are stated.",
+      "cues": ["objective", "hypothes", "aim"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "5",
+      "section": "Methods",
+      "short_prompt": "The study design is described.",
+      "cues": ["study design", "prospective", "retrospective", "cross.sectional"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "6",
+      "section": "Methods",
+      "short_prompt": "Participant eligibility criteria are stated.",
+      "cues": ["eligib", "inclusion", "exclusion", "participants"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "7",
+      "section": "Methods",
+      "short_prompt": "How participants were identified and recruited is described.",
+      "cues": ["recruit", "identified", "consecutive", "sampling"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "8",
+      "section": "Methods",
+      "short_prompt": "The setting and locations of recruitment and testing are described.",
+      "cues": ["setting", "location", "hospital", "clinic"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "9",
+      "section": "Methods",
+      "short_prompt": "The reference standard and its rationale are described.",
+      "cues": ["reference standard", "gold standard", "criterion standard"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "10",
+      "section": "Methods",
+      "short_prompt": "The index test and its technical specifications are described.",
+      "cues": ["index test", "cut.off", "threshold", "assay", "imaging protocol"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "11",
+      "section": "Methods",
+      "short_prompt": "The rationale for the chosen cut-offs or thresholds is given.",
+      "cues": ["cut.off", "threshold", "prespecified", "rationale"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "12",
+      "section": "Methods",
+      "short_prompt": "Whether readers of the index test and reference standard were blinded is stated.",
+      "cues": ["blind", "mask", "independent", "reader"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "13",
+      "section": "Methods",
+      "short_prompt": "The methods for estimating diagnostic accuracy are described.",
+      "cues": ["sensitivity", "specificity", "ROC", "AUC", "accuracy"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "14",
+      "section": "Methods",
+      "short_prompt": "The sample size and how it was determined are reported.",
+      "cues": ["sample size", "power", "precision", "confidence interval"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "15",
+      "section": "Methods",
+      "short_prompt": "How indeterminate results, missing data, and outliers were handled is described.",
+      "cues": ["indeterminate", "missing data", "outlier", "excluded"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "16",
+      "section": "Methods",
+      "short_prompt": "The time interval between the index test and reference standard is described.",
+      "cues": ["time interval", "days between", "same day", "within"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "17",
+      "section": "Methods",
+      "short_prompt": "Any adverse events from the index test or reference standard are described.",
+      "cues": ["adverse event", "harm", "complication", "safety"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "18",
+      "section": "Results",
+      "short_prompt": "Participant flow, including withdrawals and exclusions, is reported.",
+      "cues": ["flow", "excluded", "withdrew", "number of participants"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "19",
+      "section": "Results",
+      "short_prompt": "Participant characteristics are reported.",
+      "cues": ["characteristics", "age", "sex", "table 1"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "20",
+      "section": "Results",
+      "short_prompt": "The distribution of disease severity or target condition is reported.",
+      "cues": ["severity", "spectrum", "disease stage", "prevalence"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "21",
+      "section": "Results",
+      "short_prompt": "Cross-tabulations of index test and reference standard results are reported.",
+      "cues": ["2x2", "cross.tab", "true positive", "false negative", "contingency"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "22",
+      "section": "Results",
+      "short_prompt": "Time intervals between tests and any adverse events are reported.",
+      "cues": ["time interval", "adverse event", "median time"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "23",
+      "section": "Results",
+      "short_prompt": "Estimates of diagnostic accuracy with confidence intervals are reported.",
+      "cues": ["sensitivity", "specificity", "confidence interval", "likelihood ratio", "predictive value"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "24",
+      "section": "Results",
+      "short_prompt": "Indeterminate results and how they were handled are reported.",
+      "cues": ["indeterminate", "inconclusive", "uninterpretable"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "25",
+      "section": "Results",
+      "short_prompt": "Estimates of variability between subgroups, readers, or centres are reported.",
+      "cues": ["subgroup", "reader", "centre", "center", "variability"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "26",
+      "section": "Discussion",
+      "short_prompt": "Limitations, including bias and applicability, are discussed.",
+      "cues": ["limitation", "bias", "applicab", "spectrum bias"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "27",
+      "section": "Discussion",
+      "short_prompt": "The clinical implications of the findings are discussed.",
+      "cues": ["clinical implication", "practice", "decision", "utility"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "28",
+      "section": "Other information",
+      "short_prompt": "Study registration details are reported where applicable.",
+      "cues": ["registration", "registered", "trial registry"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "29",
+      "section": "Other information",
+      "short_prompt": "Funding and the role of funders are reported.",
+      "cues": ["funding", "funder", "grant"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    },
+    {
+      "id": "30",
+      "section": "Other information",
+      "short_prompt": "Data and protocol availability are reported.",
+      "cues": ["data availability", "protocol", "repository", "available"],
+      "source_url": "https://www.equator-network.org/reporting-guidelines/stard/"
+    }
+  ]
+}

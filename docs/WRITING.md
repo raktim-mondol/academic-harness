@@ -99,6 +99,35 @@ It reports:
 
 `\nocite{*}` suppresses unused-entry reporting. It is local and deterministic, does not reformat citations, and rejects `.docx` because Word citation fields cannot be inspected reliably.
 
+## Reporting checklists
+
+`reporting_check` is a preset-only native tool for the question a journal checklist actually asks: does this manuscript report the items the guideline requires? It is not a peer review and it never returns a compliance verdict. State lives under `<cwd>/.dsh/reporting/<slug>/` as a write-once `check.json`, an append-only `verdicts.jsonl`, and exports.
+
+| Action | What it does |
+|---|---|
+| `list` | Guidelines, versions, study designs, item counts, and official source links. |
+| `suggest` | Candidate guidelines from study-design cues, with the matched terms shown. It never selects one. |
+| `start` | Open a check for a workspace manuscript (`.tex`, `.md`, `.txt`, `.docx`, `.pdf`) or a PaperMemory paper; snapshot the manuscript hash. `resume: true` continues an existing check. |
+| `items` | The checklist with current verdicts; filter by `unassessed`, `assessed`, `failing`, `stale`, or one verdict. |
+| `candidates` | Ranked passages for one item from section heuristics and the item's cue terms. A reading aid, not a decision. |
+| `judge` | Record `reported`, `partial`, `not_reported`, or `not_applicable` with evidence. |
+| `status` | Counts, unassessed items, stale evidence, and quotes that no longer match the current manuscript. |
+| `export` | Markdown table, CSV, or a LaTeX supplementary table, with the guideline source link. |
+
+The first set covers CONSORT 2010, STROBE 2007, PRISMA 2020, PRISMA-S 2021, PRISMA-ScR 2018, ARRIVE 2.0, TRIPOD+AI 2024, CARE 2013, and STARD 2015. Each checklist is versioned JSON under `checklists/<id>/<version>.json`; item ids follow the published numbering, and every prompt is a paraphrase linked to the official wording. The official text is not bundled.
+
+Evidence rules the tool enforces:
+
+- `reported` and `partial` need a verbatim quote. The tool re-reads the manuscript and re-finds the quote after whitespace normalisation; a quote that does not appear is rejected and not stored. For LaTeX, commands are masked for matching but offsets and line numbers stay against the original file.
+- `not_reported` is a claim of absence and needs `searched` terms or sections. It is stored as advisory.
+- `not_applicable` needs a reason so a reader can challenge it.
+- Re-judging an item needs `override: true` and a reason; both events stay in the log.
+- When the manuscript changes, `status` re-verifies quotes. Quotes that no longer match become stale, and an absence claim is marked stale because it must be rechecked. Re-judge with a new event rather than editing the ledger.
+
+If the manuscript is a `.tex` file in an `ah.yaml` project, an evidence location also carries the `%% @unit` id from the engine's anchors (read-only; the check does not run `ah units sync`). A PaperMemory id snapshots the stored text; the export says the source was indexed chunks, and OCR-flagged pages may be missing.
+
+Exports say **N of M items have verified evidence**, with unassessed and stale counts. They contain the guideline's source link and the paraphrased prompts. They never say "compliant", "ready for submission", or "meets CONSORT". The model proposes and the tool verifies; the author decides. Load the `reporting-guidelines` skill for the item-batch and subagent workflow.
+
 ## LaTeX
 
 `latex_compile` compiles a `.tex` file to PDF: `latexmk` when it's on `PATH` (handles bibtex/biber automatically), otherwise a `pdflatex`/`xelatex`/`lualatex` fallback with a bibtex/biber pass when the source needs one. Requires a TeX Live (or similar) install.
