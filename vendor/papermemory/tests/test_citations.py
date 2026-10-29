@@ -43,3 +43,22 @@ def test_cite_check_missing_and_unverified(tmp_path: Path):
     assert "simmons2004shear" in unverified_keys
     assert "he2016deep" not in unverified_keys
     store.close()
+
+
+def test_cite_check_resolves_project_keys_that_the_library_renamed(tmp_path: Path):
+    """Two projects use `smith2020` for different papers; each manuscript must still resolve its own."""
+    from papermemory.library import import_text
+
+    store = Store(tmp_path / "mem.db")
+    import_text(store, "@article{smith2020, title={Alpha}, doi={10.1/a}, year=2020}", project_id="one")
+    root = tmp_path / "two"
+    (root / "sections").mkdir(parents=True)
+    (root / "references.bib").write_text("@article{smith2020, title={Beta}, doi={10.1/b}, year=2020}\n", encoding="utf-8")
+    (root / "sections" / "intro.tex").write_text(r"As shown \citep{smith2020}.", encoding="utf-8")
+    (root / "main.tex").write_text("\\input{sections/intro}\n", encoding="utf-8")
+    ingest_manuscript(store, root, slug="two")
+    assert store.conn.execute("SELECT key FROM bib_keys WHERE paper_id=(SELECT id FROM papers WHERE doi='10.1/b')").fetchone()["key"] == "smith2020a"
+    report = cite_check(store, "two")
+    assert report["missing_from_memory"] == []
+    assert report["cited_keys"] == ["smith2020"]
+    store.close()

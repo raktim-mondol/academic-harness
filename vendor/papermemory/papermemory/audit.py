@@ -23,6 +23,11 @@ EVENT_OPS = frozenset(
         "REMEMBER",
         "LESSON_WRITE",
         "MANUSCRIPT_WRITE",
+        "LIBRARY_IMPORT",
+        "LIBRARY_WRITE",
+        "KEY_ASSIGN",
+        "KEY_FREEZE",
+        "KEY_RENAME",
     }
 )
 

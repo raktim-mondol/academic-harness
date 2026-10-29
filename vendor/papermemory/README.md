@@ -82,6 +82,85 @@ Tools: `papermemory_search`, `papermemory_ingest`, `papermemory_get`, `papermemo
 
 `papermemory_ingest` accepts `path` together with `doi` / `title` / `pdf_path` so a local PDF and a later markdown conversion merge onto one verified record.
 
+## Reference library (unreleased, schema 2100)
+
+PaperMemory keeps a lossless bibliographic record for every paper, so a reference can be stored, cited, and later exported without losing fields.
+
+```bash
+papermemory migrate                                   # once: schema 2000 -> 2100 (back up first: papermemory backup)
+papermemory library import refs.bib --project thesis  # BibTeX / BibLaTeX
+papermemory library import export.ris                 # RIS (Zotero, EndNote, publisher exports)
+papermemory library import items.json                 # CSL-JSON
+papermemory library import refs.bib --dry-run         # report only, write nothing
+papermemory library get smith2020 --project thesis    # lossless record, key, and aliases
+```
+
+- **Lossless.** `reference_meta` holds CSL-JSON plus every field CSL has no home for, under its original name (`mrnumber`, `eprint`, `pdf`, ...), and the original BibTeX entry verbatim.
+- **Tolerant parser.** `@string` macros, `#` concatenation, `{}` and `()` entries, quoted values, month macros, and braced corporate authors. An entry missing its closing brace is reported and recovered; it never swallows the next entry.
+- **Library-wide unique keys.** Keys from your files are kept as written. If a *different* paper already owns the key, the newcomer gets a letter suffix, and the key your project used is recorded as a project alias so `cite-check` still resolves it.
+- **Idempotent.** Re-importing a file merges by DOI / arXiv / PMID / title+year and never overwrites richer stored metadata.
+- Existing `papers.bibtex_key` values are never changed by the migration.
+
+### Tags, collections, notes, and queries
+
+```bash
+papermemory library tag add "ml,to-read" smith2020 lee2021       # tags are lower-cased and hyphenated
+papermemory library tag list year:2020..                         # tags with counts, within a filter
+papermemory library collection create thesis --title "Thesis refs" --project thesis --bib-path references.bib
+papermemory library collection create chapter-1 --parent thesis  # one level of nesting
+papermemory library collection add chapter-1 smith2020 lee2021
+papermemory library collection reorder chapter-1 lee2021         # listed papers first, the rest keep their order
+papermemory library collection show thesis                       # includes papers of child collections in filters
+papermemory library note add smith2020 "Baseline is in section 4"
+papermemory library note edit NOTE_ID "..."                      # the old text is kept, marked superseded
+papermemory library list tag:ml year:2020..2024 has:pdf '!tag:skip' graph --sort year --desc --limit 20
+```
+
+Filters: `tag: collection: project: year:(2021 | 2020..2024 | 2020.. | ..2019) author: venue: title: key: doi: arxiv: has:(pdf|fulltext|doi|abstract|notes|key|tags) verified:(yes|no) integrity:(status|unchecked)`; plain words must all appear in the title, abstract, authors, venue, DOI, key, tags, or notes. `-` or `!` negates a filter (use `!` on the command line). An unknown field is an error, never a silent no-op. Results are keyset-paged with `total_count` and `--cursor`; `--sort added|year|title|key`.
+
+Deleting a collection or a tag never deletes a paper. Tags and notes are searched by `papermemory search --kind paper`. All edits are audited (`papermemory log`).
+
+### Export, project `.bib` sync, duplicates, doctor
+
+```bash
+papermemory library export --all                                  # print BibTeX
+papermemory library export tag:ml year:2020.. --format biblatex --out refs/ml.bib --cwd .
+papermemory library export --cited-only thesis --out references.bib --cwd .   # exactly what the manuscript cites
+papermemory library export --collection chapter-1 --format ris --out ch1.ris --cwd .
+papermemory library export --all --out references.bib --cwd . --check          # in_sync | out_of_date | hand_edited | not_managed | missing
+papermemory library dedupe                                        # candidate duplicate groups; nothing is merged
+papermemory library merge keep2020 dup2020                        # field-level preview (add --apply --reason "...")
+papermemory library doctor --cwd .                                # library health: evidence, not a verdict
+```
+
+- **Formats:** `bibtex` (classic types), `biblatex`, `ris`, `csl-json`, `json`, `csv`. Entries are sorted by key with a fixed field order, so exports diff cleanly in git. Values come from the original BibTeX entry when there is one (accents and case-protection braces survive); otherwise from the CSL record, escaped. Unmapped fields and local file paths (`pdf`, `file`) stay out unless `--fields all` (paths never).
+- **Scopes:** a filter, `--collection`, `--project`, `--cited-only MANUSCRIPT` (uses the keys the manuscript actually cites and reports cited keys the library lacks), or `--all`. Nothing is exported by accident.
+- **A project's own version.** The library keeps every imported version of a paper (`reference_variants`) and picks the most complete as canonical. A project export reproduces that project's own entries and keys; `--variant canonical` writes the library record instead.
+- **Managed `.bib`.** Output has a header and begin/end markers. Re-exporting rewrites only the managed block and keeps whatever you put after the `hand-added` marker. A file that is already in sync is not touched. If you edit inside the managed block, export refuses (`hand_edited`) unless `--force`; an existing `.bib` that PaperMemory did not write needs `--adopt`. Both keep a timestamped backup. `--out` must stay inside the workspace (`--cwd`), and other formats never overwrite an existing file without `--force`.
+- **Frozen keys.** Exporting freezes the keys it writes; only `keys rekey` changes them afterwards.
+- **Duplicates.** `dedupe` groups papers by title, year, and first author, recognises a preprint and its published version, and does not flag siblings in a series ("Part one/two"), notices ("Addendum:"), or yearly items ("News from X") as duplicates. `merge` is a dry run until `--apply --reason`; it moves documents, claims, tags, collections, notes, keys, and variants, and fills gaps from the dropped record.
+- **Doctor.** Missing required fields per entry type, unsafe or missing keys, unverified DOIs, duplicate groups, papers flagged retracted or corrected (and whether a manuscript still cites them), and, with `--cwd`, whether each collection-bound `.bib` is in sync. A paper never integrity-checked is reported as unknown, not clean.
+
+### MCP
+
+`papermemory mcp` exposes the library as one tool, `papermemory_library`, with an `action` argument (`list get resolve import export tag collection note keys dedupe merge doctor set_integrity`). Reads change nothing; anything hard to undo is a dry run unless `apply` (with a `reason`), `force`, or `adopt` is set. Paths must stay inside the allowed roots, and export paths inside `cwd`.
+
+A new paper gets a library record when it is ingested, and a key as soon as it has enough metadata to build a good one (an author, DOI, or arXiv id, and a real title). Others are keyed on request or on first export.
+
+### Citation keys
+
+```bash
+papermemory library keys check                         # report problems; changes nothing
+papermemory library keys assign                        # give every paper without a key one
+papermemory library keys freeze smith2020 --label export:references.bib
+papermemory library keys rekey smith2020 --to smith2020gnn            # dry run: shows manuscripts that cite it
+papermemory library keys rekey smith2020 --to smith2020gnn --apply --reason "clearer name"
+```
+
+- **Template.** Default `{family}{year}{titleword}` (same as the Academic Harness `citation` tool). Tokens: `{family} {year} {titleword} {doi} {arxiv}`. Set `PAPERMEMORY_KEY_TEMPLATE` or pass `--template`. A record with neither author nor year falls back to its DOI, then its arXiv id. Keys are ASCII, safe for BibTeX, and never start with a digit.
+- **Stable.** A key is set once and never changes by itself; keys from your files are kept as written. `freeze` marks a key as relied on (exports do this automatically). Only `rekey` changes a key, needs a reason, and keeps the old key as a library-wide alias so manuscripts that still cite it keep resolving in `cite-check`.
+- **Honest checks.** `keys check` reports missing keys, unsafe characters (spaces, commas, non-ASCII), mismatches with `papers.bibtex_key`, template drift on *generated* keys only (imported keys are never "drift"), and project aliases that shadow another paper's key.
+
 ## Citation rules (non-negotiable)
 
 1. Only cite papers that are in PaperMemory.

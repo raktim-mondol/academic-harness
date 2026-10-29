@@ -8,7 +8,7 @@ from typing import Any, Iterable
 
 from papermemory.audit import EVENT_OPS
 from papermemory.config import db_path, ensure_dirs
-from papermemory.schema_v2 import SCHEMA_VERSION, V2_SCHEMA
+from papermemory.schema_v2 import FULL_SCHEMA, SCHEMA_VERSION
 from papermemory.util import (
     dumps, loads, new_id, normalize_arxiv, normalize_doi, normalize_title, now_iso,
 )
@@ -78,11 +78,11 @@ class Store:
                     raise MigrationRequired(
                         f"db user_version={user_version}; run `papermemory migrate`"
                     )
-                self.conn.executescript(V2_SCHEMA)
+                self.conn.executescript(FULL_SCHEMA)
                 self.conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
                 self.conn.commit()
             elif not self._object_exists("events"):
-                self.conn.executescript(V2_SCHEMA)
+                self.conn.executescript(FULL_SCHEMA)
                 self.conn.executescript("PRAGMA user_version=%d" % SCHEMA_VERSION)
                 self.conn.commit()
             self._bootstrap_search_index()
@@ -265,6 +265,8 @@ class Store:
         fields: dict[str, Any] | None = None,
         project_key: str | None = None,
         metadata_only: bool = False,
+        commit: bool = True,
+        library: bool = True,
     ) -> tuple[str, str]:
         fields = dict(fields or {})
         now = now_iso()
@@ -359,7 +361,12 @@ class Store:
         if project_key:
             self.add_membership(paper_id, project_key)
         self.mut("INGEST", paper_id=paper_id, project_key=project_key, status=state, detail=title[:200])
-        self.conn.commit()
+        if library and state == "created":
+            from papermemory.library_store import ensure_library_record
+
+            ensure_library_record(self.conn, paper_id)
+        if commit:
+            self.conn.commit()
         return paper_id, state
 
     def promote_identity(self, paper_id: str, kind: str, value: str) -> dict[str, Any]:
@@ -557,6 +564,9 @@ class Store:
                 )
             self.conn.execute("UPDATE citations SET paper_id=? WHERE paper_id=?", (target_id, source_id))
             self.conn.execute("UPDATE sweeps SET paper_id=? WHERE paper_id=?", (target_id, source_id))
+            from papermemory.library_store import merge_library_rows
+
+            merge_library_rows(self.conn, source_id, target_id, now)
             self.conn.execute("DELETE FROM papers WHERE id=?", (source_id,))
             current = self.conn.execute(
                 "SELECT id FROM raw_documents WHERE paper_id=? AND is_current=1 LIMIT 1", (target_id,)

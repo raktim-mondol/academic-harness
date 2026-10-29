@@ -16,7 +16,7 @@ EXPECTED_TOOLS = [
     "papermemory_search", "papermemory_ingest", "papermemory_get", "papermemory_cite",
     "papermemory_cite_check", "papermemory_remember", "papermemory_claim", "papermemory_recap",
     "papermemory_lesson", "papermemory_quote_check", "papermemory_trace",
-    "papermemory_register_to_ah", "papermemory_outline", "papermemory_list",
+    "papermemory_register_to_ah", "papermemory_outline", "papermemory_list", "papermemory_library",
 ]
 
 BODY = """# P

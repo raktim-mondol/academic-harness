@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 APP_NAME = "papermemory"
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 
 
 def data_dir() -> Path:

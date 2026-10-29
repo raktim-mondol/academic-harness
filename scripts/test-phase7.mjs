@@ -10,13 +10,16 @@ const EXPECTED = [
   'papermemory_search', 'papermemory_ingest', 'papermemory_get', 'papermemory_cite',
   'papermemory_cite_check', 'papermemory_remember', 'papermemory_claim', 'papermemory_recap',
   'papermemory_lesson', 'papermemory_quote_check', 'papermemory_trace',
-  'papermemory_register_to_ah', 'papermemory_outline', 'papermemory_list',
+  'papermemory_register_to_ah', 'papermemory_outline', 'papermemory_list', 'papermemory_library',
 ]
 const failures = []
 const check = (ok, message) => { if (!ok) failures.push(message) }
 
-const cli = process.env.PM_CLI || join(homedir(), '.dsh/papermemory/.venv/bin/papermemory')
-const tools = spawnSync(cli, ['tools', '--json'], { encoding: 'utf8' })
+// Test the vendored package (what the plugin installs), not whatever copy happens to be installed.
+const vendored = join(root, 'vendor', 'papermemory')
+const tools = process.env.PM_CLI
+  ? spawnSync(process.env.PM_CLI, ['tools', '--json'], { encoding: 'utf8' })
+  : spawnSync('python3', ['-m', 'papermemory', 'tools', '--json'], { encoding: 'utf8', env: { ...process.env, PYTHONPATH: vendored } })
 if (tools.status !== 0) failures.push(`tools --json failed: ${tools.stderr || tools.status}`)
 else {
   const names = JSON.parse(tools.stdout)
@@ -47,7 +50,7 @@ check(zvecIndex.includes('globs: Array.isArray(args.exclude)'), 'zvec_index does
 
 const mount = readFileSync(join(root, 'papermemory.js'), 'utf8')
 check(mount.includes('failOnStartupError: true'), 'papermemory.js must fail loudly on startup')
-check(mount.includes('EXPECTED_TOOL_COUNT = 14'), 'papermemory.js missing tool-count drift check')
+check(mount.includes('EXPECTED_TOOL_COUNT = 15'), 'papermemory.js missing tool-count drift check')
 
 const pdf = readFileSync(join(root, 'pdf-to-markdown.js'), 'utf8')
 check(pdf.includes('converter:'), 'pdf-to-markdown.js does not forward converter signals')

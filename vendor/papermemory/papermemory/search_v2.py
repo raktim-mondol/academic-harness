@@ -133,6 +133,22 @@ def _claim_leg(store, query, limit, project_id, section_roles):
     return scored[: max(4 * limit, 32)], stats
 
 
+def _library_text(store, paper_ids: list[str]) -> dict[str, str]:
+    """Tags and active note text per paper, so they count toward paper relevance."""
+    text: dict[str, list[str]] = {}
+    for start in range(0, len(paper_ids), 400):
+        chunk = paper_ids[start:start + 400]
+        marks = ",".join("?" for _ in chunk)
+        for row in store.conn.execute(f"SELECT paper_id, tag FROM paper_tags WHERE paper_id IN ({marks})", chunk):
+            text.setdefault(row["paper_id"], []).append(row["tag"])
+        for row in store.conn.execute(
+            f"SELECT paper_id, content FROM observations WHERE paper_id IN ({marks}) AND tier='note' "
+            "AND superseded_by IS NULL", chunk,
+        ):
+            text.setdefault(row["paper_id"], []).append(row["content"])
+    return {key: " ".join(values) for key, values in text.items()}
+
+
 def _paper_leg(store, query, limit, project_id, *, include_chunkless: bool):
     from papermemory.tokenizer import terms
 
@@ -143,6 +159,17 @@ def _paper_leg(store, query, limit, project_id, *, include_chunkless: bool):
     fields = ("title", "abstract", "bibtex_key", "doi", "arxiv_id", "authors_json")
     where = "(" + " OR ".join(f"p.{field} LIKE ?" for field in fields for _ in tokens) + ")"
     args: list[Any] = [f"%{token}%" for field in fields for token in tokens]
+    # Library tags and paper notes are searchable too.
+    where = (
+        where[:-1]
+        + " OR " + " OR ".join(
+            "EXISTS(SELECT 1 FROM paper_tags t WHERE t.paper_id=p.id AND t.tag LIKE ?)" for _ in tokens)
+        + " OR " + " OR ".join(
+            "EXISTS(SELECT 1 FROM observations o WHERE o.paper_id=p.id AND o.tier='note' "
+            "AND o.superseded_by IS NULL AND o.content LIKE ?)" for _ in tokens)
+        + ")"
+    )
+    args += [f"%{token}%" for token in tokens] * 2
     try:
         suppressed_sql = f"SELECT COUNT(*) FROM papers p WHERE p.cite_state='chunkless' AND {where}"
         suppressed_args = list(args)
@@ -162,6 +189,7 @@ def _paper_leg(store, query, limit, project_id, *, include_chunkless: bool):
         stats["error"] = str(exc)
         return [], stats
     scored = []
+    extra_text = _library_text(store, [row["id"] for row in rows])
     for row in rows:
         record = dict(row)
         record["authors"] = loads(record.get("authors_json"), [])
@@ -170,7 +198,8 @@ def _paper_leg(store, query, limit, project_id, *, include_chunkless: bool):
         record["snippet"] = (record.get("abstract") or record["title"])[:400]
         blob = " ".join(
             [record.get("title") or "", record.get("authors_json") or "", record.get("abstract") or "",
-             record.get("venue") or "", record.get("bibtex_key") or "", record.get("doi") or ""]
+             record.get("venue") or "", record.get("bibtex_key") or "", record.get("doi") or "",
+             extra_text.get(record["id"], "")]
         )
         record["overlap"] = overlap(query, blob)
         scored.append(record)

@@ -14,6 +14,7 @@ import { runS2Search } from './semantic-scholar-search.js'
 import { runPubMedSearch } from './pubmed-search.js'
 import { runArxivSearch } from './arxiv-search.js'
 import { runCrossrefQuery } from './crossref-lookup.js'
+import { libraryLaunch, libraryResolve } from './papermemory-library.js'
 
 const ALLOWED = ['openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints']
 const BIOMEDICAL = /\b(clinic|clinical|patient|patients|trial|trials|disease|therapy|therapies|treatment|cancer|tumou?r|gene|genes|genetic|protein|proteins|cell|cells|drug|drugs|medical|medicine|health|epidemi\w*|cohort|rct|surgery|surgical|diagnos\w*|psychiatr\w*|neuron\w*|biolog\w*|immun\w*|infect\w*|virus|viral|vaccine|malaria|diabetes|alzheimer|parkinson|cardio\w*|oncology)\b/i
@@ -114,6 +115,28 @@ async function runSource(source, { query, perSource, yearMin, yearMax, openAcces
   }
 }
 
+/**
+ * Flag results already in the PaperMemory reference library (by DOI), so they are not added twice.
+ * Best effort and local: when PaperMemory or its library is unavailable the field is simply absent,
+ * which means "not checked", not "not in the library".
+ */
+export async function markInLibrary(papers, exec) {
+  const dois = [...new Set(papers.map((paper) => paper.doi).filter(Boolean))]
+  if (!dois.length || !libraryLaunch()) return undefined
+  const resolved = await libraryResolve(dois, { cwd: exec?.agent?.session?.header?.cwd || process.cwd(), signal: exec?.signal })
+  if (!resolved.ok) return undefined
+  const byDoi = new Map(resolved.results.filter((entry) => entry.found).map((entry) => [entry.ref, entry.key]))
+  let matched = 0
+  for (const paper of papers) {
+    const key = paper.doi ? byDoi.get(String(paper.doi).trim()) : undefined
+    if (key) {
+      paper.in_library = key
+      matched += 1
+    }
+  }
+  return { checked: dois.length, in_library: matched }
+}
+
 function withinYears(paper, min, max) {
   if (paper.year == null) return true
   if (min != null && paper.year < min) return false
@@ -138,6 +161,10 @@ function render(value) {
   if (value.warnings?.length) bits.push(`warnings: ${value.warnings.join('; ')}`)
   if (value.failures?.length) {
     bits.push(`failed: ${value.failures.map((failure) => `${failure.source} (${failure.error})`).join('; ')}`)
+  }
+  if (value.library?.in_library) {
+    const have = (value.papers || []).filter((paper) => paper.in_library).map((paper) => paper.in_library)
+    bits.push(`already in your reference library: ${have.join(', ')}`)
   }
   bits.push(renderPapers(value.papers || [], {
     abstractChars: value.include_abstracts ? 500 : 0,
@@ -242,6 +269,7 @@ export function apply(ctx) {
         ...paper,
         rrf_score: Number(paper.rrf_score.toFixed(5)),
       }))
+      const library = await markInLibrary(papers, exec)
       return {
         query,
         sources,
@@ -251,6 +279,7 @@ export function apply(ctx) {
         total_unique: merged.length,
         truncated: merged.length > papers.length,
         include_abstracts: Boolean(args.include_abstracts),
+        ...(library ? { library } : {}),
         papers,
       }
     },

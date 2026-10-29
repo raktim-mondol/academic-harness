@@ -51,6 +51,7 @@ const STALE_SKILLS = [
   { dir: 'vastai', stale: (text) => !text.includes('## Pitfalls that break agent runs') },
   { dir: 'modal-usage', stale: (text) => /^name: modal$/m.test(text) },
   { dir: 'academic-harness-notebook', stale: (text) => /ResearchCraft/.test(text) },
+  { dir: 'papermemory', stale: (text) => !text.includes('## Reference library') },
 ]
 
 function refreshStaleSkills(dest) {

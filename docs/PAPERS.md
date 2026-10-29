@@ -90,7 +90,7 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 
 [PaperMemory](https://github.com/raktim-mondol/papermemory) is the local academic-memory layer on the Academic Harness preset: papers (title, authors, year, venue, DOI, arXiv, bibtex key), claims with quoted evidence, citation graphs, manuscript recap, and cite-check. It is how the agent remembers papers it has read and cites without inventing references — open-web and peer-reviewed discovery stays on Parallel / Consensus / Firecrawl / Scite.
 
-You do **not** install PaperMemory yourself. The first time the Academic Harness preset mounts after `dsh plugin add`, the plugin uses `papermemory` already on `PATH` if present, otherwise installs the vendored package (with `pypdf`) into `~/.dsh/papermemory` via `uv` (or `python -m venv` + pip). It then mounts `mcp__papermemory__*` over stdio (`papermemory mcp`) — no second restart. Startup is **fail-loud**: a missing or broken memory server (and any drift from the expected 14-tool surface) is logged/surfaced instead of silently reading as an empty store. Override with `PAPERMEMORY_CLI` if you already have a binary you want to keep; `PAPERMEMORY_SKIP_INSTALL=1` skips the bundled venv.
+You do **not** install PaperMemory yourself. The first time the Academic Harness preset mounts after `dsh plugin add`, the plugin uses `papermemory` already on `PATH` if present, otherwise installs the vendored package (with `pypdf`) into `~/.dsh/papermemory` via `uv` (or `python -m venv` + pip). It then mounts `mcp__papermemory__*` over stdio (`papermemory mcp`) — no second restart. Startup is **fail-loud**: a missing or broken memory server (and any drift from the expected 15-tool surface) is logged/surfaced instead of silently reading as an empty store. Override with `PAPERMEMORY_CLI` if you already have a binary you want to keep; `PAPERMEMORY_SKIP_INSTALL=1` skips the bundled venv.
 
 The SQLite store is PaperMemory's default: `~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB` or `PAPERMEMORY_DATA_DIR`). A standalone `papermemory` CLI, Grok, and Academic Harness share that same database. No API key.
 
@@ -104,7 +104,7 @@ Each paper is stored as content-addressed markdown; chunks are byte slices, sect
 - Existing stores migrate once with `papermemory migrate` (schema 2000); legacy chunks/claims are quarantined, not promoted — re-ingest papers as markdown to make them citable.
 - A 104-paper scale run (28/28 checks, bm25 top-N 20/20, scoped p95 11.7 ms) is documented in [`reports/papermemory-v2-scale-test.md`](../reports/papermemory-v2-scale-test.md).
 
-### The 14 tools
+### The 15 tools
 
 | Tool | What it does |
 |---|---|
@@ -122,8 +122,27 @@ Each paper is stored as content-addressed markdown; chunks are byte slices, sect
 | `mcp__papermemory__papermemory_list` | Enumerate papers/claims/lessons/coverage with totals |
 | `mcp__papermemory__papermemory_register_to_ah` | Register stored markdown into an Academic Harness project |
 | `mcp__papermemory__papermemory_lesson` | Save a durable academic writing/reading rule |
+| `mcp__papermemory__papermemory_library` | Reference library, one `action` argument: `list get resolve import export tag collection note keys dedupe merge doctor set_integrity` (see below) |
 
 `paper_download` calls ingest on the saved PDF (and DOI metadata when a DOI was given). The agent is steered to `recap` on paper-writing tasks, to cite only memory hits, to check `supports_statement`/`degradation`, and to `cite_check` before treating a section as finished. Load the bundled `papermemory` skill (`skills/papermemory`) for the full workflow.
+
+### Reference library
+
+PaperMemory is also the reference manager. One tool, `papermemory_library`, keeps a lossless record of every paper (so a `.bib` entry's `volume`, `pages`, `mrnumber`, ... survive), gives it a unique, stable citation key, and lets you organise and export it.
+
+| Task | How |
+|---|---|
+| Add references | `import` BibTeX, BibLaTeX, RIS (Zotero/EndNote-style and publisher exports) or CSL-JSON; `paper_download` and `papermemory_ingest` add papers automatically. `dry_run` first for a big file. |
+| Find | `list` with filters — `tag:ml year:2020..2024 has:pdf !tag:skip graph` — or `get` / `resolve` by key, DOI, or id. |
+| Organise | `tag`; `collection` (one level of nesting; can be bound to a project and a `.bib`); `note` (an edit keeps the old text). |
+| Write a bibliography | `export` to BibTeX, BibLaTeX, RIS, CSL-JSON, JSON, or CSV. `cited_only: <manuscript>` exports exactly what a manuscript cites, under that project's own keys. A project `.bib` is **managed**: re-export rewrites only the managed block, keeps what you wrote after the `hand-added` marker, and refuses to overwrite hand edits unless forced (a backup is kept). |
+| Keep keys stable | A key is set once. `keys` `check` reports problems; `rekey` is a dry run listing the manuscripts that cite the old key, and applying it needs a reason. The old key keeps resolving. |
+| Clean up | `dedupe` lists candidate duplicates (it recognises a preprint and its published version, and does not flag "Part one/two", "Addendum", or yearly items); `merge` previews field by field and applies only with a reason. |
+| Health | `doctor` reports missing required fields, unsafe keys, unverified DOIs, duplicates, retracted papers a manuscript still cites, and `.bib` files out of sync. A paper never integrity-checked is *unknown*, not clean. |
+
+The harness tools use it: `citation` accepts `library: { cited_only | project | collection | query | all }` as a record source, `manuscript_citations` accepts `library: true` (and `project`) to compare cited keys with the library, `literature_search` marks results already stored (`in_library`), and `integrity_check` accepts `library` to check the DOIs of library papers and record each result. The MCP server does not run in the workspace, so pass `cwd` for any path.
+
+The first start after upgrading migrates an existing store (schema 2000 → 2100) after taking a backup (`backups/` next to the database). If another DSH session still holds the database the migration waits; close it and restart. Details and the standalone CLI (`papermemory library ...`) are in the [PaperMemory README](../vendor/papermemory/README.md).
 
 ### Auto-ingest project scope
 

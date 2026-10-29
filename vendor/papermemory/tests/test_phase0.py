@@ -29,7 +29,7 @@ def test_fresh_store_uses_events_and_audit_view(tmp_path):
         for row in store.conn.execute("SELECT name, type FROM sqlite_master WHERE name IN ('events','audit')")
     }
     assert types == {"events": "table", "audit": "view"}
-    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2000
+    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2100
     store.close()
 
 
@@ -38,7 +38,7 @@ def test_schema_too_new_refused(tmp_path):
 
     path = tmp_path / "newer.db"
     conn = sqlite3.connect(path)
-    conn.execute("PRAGMA user_version=2001")
+    conn.execute("PRAGMA user_version=2101")
     conn.commit()
     conn.close()
     with pytest.raises(SchemaTooNew) as exc:
@@ -103,7 +103,7 @@ def test_backup_export_restore_roundtrip(tmp_path):
     exported = export_store(store, out)
     assert exported["tables"]["papers"] == 1
     header = json.loads(out.read_text().splitlines()[0])
-    assert header["kind"] == "header" and header["schema"] == "pm-2"
+    assert header["kind"] == "header" and header["schema"] == "pm-2.1"
 
     target = _store(tmp_path / "target")
     restored = restore_store(target, out)
@@ -122,7 +122,7 @@ def test_backup_export_restore_roundtrip(tmp_path):
 def test_doctor_schema_reports_runtime(tmp_path):
     store = _store(tmp_path)
     report = doctor_schema(store)
-    assert report["user_version"] == 2000
+    assert report["user_version"] == 2100
     assert report["db_path"].endswith("pm.db")
     assert report["sqlite_version"]
     assert report["module_version"]

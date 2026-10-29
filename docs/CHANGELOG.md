@@ -2,6 +2,14 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.26.0
+
+- **PaperMemory is now the reference manager.** The vendored PaperMemory moves to 0.3.0 (schema 2100) and adds a reference library: lossless records, unique stable citation keys, tags, collections, notes, import of BibTeX/BibLaTeX/RIS/CSL-JSON, export to BibTeX/BibLaTeX/RIS/CSL-JSON/JSON/CSV, a managed project `.bib` that never overwrites hand edits, duplicate detection, a field-level merge preview, and a library `doctor`. It is one new tool, `mcp__papermemory__papermemory_library`, so PaperMemory exposes **15 tools** (the start-up drift check now expects 15). Nothing was added for Zotero; PaperMemory replaces the need for it.
+- **Existing stores migrate on first start.** A schema-2000 store is backed up (`backups/` next to the database) and migrated to 2100 automatically. If another process still holds the database the migration is refused with a clear message and the store is left untouched. `papermemory backup` now also works on a store that still needs migrating.
+- **Harness tools use the library.** `citation` takes `library: { cited_only | project | collection | query | all }` as a record source and keeps the library's own keys; `manuscript_citations` takes `library: true` (and `project`) and reports cited keys missing from the library, keys cited under another library key, and a project's entries never cited; `literature_search` marks results already stored (`in_library`) and says nothing when the library cannot be reached; `integrity_check` takes `library` (a bounded sweep of library DOIs, recording each result on the paper; unknown and malformed-DOI results are recorded as unknown, never ok) and `record_in_library` for a single DOI.
+- New papers get a library record at ingest, and a key as soon as there is enough metadata to build a good one; export assigns the rest (a `--check` never writes).
+- The `papermemory` skill documents the library and is refreshed on existing installs. `scripts/test-library.mjs` (`npm run test:library`) covers the CLI bridge, the `citation` library source (including that both BibTeX writers agree), `manuscript_citations`, integrity sweeps, `literature_search`, and the first-run migration; `scripts/test-phase7.mjs` now tests the vendored package rather than whichever copy is installed.
+
 ## 0.25.4
 
 - Fixed `paper_fold` failing preset validation on current DSH/Cordis: the plugin registered through `ctx.tools` without `export const inject = ['tools']`, so every new session failed with `agent-preset/invalid: paper-fold ... cannot get property "tools" without inject`. New sessions and `paper_fold` work again after restart.

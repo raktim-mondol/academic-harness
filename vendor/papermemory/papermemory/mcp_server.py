@@ -11,6 +11,7 @@ from papermemory.context import recap
 from papermemory.db import Store
 from papermemory.ingest import ingest_arxiv, ingest_doi, ingest_path
 from papermemory.search import search as hybrid_search
+from papermemory.mcp_library import TOOL as LIBRARY_TOOL
 from papermemory.util import loads
 
 TOOLS = [
@@ -190,6 +191,7 @@ TOOLS = [
             },
         },
     },
+    LIBRARY_TOOL,
 ]
 
 
@@ -278,6 +280,15 @@ def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
     store = None
     try:
         store = Store()
+        if name == "papermemory_library":
+            from papermemory.mcp_library import ToolError, error_code, library_call
+
+            try:
+                return _ok(library_call(store, args, lambda raw: _sandbox(store, raw)))
+            except Exception as exc:
+                if isinstance(exc, (ToolError, ValueError, LookupError)) or hasattr(exc, "code"):
+                    return _err(str(exc), error_code(exc))
+                raise
         if name == "papermemory_search":
             from papermemory.search_v2 import search_with_status
 

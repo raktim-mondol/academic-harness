@@ -14,20 +14,17 @@ SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", "fi
 
 
 def ingest_bibtex(store: Store, text: str, *, project_id: str | None = None, source: str | None = None) -> list[dict[str, Any]]:
+    """Import BibTeX into the library (lossless record, keys, aliases) and return the papers."""
+    from papermemory.library import import_text
+
+    report = import_text(store, text, fmt="bibtex", path=source, project_id=project_id)
     papers = []
-    for entry in parse_bibtex(text):
-        record = store.upsert_paper(
-            {
-                **entry,
-                "project_id": project_id,
-                "source_type": "bibtex",
-                "verified": 1 if (entry.get("doi") or entry.get("arxiv_id")) else 0,
-            }
-        )
-        if project_id:
-            store.add_membership(record["id"], project_id)
-        papers.append(record)
-    store.conn.commit()
+    for entry in report["entries"]:
+        if entry["status"] == "failed":
+            continue
+        record = store.get_paper(entry["paper_id"])
+        if record:
+            papers.append(record)
     return papers
 
 
@@ -238,7 +235,7 @@ def ingest_path(
                 kind = "dir"
         else:
             suffix = path.suffix.lower()
-            kind = {".pdf": "pdf", ".bib": "bibtex", ".md": "markdown", ".tex": "markdown"}.get(suffix, "file")
+            kind = {".pdf": "pdf", ".bib": "bibtex", ".ris": "ris", ".md": "markdown", ".tex": "markdown"}.get(suffix, "file")
     if progress:
         progress(f"ingest {kind}: {path}")
     if kind == "manuscript":
@@ -248,6 +245,11 @@ def ingest_path(
     if kind == "bibtex":
         papers = ingest_bibtex(store, path.read_text(encoding="utf-8", errors="replace"), project_id=project_id, source=str(path))
         return {"papers": papers, "count": len(papers)}
+    if kind == "ris":
+        from papermemory.library import import_text
+
+        report = import_text(store, path.read_text(encoding="utf-8", errors="replace"), fmt="ris", path=str(path), project_id=project_id)
+        return {"papers": [e for e in report["entries"] if e["status"] != "failed"], "count": report["counts"]["added"] + report["counts"]["merged"], "report": report}
     if kind == "markdown":
         return ingest_markdown(
             store, path, project_id=project_id, doi=doi, pdf_path=pdf_path, title=title,
@@ -260,7 +262,7 @@ def ingest_path(
                 continue
             if any(part in SKIP_DIRS for part in child.parts):
                 continue
-            if child.suffix.lower() not in {".pdf", ".bib", ".md"}:
+            if child.suffix.lower() not in {".pdf", ".bib", ".ris", ".md"}:
                 continue
             try:
                 results.append(ingest_path(store, child, project_id=project_id, kind="auto"))

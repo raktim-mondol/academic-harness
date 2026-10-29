@@ -10,6 +10,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { parseBibtex } from './citation-format.js'
+import { libraryResolve } from './papermemory-library.js'
 
 const MAX_BYTES = 20 * 1024 * 1024
 const CITE_COMMANDS = new Set([
@@ -161,6 +162,32 @@ function bibPathsFromArgs(cwd, value) {
   return raw.map((part) => part.trim()).filter(Boolean).map((part) => resolveInside(cwd, part))
 }
 
+/**
+ * Compare the cited keys with the PaperMemory reference library. A library that cannot be reached is
+ * reported as unavailable, never as "everything is missing".
+ */
+async function checkAgainstLibrary(cited, project, cwd, signal, warnings) {
+  const resolved = await libraryResolve(cited.map((entry) => entry.key), {
+    project: project || undefined, projectKeys: Boolean(project), cwd, signal,
+  })
+  if (!resolved.ok) {
+    warnings.push(`reference library not checked (${resolved.code}): ${resolved.error}`)
+    return { available: false, code: resolved.code }
+  }
+  const found = new Map(resolved.results.map((entry) => [entry.ref, entry]))
+  const citedKeys = new Set(cited.map((entry) => entry.key))
+  return {
+    available: true,
+    project: project || null,
+    checked: cited.length,
+    cited_not_in_library: cited.filter((entry) => !found.get(entry.key)?.found).map((entry) => entry.key),
+    cited_under_another_key: cited
+      .filter((entry) => found.get(entry.key)?.found && found.get(entry.key).key !== entry.key)
+      .map((entry) => ({ cited: entry.key, library_key: found.get(entry.key).key })),
+    project_entries_never_cited: resolved.project_keys ? resolved.project_keys.filter((key) => !citedKeys.has(key)) : null,
+  }
+}
+
 export async function runManuscriptCitations(args, exec) {
   const cwd = workspaceRoot(exec)
   const manuscriptPath = String(args.manuscript || '').trim()
@@ -215,6 +242,11 @@ export async function runManuscriptCitations(args, exec) {
       .filter((entry) => !citations.keys.has(entry.key))
       .map((entry) => ({ key: entry.key, type: entry.type, title: titles.get(entry.key) || null }))
 
+  let library
+  if (args.library) {
+    library = await checkAgainstLibrary(cited, args.project, cwd, exec?.signal, warnings)
+  }
+
   return {
     manuscript: relative(cwd, manuscript),
     bibliography: bibPaths.filter((path) => existsSync(path)).map((path) => relative(cwd, path)),
@@ -234,6 +266,7 @@ export async function runManuscriptCitations(args, exec) {
     undefined_refs: refs.undefined_refs,
     duplicate_labels: refs.duplicate_labels,
     nocite_all: citations.nociteAll,
+    ...(library ? { library } : {}),
     warnings,
   }
 }
@@ -252,6 +285,17 @@ function render(value) {
   }
   section('Missing from the bibliography', value.missing_keys.map((entry) => `${entry.key} (cited ${entry.count}×)`))
   section('Bibliography entries never cited', value.unused_keys.map((entry) => `${entry.key}${entry.title ? ` — ${entry.title}` : ''}`))
+  if (value.library) {
+    if (!value.library.available) {
+      lines.push('', `Reference library not checked (${value.library.code}).`)
+    } else {
+      section('Cited but not in the reference library', value.library.cited_not_in_library)
+      section('Cited under a different library key', value.library.cited_under_another_key.map((e) => `${e.cited} → ${e.library_key}`))
+      if (value.library.project_entries_never_cited) {
+        section(`Library entries of project ${value.library.project} never cited`, value.library.project_entries_never_cited)
+      }
+    }
+  }
   section('Duplicate bibliography keys', value.duplicate_keys.map((entry) => `${entry.key} (${entry.count} entries)`))
   section('Undefined references', value.undefined_refs)
   section('Duplicate labels', value.duplicate_labels)
@@ -280,6 +324,8 @@ export function apply(ctx) {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
         description: 'Workspace-relative .bib file(s). Optional for .tex, required for .md.',
       },
+      library: { type: 'boolean', description: 'Also check the cited keys against the PaperMemory reference library (local, no network).' },
+      project: { type: 'string', description: 'With library: the project whose own citation keys apply; also lists that project\'s library entries never cited.' },
     },
     output: {
       schema: { type: 'json' },

@@ -14,7 +14,8 @@ from papermemory.config import VERSION
 from papermemory.db import Store
 from papermemory.util import new_id, now_iso
 
-EXPORT_SCHEMA = "pm-2"
+EXPORT_SCHEMA = "pm-2.1"
+EXPORT_SCHEMAS_ACCEPTED = ("pm-2", "pm-2.1")
 EXPORT_TABLES = [
     "projects",
     "papers",
@@ -39,6 +40,14 @@ EXPORT_TABLES = [
     "citations",
     "observations",
     "lessons",
+    "reference_meta",
+    "reference_variants",
+    "bib_keys",
+    "bib_key_aliases",
+    "paper_tags",
+    "collections",
+    "collection_papers",
+    "integrity",
 ]
 
 
@@ -105,8 +114,8 @@ def restore_store(store: Store, in_path: Path, *, force: bool = False) -> dict[s
         first = json.loads(handle.readline())
         if first.get("kind") != "header":
             raise ValueError("export-missing-header")
-        if first.get("schema") != EXPORT_SCHEMA:
-            raise ValueError(f"export-schema-mismatch: {first.get('schema')} != {EXPORT_SCHEMA}")
+        if first.get("schema") not in EXPORT_SCHEMAS_ACCEPTED:
+            raise ValueError(f"export-schema-mismatch: {first.get('schema')} not in {EXPORT_SCHEMAS_ACCEPTED}")
         rows: dict[str, list[dict[str, Any]]] = {table: [] for table in EXPORT_TABLES}
         for line in handle:
             entry = json.loads(line)
@@ -277,7 +286,7 @@ def doctor_schema(store: Store) -> dict[str, Any]:
 
 
 def migrate(store: Store) -> dict[str, Any]:
-    """Run explicit, single-writer migrations (v1 -> schema 2000)."""
+    """Run explicit, single-writer migrations (v1 -> schema 2000 -> 2100)."""
     from papermemory.migrations import migrate_2000
 
     lock = Path(str(store.path) + ".migrate.lock")
@@ -290,8 +299,16 @@ def migrate(store: Store) -> dict[str, Any]:
         if holders:
             raise RuntimeError(f"db-in-use-by-pids: {holders}")
         store.conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        result = migrate_2000(store)
-        return {"changed": result["changed"], "user_version": result["user_version"]}
+        from papermemory.migrations import migrate_2100
+
+        first = migrate_2000(store)
+        second = migrate_2100(store)
+        detail = {key: value for key, value in second.items() if key not in {"changed", "user_version"}}
+        return {
+            "changed": bool(first["changed"] or second["changed"]),
+            "user_version": second["user_version"],
+            **detail,
+        }
     finally:
         os.close(fd)
         lock.unlink(missing_ok=True)

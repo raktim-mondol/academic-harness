@@ -82,6 +82,335 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     return 2
 
 
+def _library_project(args: argparse.Namespace, store: Store) -> str | None:
+    from papermemory.scope import canonical_project_slug
+
+    cwd = getattr(args, "cwd", None)
+    if not (getattr(args, "project", None) or cwd):
+        return None
+    anchor = Path(cwd) if cwd else Path.cwd()
+    return canonical_project_slug(anchor, project=args.project, store=store)
+
+
+def cmd_library_import(args: argparse.Namespace) -> int:
+    from papermemory.library import LibraryError, import_text
+
+    store = _store()
+    try:
+        if args.path == "-":
+            text, label = sys.stdin.read(), None
+        else:
+            source = Path(args.path).expanduser()
+            text, label = source.read_text(encoding="utf-8", errors="replace"), str(source)
+        report = import_text(
+            store, text, fmt=args.format, path=label, project_id=_library_project(args, store),
+            batch_size=args.batch_size, dry_run=args.dry_run,
+        )
+    except (LibraryError, OSError) as exc:
+        print(f"library import: {exc}", file=sys.stderr)
+        return 2
+    c = report["counts"]
+    lines = [
+        f"{'would import' if report['dry_run'] else 'imported'} {report['format']}: "
+        f"{c['added']} added, {c['merged']} merged, {c['failed']} failed, {c['parse_errors']} parse problems"
+    ]
+    for entry in report["entries"]:
+        if entry["status"] == "failed":
+            lines.append(f"  ! {entry.get('source_key')}: {entry.get('reason')}")
+        elif entry.get("key_collision"):
+            lines.append(f"  ! key {entry['key_collision']} already names another paper; stored as {entry['key']}")
+        elif entry.get("alias_conflict"):
+            lines.append(f"  ! key {entry['alias_conflict']} is used twice in this project for different papers")
+    for error in report["parse_errors"][:20]:
+        lines.append(f"  ! line {error.get('line')}: {error['message']} ({error.get('key')})")
+    return _emit(report, args.json, "\n".join(lines))
+
+
+def cmd_library_get(args: argparse.Namespace) -> int:
+    from papermemory.library import get_entry
+
+    store = _store()
+    entry = get_entry(store, args.ref, project_id=_library_project(args, store))
+    if entry is None:
+        print(f"library get: nothing found for {args.ref!r}", file=sys.stderr)
+        return 1
+    return _emit(entry, args.json)
+
+
+def cmd_library_keys(args: argparse.Namespace) -> int:
+    from papermemory import library_keys
+    from papermemory.bibkeys import TemplateError
+
+    store = _store()
+    project = _library_project(args, store)
+    try:
+        if args.keys_cmd == "check":
+            report = library_keys.check(store, template=args.template)
+            s = report["summary"]
+            lines = [
+                f"{s['keys']} keys ({s['frozen']} frozen), template {s['template']}: "
+                + ("ok" if s["ok"] else "problems found")
+            ]
+            for name, count in s["problems"].items():
+                if count:
+                    lines.append(f"  {name}: {count}")
+            return _emit(report, args.json, "\n".join(lines))
+        if args.keys_cmd == "assign":
+            result = library_keys.assign_missing(store, template=args.template)
+            return _emit(result, args.json, f"assigned {result['assigned']} key(s) with template {result['template']}")
+        if args.keys_cmd == "freeze":
+            result = library_keys.freeze(store, args.ref, args.label, project_id=project)
+            return _emit(result, args.json, f"{result['key']}: " + ("frozen" if result["changed"] else "already frozen"))
+        result = library_keys.rekey(
+            store, args.ref, to=args.to, template=args.template, reason=args.reason or "",
+            apply=args.apply, project_id=project,
+        )
+        if not result["changed"]:
+            return _emit(result, args.json, f"{result['old_key']}: already the key; nothing to do")
+        affected = result.get("affected_manuscripts", [])
+        text = f"{result['old_key']} -> {result['new_key']}: " + ("applied" if result["applied"] else "dry run (add --apply --reason ...)")
+        for item in affected:
+            text += f"\n  cited by {item['manuscript']} ({item['citations']} place(s)); the old key keeps resolving as an alias"
+        return _emit(result, args.json, text)
+    except (library_keys.KeyOperationError, TemplateError) as exc:
+        print(f"library keys: {getattr(exc, 'code', 'error')}: {exc}", file=sys.stderr)
+        return 2
+
+
+def _split_csv(values: list[str]) -> list[str]:
+    return [part.strip() for value in values for part in value.split(",") if part.strip()]
+
+
+def _paper_line(row: dict[str, Any]) -> str:
+    who = ", ".join(row["authors"][:2]) + (" et al." if len(row["authors"]) > 2 else "")
+    extras = " ".join(
+        part for part in (
+            f"#{','.join(row['tags'])}" if row["tags"] else "",
+            f"[{','.join(row['collections'])}]" if row["collections"] else "",
+            f"notes:{row['notes']}" if row["notes"] else "",
+            f"integrity:{row['integrity']}" if row["integrity"] else "",
+        ) if part
+    )
+    return f"{row['key'] or '-':<28} {row['year'] or '?'}  {row['title'][:70]}  ({who}) {extras}".rstrip()
+
+
+def cmd_library_list(args: argparse.Namespace) -> int:
+    from papermemory.library_query import QueryError, list_papers
+
+    store = _store()
+    try:
+        result = list_papers(store, args.query, sort=args.sort, desc=args.desc, limit=args.limit, cursor=args.cursor)
+    except QueryError as exc:
+        print(f"library list: {exc}", file=sys.stderr)
+        return 2
+    lines = [f"{result['total_count']} paper(s)"] + [_paper_line(r) for r in result["rows"]]
+    if result["next_cursor"]:
+        lines.append(f"more: --cursor {result['next_cursor']}")
+    return _emit(result, args.json, "\n".join(lines))
+
+
+def cmd_library_tag(args: argparse.Namespace) -> int:
+    from papermemory import library_org
+    from papermemory.library_query import QueryError, tag_counts
+
+    store = _store()
+    try:
+        project = _library_project(args, store)
+        if args.tag_cmd == "list":
+            rows = tag_counts(store, args.query)
+            return _emit(rows, args.json, "\n".join(f"{r['papers']:>5}  {r['tag']}" for r in rows) or "no tags")
+        tags = _split_csv(args.tags)
+        action = library_org.add_tags if args.tag_cmd == "add" else library_org.remove_tags
+        result = action(store, args.refs, tags, project_id=project)
+        verb = "added" if args.tag_cmd == "add" else "removed"
+        return _emit(result, args.json, f"{verb} {result.get('added', result.get('removed'))} tag assignment(s) on {result['papers']} paper(s)")
+    except (library_org.OrgError, QueryError) as exc:
+        print(f"library tag: {getattr(exc, 'code', 'error')}: {exc}", file=sys.stderr)
+        return 2
+
+
+def cmd_library_collection(args: argparse.Namespace) -> int:
+    from papermemory import library_org
+
+    store = _store()
+    try:
+        project = _library_project(args, store) if args.collection_cmd in {"add", "remove", "reorder"} else None
+        cmd = args.collection_cmd
+        if cmd == "create":
+            result = library_org.create_collection(
+                store, args.slug, title=args.title, parent=args.parent, project=args.project, bib_path=args.bib_path
+            )
+            return _emit(result, args.json, f"created collection {result['slug']}")
+        if cmd == "list":
+            rows = library_org.list_collections(store)
+            text = "\n".join(
+                f"{r['slug']:<24} {r['papers']:>4} paper(s)" + (f"  in {r['parent']}" if r["parent"] else "")
+                + (f"  -> project {r['project']}" if r["project"] else "") for r in rows
+            ) or "no collections"
+            return _emit(rows, args.json, text)
+        if cmd == "show":
+            result = library_org.show_collection(store, args.slug, limit=args.limit, offset=args.offset)
+            text = f"{result['slug']}: {result['total_count']} paper(s)\n" + "\n".join(
+                f"{r['position']:>4}  {r['key'] or '-':<28} {r['year'] or '?'}  {r['title'][:70]}" for r in result["papers"]
+            )
+            return _emit(result, args.json, text)
+        if cmd == "delete":
+            result = library_org.delete_collection(store, args.slug)
+            return _emit(result, args.json, f"deleted {result['deleted']} ({result['memberships_removed']} membership(s); no papers deleted)")
+        action = {"add": library_org.add_to_collection, "remove": library_org.remove_from_collection,
+                  "reorder": library_org.reorder_collection}[cmd]
+        result = action(store, args.slug, args.refs, project_id=project)
+        return _emit(result, args.json, f"{cmd}: {json.dumps({k: v for k, v in result.items() if k != 'collection'})} in {result['collection']}")
+    except library_org.OrgError as exc:
+        print(f"library collection: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+
+
+def cmd_library_note(args: argparse.Namespace) -> int:
+    from papermemory import library_org
+
+    store = _store()
+    try:
+        cmd = args.note_cmd
+        if cmd == "add":
+            result = library_org.add_note(store, args.ref, args.text, project_id=_library_project(args, store))
+            return _emit(result, args.json, f"note {result['note_id']} added")
+        if cmd == "list":
+            rows = library_org.list_notes(store, args.ref, project_id=_library_project(args, store))
+            return _emit(rows, args.json, "\n".join(f"{r['id']}  {r['content']}" for r in rows) or "no notes")
+        if cmd == "edit":
+            result = library_org.edit_note(store, args.note_id, args.text)
+            return _emit(result, args.json, f"note {result['replaced']} replaced by {result['note_id']}")
+        result = library_org.remove_note(store, args.note_id)
+        return _emit(result, args.json, f"note {result['removed']} removed")
+    except library_org.OrgError as exc:
+        print(f"library note: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+
+
+def cmd_library_export(args: argparse.Namespace) -> int:
+    from papermemory.library_export import ExportError, export_library
+
+    store = _store()
+    try:
+        result = export_library(
+            store, fmt=args.format, query=args.query or None, collection=args.collection, project=args.project,
+            cited_only=args.cited_only, everything=args.all, out=args.out, cwd=args.cwd, style=args.style,
+            fields=args.fields, check=args.check, force=args.force, adopt=args.adopt, variant=args.variant,
+        )
+    except ExportError as exc:
+        print(f"library export: {exc.code}: {exc}", file=sys.stderr)
+        if args.json:
+            print(json.dumps({"error": exc.code, "message": str(exc), **exc.detail}, indent=2, default=str))
+        return 2
+    for warning in result.get("warnings", []):
+        print(f"warning: {warning}", file=sys.stderr)
+    if args.json:
+        return _emit(result, True)
+    if "text" in result:
+        sys.stdout.write(result["text"])
+        return 0
+    diff = result.get("diff") or {}
+    parts = [f"{k} {len(v)}" for k, v in diff.items() if v]
+    line = f"{result['format']}: {result['count']} entr{'y' if result['count'] == 1 else 'ies'} -> {result['path']} [{result.get('status')}]"
+    if result.get("written"):
+        line += " written"
+    if parts:
+        line += " (" + ", ".join(parts) + ")"
+    if result.get("frozen"):
+        line += f"; froze {result['frozen']} key(s)"
+    for key in result.get("missing_keys", []):
+        line += f"\n  ! cited key not in the library: {key}"
+    return _emit(result, False, line)
+
+
+def cmd_library_dedupe(args: argparse.Namespace) -> int:
+    from papermemory.library_hygiene import find_duplicates
+
+    result = find_duplicates(_store(), limit=args.limit)
+    lines = [f"{result['total_groups']} candidate group(s) among {result['papers_considered']} paper(s)"]
+    for group in result["groups"]:
+        lines.append(f"- similarity {group['strongest']}")
+        for paper in group["papers"]:
+            ids = paper["doi"] or paper["arxiv_id"] or "-"
+            lines.append(f"    {paper['key'] or paper['paper_id']:<28} {paper['year'] or '?'}  {paper['title'][:60]}  [{ids}]")
+    return _emit(result, args.json, "\n".join(lines))
+
+
+def cmd_library_merge(args: argparse.Namespace) -> int:
+    from papermemory.library_hygiene import HygieneError, merge_apply, merge_plan
+
+    store = _store()
+    project = _library_project(args, store)
+    try:
+        if args.apply:
+            result = merge_apply(store, args.keep, args.drop, reason=args.reason or "", prefer=args.prefer, project_id=project)
+        else:
+            result = merge_plan(store, args.keep, args.drop, project_id=project, prefer=args.prefer)
+    except HygieneError as exc:
+        print(f"library merge: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # structural merge refusals (identity conflict, mismatched documents)
+        print(f"library merge: {getattr(exc, 'code', 'error')}: {exc}", file=sys.stderr)
+        return 2
+    lines = [f"{'merged' if result['applied'] else 'dry run:'} {result['drop']['key']} into {result['keep']['key']}"]
+    for f in result["fields"] + result["reference_fields"]:
+        if f["status"] in ("conflict", "drop_only"):
+            lines.append(f"  {f['field']}: {f['status']} -> {f['winner']}")
+    if result["conflicts"]:
+        lines.append(f"  conflicts: {', '.join(result['conflicts'])} (prefer={result['prefer']})")
+    lines.append("  moves: " + ", ".join(f"{k}={v}" for k, v in result["moves"].items() if v))
+    if not result["applied"]:
+        lines.append("  add --apply --reason ... to merge")
+    for warning in result.get("warnings", []):
+        lines.append(f"  warning: {warning}")
+    return _emit(result, args.json, "\n".join(lines))
+
+
+def cmd_library_doctor(args: argparse.Namespace) -> int:
+    from papermemory.bibkeys import TemplateError
+    from papermemory.library_hygiene import doctor
+
+    try:
+        report = doctor(_store(), template=args.template, cwd=args.cwd)
+    except TemplateError as exc:
+        print(f"library doctor: {exc}", file=sys.stderr)
+        return 2
+    s = report["summary"]
+    lines = [f"{s['papers']} paper(s): {s['errors']} error(s), {s['warnings']} warning(s)" + ("" if s["ok"] else " - needs attention")]
+    for name, count in s["problems"].items():
+        if count:
+            lines.append(f"  {name}: {count}")
+    lines.append(f"  unknown: {s['unknown']['integrity_unchecked']} paper(s) never integrity-checked")
+    return _emit(report, args.json, "\n".join(lines))
+
+
+def cmd_library_resolve(args: argparse.Namespace) -> int:
+    from papermemory.library_hygiene import HygieneError, resolve_refs
+
+    try:
+        result = resolve_refs(_store(), args.refs, project_id=args.project, include_project_keys=args.project_keys)
+    except HygieneError as exc:
+        print(f"library resolve: {exc.code}: {exc}", file=sys.stderr)
+        return 2
+    text = "\n".join(f"{r['ref']}: " + (f"{r['key']}  {r['title'][:60]}" if r["found"] else "not in the library") for r in result["results"])
+    return _emit(result, args.json, text)
+
+
+def cmd_library_integrity(args: argparse.Namespace) -> int:
+    from papermemory.library_hygiene import set_integrity
+
+    try:
+        items = json.loads(args.items_json)
+        if not isinstance(items, list):
+            raise ValueError("items must be a JSON list")
+    except ValueError as exc:
+        print(f"library integrity: bad --items-json: {exc}", file=sys.stderr)
+        return 2
+    result = set_integrity(_store(), items)
+    return _emit(result, args.json, f"recorded {result['written']}; {len(result['unresolved'])} unresolved, {len(result['rejected'])} rejected")
+
+
 def cmd_search(args: argparse.Namespace) -> int:
     from papermemory.search import search
 
@@ -346,7 +675,12 @@ def cmd_migrate(args: argparse.Namespace) -> int:
 def cmd_backup(args: argparse.Namespace) -> int:
     from papermemory.ops import backup
 
-    result = backup(_store(), Path(args.out) if args.out else None)
+    # A backup must work on a store that still needs migrating: it is the step before `migrate`.
+    store = Store.connect_for_migration(db_path())
+    try:
+        result = backup(store, Path(args.out) if args.out else None)
+    finally:
+        store.close()
     return _emit(result, args.json, f"backup: {result['path']} ({result['papers']} papers)")
 
 
@@ -656,6 +990,169 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--status", default="extracted")
     s.add_argument("--confidence", type=float, default=0.5)
     s.set_defaults(func=cmd_claim)
+
+    lib = sub.add_parser("library", help="reference library: import and look up records", parents=[shared])
+    lib_sub = lib.add_subparsers(dest="lib_cmd", required=True)
+    s = lib_sub.add_parser("import", help="import BibTeX/BibLaTeX, RIS, or CSL-JSON (PATH or - for stdin)", parents=[shared])
+    s.add_argument("path")
+    s.add_argument("--format", choices=["auto", "bibtex", "ris", "csl-json"], default="auto")
+    s.add_argument("--project")
+    s.add_argument("--cwd", help="resolve the project from this workspace directory")
+    s.add_argument("--batch-size", type=int, default=200)
+    s.add_argument("--dry-run", action="store_true", help="report what would change and write nothing")
+    s.set_defaults(func=cmd_library_import)
+    s = lib_sub.add_parser("get", help="show a paper's lossless record by key, alias, id, or DOI", parents=[shared])
+    s.add_argument("ref")
+    s.add_argument("--project")
+    s.add_argument("--cwd")
+    s.set_defaults(func=cmd_library_get)
+
+    s = lib_sub.add_parser("list", help="list library papers with filters: tag:ml year:2020..2024 has:pdf !tag:skip words", parents=[shared])
+    s.add_argument("query", nargs="*")
+    s.add_argument("--sort", choices=["added", "year", "title", "key"], default="added")
+    s.add_argument("--desc", action="store_true")
+    s.add_argument("--limit", type=int, default=50)
+    s.add_argument("--cursor")
+    s.set_defaults(func=cmd_library_list)
+
+    s = lib_sub.add_parser("tag", help="tags: add, remove, list", parents=[shared])
+    tag_sub = s.add_subparsers(dest="tag_cmd", required=True)
+    t = tag_sub.add_parser("add", parents=[shared])
+    t.add_argument("tags", nargs=1, help="comma-separated tags")
+    t.add_argument("refs", nargs="+", help="keys, ids, or DOIs")
+    t.add_argument("--project")
+    t.add_argument("--cwd")
+    t.set_defaults(func=cmd_library_tag)
+    t = tag_sub.add_parser("remove", parents=[shared])
+    t.add_argument("tags", nargs=1, help="comma-separated tags")
+    t.add_argument("refs", nargs="+")
+    t.add_argument("--project")
+    t.add_argument("--cwd")
+    t.set_defaults(func=cmd_library_tag)
+    t = tag_sub.add_parser("list", help="tags with paper counts, optionally within a filter", parents=[shared])
+    t.add_argument("query", nargs="*")
+    t.set_defaults(func=cmd_library_tag)
+
+    s = lib_sub.add_parser("collection", help="collections: create, list, show, add, remove, reorder, delete", parents=[shared])
+    col_sub = s.add_subparsers(dest="collection_cmd", required=True)
+    c = col_sub.add_parser("create", parents=[shared])
+    c.add_argument("slug")
+    c.add_argument("--title")
+    c.add_argument("--parent", help="one level of nesting")
+    c.add_argument("--project", help="bind to a project")
+    c.add_argument("--bib-path", help="the project .bib this collection feeds (used by export)")
+    c.set_defaults(func=cmd_library_collection)
+    c = col_sub.add_parser("list", parents=[shared])
+    c.set_defaults(func=cmd_library_collection)
+    c = col_sub.add_parser("show", parents=[shared])
+    c.add_argument("slug")
+    c.add_argument("--limit", type=int, default=50)
+    c.add_argument("--offset", type=int, default=0)
+    c.set_defaults(func=cmd_library_collection)
+    for name in ("add", "remove", "reorder"):
+        c = col_sub.add_parser(name, parents=[shared])
+        c.add_argument("slug")
+        c.add_argument("refs", nargs="+")
+        c.add_argument("--project")
+        c.add_argument("--cwd")
+        c.set_defaults(func=cmd_library_collection)
+    c = col_sub.add_parser("delete", help="delete the collection, never its papers", parents=[shared])
+    c.add_argument("slug")
+    c.set_defaults(func=cmd_library_collection)
+
+    s = lib_sub.add_parser("note", help="per-paper notes: add, list, edit, remove", parents=[shared])
+    note_sub = s.add_subparsers(dest="note_cmd", required=True)
+    n = note_sub.add_parser("add", parents=[shared])
+    n.add_argument("ref")
+    n.add_argument("text")
+    n.add_argument("--project")
+    n.add_argument("--cwd")
+    n.set_defaults(func=cmd_library_note)
+    n = note_sub.add_parser("list", parents=[shared])
+    n.add_argument("ref")
+    n.add_argument("--project")
+    n.add_argument("--cwd")
+    n.set_defaults(func=cmd_library_note)
+    n = note_sub.add_parser("edit", help="replace a note (the old text is kept, marked superseded)", parents=[shared])
+    n.add_argument("note_id")
+    n.add_argument("text")
+    n.set_defaults(func=cmd_library_note)
+    n = note_sub.add_parser("remove", parents=[shared])
+    n.add_argument("note_id")
+    n.set_defaults(func=cmd_library_note)
+
+    s = lib_sub.add_parser("export", help="export to BibTeX/BibLaTeX/RIS/CSL-JSON/JSON/CSV or sync a managed project .bib", parents=[shared])
+    s.add_argument("query", nargs="*", help="library filters, e.g. tag:ml year:2020..")
+    s.add_argument("--format", choices=["bibtex", "biblatex", "ris", "csl-json", "json", "csv"], default="bibtex")
+    s.add_argument("--out", help="write here (inside the workspace); omit to print")
+    s.add_argument("--collection")
+    s.add_argument("--project", help="project filter; its own citation keys are used")
+    s.add_argument("--cited-only", metavar="MANUSCRIPT", help="only the papers this manuscript cites")
+    s.add_argument("--all", action="store_true", help="export every paper")
+    s.add_argument("--style", choices=["normalized", "original"], default="normalized")
+    s.add_argument("--fields", choices=["standard", "all"], default="standard")
+    s.add_argument("--variant", choices=["project", "canonical"], default="project",
+                   help="project: a project export uses that project's own imported version of each entry; canonical: the library record")
+    s.add_argument("--check", action="store_true", help="report whether --out is in sync; write nothing")
+    s.add_argument("--force", action="store_true", help="overwrite hand edits (a backup is kept)")
+    s.add_argument("--adopt", action="store_true", help="take over an existing .bib (a backup is kept)")
+    s.add_argument("--cwd", help="the workspace --out must stay inside (default: current directory)")
+    s.set_defaults(func=cmd_library_export)
+
+    s = lib_sub.add_parser("dedupe", help="candidate duplicate groups; nothing is merged", parents=[shared])
+    s.add_argument("--limit", type=int, default=50)
+    s.set_defaults(func=cmd_library_dedupe)
+
+    s = lib_sub.add_parser("merge", help="merge DROP into KEEP: a field-level preview, then --apply --reason", parents=[shared])
+    s.add_argument("keep")
+    s.add_argument("drop")
+    s.add_argument("--prefer", choices=["keep", "drop"], default="keep", help="who wins a conflicting field")
+    s.add_argument("--apply", action="store_true")
+    s.add_argument("--reason")
+    s.add_argument("--project")
+    s.add_argument("--cwd")
+    s.set_defaults(func=cmd_library_merge)
+
+    s = lib_sub.add_parser("doctor", help="library health report (evidence, not a verdict)", parents=[shared])
+    s.add_argument("--template")
+    s.add_argument("--cwd", help="also check collection-bound .bib files in this workspace")
+    s.set_defaults(func=cmd_library_doctor)
+
+    s = lib_sub.add_parser("resolve", help="which keys / DOIs / ids are in the library (with --project, that project's keys win)", parents=[shared])
+    s.add_argument("refs", nargs="+")
+    s.add_argument("--project")
+    s.add_argument("--project-keys", action="store_true", help="also list every key the project would use")
+    s.set_defaults(func=cmd_library_resolve)
+
+    s = lib_sub.add_parser("integrity", help="record retraction/correction results from an external check", parents=[shared])
+    isub = s.add_subparsers(dest="integrity_cmd", required=True)
+    i = isub.add_parser("set", parents=[shared])
+    i.add_argument("--items-json", required=True, help='[{"ref": "10.1/x", "status": "retracted", "source": "crossref", "notice_doi": "..."}]')
+    i.set_defaults(func=cmd_library_integrity)
+
+    s = lib_sub.add_parser("keys", help="citation keys: check, assign, freeze, rekey", parents=[shared])
+    keys_sub = s.add_subparsers(dest="keys_cmd", required=True)
+    k = keys_sub.add_parser("check", help="report key problems (changes nothing)", parents=[shared])
+    k.add_argument("--template")
+    k.set_defaults(func=cmd_library_keys)
+    k = keys_sub.add_parser("assign", help="give every paper without a key one", parents=[shared])
+    k.add_argument("--template")
+    k.set_defaults(func=cmd_library_keys)
+    k = keys_sub.add_parser("freeze", help="mark a key as relied on; it can then change only through rekey", parents=[shared])
+    k.add_argument("ref")
+    k.add_argument("--label", required=True, help="where the key is used, e.g. export:references.bib")
+    k.add_argument("--project")
+    k.add_argument("--cwd")
+    k.set_defaults(func=cmd_library_keys)
+    k = keys_sub.add_parser("rekey", help="change a key (dry run unless --apply); the old key stays as an alias", parents=[shared])
+    k.add_argument("ref")
+    k.add_argument("--to", help="the new key (default: render from the template)")
+    k.add_argument("--template")
+    k.add_argument("--reason")
+    k.add_argument("--apply", action="store_true")
+    k.add_argument("--project")
+    k.add_argument("--cwd")
+    k.set_defaults(func=cmd_library_keys)
 
     ms = sub.add_parser("manuscript", help="writing-project commands", parents=[shared])
     ms_sub = ms.add_subparsers(dest="ms_cmd", required=True)

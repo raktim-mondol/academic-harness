@@ -9,6 +9,7 @@ import { isAbsolute, relative, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './paper-download.js'
+import { libraryRecords } from './papermemory-library.js'
 import { fetchJson, fetchText, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 import {
@@ -131,6 +132,15 @@ async function loadRecords(args, exec) {
   if (Array.isArray(args.records) && args.records.length) {
     return normalizeCsl(args.records)
   }
+  if (args.library && typeof args.library === 'object') {
+    const scope = args.library
+    if (!(scope.query || scope.collection || scope.project || scope.cited_only || scope.all)) {
+      throw new Error('library needs a scope: query, collection, project, cited_only, or all')
+    }
+    const loaded = await libraryRecords(scope, { cwd: workspaceRoot(exec), signal: exec?.signal })
+    if (!loaded.ok) throw new Error(`reference library unavailable (${loaded.code}): ${loaded.error}`)
+    return normalizeCsl(loaded.records)
+  }
   const dois = doiList(args.doi)
   if (dois.length) {
     const bibtex = []
@@ -143,7 +153,7 @@ async function loadRecords(args, exec) {
   if (typeof args.path === 'string' && args.path.trim()) {
     return parseInput(readWorkspaceText(cwd, args.path), args.input_format)
   }
-  throw new Error('give records, doi, text, or path')
+  throw new Error('give records, doi, text, path, or library')
 }
 
 async function checkDois(records, exec) {
@@ -251,7 +261,7 @@ export function apply(ctx) {
     description: [
       'Format, export, or validate citations and bibliographies.',
       '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, or DOIs (Crossref content negotiation). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref.',
-      'Accepts CSL-JSON records, BibTeX, RIS, or a workspace path. No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
+      'Accepts CSL-JSON records, BibTeX, RIS, a workspace path, or `library` (papers from the PaperMemory reference library, under its own keys; to write a project .bib use `papermemory_library` export). No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
     ].join(' '),
     parameters: {
       action: {
@@ -263,6 +273,19 @@ export function apply(ctx) {
         type: 'array',
         items: { type: 'object', additionalProperties: true },
         description: 'CSL-JSON records. Takes precedence over doi/text/path.',
+      },
+      library: {
+        type: 'object',
+        additionalProperties: false,
+        description: 'Use papers from the PaperMemory reference library as the records (keys are the library\'s own). Give one scope.',
+        properties: {
+          query: { type: 'string', description: 'Library filters, e.g. "tag:ml year:2020.. has:doi".' },
+          collection: { type: 'string' },
+          project: { type: 'string', description: 'Papers of this project, under that project\'s own citation keys.' },
+          cited_only: { type: 'string', description: 'Only the papers this manuscript cites.' },
+          all: { type: 'boolean' },
+          variant: { type: 'string', enum: ['project', 'canonical'] },
+        },
       },
       doi: {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],

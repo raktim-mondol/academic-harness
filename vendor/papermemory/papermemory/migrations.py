@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 
-from papermemory.schema_v2 import SCHEMA_VERSION, V2_STATEMENTS
+from papermemory.schema_v2 import SCHEMA_V2000, V2_STATEMENTS
 from papermemory.util import dumps, normalize_arxiv, normalize_doi, normalize_title, now_iso
 
 
@@ -37,7 +37,7 @@ def _paper_identity(row) -> tuple[str, str, str]:
 def migrate_2000(store) -> dict:
     conn: sqlite3.Connection = store.conn
     user_version = conn.execute("PRAGMA user_version").fetchone()[0]
-    if user_version >= SCHEMA_VERSION:
+    if user_version >= SCHEMA_V2000:
         return {"changed": False, "user_version": user_version}
     conn.execute("PRAGMA foreign_keys=OFF")
     legacy_audit_rows: list[dict] = []
@@ -178,7 +178,7 @@ def migrate_2000(store) -> dict:
             if _object_type(conn, legacy) == "table":
                 conn.execute(f"DROP TABLE {legacy}")
 
-        conn.execute(f"PRAGMA user_version={SCHEMA_VERSION}")
+        conn.execute(f"PRAGMA user_version={SCHEMA_V2000}")
         violations = conn.execute("PRAGMA foreign_key_check").fetchall()
         if violations:
             raise RuntimeError(
@@ -191,4 +191,38 @@ def migrate_2000(store) -> dict:
         raise
     finally:
         conn.execute("PRAGMA foreign_keys=ON")
-    return {"changed": True, "user_version": SCHEMA_VERSION}
+    return {"changed": True, "user_version": SCHEMA_V2000}
+
+
+def migrate_2100(store) -> dict:
+    """Add the reference-library tables and backfill them from ``papers``.
+
+    Additive: no existing table is altered and no existing ``bibtex_key`` is
+    changed. Runs in one transaction; on failure nothing is applied.
+    """
+    from papermemory.library_store import backfill_library
+    from papermemory.schema_library import LIBRARY_SCHEMA_VERSION, LIBRARY_STATEMENTS
+
+    conn: sqlite3.Connection = store.conn
+    user_version = conn.execute("PRAGMA user_version").fetchone()[0]
+    if user_version >= LIBRARY_SCHEMA_VERSION:
+        return {"changed": False, "user_version": user_version}
+    if user_version < SCHEMA_V2000:
+        raise RuntimeError(f"migrate-2000-first: db user_version={user_version}")
+    try:
+        conn.execute("BEGIN")
+        for statement in LIBRARY_STATEMENTS:
+            conn.execute(statement)
+        summary = backfill_library(store)
+        conn.execute(f"PRAGMA user_version={LIBRARY_SCHEMA_VERSION}")
+        violations = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if violations:
+            raise RuntimeError(
+                "migration-foreign-key-violations: "
+                + repr([tuple(row) for row in violations[:10]])
+            )
+        conn.execute("COMMIT")
+    except Exception:
+        conn.execute("ROLLBACK")
+        raise
+    return {"changed": True, "user_version": LIBRARY_SCHEMA_VERSION, **summary}

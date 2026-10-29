@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-SCHEMA_VERSION = 2000
+SCHEMA_V2000 = 2000
 PIPELINE_VERSION = "pmv2-p1"
 
 # Statements only; PRAGMAs are applied by Store/migration outside transactions.
@@ -211,3 +211,12 @@ V2_STATEMENTS = [
 ]
 
 V2_SCHEMA = ";\n".join(V2_STATEMENTS) + ";\n"
+
+
+# The version a fresh store is created at: the v2 schema plus the reference
+# library tables (schema_library.py). 2000 databases migrate with
+# ``papermemory migrate``.
+from papermemory.schema_library import LIBRARY_SCHEMA, LIBRARY_SCHEMA_VERSION  # noqa: E402
+
+SCHEMA_VERSION = LIBRARY_SCHEMA_VERSION
+FULL_SCHEMA = V2_SCHEMA + LIBRARY_SCHEMA

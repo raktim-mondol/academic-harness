@@ -10,6 +10,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
+import { libraryPapers, librarySetIntegrity } from './papermemory-library.js'
 
 const CROSSREF_WORKS = 'https://api.crossref.org/works'
 const OPENALEX_WORKS = 'https://api.openalex.org/works'
@@ -292,8 +293,20 @@ function renderResult(result) {
   return lines.join('\n')
 }
 
+function renderSweep(sweep) {
+  const lines = [
+    `Library integrity sweep (${sweep.query}): ${sweep.checked} checked, ${sweep.clean} clean, ${sweep.flagged.length} needing attention, ${sweep.recorded} recorded`,
+  ]
+  if (sweep.record_error) lines.push(`Could not record results in the library: ${sweep.record_error}`)
+  for (const entry of sweep.flagged) lines.push(`- ${entry.key || entry.doi}: ${entry.verdict} — ${entry.title || ''}`.trimEnd())
+  if (sweep.remaining > 0) lines.push('', `${sweep.remaining} more paper(s) match; run it again to continue.`)
+  lines.push('', 'A verdict of unknown or not_found means the check could not be completed; it is not a clean result.')
+  return lines.join('\n')
+}
+
 function render(value) {
   if (value.error) return [{ type: 'text', text: `Error: ${value.error}` }]
+  if (value.sweep) return [{ type: 'text', text: renderSweep(value.sweep) }]
   if (value.verdict === 'ambiguous') {
     const lines = [
       `Title match is ambiguous for: ${value.title}`,
@@ -306,6 +319,73 @@ function render(value) {
   return [{ type: 'text', text: renderResult(value) }]
 }
 
+/** The library's status word for a verdict. A check that could not run is "unknown", never "ok". */
+const LIBRARY_STATUS = {
+  clean: 'ok',
+  retracted: 'retracted',
+  corrected: 'corrected',
+  expression_of_concern: 'expression-of-concern',
+  unknown: 'unknown',
+  not_found: 'unknown',
+}
+
+const SWEEP_DEFAULT = 25
+const SWEEP_MAX = 100
+
+function libraryItem(paper, result) {
+  const notice = result.signals?.find((signal) => signal.notice_doi)?.notice_doi
+  return {
+    ref: paper.paper_id,
+    status: LIBRARY_STATUS[result.verdict] || 'unknown',
+    source: 'integrity_check',
+    ...(notice ? { notice_doi: notice } : {}),
+  }
+}
+
+/**
+ * Check library papers (those matching `library`, default the ones never checked) and record each
+ * result on the paper. Bounded per call; run it again to continue, because checked papers drop out
+ * of the default selection.
+ */
+async function sweepLibrary(args, exec, shared, deps) {
+  const cwd = exec?.agent?.session?.header?.cwd || process.cwd()
+  const limit = Math.min(Math.max(Math.trunc(Number(args.limit)) || SWEEP_DEFAULT, 1), SWEEP_MAX)
+  const filter = String(args.library === true ? '' : args.library || '').trim()
+  const query = ['has:doi']
+  if (!args.recheck) query.push('integrity:unchecked')
+  if (filter) query.push(...filter.split(/\s+/).filter(Boolean))
+  const listed = await libraryPapers(query, { cwd, signal: shared.signal, limit })
+  if (!listed.ok) return { error: `reference library unavailable (${listed.code}): ${listed.error}` }
+  const checked = []
+  const items = []
+  for (const paper of listed.data.rows) {
+    const doi = canonicalDoi(paper.doi)
+    if (!doi) {
+      // Cannot be looked up. Record that as unknown so it neither loops forever nor reads as clean.
+      checked.push({ key: paper.key, doi: paper.doi, verdict: 'invalid_doi', title: paper.title })
+      items.push({ ref: paper.paper_id, status: 'unknown', source: 'integrity_check:invalid-doi' })
+      continue
+    }
+    const result = await (deps.checkOne || checkOne)(doi, shared)
+    checked.push({ key: paper.key, doi, verdict: result.verdict, title: result.title || paper.title })
+    items.push(libraryItem(paper, result))
+  }
+  const recorded = items.length ? await librarySetIntegrity(items, { cwd, signal: shared.signal }) : { ok: true, written: 0 }
+  const remaining = listed.data.total_count - checked.length
+  const flagged = checked.filter((entry) => !['clean'].includes(entry.verdict))
+  return {
+    sweep: {
+      query: query.join(' '),
+      checked: checked.length,
+      recorded: recorded.ok ? recorded.written : 0,
+      record_error: recorded.ok ? null : `${recorded.code}: ${recorded.error}`,
+      remaining: Math.max(remaining, 0),
+      clean: checked.length - flagged.length,
+      flagged,
+    },
+  }
+}
+
 export async function runIntegrityCheck(args, exec, deps = {}) {
   const readEnv = deps.resolveEnv || resolveEnv
   const mailto = await readEnv('CROSSREF_MAILTO') || await readEnv('UNPAYWALL_EMAIL')
@@ -315,7 +395,22 @@ export async function runIntegrityCheck(args, exec, deps = {}) {
   const title = String(args.title || '').trim()
   const shared = { signal: exec?.signal, mailto, openalexKey, deps }
 
-  if (explicit) return checkOne(explicit, shared)
+  if (args.library && !explicit && !title) return sweepLibrary(args, exec, shared, deps)
+  if (explicit) {
+    const result = await checkOne(explicit, shared)
+    if (args.record_in_library) {
+      const cwd = exec?.agent?.session?.header?.cwd || process.cwd()
+      const recorded = await librarySetIntegrity(
+        [{ ref: explicit, status: LIBRARY_STATUS[result.verdict] || 'unknown', source: 'integrity_check',
+          ...(result.signals?.find((signal) => signal.notice_doi) ? { notice_doi: result.signals.find((signal) => signal.notice_doi).notice_doi } : {}) }],
+        { cwd, signal: shared.signal },
+      )
+      result.library = recorded.ok
+        ? { recorded: recorded.written, in_library: recorded.written > 0 }
+        : { recorded: 0, unavailable: `${recorded.code}: ${recorded.error}` }
+    }
+    return result
+  }
   if (title) {
     const found = await resolveTitle(title, shared)
     if (found.error) return { error: found.error, title }
@@ -338,11 +433,18 @@ export function apply(ctx) {
       'Check a paper for retraction, expression of concern, or correction against Crossref relationship metadata and OpenAlex retraction flags.',
       'Pass a `doi` (bare or doi.org URL) or a `title` — a title is resolved through Crossref; more than one match comes back as candidates for you to choose, never auto-picked.',
       'Run it for every DOI you intend to cite in a manuscript, rebuttal, or review. A `retracted`, `unknown`, or `not_found` verdict must be surfaced to the user; never present such a paper as current evidence.',
-      'Free and keyless (OPENALEX_API_KEY and CROSSREF_MAILTO only raise rate limits). This is publication status, not claim support — verifying that a paper backs a statement stays with PaperMemory quote checks and scite. PubPeer has no public API, so only its URL is returned.',
+      'With `library`, checks the DOIs of papers in the PaperMemory reference library (bounded per call) and records each result there so `papermemory_library` doctor can flag retracted papers a manuscript still cites. Free and keyless (OPENALEX_API_KEY and CROSSREF_MAILTO only raise rate limits). This is publication status, not claim support — verifying that a paper backs a statement stays with PaperMemory quote checks and scite. PubPeer has no public API, so only its URL is returned.',
     ].join(' '),
     parameters: {
       doi: { type: 'string', description: 'DOI to check (bare or doi.org URL). Takes precedence over title.' },
       title: { type: 'string', description: 'Paper title to resolve via Crossref when no DOI is known.' },
+      library: {
+        oneOf: [{ type: 'boolean' }, { type: 'string' }],
+        description: 'Sweep the PaperMemory reference library instead: true for papers never checked, or library filters (e.g. "tag:thesis year:2020..") to narrow them. Each result is recorded on the paper.',
+      },
+      limit: { type: 'number', description: 'Library sweep: papers to check per call (default 25, max 100). Run again to continue.' },
+      recheck: { type: 'boolean', description: 'Library sweep: include papers that were already checked.' },
+      record_in_library: { type: 'boolean', description: 'Single DOI: also record the result on that paper in the reference library, if it is there.' },
     },
     output: {
       schema: { type: 'json' },

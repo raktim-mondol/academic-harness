@@ -17,7 +17,7 @@ metadata:
 
 Local, verbatim-first academic memory on the Academic Harness preset. Database:
 `~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB`); the
-plugin auto-installs the CLI and mounts 14 MCP tools. Do not `pip install` a
+plugin auto-installs the CLI and mounts 15 MCP tools. Do not `pip install` a
 second copy. Prefer `mcp__papermemory__*` when present; CLI fallback:
 `papermemory <cmd> --json`.
 
@@ -105,3 +105,17 @@ metadata lookup (not the same command).
 - Do not invent titles, years, DOIs, or keys; missing keys are gaps to report.
 - Do not treat chunkless (metadata-only) papers as evidence; they are
   bibliographic rows (`cite_state='chunkless'`).
+
+## Reference library
+
+`papermemory_library` (one tool, an `action` argument) is the reference manager over the same database.
+
+- **Add:** `import` BibTeX/BibLaTeX/RIS/CSL-JSON (`dry_run` first for a big file; the report lists parse problems, key collisions and duplicates). `paper_download` and `papermemory_ingest` add papers automatically.
+- **Find:** `list` with filters (`tag:ml year:2020..2024 has:pdf !tag:skip words`), `get`/`resolve` by key, DOI or id. `resolve` with a `project` returns that project's own keys.
+- **Organise:** `tag`, `collection` (one level of nesting, can be bound to a project and a `.bib`), `note` (edits keep the old text).
+- **Export:** `export` to BibTeX/BibLaTeX/RIS/CSL-JSON/JSON/CSV. For a project bibliography use `cited_only: <manuscript>` with `out` and `cwd`; the file is managed (a header, markers, a hash). Re-export rewrites only the managed block and keeps text after the `hand-added` marker. `check: true` reports `in_sync`, `out_of_date`, `hand_edited`, `not_managed` or `missing` without writing. Never `force` or `adopt` unless the user asks.
+- **Keys:** stable once exported. `keys` `check` reports problems; `rekey` is a dry run unless `apply` with a reason, and lists the manuscripts that cite the old key (it stays as an alias).
+- **Clean up:** `dedupe` lists candidates; `merge` previews field by field and applies only with a reason. `doctor` reports missing fields, unsafe keys, unverified DOIs, duplicates, retracted papers still cited, and `.bib` files out of sync; never-checked papers are *unknown*.
+- **Integrity:** `integrity_check` with `library` checks the DOIs of library papers and records the result (`set_integrity`).
+
+The existing rule still holds: an empty `papermemory_cite` result means do not invent a citation.

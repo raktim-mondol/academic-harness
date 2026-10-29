@@ -31,7 +31,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `integrity_check` | Academic Harness preset | Retraction / expression-of-concern / correction status from Crossref and OpenAlex, with notice DOIs | [Search](SEARCH.md#publication-integrity) |
 | `paper_resolve` | Academic Harness preset | Convert between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID | [Search](SEARCH.md#academic-databases) |
 | `paper_mcp` | Academic Harness preset | Register / status / unregister a Paper2MCP stdio server from `<cwd>/.dsh/paper-mcps.json` | [Papers](PAPERS.md#paper-agents-paper2agent) |
-| `mcp__papermemory__*` | Academic Harness preset | 14-tool local academic memory: search, ingest, cite, cite-check, recap, remember, claim, quote-check, trace, outline, list, register, lesson | [Papers](PAPERS.md#paper-memory) |
+| `mcp__papermemory__*` | Academic Harness preset | 15-tool local academic memory: search, ingest, cite, cite-check, recap, remember, claim, quote-check, trace, outline, list, register, lesson, **library** (reference manager: import/export BibTeX, BibLaTeX, RIS, CSL-JSON; tags, collections, notes, keys, duplicates, doctor) | [Papers](PAPERS.md#paper-memory) |
 
 ## Search and discovery
 

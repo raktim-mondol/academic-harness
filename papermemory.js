@@ -24,7 +24,7 @@ import {
   run,
 } from './papermemory-cli.js'
 
-const EXPECTED_TOOL_COUNT = 14
+const EXPECTED_TOOL_COUNT = 15
 
 export const name = 'academic-harness-papermemory'
 // Same as mcp-connectors.js / zvec-grep.js: this row only registers into the

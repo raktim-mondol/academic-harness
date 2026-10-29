@@ -41,7 +41,32 @@ def _scoped_papers(store: Store, slug: str) -> dict[str, dict[str, Any]]:
         """,
         {"slug": slug},
     ).fetchall()
-    return {row["bibtex_key"]: dict(row) for row in rows}
+    scoped = {row["bibtex_key"]: dict(row) for row in rows}
+    # The keys this project's own .bib used, even when the library stores the
+    # paper under another key (two projects may reuse one key for two papers).
+    aliases = store.conn.execute(
+        """SELECT a.key AS alias, p.* FROM bib_key_aliases a JOIN papers p ON p.id=a.paper_id
+           WHERE a.project_key=:slug""",
+        {"slug": slug},
+    ).fetchall()
+    for row in aliases:
+        record = dict(row)
+        alias = record.pop("alias")
+        scoped[alias] = record
+    # Keys retired by `library keys rekey` still name their paper, for papers
+    # that belong to this project. A current key always beats a retired one.
+    retired = store.conn.execute(
+        """SELECT a.key AS alias, p.* FROM bib_key_aliases a JOIN papers p ON p.id=a.paper_id
+           WHERE a.project_key='' AND a.source='rekey' AND (
+             p.project_id=:slug OR EXISTS(
+               SELECT 1 FROM paper_projects pp WHERE pp.paper_id=p.id AND pp.project_key=:slug))""",
+        {"slug": slug},
+    ).fetchall()
+    for row in retired:
+        record = dict(row)
+        alias = record.pop("alias")
+        scoped.setdefault(alias, record)
+    return scoped
 
 
 def cite_check(store: Store, manuscript_slug: str) -> dict[str, Any]:

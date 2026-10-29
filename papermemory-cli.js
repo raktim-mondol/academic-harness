@@ -17,14 +17,15 @@ import { fileURLToPath } from 'node:url'
 const INSTALL_TIMEOUT_MS = 5 * 60 * 1000
 const INIT_TIMEOUT_MS = 20 * 1000
 const INGEST_TIMEOUT_MS = 90 * 1000
+const MIGRATE_TIMEOUT_MS = 2 * 60 * 1000
 const BIN_NAMES = process.platform === 'win32' ? ['papermemory.exe', 'papermemory.cmd', 'papermemory'] : ['papermemory']
 const UV_BIN = process.platform === 'win32' ? 'uv.exe' : 'uv'
 const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['python3', 'python']
 
 export const LOG = '[academic-harness] papermemory'
-export const MIN_PAPERMEMORY_VERSION = '0.2.1'
+export const MIN_PAPERMEMORY_VERSION = '0.3.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh15'
+const BUNDLE_REV = 'dsh16'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -385,17 +386,51 @@ export async function ensurePaperMemoryDb(launch) {
     console.warn(`${LOG}: init skipped: PATH fallback is read-only`)
     return false
   }
-  const result = await run(launch.command, cliArgs(launch, ['init', '--json']), {
+  const init = () => run(launch.command, cliArgs(launch, ['init', '--json']), {
     timeoutMs: INIT_TIMEOUT_MS,
     env: papermemoryEnv(),
     silent: true,
   })
+  let result = await init()
+  if (result.code !== 0 && /migration-required/.test(`${result.err}\n${result.out}`)) {
+    result = await migrateExistingStore(launch, init)
+  }
   if (result.code !== 0) {
     const detail = (result.err || result.out || '').trim().replace(/\s+/g, ' ').slice(0, 240)
     console.warn(`${LOG}: init failed (exit ${result.code})${detail ? `: ${detail}` : ''}`)
     return false
   }
   return true
+}
+
+/**
+ * An existing store from before 0.3.0 (schema 2000) must be migrated once. Always back it up first, and
+ * never migrate without a backup. If another process still holds the database the migration refuses;
+ * we say so and leave the store untouched.
+ */
+async function migrateExistingStore(launch, init) {
+  const backup = await run(launch.command, cliArgs(launch, ['backup', '--json']), {
+    timeoutMs: MIGRATE_TIMEOUT_MS, env: papermemoryEnv(), silent: true,
+  })
+  if (backup.code !== 0) {
+    console.warn(`${LOG}: store needs migrating but the backup failed, so it was left untouched: ${(backup.err || backup.out).trim().slice(0, 200)}`)
+    return backup
+  }
+  const where = parseJsonOutput(backup.out)?.path
+  const migrated = await run(launch.command, cliArgs(launch, ['migrate', '--json']), {
+    timeoutMs: MIGRATE_TIMEOUT_MS, env: papermemoryEnv(), silent: true,
+  })
+  if (migrated.code !== 0) {
+    const detail = (migrated.err || migrated.out || '').trim().replace(/\s+/g, ' ').slice(0, 240)
+    const busy = /db-in-use|migration-lock/.test(detail)
+    console.warn(
+      `${LOG}: could not migrate the store to the reference-library schema${busy ? ' because another process is using it; close other DSH sessions and PaperMemory processes, then restart' : ''}`
+      + `${where ? ` (backup: ${where})` : ''}: ${detail}`,
+    )
+    return migrated
+  }
+  console.warn(`${LOG}: store migrated to the reference-library schema${where ? ` (backup: ${where})` : ''}`)
+  return await init()
 }
 
 /**

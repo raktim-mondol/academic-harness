@@ -50,7 +50,7 @@ Full instructions, migration from `researchcraft`, troubleshooting, and the "one
 | Surface | Highlights | Guide |
 |---|---|---|
 | **Search and discovery** | `literature_search` router, OpenAlex, Semantic Scholar, PubMed, arXiv, Crossref, Consensus, Parallel, Firecrawl, Scite, Tavily, Exa, Perplexity, Jina, CORE, Elicit, FutureHouse | [Search](docs/SEARCH.md) |
-| **Papers and evidence** | `paper_download`, `paper_fold`, `pdf_to_markdown`, PaperMemory's 14 tools, `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
+| **Papers and evidence** | `paper_download`, `paper_fold`, `pdf_to_markdown`, PaperMemory's 15 tools (including the reference library), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
 | **Writing and citation** | `ah_*` writing oracle and gate, `citation`, `manuscript_citations`, LaTeX, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
 | **Reviews and hypotheses** | `review` PRISMA-style ledger, `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors | [Research](docs/RESEARCH.md) |
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |

@@ -24,7 +24,7 @@ def _md(tmp_path, name: str, body: str, fm: str = "") -> object:
 
 def test_fresh_store_is_v2(tmp_path):
     store = _store(tmp_path)
-    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2000
+    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2100
     columns = {row["name"] for row in store.conn.execute("PRAGMA table_info(chunks)")}
     assert "text" not in columns
     assert {"byte_start", "byte_end", "slice_sha256", "source_sha256"} <= columns
@@ -265,8 +265,8 @@ def test_migration_2000_quarantines_legacy(tmp_path):
     finally:
         pass
     result = migrate(store)
-    assert result["user_version"] == 2000
-    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2000
+    assert result["user_version"] == 2100
+    assert store.conn.execute("PRAGMA user_version").fetchone()[0] == 2100
     assert store.conn.execute("SELECT COUNT(*) FROM papers").fetchone()[0] == 2
     assert store.conn.execute("SELECT COUNT(*) FROM paper_projects").fetchone()[0] >= 1
     assert store.conn.execute("SELECT COUNT(*) FROM legacy_chunks").fetchone()[0] == 1
@@ -277,7 +277,7 @@ def test_migration_2000_quarantines_legacy(tmp_path):
     assert migrate(store)["changed"] is False
     store.close()
     reopened = Store(path)
-    assert reopened.conn.execute("PRAGMA user_version").fetchone()[0] == 2000
+    assert reopened.conn.execute("PRAGMA user_version").fetchone()[0] == 2100
     reopened.close()
 
 
@@ -288,7 +288,7 @@ def test_migrate_cli_and_doctor(tmp_path):
     store._connect_raw(path)
     migrate(store)
     report = doctor_schema(store)
-    assert report["user_version"] == 2000
+    assert report["user_version"] == 2100
     store.close()
 
 
@@ -348,3 +348,23 @@ def test_300_file_ingest_is_deterministic(tmp_path):
         "SELECT COUNT(*), SUM(byte_start), SUM(byte_end), SUM(char_start), SUM(char_end) FROM chunks"
     ).fetchone()) == fingerprint
     store.close()
+
+
+def test_backup_works_on_a_store_that_still_needs_migrating(tmp_path, monkeypatch, capsys):
+    from papermemory.cli import main as cli_main
+
+    path = tmp_path / "old.db"
+    _make_v1_db(path)
+    store = Store.__new__(Store)
+    store._connect_raw(path)
+    from papermemory.migrations import migrate_2000
+
+    migrate_2000(store)  # now at schema 2000: opening it normally asks for `migrate`
+    store.close()
+    monkeypatch.setenv("PAPERMEMORY_DB", str(path))
+    assert cli_main(["init"]) == 1  # migration-required
+    capsys.readouterr()
+    assert cli_main(["backup", "--json", "--out", str(tmp_path / "bk")]) == 0
+    assert (tmp_path / "bk" / "papermemory.db").exists()
+    assert cli_main(["migrate", "--json"]) == 0
+    assert cli_main(["init", "--json"]) == 0
