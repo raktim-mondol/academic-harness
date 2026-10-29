@@ -248,10 +248,12 @@
                   toolName: subagent_fork
 
               # Two optional spawn-backed delegation tools. Each can register a custom
-              # OpenAI/Anthropic-compatible route from its four Settings fields (API
-              # type, endpoint URL, model, API key); the plugin writes that route onto
-              # the llm-pi-ai entry and stores the key in the credential service. With
-              # no complete custom route the tool inherits the session model.
+              # OpenAI/Anthropic-compatible route from its three Settings fields
+              # (endpoint URL, model, API key); the URL selects Anthropic Messages when
+              # it contains "anthropic" and OpenAI Chat Completions otherwise. The
+              # plugin writes that route onto the llm-pi-ai entry and stores the key in
+              # the credential service. With no complete custom route the tool inherits
+              # the session model.
               # `subagent_pro` is for difficulty-bound work, `subagent_vision` for image
               # reading (paired with the shared `read_image` tool from
               # `@deepseek-ai/dsh-tool-fs`, gated on the child's route actually declaring

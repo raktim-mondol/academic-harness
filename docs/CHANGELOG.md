@@ -4,7 +4,7 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## 0.31.0
 
-- **`subagent_pro` and `subagent_vision` now take optional custom routes.** Each tool has four fields in Settings → Academic Harness API keys — API type (Anthropic Messages or an OpenAI-compatible API), endpoint URL, model, and API key. Setting all four registers an `academic-harness-pro`/`academic-harness-vision` route on the host's pi-ai adapter; the key is stored in the credential service. With no complete route, both tools inherit the session model (DeepSeek-V4.1-Flash by default, which also accepts images); a partial set is ignored. This replaces the old fixed model defaults that pinned both tools to `deepseek-flash`.
+- **`subagent_pro` and `subagent_vision` now take optional custom routes.** Each tool has three fields in Settings → Academic Harness API keys — endpoint URL, model, and API key. Setting all three registers an `academic-harness-pro`/`academic-harness-vision` route on the host's pi-ai adapter; the key is stored in the credential service. The endpoint URL selects Anthropic Messages when it contains `anthropic` (for example `https://api.deepseek.com/anthropic`) and OpenAI Chat Completions otherwise. With no complete route, both tools inherit the session model (DeepSeek-V4.1-Flash by default, which also accepts images); a partial set is ignored. This replaces the old fixed model defaults that pinned both tools to `deepseek-flash`.
 
 ## 0.30.1
 

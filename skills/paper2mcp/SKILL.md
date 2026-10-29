@@ -13,7 +13,7 @@ metadata:
 
 - Launch specialists with `subagent`. Each call returns `{ kind: "activation", subagentId }` immediately; record the id as schema-1 `agent_id`, wait for every child's completion notice, and read its assigned report before the next `verify_workflow.py` gate.
 - Verifiers and the delivery verifier: **new** `subagent` spawns, distinct from every implementer. Never `subagent_fork`.
-- Heavy scientific implement/verify: `subagent_pro` when a custom API/endpoint/model/key route is configured, otherwise `subagent`.
+- Heavy scientific implement/verify: `subagent_pro` when a custom endpoint/model/key route is configured, otherwise `subagent`.
 - Isolated env: `uv venv "$PROJECT_ENV" --python …` then `uv pip install --python "$PROJECT_PYTHON"`. FastMCP baseline is in [runtime.md](references/runtime.md).
 - `requires_gpu`: `runpod_run` / `modal_run`. Do not silently substitute CPU.
 - Client registration is `paper_mcp register` on this host, and only when requested. Do not run `claude mcp add`.

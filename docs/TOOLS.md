@@ -115,8 +115,8 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `vastai_run` | Every preset | Rent the cheapest matching Vast.ai offer, run a command, destroy it; spot bids and volumes | [Compute](COMPUTE.md) |
 | `subagent` | DSH built-in | Delegated work, including difficulty-bound specialist calls; inherits the parent session's model. The preset adds optional `subagent_pro`/`subagent_vision` routes alongside it. | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_fork` | DSH built-in | Fork delegation that inherits the parent preset and history | [Agents](AGENTS.md#subagent-model-routing) |
-| `subagent_pro` | Academic Harness preset | Difficulty-bound delegation with an optional custom API/endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
-| `subagent_vision` | Academic Harness preset | Image-reading delegation with an optional custom API/endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
+| `subagent_pro` | Academic Harness preset | Difficulty-bound delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
+| `subagent_vision` | Academic Harness preset | Image-reading delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
 | `skill` | DSH built-in | Load a bundled skill by name | [Skills](SKILLS.md) |
 
 ## Optional tools

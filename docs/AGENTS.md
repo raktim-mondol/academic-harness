@@ -12,10 +12,10 @@ Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-har
 |---|---|---|---|
 | `subagent` | Delegated work, including difficulty-bound specialist calls | — (inherits the parent session's model) | — |
 | `subagent_fork` | Forked delegation that inherits the parent preset and history | — (inherits the parent) | — |
-| `subagent_pro` | Difficulty-bound work: a hard proof/derivation, a causal-inference or experimental-design critique, tracing a subtle methodological flaw, multi-step reaction/pathway reasoning, a large multi-file refactor | Pro API type + endpoint URL + model + API key (Settings) | Inherit session model |
-| `subagent_vision` | Tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | Vision API type + endpoint URL + model + API key (Settings) | Inherit session model |
+| `subagent_pro` | Difficulty-bound work: a hard proof/derivation, a causal-inference or experimental-design critique, tracing a subtle methodological flaw, multi-step reaction/pathway reasoning, a large multi-file refactor | Pro endpoint URL + model + API key (Settings) | Inherit session model |
+| `subagent_vision` | Tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | Vision endpoint URL + model + API key (Settings) | Inherit session model |
 
-Both routes are optional. Set all four fields (API type, endpoint URL, model, API key) to register a custom OpenAI/Anthropic-compatible route; with none set they inherit the session model (DeepSeek-V4.1-Flash by default). A partial set is ignored. The plugin registers the route on the host's pi-ai adapter and stores the key in the credential service. The legacy model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
+Both routes are optional. Set the endpoint URL, model, and API key to register a custom OpenAI/Anthropic-compatible route; with none set they inherit the session model (DeepSeek-V4.1-Flash by default). A partial set is ignored. The endpoint URL selects Anthropic Messages when it contains `anthropic` (for example `https://api.deepseek.com/anthropic`) and OpenAI Chat Completions otherwise. The plugin registers the route on the host's pi-ai adapter and stores the key in the credential service. The legacy model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
 
 All four delegation tools use DSH 0.2.1's managed activations: a call returns a `subagentId` immediately, the child's final answer arrives as a completion notice, and `send_message` / `interrupt_agent` handle follow-ups and stops.
 
@@ -50,7 +50,7 @@ It also covers a case text tools can't: auditing a compiled LaTeX PDF's page lay
 
 ### Configuration
 
-Set the API type, endpoint URL, model, and API key for Pro and Vision in Settings → Academic Harness API keys (or the matching `SUBAGENT_PRO_*` / `SUBAGENT_VISION_*` env vars; env wins). Set all four fields to register the custom route; leave all four blank to inherit the session model, and a partial set is ignored. The plugin writes the route onto the host's pi-ai adapter and stores the key in the credential service. These fields need a `dsh` restart to take effect (see [Configuration](CONFIGURATION.md#when-a-change-takes-effect)).
+Set the endpoint URL, model, and API key for Pro and Vision in Settings → Academic Harness API keys (or the matching `SUBAGENT_PRO_*` / `SUBAGENT_VISION_*` env vars; env wins). Set all three fields to register the custom route; leave all three blank to inherit the session model, and a partial set is ignored. The endpoint URL selects Anthropic Messages when it contains `anthropic` and OpenAI Chat Completions otherwise. The plugin writes the route onto the host's pi-ai adapter and stores the key in the credential service. These fields need a `dsh` restart to take effect (see [Configuration](CONFIGURATION.md#when-a-change-takes-effect)).
 
 ## Specialist briefs and skills
 

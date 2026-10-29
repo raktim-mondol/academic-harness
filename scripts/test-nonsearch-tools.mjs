@@ -14,28 +14,29 @@ const prompt = read('prompt.js')
 const settings = read('settings-keys.js')
 
 for (const key of [
-  'SUBAGENT_PRO_API', 'SUBAGENT_PRO_BASE_URL', 'SUBAGENT_PRO_MODEL', 'SUBAGENT_PRO_API_KEY',
-  'SUBAGENT_VISION_API', 'SUBAGENT_VISION_BASE_URL', 'SUBAGENT_VISION_MODEL', 'SUBAGENT_VISION_API_KEY',
+  'SUBAGENT_PRO_BASE_URL', 'SUBAGENT_PRO_MODEL', 'SUBAGENT_PRO_API_KEY',
+  'SUBAGENT_VISION_BASE_URL', 'SUBAGENT_VISION_MODEL', 'SUBAGENT_VISION_API_KEY',
 ]) {
   assert.ok(settings.includes(`'${key}'`), `settings-keys.js missing ${key}`)
 }
-assert.match(read('client/ApiKeysSection.jsx'), /SUBAGENT_PRO_API/)
+assert.match(read('client/ApiKeysSection.jsx'), /SUBAGENT_PRO_BASE_URL/)
 assert.match(read('subagent-models.js'), /subagent_pro/)
 assert.match(read('subagent-models.js'), /subagent_vision/)
 assert.match(prompt, /subagent_pro/)
 assert.match(prompt, /subagent_vision/)
 assert.equal(buildCustomRoute({}), null)
 assert.deepEqual(
-  buildCustomRoute({
-    api: 'anthropic-messages', baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k',
-  }),
+  buildCustomRoute({ baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k' }),
   {
     api: 'anthropic-messages', baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k',
   },
 )
-assert.equal(buildCustomRoute({ api: 'anthropic-messages', baseURL: 'https://x', model: 'm' }).incomplete, true)
-assert.match(buildCustomRoute({ api: 'nope', baseURL: 'https://x', model: 'm', apiKey: 'k' }).invalid, /API type/)
-assert.match(buildCustomRoute({ api: 'openai-completions', baseURL: 'ftp://x', model: 'm', apiKey: 'k' }).invalid, /HTTP/)
+assert.equal(
+  buildCustomRoute({ baseURL: 'https://api.openai.com/v1', model: 'gpt', apiKey: 'k' }).api,
+  'openai-completions',
+)
+assert.equal(buildCustomRoute({ baseURL: 'https://x', model: 'm' }).incomplete, true)
+assert.match(buildCustomRoute({ baseURL: 'ftp://x', model: 'm', apiKey: 'k' }).invalid, /HTTP/)
 const visionProfile = customRouteProfile({
   api: 'anthropic-messages', baseURL: 'https://x', model: 'm', credential: 'AH_SUBAGENT_VISION_KEY',
 }, { vision: true })

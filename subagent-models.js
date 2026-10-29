@@ -5,13 +5,13 @@
  * matching env vars. Adds two subagent tools alongside the default `subagent`
  * and `subagent_fork` (presets/academic-harness/agent.cordis.yml):
  *
- * - `subagent_pro` — difficulty-bound delegated work. When its four custom
- *   fields (API type, endpoint, model, API key) are set, the plugin registers
+ * - `subagent_pro` — difficulty-bound delegated work. When its three custom
+ *   fields (endpoint, model, API key) are set, the plugin registers
  *   an OpenAI/Anthropic-compatible route with the host's `dsh-llm-pi-ai`
  *   adapter and routes this tool there. Otherwise the tool inherits the
  *   session model.
  * - `subagent_vision` — image-reading/visual-inspection work, with the same
- *   four optional fields. Otherwise it inherits the session model, which is
+ *   three optional fields. Otherwise it inherits the session model, which is
  *   DeepSeek-V4.1-Flash in the default deployment and accepts image input.
  *
  * The API key is stored in the host credential service under
@@ -56,7 +56,6 @@ export const inject = [
 ]
 
 const ROUTER_ENTRY = 'llm-pi-ai'
-const API_TYPES = new Set(['anthropic-messages', 'openai-completions', 'openai-responses'])
 const SPECS = {
   pro: {
     toolName: 'subagent_pro',
@@ -64,7 +63,6 @@ const SPECS = {
     credential: 'AH_SUBAGENT_PRO_KEY',
     vision: false,
     fields: {
-      api: 'SUBAGENT_PRO_API',
       baseURL: 'SUBAGENT_PRO_BASE_URL',
       model: 'SUBAGENT_PRO_MODEL',
       apiKey: 'SUBAGENT_PRO_API_KEY',
@@ -76,7 +74,6 @@ const SPECS = {
     credential: 'AH_SUBAGENT_VISION_KEY',
     vision: true,
     fields: {
-      api: 'SUBAGENT_VISION_API',
       baseURL: 'SUBAGENT_VISION_BASE_URL',
       model: 'SUBAGENT_VISION_MODEL',
       apiKey: 'SUBAGENT_VISION_API_KEY',
@@ -88,30 +85,32 @@ function resolveEnvSync(name) {
   return process.env[name]?.trim() || getStoredKey(name)
 }
 
-/** Validate a custom route; null means all four fields are blank. */
-export function buildCustomRoute({ api, baseURL, model, apiKey } = {}) {
+/** Infer the pi-ai wire protocol from the endpoint URL. */
+export function inferApi(baseURL) {
+  let endpoint
+  try {
+    endpoint = new URL(String(baseURL))
+  } catch {
+    return null
+  }
+  if (!['http:', 'https:'].includes(endpoint.protocol)) return null
+  const text = `${endpoint.hostname}${endpoint.pathname}`.toLowerCase()
+  return text.includes('anthropic') ? 'anthropic-messages' : 'openai-completions'
+}
+
+/** Validate a custom route; null means all three fields are blank. */
+export function buildCustomRoute({ baseURL, model, apiKey } = {}) {
   const route = {
-    api: String(api ?? '').trim(),
     baseURL: String(baseURL ?? '').trim(),
     model: String(model ?? '').trim(),
     apiKey: String(apiKey ?? '').trim(),
   }
   const filled = Object.values(route).filter(Boolean).length
   if (filled === 0) return null
-  if (filled < 4) return { incomplete: true }
-  if (!API_TYPES.has(route.api)) {
-    return { invalid: `API type must be one of ${[...API_TYPES].join(', ')}` }
-  }
-  let endpoint
-  try {
-    endpoint = new URL(route.baseURL)
-  } catch {
-    return { invalid: 'endpoint must be an HTTP(S) URL' }
-  }
-  if (!['http:', 'https:'].includes(endpoint.protocol)) {
-    return { invalid: 'endpoint must be an HTTP(S) URL' }
-  }
-  return route
+  if (filled < 3) return { incomplete: true }
+  const api = inferApi(route.baseURL)
+  if (!api) return { invalid: 'endpoint must be an HTTP(S) URL' }
+  return { ...route, api }
 }
 
 /** The pi-ai provider profile for one custom route. */
@@ -130,7 +129,6 @@ export function customRouteProfile(route, { vision = false } = {}) {
 function readCustomRoute(kind) {
   const spec = SPECS[kind]
   const route = buildCustomRoute({
-    api: resolveEnvSync(spec.fields.api),
     baseURL: resolveEnvSync(spec.fields.baseURL),
     model: resolveEnvSync(spec.fields.model),
     apiKey: resolveEnvSync(spec.fields.apiKey),
@@ -175,7 +173,7 @@ async function syncCustomRoutes(ctx, routes) {
     const exists = Object.hasOwn(current, spec.provider)
     if (!route || route.incomplete || route.invalid) {
       if (route?.incomplete) {
-        ctx.logger?.warn(`academic-harness: ${spec.toolName} custom route needs API type, endpoint, model, and API key; using the session model`)
+        ctx.logger?.warn(`academic-harness: ${spec.toolName} custom route needs endpoint, model, and API key; using the session model`)
       } else if (route?.invalid) {
         ctx.logger?.warn(`academic-harness: ${spec.toolName} custom route is invalid (${route.invalid}); using the session model`)
       }

@@ -1,10 +1,9 @@
 /**
  * The `academic-harness` host entry Config: API keys for the MCP
  * connectors, image generation, and remote-compute tools, plus a handful of
- * non-secret preferences (IMAGE_MODEL, SUBAGENT_PRO_API,
- * SUBAGENT_PRO_BASE_URL, SUBAGENT_PRO_MODEL, SUBAGENT_VISION_API,
- * SUBAGENT_VISION_BASE_URL, SUBAGENT_VISION_MODEL, ZVEC_GREP_EMBEDDING,
- * ZVEC_GREP_AUTO_INDEX) that ride
+ * non-secret preferences (IMAGE_MODEL, SUBAGENT_PRO_BASE_URL,
+ * SUBAGENT_PRO_MODEL, SUBAGENT_VISION_BASE_URL, SUBAGENT_VISION_MODEL,
+ * ZVEC_GREP_EMBEDDING, ZVEC_GREP_AUTO_INDEX) that ride
  * along in the same schema/UI section for convenience — editable from
  * Settings -> Academic Harness API keys.
  * Registered at plugin load; resolveEnv() (credential-env.js) reads the live
@@ -72,11 +71,9 @@ export const KEY_FIELDS = [
   'PATENTSVIEW_API_KEY',
   'GEMINI_API_KEY',
   'IMAGE_MODEL',
-  'SUBAGENT_PRO_API',
   'SUBAGENT_PRO_BASE_URL',
   'SUBAGENT_PRO_MODEL',
   'SUBAGENT_PRO_API_KEY',
-  'SUBAGENT_VISION_API',
   'SUBAGENT_VISION_BASE_URL',
   'SUBAGENT_VISION_MODEL',
   'SUBAGENT_VISION_API_KEY',
