@@ -1,6 +1,6 @@
 # Reporting-guideline checker and risk-of-bias appraisal — implementation plan
 
-Status: **Phase 3 implemented in v0.29.0; Phase 4 proposed** · baseline **v0.28.0** · shipped **v0.29.0** (Phase 3), target **v0.30.0** (Phase 4).
+Status: **Phase 3 shipped in v0.29.0; Phase 4 shipped in v0.30.0** · baseline **v0.28.0** · shipped **v0.29.0** (Phase 3) and **v0.30.0** (Phase 4).
 
 This document covers the two evidence-quality phases that remain after the reference-library work:
 
@@ -242,6 +242,28 @@ Modified:
 - Overall RoB 2 derivation matches a truth table.
 - AI-vs-human agreement is never folded into the human κ.
 - A fabricated appraisal quote is rejected; an unverifiable one is marked `unverified`.
+
+### 5.8 Implementation record (v0.30.0)
+
+Shipped files: `agreement.js`, `appraisal.js`, `appraisal/<id>/<version>.json` (RoB 2 2019, ROBINS-I v1, QUADAS-2 2011, Newcastle-Ottawa 1), `papermemory-mcp.js`, `python-helpers/rob_figure.py`, `skills/risk-of-bias-appraisal/SKILL.md`, `scripts/test-agreement.mjs`, `scripts/test-appraisal.mjs`; `review-store.js` and `review.js` extended. Sub-phase 4b (official signalling-answer algorithms) was not implemented.
+
+Decisions taken during implementation:
+
+- **Shared resolution state machine.** Screening and appraisal both use `resolveSeries`: latest value per reviewer, last reconcile wins until a later value differs (`reopened`), a declared roster with a missing reviewer is `incomplete`, and one reviewer is `single`. Counts use resolved values; `pending` absorbs `incomplete`. Reviewer-keyed screening is enabled only when a roster is declared or a Phase 4 screening event exists; a pure v0.29 ledger resolves latest-per-(record,stage) regardless of any stored free-text reviewer name, and `reviewers`, `conflicts`, and the stage `conflict` counter appear only in multi mode. This keeps v0.29 ledgers deriving and exporting identically, including ledgers that stored a reviewer name on an override.
+- **Reconcile is an event in the same log.** `kind:"reconcile"` with a required reason, allowed only over `conflict`/`reopened`. `basis` is `consensus` when the adjudicator already rated the key, otherwise `third_reviewer`. `supersedes` lists the event ids; originals are untouched. A later disagreeing rating reopens the key.
+- **Reviewer identities.** `human:<name>` and `ai:<name>`; untyped names become human, and comparison is case-insensitive. A declared roster is enforced for `screen`/`appraise`; `reconcile` may name an outside adjudicator. Appraisal requires a reviewer even without a roster.
+- **Instrument registry and freeze.** The full template is copied into `.dsh/review/<slug>/instruments.json` at `start` or first `appraise`. One version per instrument id per review; a different version is refused rather than silently upgraded. Joining two versions is out of scope.
+- **Appraisal key.** `(record_id, instrument@version, domain, axis, reviewer)`; `domain:"overall"` is an explicit override with a required reason. QUADAS-2's two axes are distinguished in the key, giving seven domain×axis cells. Newcastle-Ottawa is modelled as three domain-level star counts (selection 0–4, comparability 0–2, outcome/exposure 0–3) with no overall; the total is a count.
+- **Overall derivation.** For RoB 2 and ROBINS-I the overall is derived from the *resolved* domain values after reconciliation, not from each reviewer's pre-reconciliation values. ROBINS-I uses the worst domain with `no_information` ordered between `moderate` and `serious`; this is a local, documented rule and is truth-tabled.
+- **Quote verification.** Verification uses PaperMemory's `papermemory_quote_check` when the caller supplies `paper`. A `found:false` result rejects the event only when PaperMemory resolved a document (`checked_against.sha256` present); a match found only in the bibliography is also rejected. A `found:true` result without a resolved occurrence is treated as malformed and stored `unverified`. An unresolved paper, a transport failure, or an unexpected result stores `unverified` with the reason instead of rejecting. Without `paper`, the event is stored `unverified`. No second local document reader was added, matching plan §5.5.
+- **Appraisal panel.** `evaluateInstrument` unions the declared reviewers with appraisers observed on included records. A declared roster with a missing appraiser is `incomplete`, while an AI reviewer who only appraised an excluded record does not block completeness for the included population. Missing roster members remain missing through `reconcile`: a reconciled cell with an absent appraiser stays `incomplete` rather than counting as complete.
+- **Legacy continuity.** A reviewer roster can be added on `resume` while a ledger still has only v0.29 events; after the first Phase 4 screening event it cannot be added. A continued v0.29 ledger should name the same reviewer on new events (or declare the roster first), because legacy named events are keyed by their stored name once reviewer-keyed mode is active. Once any named reviewer event exists, a new `screen` must name a reviewer; a ledger that has only default events may keep omitting it.
+- **The frozen definition is authoritative.** `frozenInstrument` reads `instruments.json` before the bundled template, and `appraise` validates domains, axes, and judgements against the frozen definition. Editing or removing a bundled template cannot change a running review.
+- **Provenance in outputs.** `rob-table` and its CSV carry the reviewers behind each resolved row and an unverified-quote count; `appraisal_status` cells carry `by_reviewer`; the figure note repeats reviewers and unverified counts. NOS star cells use a neutral colour so a star total is not painted as a verdict. Reopened and incomplete cells map to `conflict`/`pending` in tables and figures so an unresolved state cannot slip through as a value.
+- **Agreement.** Percent agreement, Cohen's κ, linear/quadratic weighted κ, and a normal-approximation CI. Categories always come from the declared scale, so unused categories keep their weight. More than two raters is pairwise; Fleiss' κ is out of scope. Human sections exclude AI; AI-vs-human and AI-vs-AI are separate. Caveats cover prevalence/marginals, `high_agreement_low_kappa`, small N, rater bias, and clipped intervals.
+- **Exports.** `rob-table` and `rob-summary` take `table_format: markdown|csv`; `rob-figure` writes two SVGs and checks both destinations for overwrite before writing either. SVG output is capped at 8 MB and a missing matplotlib is surfaced as an actionable error. Exports report recorded judgements and completeness, never a risk-of-bias or quality verdict.
+- **Population.** Appraisal and exports use resolved full-text includes. Appraisals left behind by a later exclusion are surfaced as `appraisals_outside_population` rather than deleted.
+- **Shared PaperMemory bridge.** `reporting-check.js` and `review.js` now share `papermemory-mcp.js`; the Phase 3 behaviour and tests are unchanged.
 
 ## 6. Delivery order
 

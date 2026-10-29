@@ -461,10 +461,14 @@
           - id: manuscript-citations
             name: academic-harness/manuscript-citations
 
-          # Systematic/scoping-review ledger (Phase 3 of docs/NON-SEARCH-TOOLS-PLAN.md):
-          # protocol, records, two-stage screening, evidence, PRISMA counts, exports.
-          # Append-only event logs under <cwd>/.dsh/review/<slug>/; see review.js and
-          # review-store.js. The tool never makes inclusion decisions.
+          # Systematic/scoping-review ledger plus risk-of-bias appraisal (Phase 4 of
+          # docs/REPORTING-AND-APPRAISAL-PLAN.md): protocol, records, single or dual
+          # two-stage screening, evidence, RoB 2/ROBINS-I/QUADAS-2/NOS appraisal,
+          # conflicts and reconcile, kappa agreement, PRISMA counts, and
+          # rob-table/rob-summary/rob-figure exports. Append-only logs under
+          # <cwd>/.dsh/review/<slug>/; see review.js, review-store.js, appraisal.js, and
+          # agreement.js. The tool never makes inclusion, appraisal, or consensus
+          # decisions.
           - id: review
             name: academic-harness/review
 

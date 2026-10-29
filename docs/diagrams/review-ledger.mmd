@@ -1,20 +1,30 @@
 flowchart TD
-  start[review start<br/>question, databases,<br/>inclusion and exclusion criteria] --> protocol[protocol.json<br/>write-once]
+  start[review start<br/>question, criteria,<br/>optional reviewers and instruments] --> protocol[protocol.json<br/>write-once]
   protocol --> add[add records<br/>DOI, PMID, arXiv,<br/>normalized title and year]
-  add --> screen1[Title / abstract screen]
-  screen1 -->|include| screen2[Full-text screen]
+  add --> screen1[Title / abstract screen<br/>per reviewer]
+  screen1 -->|include| screen2[Full-text screen<br/>per reviewer]
   screen1 -->|exclude or maybe<br/>with reason| excluded[Excluded or pending]
   screen2 -->|include| evidence[Evidence<br/>claim + verbatim quote + location]
   screen2 -->|exclude with reason| excluded
-  evidence --> status[review status<br/>PRISMA-style counts<br/>exclusion reasons]
-  status --> export[export<br/>Markdown, CSV, or JSON]
+  screen1 -->|disagreement| reconcile[reconcile<br/>consensus or third reviewer]
+  screen2 -->|disagreement| reconcile
+  evidence --> appraise[appraise<br/>RoB 2, ROBINS-I,<br/>QUADAS-2, Newcastle-Ottawa]
+  appraise -->|disagreement| reconcile
+  appraise --> appraisalStatus[appraisal_status<br/>completeness and conflicts]
+  reconcile --> appraisalStatus
+  evidence --> status[review status<br/>PRISMA-style counts<br/>exclusion reasons and conflicts]
+  appraisalStatus --> status
+  status --> export[export<br/>markdown, csv, json,<br/>rob-table, rob-summary]
+  status --> figure[rob-figure<br/>traffic light + summary SVGs]
 
-  add -. every event appended .-> log[(.dsh/review/slug/<br/>event logs)]
+  add -. every event appended .-> log[(.dsh/review/slug/<br/>screening.jsonl, evidence.jsonl,<br/>appraisal.jsonl, instruments.json)]
   screen1 -.-> log
   screen2 -.-> log
   evidence -.-> log
+  appraise -.-> log
+  reconcile -.-> log
 
   classDef step fill:#ecfdf5,stroke:#059669,color:#064e3b
   classDef store fill:#fff7ed,stroke:#f97316,color:#7c2d12
-  class start,add,screen1,screen2,evidence,status,export step
+  class start,add,screen1,screen2,evidence,appraise,appraisalStatus,status,export,figure,reconcile step
   class protocol,log,excluded store

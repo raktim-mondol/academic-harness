@@ -7,7 +7,7 @@ Academic Harness is a **DeepSeek Harness (DSH) profile**: the DSH web UI and DSH
 ## Requirements
 
 - **DeepSeek Harness 0.2.1–0.2.x** (`dsh --version` should report 0.2.1 to 0.2.x; the plugin's engine range is `>=0.2.1-rc.2 <0.3.0`).
-- Optional Python runtimes are installed automatically on first use, with one exception: the `sci_inspect`/`power_analysis` helpers need a one-time `cd python-helpers && uv sync`. See [Architecture](ARCHITECTURE.md#runtime-installs).
+- Optional Python runtimes are installed automatically on first use, with one exception: the `sci_inspect`/`power_analysis` helpers and the `rob-figure` appraisal export need a one-time `cd python-helpers && uv sync` (matplotlib). See [Architecture](ARCHITECTURE.md#runtime-installs).
 - `modal_run` needs the Modal SDK, which the plugin installs into `$DSH_HOME/modal-sdk` on first use (no restart; set `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` to manage it yourself). `runpod_run` and `vastai_run` need only their API key plus OpenSSH client tools; see [Remote compute](COMPUTE.md).
 
 ## 1. Install DSH

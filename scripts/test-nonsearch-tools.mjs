@@ -12,10 +12,10 @@ const preset = read('presets/academic-harness/agent.cordis.yml')
 const prompt = read('prompt.js')
 const settings = read('settings-keys.js')
 
-for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
+for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './agreement', './appraisal', './papermemory-mcp', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
 }
-for (const file of ['citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
+for (const file of ['citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'agreement.js', 'appraisal.js', 'papermemory-mcp.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
   assert.ok(pkg.files?.includes(file), `package files missing ${file}`)
   assert.ok(existsSync(join(root, file)), `missing ${file}`)
 }
@@ -38,6 +38,7 @@ assert.match(preset, /- id: integrity-check\n  name: academic-harness\/integrity
 assert.match(read('review.js'), /name: 'review'/)
 assert.match(preset, /- id: review\n  name: academic-harness\/review/)
 assert.ok(existsSync(join(root, 'skills/systematic-review-ledger/SKILL.md')), 'missing systematic-review-ledger skill')
+assert.ok(existsSync(join(root, 'skills/risk-of-bias-appraisal/SKILL.md')), 'missing risk-of-bias-appraisal skill')
 assert.ok(existsSync(join(root, 'skills/remove-ai-signs/SKILL.md')), 'missing remove-ai-signs skill')
 assert.ok(existsSync(join(root, 'skills/remove-ai-signs/scripts/scan_ai_signs.py')), 'missing remove-ai-signs scanner')
 assert.ok(!read('skills/remove-ai-signs/SKILL.md').includes('.qoder'), 'remove-ai-signs must not reference the Qoder skill path')
@@ -60,7 +61,7 @@ for (const [id, tool] of [['pdf-references', 'pdf_references'], ['stat-audit', '
   assert.ok(existsSync(join(root, `${id}.js`)), `missing ${id}.js`)
   assert.ok(read(`${id}.js`).includes(`name: '${tool}'`), `${id}.js must register ${tool}`)
 }
-for (const helper of ['stat_audit.py', 'figure_audit.py']) {
+for (const helper of ['stat_audit.py', 'figure_audit.py', 'rob_figure.py']) {
   assert.ok(existsSync(join(root, 'python-helpers', helper)), `missing python helper ${helper}`)
 }
 assert.ok(read('client/ApiKeysSection.jsx').includes('OPENFDA_API_KEY'), 'Settings UI missing OPENFDA_API_KEY')
@@ -79,6 +80,7 @@ assert.ok(!preset.includes('academic-harness/zotero'), 'Zotero preset row must b
 
 for (const marker of [
   '## References and citation', 'Chicago author-date', '### Paper integrity', '## Systematic reviews',
+  'risk-of-bias', 'rob-table', 'appraise', 'reconcile',
   '### Clinical and regulatory evidence', '### Data and journal policy',
   'manuscript_citations', 'funder_policy', '## Writing quality', 'remove-ai-signs',
   'after a draft or chapter exists',

@@ -1,0 +1,102 @@
+{
+  "id": "robins-i",
+  "name": "ROBINS-I",
+  "version": "1",
+  "study_designs": ["non-randomised intervention", "cohort", "case-control"],
+  "source_url": "https://www.riskofbias.info/welcome/home/current-version-of-robins-i",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "The overall judgement is derived as the worst domain, with no_information placed between moderate and serious. Signalling answers are supporting detail only.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "low", "label": "Low", "rank": 1, "requires_quote": true },
+      { "id": "moderate", "label": "Moderate", "rank": 2, "requires_quote": false },
+      { "id": "no_information", "label": "No information", "rank": 3, "requires_quote": false },
+      { "id": "serious", "label": "Serious", "rank": 4, "requires_quote": false },
+      { "id": "critical", "label": "Critical", "rank": 5, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    {
+      "id": "d1",
+      "name": "Confounding",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether confounding was present and whether the analysis controlled for the important confounders.",
+      "signalling": [
+        { "id": "1.1", "prompt": "Is there potential for confounding of the effect of intervention in this study?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.2", "prompt": "Did the authors control for the important confounding domains?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.3", "prompt": "Were the confounders measured validly and reliably?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d2",
+      "name": "Selection of participants",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether selection into the study was related to intervention and outcome.",
+      "signalling": [
+        { "id": "2.1", "prompt": "Was selection based on characteristics observed after the start of intervention?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.2", "prompt": "Was selection related to both intervention and outcome?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "Classification of interventions",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether intervention status was defined and ascertained well enough to avoid misclassification.",
+      "signalling": [
+        { "id": "3.1", "prompt": "Were the interventions well defined?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.2", "prompt": "Was intervention status based on records or recall likely to reflect the intervention?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.3", "prompt": "Could classification have been affected by knowledge of outcome or risk factors?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d4",
+      "name": "Deviations from intended interventions",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether deviations from the intended intervention were balanced or handled by an appropriate analysis.",
+      "signalling": [
+        { "id": "4.1", "prompt": "Were there deviations beyond what would be expected in usual practice?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.2", "prompt": "Were deviations balanced between groups, or was an appropriate analysis used?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.3", "prompt": "Was an appropriate analysis used to estimate the effect of starting and adhering to the intervention?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d5",
+      "name": "Missing data",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether missing outcome, confounder, or intervention data could bias the result.",
+      "signalling": [
+        { "id": "5.1", "prompt": "Were outcome data available for all or nearly all participants?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "5.2", "prompt": "Were participants excluded because of missing data?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "5.3", "prompt": "Could missingness depend on the true value of the outcome?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d6",
+      "name": "Measurement of outcomes",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether outcome measurement could have been influenced by intervention knowledge and was comparable across groups.",
+      "signalling": [
+        { "id": "6.1", "prompt": "Could the outcome measure have been influenced by knowledge of the intervention received?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "6.2", "prompt": "Were outcome assessors aware of the intervention received?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "6.3", "prompt": "Were methods of outcome assessment comparable across groups?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d7",
+      "name": "Selection of the reported result",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the reported effect estimate could have been selected from multiple analyses.",
+      "signalling": [
+        { "id": "7.1", "prompt": "Is the reported estimate likely to be selected from multiple measurements, analyses, subgroups, or time points?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "7.2", "prompt": "Were the reported results consistent with a pre-specified analysis plan?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    }
+  ],
+  "overall": {
+    "id": "overall",
+    "name": "Overall risk of bias",
+    "derived": true,
+    "rule": { "type": "worst", "order": ["low", "moderate", "no_information", "serious", "critical"] }
+  }
+}

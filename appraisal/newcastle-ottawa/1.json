@@ -1,0 +1,48 @@
+{
+  "id": "newcastle-ottawa",
+  "name": "Newcastle-Ottawa Scale",
+  "version": "1",
+  "study_designs": ["cohort", "case-control"],
+  "source_url": "https://www.ohri.ca/programs/clinical_epidemiology/oxford.asp",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "Domain-level star counts for cohort or case-control studies. The third domain covers outcome (cohort) or exposure (case-control). No overall judgement is derived; a star total is reported as a count.",
+  "scale": { "type": "stars" },
+  "domains": [
+    {
+      "id": "selection",
+      "name": "Selection",
+      "axes": ["risk_of_bias"],
+      "max_stars": 4,
+      "short_prompt": "How the exposed and non-exposed groups (or cases and controls) were selected.",
+      "signalling": [
+        { "id": "1.1", "prompt": "Was the exposed cohort (or case group) representative of the target population?", "answers": ["yes", "no", "unclear"] },
+        { "id": "1.2", "prompt": "Was the non-exposed cohort (or control group) drawn from the same population?", "answers": ["yes", "no", "unclear"] },
+        { "id": "1.3", "prompt": "Was exposure status ascertained from a secure record or structured interview?", "answers": ["yes", "no", "unclear"] },
+        { "id": "1.4", "prompt": "Was the outcome absent at the start (cohort), or were controls clearly defined (case-control)?", "answers": ["yes", "no", "unclear"] }
+      ]
+    },
+    {
+      "id": "comparability",
+      "name": "Comparability",
+      "axes": ["risk_of_bias"],
+      "max_stars": 2,
+      "short_prompt": "Whether the design or analysis controlled for the most important confounders.",
+      "signalling": [
+        { "id": "2.1", "prompt": "Did the design or analysis control for the most important factor?", "answers": ["yes", "no", "unclear"] },
+        { "id": "2.2", "prompt": "Did it also control for a second relevant factor?", "answers": ["yes", "no", "unclear"] }
+      ]
+    },
+    {
+      "id": "outcome",
+      "name": "Outcome or exposure",
+      "axes": ["risk_of_bias"],
+      "max_stars": 3,
+      "short_prompt": "How the outcome (cohort) or exposure (case-control) was assessed and whether follow-up was adequate.",
+      "signalling": [
+        { "id": "3.1", "prompt": "Was the outcome assessed independently or through record linkage (cohort), or was exposure ascertained blinded (case-control)?", "answers": ["yes", "no", "unclear"] },
+        { "id": "3.2", "prompt": "Was follow-up long enough for the outcome (cohort), or was the same method used for cases and controls?", "answers": ["yes", "no", "unclear"] },
+        { "id": "3.3", "prompt": "Was follow-up complete, or was the non-response rate low?", "answers": ["yes", "no", "unclear"] }
+      ]
+    }
+  ]
+}

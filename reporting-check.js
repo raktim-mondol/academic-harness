@@ -8,13 +8,13 @@
  * searched.
  */
 import { createHash } from 'node:crypto'
-import { spawn } from 'node:child_process'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, extname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { notebookFile } from './notebook.js'
-import { papermemoryEnv, resolvePaperMemoryLaunch } from './papermemory-cli.js'
+import { mcpText, paperMemoryCall } from './papermemory-mcp.js'
+import { resolvePaperMemoryLaunch } from './papermemory-cli.js'
 import { convertPdfMarkdown } from './pdf-to-markdown.js'
 import { runHelper } from './python-runtime.js'
 import {
@@ -582,83 +582,13 @@ async function fileSource(cwd, manuscript, { title = null, deps = {} } = {}) {
 
 /* -------------------------------------------------------------- papermemory */
 
-function mcpText(result) {
-  const part = result?.content?.find((item) => item?.type === 'text')
-  if (!part?.text) throw new Error('PaperMemory returned no text content')
-  try {
-    return JSON.parse(part.text)
-  } catch {
-    throw new Error('PaperMemory returned output that is not JSON')
-  }
-}
-
-function paperMemoryCall(launch, name, args, { timeoutMs = 90_000 } = {}) {
-  return new Promise((resolvePromise, reject) => {
-    const child = spawn(launch.command, [...(launch.args || []), 'mcp'], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: papermemoryEnv(),
-    })
-    let buffer = ''
-    let stderr = ''
-    let settled = false
-    const timer = setTimeout(() => finish(new Error(`PaperMemory did not answer within ${timeoutMs}ms`)), timeoutMs)
-
-    function finish(error, value) {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      child.kill('SIGTERM')
-      if (error) reject(error)
-      else resolvePromise(value)
-    }
-
-    function send(message) {
-      if (!child.stdin.destroyed) child.stdin.write(`${JSON.stringify(message)}\n`)
-    }
-
-    child.stdout.setEncoding('utf8')
-    child.stdout.on('data', (chunk) => {
-      buffer += chunk
-      let index
-      while ((index = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, index).trim()
-        buffer = buffer.slice(index + 1)
-        if (!line) continue
-        let message
-        try { message = JSON.parse(line) } catch { continue }
-        if (message.id === 1 && message.result) {
-          send({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} })
-          send({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name, arguments: args } })
-        } else if (message.id === 2) {
-          if (message.error) finish(new Error(message.error.message || 'PaperMemory tool call failed'))
-          else finish(null, message.result)
-        }
-      }
-    })
-    child.stderr.setEncoding('utf8')
-    child.stderr.on('data', (chunk) => { stderr += chunk })
-    child.on('error', (error) => finish(new Error(`PaperMemory failed to start: ${error.message}`)))
-    child.on('exit', (code) => {
-      if (!settled) finish(new Error(`PaperMemory exited ${code}${stderr ? `: ${stderr.trim().slice(0, 300)}` : ''}`))
-    })
-    send({
-      jsonrpc: '2.0',
-      id: 1,
-      method: 'initialize',
-      params: {
-        protocolVersion: '2024-11-05',
-        capabilities: {},
-        clientInfo: { name: 'academic-harness-reporting-check', version: '0.29.0' },
-      },
-    })
-  })
-}
-
 async function memorySource(paper, { deps = {} } = {}) {
   const fetch = deps.getMemoryText || (async (ref) => {
     const launch = resolvePaperMemoryLaunch()
     if (!launch) throw new Error('PaperMemory is not installed; pass a workspace manuscript path instead')
-    const result = await paperMemoryCall(launch, 'papermemory_get', { key: ref, max_chars: 40_000_000 })
+    const result = await paperMemoryCall(launch, 'papermemory_get', {
+      key: ref, max_chars: 40_000_000,
+    }, { clientName: 'academic-harness-reporting-check' })
     if (result?.isError) {
       const detail = mcpText(result)
       throw new Error(`PaperMemory: ${detail.error || detail.code || 'lookup failed'}`)

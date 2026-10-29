@@ -53,7 +53,7 @@ The first Academic Harness start prepares optional runtimes in the background, s
 | **PaperMemory** | venv `~/.dsh/papermemory`; SQLite store `~/.local/share/papermemory/papermemory.db` | First Academic Harness preset mount, unless `papermemory` is already on `PATH` | **Fail-loud.** A broken memory server and any drift from the expected 14-tool MCP surface are surfaced. | `PAPERMEMORY_CLI`, `PAPERMEMORY_DB`, `PAPERMEMORY_DATA_DIR`, `PAPERMEMORY_SKIP_INSTALL` |
 | **TextFold** | `$DSH_HOME/textfold/venv`; documents in `$DSH_HOME/textfold/data` | First Academic Harness preset start | The first `paper_fold` call waits for install and reports a failure if it cannot complete. | `TEXTFOLD_SKIP_INSTALL`, `TEXTFOLD_PYTHON`, `TEXTFOLD_CLI`, `TEXTFOLD_DATA` |
 | **Writing engine venv** | `vendor/academic-harness/.venv` | First plugin mount, in the background | An early `ah_*` call or interceptor waits for preparation and reports failure. | `ACADEMIC_HARNESS_CLI`, `AH_CMD`, `ACADEMIC_HARNESS_SKIP_INSTALL` |
-| **Python helpers** (for `sci_inspect` and `power_analysis`) | `python-helpers/.venv` | You run `cd python-helpers && uv sync` once | The tool reports the missing helper environment. | `ACADEMIC_HARNESS_HELPERS_DIR`, `ACADEMIC_HARNESS_PYTHON` |
+| **Python helpers** (for `sci_inspect`, `power_analysis`, and the `rob-figure` export) | `python-helpers/.venv` | You run `cd python-helpers && uv sync` once | The tool reports the missing helper environment; `rob-figure` names matplotlib. | `ACADEMIC_HARNESS_HELPERS_DIR`, `ACADEMIC_HARNESS_PYTHON` |
 
 PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and PaperMemory is **fail-loud**. Never read a missing zg tool as missing memory. Paper markdown in the workspace is indexed by zg for *discovery*; evidence for claims, numbers, and quotations always comes from PaperMemory.
 
@@ -62,7 +62,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | Path | Owner | Contents |
 |---|---|---|
 | `<cwd>/.dsh/notebook/<sessionId>.jsonl` | `notebook` | Running lab-notebook entries, shared across a delegation tree |
-| `<cwd>/.dsh/review/<slug>/` | `review` | Write-once `protocol.json`, append-only event logs, exports |
+| `<cwd>/.dsh/review/<slug>/` | `review` | Write-once `protocol.json`; append-only screening, evidence, and appraisal logs; frozen `instruments.json`; exports |
 | `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl` |
 | `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
 | `<cwd>/.zvec-grep/` | zvec-grep | Workspace index |
@@ -85,7 +85,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Search providers | `literature-search.js`, `openalex-search.js`, `openalex-cite.js`, `semantic-scholar-search.js`, `crossref-lookup.js`, `arxiv-search.js`, `pubmed-search.js`, `consensus-search.js`, `parallel-search.js`, `parallel-extract.js`, `brave-search.js`, `tavily-search.js`, `exa-search.js`, `perplexity-search.js`, `jina-reader.js`, `core-search.js`, `elicit-search.js`, `futurehouse-agent.js`, `search-normalize.js`, `search-http.js` |
 | Papers and memory | `paper-resolve.js`, `paper-download.js`, `paper-fold.js`, `textfold-runtime.js`, `pdf-to-markdown.js`, `papermemory.js`, `paper-mcp.js` |
 | Citation and writing | `citation.js`, `citation-format.js`, `manuscript-citations.js`, `integrity-check.js`, `academic-harness.js`, `academic-harness-hooks.js`, `academic-harness-cli.js`, `vendor/academic-harness/` |
-| Reviews and hypotheses | `review.js`, `review-store.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js` |
+| Reviews and hypotheses | `review.js`, `review-store.js`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js` |
 | Clinical, datasets, policy | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js` |
 | Workspace and notebook | `notebook.js`, `notebook-export.js`, `notebook-zip.js`, `zvec-grep.js`, `zvec-index.js`, `zvec-index-engine.js`, `fold-core.js`, `fold-text.js`, `scientific-result.js` |
 | Figures and file formats | `image-generate.js`, `image-gen-client.js`, `mermaid-render.js`, `sci-inspect.js`, `latex-compile.js`, `python-helpers/` |
@@ -93,7 +93,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (744 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (745 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

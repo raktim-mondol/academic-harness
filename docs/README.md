@@ -20,11 +20,11 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Search and discovery](SEARCH.md) | Literature databases, Consensus, Parallel, MCP connectors, web indexes, publication integrity |
 | [Papers and evidence](PAPERS.md) | Download, `paper_fold`, PDF conversion, PaperMemory, Paper2Agent |
 | [Writing, citation, and figures](WRITING.md) | The `ah_*` writing oracle, bibliography tools, LaTeX, figures, `image_generate`, `mermaid_render` |
-| [Reviews, hypotheses, and records](RESEARCH.md) | Systematic reviews, hypothesis tournaments, clinical/regulatory records, dataset and policy tools |
+| [Reviews, hypotheses, and records](RESEARCH.md) | Systematic reviews, dual-reviewer screening, risk-of-bias appraisal, agreement statistics, hypothesis tournaments, clinical/regulatory records, dataset and policy tools |
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 743-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 745-skill catalogue, its sources, and workflow skills |
 | [Optional tools](OPTIONAL-TOOLS.md) | The tools behind `AH_ENABLE_OPTIONAL_TOOLS=1` |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 

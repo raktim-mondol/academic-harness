@@ -10,14 +10,41 @@ This page covers the local ledgers that keep work auditable past the context win
 
 | Action | What it does |
 |---|---|
-| `start` | Question, databases, inclusion/exclusion criteria, date range. Refuses to overwrite an existing review unless `resume: true`. |
+| `start` | Question, databases, inclusion/exclusion criteria, date range, optional reviewer roster and risk-of-bias instruments. Refuses to overwrite an existing review unless `resume: true`. |
 | `add` | Records from a search tool's result array or a workspace JSON/JSONL file; deduplicates by DOI, PMID, arXiv ID, then normalized title+year, and logs every query in `search_log.jsonl`. |
-| `screen` | `title_abstract` / `full_text` × `include` / `exclude` / `maybe`. A full-text decision requires a prior title/abstract include; exclude and maybe require a reason; re-screening requires `override: true`. |
-| `evidence` | Only after a full-text include; claim, verbatim quote, and location. The ledger stores the quote but does not verify it — PaperMemory `quote_check`/`trace` remains the verifier. |
-| `status` | Records, query counts, PRISMA-style stage counts, exclusion reasons, includes missing evidence. |
-| `export` | `markdown` report skeleton, `csv` evidence table, or `json` full ledger under `exports/`; refuses to overwrite without `overwrite: true`. |
+| `screen` | `title_abstract` / `full_text` × `include` / `exclude` / `maybe`, per named reviewer. A full-text decision requires that reviewer's title/abstract include; exclude and maybe require a reason; re-screening requires `override: true` and replaces only that reviewer's event. With a declared roster, disagreements are reported as conflicts. |
+| `evidence` | Only after a resolved full-text include; claim, verbatim quote, and location. The ledger stores the quote but does not verify it — PaperMemory `quote_check`/`trace` remains the verifier. |
+| `appraise` | One risk-of-bias domain judgement per reviewer under a frozen instrument; quote and location required for low/high (and ROBINS-I low/critical); optional PaperMemory quote check; signalling answers stored as supporting detail. |
+| `reconcile` | A consensus or third-reviewer decision over a screening or appraisal disagreement, with a reason. The originals stay in the log. |
+| `agreement` | Percent agreement and Cohen's κ (linear/quadratic weighted for ordinal appraisal scales, pairwise above two raters) per screening stage or appraisal domain. Human-vs-human is primary; AI pairs are separate. |
+| `appraisal_status` | Per-instrument, per-record, per-domain completeness; missing reviewers; outstanding conflicts; appraisals outside the included population. |
+| `status` | Records, query counts, PRISMA-style stage counts, per-reviewer counts and conflicts in dual mode, exclusion reasons, includes missing evidence. |
+| `export` | `markdown` report skeleton, `csv` evidence table, `json` full ledger, `rob-table`/`rob-summary` (Markdown or CSV), or `rob-figure` (two SVGs) under `exports/`; refuses to overwrite without `overwrite: true`. |
 
-The tool never makes inclusion decisions — discovery stays in the search tools and every screening decision and reason comes from the user or the stated criteria. The `systematic-review-ledger` skill documents the full workflow.
+The tool never makes inclusion, appraisal, or consensus decisions — discovery stays in the search tools and every decision and reason comes from the user or the stated criteria. Reviewer identities are typed `human:<name>` / `ai:<model>`; reviewer-less legacy events derive as `default`, so single-reviewer ledgers read as before. The `systematic-review-ledger` skill documents the screening workflow, and `risk-of-bias-appraisal` documents appraisal.
+
+## Risk-of-bias appraisal
+
+`review appraise` records a reviewer's judgement for one instrument domain. Four instruments ship as paraphrased, versioned templates under `appraisal/<id>/<version>.json` with links to the official sources:
+
+| Instrument | Study design | Domains | Judgements |
+|---|---|---|---|
+| RoB 2 (2019) | randomised trial | 5 + derived overall | low / some concerns / high |
+| ROBINS-I v1 | non-randomised intervention | 7 + derived overall | low / moderate / serious / critical / no information |
+| QUADAS-2 (2011) | diagnostic accuracy | 4 domains, 7 risk-of-bias/applicability cells | low / unclear / high |
+| Newcastle-Ottawa | cohort or case-control | 3 star-count domains | 0–4, 0–2, 0–3; total reported as a count |
+
+The full instrument definition is frozen into `.dsh/review/<slug>/instruments.json` at `start` or on first use; a second version of the same instrument is rejected, so a running review cannot change its rubric. Evidence rules:
+
+- `low`/`high` (RoB 2, QUADAS-2) and `low`/`critical` (ROBINS-I) need a verbatim quote and location. With a PaperMemory `paper`, the quote is re-found through `papermemory_quote_check`. A quote absent from a resolved paper is rejected and not stored; a match only in the bibliography is rejected. If the paper cannot be resolved or the check fails, the event is stored `unverified` with the reason. Without `paper`, it is stored `unverified`.
+- Signalling answers are supporting detail. The official answer-to-judgement algorithms are not implemented; the tool never converts an answer into a judgement.
+- A declared reviewer roster is the appraisal panel: every declared reviewer must judge every domain before a record counts as complete, and `appraisal_status` lists the missing reviewers. Without a roster, the active appraisers on included records are the panel.
+- The RoB 2 and ROBINS-I overall is derived from the resolved domains (any high → high; otherwise any some concerns → some concerns; ROBINS-I uses the worst domain, with no_information between moderate and serious). It is marked derived and never stored. An explicit `domain: "overall"` override requires a reason.
+- QUADAS-2 and Newcastle-Ottawa have no derived overall; report the domain cells and the NOS star total.
+
+A disagreement is a first-class state: `appraisal_status` lists it, `reconcile` records the consensus or third-reviewer decision with a reason, and a later disagreeing appraisal reopens it. `agreement` computes percent agreement and κ with an approximate 95% CI, reports N and dropped ratings, and emits caveats for skewed marginals, small samples, and clipped intervals. Human κ never includes AI judgements; AI-vs-human and AI-vs-AI pairs are reported separately. For more than two human raters, agreement is pairwise; Fleiss' κ is not implemented.
+
+`rob-figure` renders `rob-traffic-light.svg` and `rob-summary.svg` through `python-helpers/rob_figure.py`, which needs the helper environment (`cd python-helpers && uv sync`). The table and CSV name the reviewers behind each resolved row and count unverified quotes; the figure note repeats both, and AI reviewers keep their `ai:` prefix. The exports contain recorded judgements and completeness counts; they never say "low risk", "high quality", or "compliant". Load the `risk-of-bias-appraisal` skill for the full workflow.
 
 ## Hypothesis tournaments
 

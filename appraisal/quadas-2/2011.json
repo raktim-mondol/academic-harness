@@ -1,0 +1,64 @@
+{
+  "id": "quadas-2",
+  "name": "QUADAS-2",
+  "version": "2011",
+  "study_designs": ["diagnostic accuracy"],
+  "source_url": "https://www.bristol.ac.uk/population-health-sciences/projects/quadas/quadas-2/",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "The first three domains are judged on both risk of bias and applicability; flow and timing is judged on risk of bias only. QUADAS-2 does not define a derived overall judgement.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "low", "label": "Low", "rank": 1, "requires_quote": true },
+      { "id": "unclear", "label": "Unclear", "rank": 2, "requires_quote": false },
+      { "id": "high", "label": "High", "rank": 3, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    {
+      "id": "d1",
+      "name": "Patient selection",
+      "axes": ["risk_of_bias", "applicability"],
+      "short_prompt": "Whether the patient sample was enrolled appropriately and matches the review's target population.",
+      "signalling": [
+        { "id": "1.1", "prompt": "Was a consecutive or random sample of patients enrolled?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.2", "prompt": "Was a case-control design avoided?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.3", "prompt": "Did the study avoid inappropriate exclusions?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.4", "prompt": "Were the included patients similar to the target population?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"], "axis": "applicability" }
+      ]
+    },
+    {
+      "id": "d2",
+      "name": "Index test",
+      "axes": ["risk_of_bias", "applicability"],
+      "short_prompt": "Whether the index test was interpreted without knowledge of the reference standard and matches the review question.",
+      "signalling": [
+        { "id": "2.1", "prompt": "Were index test results interpreted without knowledge of the reference standard?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.2", "prompt": "Was the threshold pre-specified when one was used?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.3", "prompt": "Is the index test and its conduct similar to the target setting?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"], "axis": "applicability" }
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "Reference standard",
+      "axes": ["risk_of_bias", "applicability"],
+      "short_prompt": "Whether the reference standard classifies the target condition correctly and was interpreted without knowledge of the index test.",
+      "signalling": [
+        { "id": "3.1", "prompt": "Is the reference standard likely to classify the target condition correctly?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.2", "prompt": "Were reference standard results interpreted without knowledge of index test results?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.3", "prompt": "Is the reference standard and target condition similar to the review question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"], "axis": "applicability" }
+      ]
+    },
+    {
+      "id": "d4",
+      "name": "Flow and timing",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the interval, reference standard, and analysis included all patients appropriately.",
+      "signalling": [
+        { "id": "4.1", "prompt": "Was there an appropriate interval between index test and reference standard?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.2", "prompt": "Did all patients receive the same reference standard?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.3", "prompt": "Were all patients included in the analysis?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    }
+  ]
+}

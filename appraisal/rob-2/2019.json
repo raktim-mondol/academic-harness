@@ -1,0 +1,80 @@
+{
+  "id": "rob-2",
+  "name": "RoB 2",
+  "version": "2019",
+  "study_designs": ["randomised trial"],
+  "source_url": "https://www.riskofbias.info/welcome/rob-2-0-tool",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "Effect-of-assignment signalling questions. Signalling answers are supporting detail only; the official answer-to-judgement algorithms are not implemented.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "low", "label": "Low", "rank": 1, "requires_quote": true },
+      { "id": "some_concerns", "label": "Some concerns", "rank": 2, "requires_quote": false },
+      { "id": "high", "label": "High", "rank": 3, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    {
+      "id": "d1",
+      "name": "Randomisation process",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether allocation was randomised and concealed, and whether baseline differences suggest a problem.",
+      "signalling": [
+        { "id": "1.1", "prompt": "Was the allocation sequence generated randomly?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.2", "prompt": "Was allocation concealed until participants were enrolled and assigned?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.3", "prompt": "Did baseline differences between groups suggest a problem with randomisation?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d2",
+      "name": "Deviations from intended interventions",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether participants, carers, or deliverers knew the assignment and whether deviations were handled appropriately.",
+      "signalling": [
+        { "id": "2.1", "prompt": "Were participants aware of their assigned intervention?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.2", "prompt": "Were carers or people delivering the intervention aware of the assignment?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.3", "prompt": "Were deviations from the intended intervention balanced between groups, or was an appropriate analysis used?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d3",
+      "name": "Missing outcome data",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether outcome data were available for all or nearly all participants and whether missingness could bias the result.",
+      "signalling": [
+        { "id": "3.1", "prompt": "Were outcome data available for all or nearly all randomised participants?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.2", "prompt": "Is there evidence that the result was not biased by missing outcome data?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.3", "prompt": "Could missingness depend on the true value of the outcome?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d4",
+      "name": "Measurement of the outcome",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether outcome measurement was appropriate and whether assessors could have been influenced by knowing the assignment.",
+      "signalling": [
+        { "id": "4.1", "prompt": "Was the method of measuring the outcome inappropriate?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.2", "prompt": "Could measurement or ascertainment have differed between groups?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.3", "prompt": "Were outcome assessors aware of the intervention received?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.4", "prompt": "Could assessment have been influenced by knowledge of the intervention received?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "d5",
+      "name": "Selection of the reported result",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the reported result was pre-specified and whether it could have been selected from multiple analyses.",
+      "signalling": [
+        { "id": "5.1", "prompt": "Were the data analysed in accordance with a pre-specified plan?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "5.2", "prompt": "Is the result likely to have been selected from multiple measurements, analyses, subgroups, or time points?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    }
+  ],
+  "overall": {
+    "id": "overall",
+    "name": "Overall risk of bias",
+    "derived": true,
+    "rule": { "type": "worst", "order": ["low", "some_concerns", "high"] }
+  }
+}

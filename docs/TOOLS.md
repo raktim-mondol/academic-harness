@@ -87,7 +87,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `review` | Academic Harness preset | Systematic/scoping-review ledger: protocol, record intake, two-stage screening, evidence, PRISMA-style counts, exports | [Research](RESEARCH.md#systematic-reviews) |
+| `review` | Academic Harness preset | Systematic/scoping-review ledger: protocol, record intake, single or dual two-stage screening, evidence, risk-of-bias appraisal (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa), reconciliation, κ agreement, PRISMA-style counts, rob-table/rob-summary/rob-figure exports | [Research](RESEARCH.md#systematic-reviews) |
 | `coscientist` | Academic Harness preset | Persistent hypothesis tournament ledger: start, add, review, safety, status, next, set-status, lineage, design-protocol, synthesize, export, graph, priors, embed | [Research](RESEARCH.md#hypothesis-tournaments) |
 | `coscientist_rank` | Academic Harness preset | Pair proposal, judged matches, Glicko-2 record, compare, similarity, feedback, history | [Research](RESEARCH.md#hypothesis-tournaments) |
 | `power_analysis` | Academic Harness preset | Study planning: power / sample size / smallest detectable effect, effect-size conversion, multiple-comparison correction, seeded simulation, diagnostic-accuracy precision. Requires `effect_source`; refuses post-hoc power | [Research](RESEARCH.md#study-planning) |
