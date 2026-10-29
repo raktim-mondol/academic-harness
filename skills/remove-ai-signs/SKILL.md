@@ -17,6 +17,10 @@ flagged passages. The taxonomy and fix recipes live in
 `references/signs.md` (read it before editing). The deterministic first pass
 is `scripts/scan_ai_signs.py`.
 
+## Related Supervisor-Skills
+
+For broader academic polish (grammar, claim calibration, translation), use `paper-polish`; this skill remains the mechanical AI-tone scanner and rewriter within that pass.
+
 ## Workflow
 
 1. **Scan.** Run the scanner on the target paths (files or directories;

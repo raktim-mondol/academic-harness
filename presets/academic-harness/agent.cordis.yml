@@ -395,10 +395,18 @@
   name: academic-harness/futurehouse-agent
 
 # Multi-source discovery router: OpenAlex + Semantic Scholar by default,
-# PubMed/arXiv by domain, Crossref opt-in. Deduplicates and rank-fuses with
-# RRF. See literature-search.js.
+# PubMed/arXiv/INSPIRE/bioRxiv by domain, ADS when keyed, Crossref opt-in.
+# Deduplicates and rank-fuses with RRF. See literature-search.js.
 - id: literature-search
   name: academic-harness/literature-search
+
+# Source-specific domain lookups: bioRxiv/medRxiv browse, ACL Anthology
+# records, INSPIRE citations/references/texkeys, ADS export and metrics,
+# Scopus/WoS cited-by, and Wikidata identity resolution. Keyed sources
+# return key_missing without a request; router adapters add no tool schema.
+# See domain-search.js.
+- id: domain-search
+  name: academic-harness/domain-search
 
 # Consensus is a plain REST tool (x-api-key auth), not an MCP client — see
 # consensus-search.js. Kept in this preset alongside the connectors above

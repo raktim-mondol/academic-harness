@@ -52,6 +52,28 @@ In a project directory:
 
 T3 (does this cited clause match the source) is advisory and never a gate. Optional model backends in `ah.yaml` are `http` (OpenAI-compatible, including local Ollama) or `command`. The engine's unused `pi` backend is not required.
 
+## Supervisor-Skills paper lifecycle
+
+The bundled [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) suite adds 12 stage-specific skills for general paper work outside an `ah.yaml` project:
+
+| Stage | Skill |
+|---|---|
+| Survey and landscape | `deep-research` |
+| Idea vetting | `idea-evaluator` |
+| Structure | `tech-paper-template`, `benchmark-paper-template` |
+| Drafting | `intro-drafter`, `paper-writer` |
+| Polishing | `paper-polish` |
+| Figures | `figure-designer`, `drawio-reconstruction` |
+| Pre-submission audit | `pre-submission-reviewer` |
+| Rebuttal strategy | `rebuttal-guidance` |
+| AI-assisted workflow | `vibe-research-workflow` |
+
+Each skill carries a **Routing in Academic Harness** section that names the existing skill or tool to use when a task crosses a stage boundary: `peer-reviewer` for a simulated referee report, `manuscript-editor` for an adversarial edit, `literature-researcher` for a short synthesis, `remove-ai-signs` for the AI-tone scan, `scientific-figure-making`/`diagram-design` for rendering, and the `ah-*` tools inside an `ah.yaml` project.
+
+Inside an `ah.yaml` project, the Academic Harness engine remains authoritative for drafting, coverage, and the gate: use its `ah_*` tools and `ah-*` skills, and do not run a second drafting workflow over the same manuscript. `deep-research` and `idea-evaluator` are still useful upstream; `rebuttal-guidance` supplies strategy while `ah_review`/`ah_review_respond`/`ah-revise-from-review` handle the manuscript-backed review loop. `rebuttal-guidance` does not write final rebuttal prose: draft it only from the author's evidence and manuscript.
+
+The suite is self-contained in `skills/`, but it refers to the upstream handbook chapters for deeper reading; the handbook is not bundled. Licences are mixed (CC BY 4.0, CC BY-NC-SA 4.0, and MIT for `drawio-reconstruction`) — see [NOTICE](../NOTICE) and the [vendor source](../vendor/supervisor-skills/SOURCE.txt).
+
 ## References and citation
 
 `citation` is a preset-only native tool — local, no key — with four actions:
@@ -93,6 +115,8 @@ The system prompt steers the agent to pick a figure tool by content, not by habi
 | **Structural diagrams** (architecture, pipelines, flowcharts, method schematics, CONSORT, trees, timelines) | `diagram-design` skill | Self-contained HTML+SVG editorial diagrams (one accent, no shadows, orthogonal connectors). Not Mermaid rounded boxes, not `image_generate`. For a paper or compiled PDF the agent also exports PNG/SVG. |
 | **Conceptual illustrations** with no defined structure and no real numbers | `image_generate` | Conceptual schematics, diagrams, and illustrations. Not quantitative plots. |
 | **Git-diffable Markdown diagram** explicitly requested | `mermaid_render` | Mermaid source → SVG with Pele, in-process. |
+
+For paper-level figure strategy, load `figure-designer` before choosing a renderer: it selects the Motivated Example, Solution Overview, or Results figure and audits layout and labelling. To rebuild an existing reference image, paper figure, or screenshot as editable Draw.io, load `drawio-reconstruction`. Neither replaces `scientific-figure-making` for real data or `diagram-design` for editorial SVG.
 
 This documentation itself uses `mermaid_render` via Pele for the diagrams under `docs/assets/diagrams/`; regenerate them with `npm run docs:diagrams`.
 

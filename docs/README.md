@@ -24,7 +24,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 730-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 743-skill catalogue, its sources, and workflow skills |
 | [Optional tools](OPTIONAL-TOOLS.md) | The tools behind `AH_ENABLE_OPTIONAL_TOOLS=1` |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 
@@ -32,15 +32,17 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 
 | Page | What it covers |
 |---|---|
-| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 to 0.27.3 |
+| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 onward, plus unreleased changes |
 | [Development](DEVELOPMENT.md) | Build, tests, docs diagrams, bundle patch, repository layout |
 | [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) | Why the writing engine is vendored and the open decision about its home |
 | [Co-Scientist integration](CO-SCIENTIST-INTEGRATION-PLAN.md) | Tournament design and implementation record |
 | [Fold integration](FOLD-INTEGRATION-PLAN.md) | Reply folding and `paper_fold` design |
 | [Non-search tools](NON-SEARCH-TOOLS-PLAN.md) | Citation, review, clinical, dataset, and policy tool plan |
 | [PaperMemory v2](PAPERMEMORY-V2-PLAN.md) | Memory v2 design record |
+| [Reporting and appraisal](REPORTING-AND-APPRAISAL-PLAN.md) | Phase 3 reporting-guideline checker and Phase 4 risk-of-bias/appraisal ledger |
 | [Search providers](SEARCH-PROVIDERS-PLAN.md) | Search provider plan |
-| [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md) | Workspace search and memory boundaries |
+| [Specialist agents](AGENTS-PLAN.md) | Specialist-roster gap analysis (partially implemented; current briefs live in `skills/` and `prompt.js`) |
+| [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md) | Historical workspace-search and memory-boundary design record |
 
 ## Diagrams
 

@@ -28,7 +28,7 @@ The [tool index](TOOLS.md) lists every registered tool, its scope, and the page 
 
 1. The user asks a question in the DSH web UI.
 2. The agent runs on the Academic Harness preset, so the persona, research prompt, and preset-scoped tools are available.
-3. Discovery tools call their providers: native REST tools (`openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `consensus_search`, `parallel_search`) or MCP connectors (`mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`).
+3. Discovery tools call their providers: native REST tools (`openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `domain_search`, `consensus_search`, `parallel_search`) or MCP connectors (`mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`). `literature_search` also routes bioRxiv/medRxiv, INSPIRE, ADS, Scopus, and Web of Science through their source adapters.
 4. Records are normalized to a common shape; `paper_resolve` collapses DOI / PMID / arXiv / OpenAlex / Semantic Scholar identifiers onto one paper, and `integrity_check` reports retraction or correction status.
 5. `paper_download` resolves an open-access PDF; a successful download is ingested into PaperMemory as content-addressed markdown.
 6. Quotes and claims are checked against stored text (`quote_check`, `trace`) before the agent treats them as evidence.
@@ -38,7 +38,7 @@ Discovery, orientation, and evidence are deliberately separate:
 
 | Layer | Tool | What it answers | What it does **not** prove |
 |---|---|---|---|
-| Discovery | `literature_search`, `openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, Consensus, Parallel, Firecrawl, Scite | What exists, and where to look | That a paper supports a sentence |
+| Discovery | `literature_search`, `domain_search`, `openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, Consensus, Parallel, Firecrawl, Scite | What exists, and where to look | That a paper supports a sentence |
 | Orientation | `paper_fold` | What the paper is about, section by section | A quotation or a number |
 | Evidence | PaperMemory `get`, `quote_check`, `trace`, `cite` | What the stored paper actually says | That the paper is correct or current |
 | Status | `integrity_check` | Retracted, expression of concern, corrected, clean, unknown, not found | Claim support |
@@ -49,11 +49,11 @@ The first Academic Harness start prepares optional runtimes in the background, s
 
 | Runtime | Installed to | Trigger | Failure behavior | Overrides |
 |---|---|---|---|---|
-| **zvec-grep (`zg`)** | `~/.dsh/zvec-grep`; model cache `~/.zvec-grep/models`; index `<cwd>/.zvec-grep/` | First Academic Harness preset mount | **Fail-soft.** The rest of the preset loads; semantic search is absent and a warning is logged. | `ZVEC_GREP_CLI`, `ZVEC_GREP_EMBEDDING` |
+| **zvec-grep (`zg`)** | `~/.dsh/zvec-grep`; daemon state `~/.zvec-grep/daemon/`; model cache `~/.zvec-grep/models`; index `<cwd>/.zvec-grep/` | First Academic Harness preset mount | **Fail-soft.** The rest of the preset loads; semantic search is absent and a warning is logged. | `ZVEC_GREP_CLI`, `ZVEC_GREP_EMBEDDING` |
 | **PaperMemory** | venv `~/.dsh/papermemory`; SQLite store `~/.local/share/papermemory/papermemory.db` | First Academic Harness preset mount, unless `papermemory` is already on `PATH` | **Fail-loud.** A broken memory server and any drift from the expected 14-tool MCP surface are surfaced. | `PAPERMEMORY_CLI`, `PAPERMEMORY_DB`, `PAPERMEMORY_DATA_DIR`, `PAPERMEMORY_SKIP_INSTALL` |
 | **TextFold** | `$DSH_HOME/textfold/venv`; documents in `$DSH_HOME/textfold/data` | First Academic Harness preset start | The first `paper_fold` call waits for install and reports a failure if it cannot complete. | `TEXTFOLD_SKIP_INSTALL`, `TEXTFOLD_PYTHON`, `TEXTFOLD_CLI`, `TEXTFOLD_DATA` |
 | **Writing engine venv** | `vendor/academic-harness/.venv` | First plugin mount, in the background | An early `ah_*` call or interceptor waits for preparation and reports failure. | `ACADEMIC_HARNESS_CLI`, `AH_CMD`, `ACADEMIC_HARNESS_SKIP_INSTALL` |
-| **Python helpers** (for `sci_inspect`) | `python-helpers/.venv` | You run `cd python-helpers && uv sync` once | The tool reports the missing helper environment. | `ACADEMIC_HARNESS_HELPERS_DIR`, `ACADEMIC_HARNESS_PYTHON` |
+| **Python helpers** (for `sci_inspect` and `power_analysis`) | `python-helpers/.venv` | You run `cd python-helpers && uv sync` once | The tool reports the missing helper environment. | `ACADEMIC_HARNESS_HELPERS_DIR`, `ACADEMIC_HARNESS_PYTHON` |
 
 PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and PaperMemory is **fail-loud**. Never read a missing zg tool as missing memory. Paper markdown in the workspace is indexed by zg for *discovery*; evidence for claims, numbers, and quotations always comes from PaperMemory.
 
@@ -67,7 +67,8 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
 | `<cwd>/.zvec-grep/` | zvec-grep | Workspace index |
 | `~/.local/share/papermemory/papermemory.db` | PaperMemory | Shared SQLite store (Academic Harness, standalone `papermemory`, Grok) |
-| `$DSH_HOME/zvec-grep/` | plugin | `zg` install and daemon state |
+| `~/.zvec-grep/` | zvec-grep | Daemon state and token (`daemon/`), model cache (`models/`) |
+| `$DSH_HOME/zvec-grep/` | plugin | `zg` npm install |
 | `$DSH_HOME/textfold/` | plugin | Pinned TextFold runtime and document store |
 | `$DSH_HOME/ah-rsi/` | RSI | Local lesson store (`AH_RSI_STORE` overrides) |
 | `vendor/academic-harness/.venv` | plugin | Writing-engine Python environment (gitignored) |
@@ -92,7 +93,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (730 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (743 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

@@ -1,5 +1,5 @@
 flowchart TB
-  dsh[Install DeepSeek Harness 0.2.1+<br/>npm install -g @deepseek-ai/dsh] --> route{Choose install route}
+  dsh[Install DeepSeek Harness 0.2.1–0.2.x<br/>npm install -g @deepseek-ai/dsh] --> route{Choose install route}
   route -->|Web UI| web[Plugins → Add plugin<br/>github:raktim-mondol/academic-harness]
   route -->|CLI profile| cli[dsh plugin --profile academic-harness add<br/>github:raktim-mondol/academic-harness]
   web --> first[Start the first Academic Harness chat]

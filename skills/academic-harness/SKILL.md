@@ -29,6 +29,10 @@ You never close a finding. Only a later check that no longer fires marks it fixe
 | Review / audit a section without editing | `ah-audit-section` |
 | Address reviewer or supervisor comments | `ah-revise-from-review` |
 
+## Non-LaTeX paper work
+
+Outside an `ah.yaml` project, the Supervisor-Skills suite covers the paper lifecycle: `deep-research`, `idea-evaluator`, `tech-paper-template` or `benchmark-paper-template`, `intro-drafter`/`paper-writer`/`paper-polish`, `figure-designer`/`drawio-reconstruction`, `pre-submission-reviewer`, and `rebuttal-guidance`. Do not use this engine as a generic paper template when no `ah.yaml` exists; its tools return "not a project".
+
 ## Tools
 
 Native `ah_*` tools (not MCP, not Pi). Prefer them over shelling out to `ah`. Do not `pip install academic-harness` and do not install it into DSH; the engine is vendored inside this plugin (`vendor/academic-harness`).

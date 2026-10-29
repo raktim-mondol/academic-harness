@@ -65,8 +65,8 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `presets/academic-harness/` | Preset source |
 | `prompt.js`, `prompt-section.js` | Research system prompt |
 | `client/` | Settings page source; `lib/client.js` is the committed build |
-| `skills/` | 730 bundled skills |
-| `python-helpers/` | Python helpers for `sci_inspect` |
+| `skills/` | 743 bundled skills |
+| `python-helpers/` | Python helpers for `sci_inspect` and `power_analysis` |
 | `vendor/academic-harness/` | Vendored writing engine |
 | `vendor/papermemory/` | Vendored PaperMemory package |
 | `docs/` | User guides, design notes, and diagram sources |

@@ -45,6 +45,40 @@ function migrateLegacyNotebookSkill(dest) {
  * this an upgraded install keeps the old brief forever. Only files carrying a
  * known stale marker are replaced, so local edits to other skills survive.
  */
+const SUPERVISOR_SKILLS = [
+  'benchmark-paper-template',
+  'deep-research',
+  'drawio-reconstruction',
+  'figure-designer',
+  'idea-evaluator',
+  'intro-drafter',
+  'paper-polish',
+  'paper-writer',
+  'pre-submission-reviewer',
+  'rebuttal-guidance',
+  'tech-paper-template',
+  'vibe-research-workflow',
+]
+
+// Existing skills that now carry a reciprocal Supervisor-Skills routing note.
+const RELATED_SKILLS = [
+  'academic-harness',
+  'abstract-writer',
+  'agentic-data-science-pipeline',
+  'ah-plan-section',
+  'ah-write-unit',
+  'diagram-design',
+  'generating-scientific-hypotheses',
+  'literature-researcher',
+  'literature-review',
+  'manuscript-editor',
+  'peer-reviewer',
+  'remove-ai-signs',
+  'scientific-figure-making',
+  'surveying-prior-work',
+  'systematic-review-ledger',
+]
+
 const STALE_SKILLS = [
   { dir: 'runpod', stale: (text) => /ResearchCraft API keys/.test(text) || !text.includes('## API version') },
   { dir: 'modal', stale: (text) => /ResearchCraft API keys/.test(text) || !text.includes('modal-sdk') },
@@ -52,6 +86,8 @@ const STALE_SKILLS = [
   { dir: 'modal-usage', stale: (text) => /^name: modal$/m.test(text) },
   { dir: 'academic-harness-notebook', stale: (text) => /ResearchCraft/.test(text) },
   { dir: 'papermemory', stale: (text) => !text.includes('its project scopes exports') },
+  ...SUPERVISOR_SKILLS.map((dir) => ({ dir, stale: (text) => !text.includes('Routing in Academic Harness') })),
+  ...RELATED_SKILLS.map((dir) => ({ dir, stale: (text) => !text.includes('Supervisor-Skills') })),
 ]
 
 function refreshStaleSkills(dest) {
@@ -72,11 +108,12 @@ function refreshStaleSkills(dest) {
 }
 
 /**
- * Install first-party skills into DSH home. The Academic Harness agent preset is
- * a `@deepseek-ai/dsh-agent-preset` declaration in `cordis.patch.yml` (DSH
- * 0.2.0+); `$DSH_HOME/.agent-presets/` is not read. Scientific catalogue
- * skills stay on disk (scientific-agent-skills or a fallback checkout) and
- * are wired through the preset's skill-filesystem row.
+ * Install the bundled skills into `$DSH_HOME/skills`. The Academic Harness
+ * agent preset is a `@deepseek-ai/dsh-agent-preset` declaration in
+ * `cordis.patch.yml` (DSH 0.2.0+); `$DSH_HOME/.agent-presets/` is not read.
+ * The preset's skill-filesystem row can point at a different catalogue with
+ * `ACADEMIC_HARNESS_SKILLS_DIR`, but the default install seeds every bundled
+ * skill here.
  */
 export function seed() {
   const home = dshHome()

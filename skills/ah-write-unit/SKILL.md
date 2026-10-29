@@ -18,3 +18,7 @@ A unit is one paragraph, float or display. The harness checks every edit by code
 7. **Edit with `edit`** on the smallest range. After each edit the harness appends the findings that edit introduced to the tool result. Fix them in the text.
 8. **Bind your claims.** When the paragraph is written, call `ah_claims_sync`, then `ah_claims_bind` with `auto: true` for each cited claim, and read the quote it captured: if the passage does not say what you wrote, rewrite the sentence. Binding records evidence; only the author verifies.
 9. **Done** means no new blocking finding and the brief's findings clear. You cannot waive findings, approve briefs, or approve outline plans. If an instruction forces a violation, call `ah_decision_request` and stop.
+
+## Outside an ah.yaml project
+
+For non-LaTeX paper drafting, use the Supervisor-Skills suite (`paper-writer`, `intro-drafter`, `paper-polish`). This skill is active only inside an Academic Harness project.

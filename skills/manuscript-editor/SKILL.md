@@ -22,3 +22,7 @@ When editing a manuscript that uses in-text citation keys, run
 `mcp__papermemory__papermemory_cite_check` on the project slug before
 calling the section done, and do not invent a bibtex key, title, year, or
 DOI to close a gap.
+
+## Related Supervisor-Skills
+
+For a full submission-quality polish pass (grammar, claim calibration, AI tone, Chinese-to-English), use `paper-polish`. For evidence-gated drafting rather than editing, use `paper-writer`. This brief remains the adversarial editor when delegated.

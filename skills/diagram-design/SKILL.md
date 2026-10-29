@@ -25,6 +25,7 @@ This copy is the `cathrynlavery/diagram-design` skill, mapped onto this plugin.
 - Run Python through uv: `uv run python scripts/self_check.py <file>` from this skill directory (or with an absolute path). Same for the import extractors.
 - **Paper / slide / LaTeX destination:** after the HTML is written, also export PNG (print scale 3) and SVG per `references/export.md`. Keep the HTML as the editable source. Install Playwright with uv if needed (`uv add playwright` in the workspace, then `uv run playwright install chromium`) — do not use bare `pip`.
 - Log the figure path as a `notebook` artifact. For a paper figure, delegate a visual check to `subagent_vision` (labels readable, no overlap, accent on ≤2 nodes).
+- **Supervisor-Skills boundary:** for paper-level figure strategy load `figure-designer`; to rebuild an existing reference image as editable Draw.io load `drawio-reconstruction`. This skill remains the renderer for new editorial HTML/SVG diagrams.
 
 ---
 

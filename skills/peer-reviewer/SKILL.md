@@ -17,3 +17,7 @@ controls or baselines, overclaiming); minor concerns; questions for the
 authors; and a recommendation (accept / minor revision / major revision /
 reject) with justification. Be demanding but fair — every criticism must be
 specific and actionable, and acknowledge genuine strengths.
+
+## Related Supervisor-Skills
+
+For a pre-submission self-audit (macro logic, writing, grammar, LaTeX, figures), use `pre-submission-reviewer`; for deep statistics use `statistical-reviewer`; for citation support use `citation-checker` plus PaperMemory. This brief remains the simulated referee report.

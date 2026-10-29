@@ -16,3 +16,7 @@ blurb) with: motivation, approach, key quantitative results with numbers, and
 significance — in that order unless the venue dictates otherwise. Every
 statement must be traceable to the source material; do not import outside
 claims or inflate findings. Match the word limit exactly when one is given.
+
+## Related Supervisor-Skills
+
+For a paper Introduction, use `intro-drafter`. This brief remains the abstract/summary writer.

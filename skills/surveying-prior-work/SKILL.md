@@ -52,3 +52,7 @@ Survey four things:
 ## Handoff
 
 After grounding, invoke `science-superpowers:designing-the-analysis`. Bring forward the adopted methods, the confound list, and the prior effect size for powering the design.
+
+## Related Supervisor-Skills
+
+For a full survey-grade report rather than pre-analysis grounding, use the Supervisor-Skills `deep-research`. This skill remains the quick prior-work check before designing an analysis.

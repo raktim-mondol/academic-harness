@@ -307,6 +307,12 @@ assert.deepEqual(chooseSources('transformer language model benchmark', 'auto'), 
 assert.deepEqual(chooseSources('anything', 'crossref,s2'), ['crossref', 's2'])
 assert.deepEqual(chooseSources('anything', []), ['openalex', 's2'])
 assert.deepEqual(chooseSources('anything', ['auto']), ['openalex', 's2'])
+assert.throws(() => chooseSources('x', 'dblp'), /unknown source/)
+assert.ok(chooseSources('particle physics collider', 'auto').includes('inspire'))
+assert.ok(!chooseSources('exoplanet atmosphere', 'auto').includes('ads'))
+assert.ok(chooseSources('exoplanet atmosphere', 'auto', { adsToken: true }).includes('ads'))
+assert.ok(chooseSources('malaria treatment preprints', 'auto').includes('biorxiv'))
+assert.deepEqual(chooseSources('anything', 'scopus'), ['scopus'])
 assert.throws(() => chooseSources('x', 'nope'), /unknown source/)
 assert.equal(
   arxivDiscoveryQuery('transformer language model benchmark'),
@@ -398,6 +404,13 @@ globalThis.fetch = async (url) => {
 const partial = await literature.execute({ query: 's2 only', sources: ['openalex', 's2'] }, {})
 assert.equal(partial.failures[0].source, 'openalex')
 assert.equal(partial.papers[0].doi, '10.1000/s2-only')
+
+delete process.env.SCOPUS_API_KEY
+calls.length = 0
+const scopusMissing = await literature.execute({ query: 'anything', sources: ['scopus'] }, {})
+assert.equal(scopusMissing.failures[0].source, 'scopus')
+assert.equal(scopusMissing.failures[0].code, 'key_missing')
+assert.equal(calls.length, 0, 'a keyed source must not fetch without its key')
 
 const sharedResult = {
   id: 'https://openalex.org/W1',

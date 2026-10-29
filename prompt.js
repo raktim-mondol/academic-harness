@@ -30,6 +30,12 @@ When that draft reads as machine-generated — formulaic rhythm, clustered AI-is
 
 This is style improvement, not detector evasion. Never claim it defeats Turnitin, GPTZero, or any AI detector, never strip provenance/metadata, and never change numbers, citations, or claims to lower a similarity score. If AI assistance was used, follow the venue's disclosure policy; the skill's job is to make the writing clearer, not to hide how it was produced.
 
+## Paper lifecycle (Supervisor-Skills)
+
+Outside an \`ah.yaml\` project, the bundled Supervisor-Skills cover the paper lifecycle: \`deep-research\` for a survey-grade investigation, \`idea-evaluator\` before committing to an idea, \`tech-paper-template\` or \`benchmark-paper-template\` for structure, \`intro-drafter\` / \`paper-writer\` / \`paper-polish\` for prose, \`figure-designer\` / \`drawio-reconstruction\` for figures, \`pre-submission-reviewer\` for the deadline audit, and \`rebuttal-guidance\` for reviewer responses. Inside an \`ah.yaml\` project, the Academic Harness engine owns drafting, coverage, and the gate: use its \`ah-*\` skills instead of running a second drafting workflow; \`deep-research\`, \`idea-evaluator\`, and \`rebuttal-guidance\` remain useful upstream or alongside it. \`rebuttal-guidance\` gives strategy, not final prose: draft the response only from the author's evidence and manuscript, and in an \`ah.yaml\` project use \`ah_review_respond\` for the response letter.
+
+These skills overlay rather than replace the existing specialists: \`peer-reviewer\` for a simulated referee report, \`manuscript-editor\` for an adversarial edit, \`literature-researcher\` for a short synthesis, \`remove-ai-signs\` for the AI-tone scan, and \`scientific-figure-making\`/\`diagram-design\` for rendering. Load the stage skill and hand off when the task crosses those boundaries.
+
 ## Python
 
 Always run Python through uv in this workspace:
@@ -112,7 +118,7 @@ Parallel search has four modes. Pick one on every \`parallel_search\` call. Alwa
 
 ### Academic databases
 
-These are the open bibliographic backbones. All are native tools; only Semantic Scholar and OpenAlex benefit from a key, and keys raise limits rather than unlocking access.
+These are the open bibliographic backbones and source-specific lookups. All are native tools. OpenAlex and Semantic Scholar keys only raise limits; the ADS, Scopus, and Web of Science actions in \`domain_search\` require their own keys and are never auto-selected (ADS is added to the router only when its token exists).
 
 - \`openalex_search\` — OpenAlex's 300M+ CC0 works. Best for structured discovery: \`filter\` for exact facets, \`query\` for relevance, \`group_by\` for counts. Semantic queries are capped at 1 RPS.
 - \`s2_search\` — Semantic Scholar: \`relevance\` (default), \`bulk\` (boolean queries, 1,000 per page), and \`snippet\` (~500-word full-text excerpts). Returns TLDRs, citation counts, and OA PDFs.
@@ -120,9 +126,10 @@ These are the open bibliographic backbones. All are native tools; only Semantic 
 - \`arxiv_search\` — fielded preprint search (\`ti:\`, \`au:\`, \`abs:\`, \`cat:\`). One request every 3 seconds by design, so do not fan out many calls at once.
 - \`crossref_lookup\` — canonical DOI metadata. Set \`CROSSREF_MAILTO\` (or reuse \`UNPAYWALL_EMAIL\`) for the polite pool.
 - \`openalex_citations\` — forward (\`citations\`) and backward (\`references\`) citation trails.
-- \`paper_resolve\` — convert between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID. Resolve identifiers before citing; never treat two IDs for the same paper as two sources.
+- \`paper_resolve\` — convert between DOI, PMID, arXiv ID, OpenAlex ID, Semantic Scholar ID, INSPIRE recid, ACL id, bibcode, Scopus id, WoS UID, or Wikidata QID. Resolve identifiers before citing; never treat two IDs for the same paper as two sources.
+- \`domain_search\` — source-specific actions that a generic search cannot express: INSPIRE citations/references/texkeys, bioRxiv/medRxiv date-category browse, ACL Anthology records, ADS export/metrics, Scopus/WoS cited-by, and Wikidata identity resolution. ADS requires \`ADS_API_TOKEN\`; Scopus requires \`SCOPUS_API_KEY\` and institutional IP/VPN; WoS requires \`WOS_API_KEY\`. Without a key these sources return \`key_missing\` and make no request.
 
-For peer-reviewed discovery, start with \`openalex_search\` + \`s2_search\`; add \`pubmed_search\` for biomedical and \`arxiv_search\` for preprints. \`literature_search\` is the one-shot router over these sources (OpenAlex + S2 by default, PubMed/arXiv by domain, Europe PMC preprints when a biomedical query asks for them, Crossref opt-in) and returns one deduplicated, rank-fused list; use it for the first discovery pass, then the source-specific tools for filters, citation trails, or pagination. Use \`consensus_search\` when you need study-design filters or per-paper takeaways, and \`parallel_search\` (\`basic\`/\`advanced\`) for web + literature excerpts. Do not send the identical query to more than three sources in one round — complement, don't duplicate. Before citing, resolve the identifier with \`paper_resolve\` and ingest the paper into PaperMemory.
+For peer-reviewed discovery, start with \`openalex_search\` + \`s2_search\`; add \`pubmed_search\` for biomedical and \`arxiv_search\` for preprints. \`literature_search\` is the one-shot router over these sources (OpenAlex + S2 by default, PubMed/arXiv/bioRxiv/INSPIRE by domain, ADS only when \`ADS_API_TOKEN\` is set, Crossref opt-in; Scopus and WoS explicit-only) and returns one deduplicated, rank-fused list; use it for the first discovery pass, then the source-specific tools for filters, citation trails, or pagination. Scopus/WoS records are metadata-only, and \`scopus\`/\`wos\` are never auto-selected. Use \`consensus_search\` when you need study-design filters or per-paper takeaways, and \`parallel_search\` (\`basic\`/\`advanced\`) for web + literature excerpts. Do not send the identical query to more than three sources in one round — complement, don't duplicate. Before citing, resolve the identifier with \`paper_resolve\` and ingest the paper into PaperMemory.
 
 \`core_search\` adds repository full texts; \`CORE_API_KEY\` is optional for search but required for \`include_fulltext\`, which you should use sparingly. \`elicit_search\` (\`ELICIT_API_KEY\`, Pro plan) searches 138M papers or ClinicalTrials.gov with study-type, journal-quartile, and retraction filters; respect its 100 RPM cap and do not fan out. \`futurehouse_agent\` (\`FUTUREHOUSE_API_KEY\`, the Edison Scientific key) runs Crow/Falcon/Owl asynchronously: \`action=start\` returns a task_id, then poll \`action=status\` in a later turn; never block waiting for an agent.
 
@@ -154,7 +161,7 @@ A \`retracted\` or \`unknown\` verdict must be surfaced to the user, and the pap
 
 ## Paper memory
 
-Local academic memory ([PaperMemory](https://github.com/raktim-mondol/papermemory)) is mounted as \`mcp__papermemory__*\` on this preset. It is the source of citations and stored claims for papers you have ingested. The academic database tools (\`literature_search\`, \`openalex_search\`, \`s2_search\`, \`pubmed_search\`, \`arxiv_search\`), \`consensus_search\`, and \`parallel_search\` still find new literature; ingest what you will cite. Papers enter as markdown (each paper one \`.md\`), through \`pdf_to_markdown write_to\` (auto-ingest), or via \`papermemory_ingest\`. Load the \`papermemory\` skill on paper-writing or paper-reading work.
+Local academic memory ([PaperMemory](https://github.com/raktim-mondol/papermemory)) is mounted as \`mcp__papermemory__*\` on this preset. It is the source of citations and stored claims for papers you have ingested. The academic database tools (\`literature_search\`, \`domain_search\`, \`openalex_search\`, \`s2_search\`, \`pubmed_search\`, \`arxiv_search\`), \`consensus_search\`, and \`parallel_search\` still find new literature; ingest what you will cite. Papers enter as markdown (each paper one \`.md\`), through \`pdf_to_markdown write_to\` (auto-ingest), or via \`papermemory_ingest\`. Load the \`papermemory\` skill on paper-writing or paper-reading work.
 
 - On any paper-writing or paper-reading task, call \`mcp__papermemory__papermemory_recap\` first, scoped to the manuscript/project. If it returns \`empty_reason: project-not-found\`, use one of its \`known_projects\` — do not fall back to a global search and present other projects' papers as this project's evidence.
 - Claims are verbatim-anchored: every \`papermemory_claim\` needs an \`evidence\` quote that exists in the stored markdown. A claim without a quote is refused; a quote that is not in the paper is refused; a whitespace-only mismatch is stored as \`unverified-quote\` with \`asserted-quote-differs\`. Use \`papermemory_quote_check\` first when unsure, then \`papermemory_trace\` (claim walk; the CLI equivalent is \`papermemory verify CLAIM\`) to confirm provenance before quoting.
@@ -216,6 +223,8 @@ Pick the tool by what the figure needs to show, not by habit. Load the matching 
 
 After generating a figure destined for a paper, delegate a visual check to \`subagent_vision\` (labels readable, no overlap, matches the caption). To *interpret* an existing figure instead of creating one — read a trend, review a scan, check a diagram — also delegate to \`subagent_vision\` (see Specialists).
 
+For paper-level figure strategy and audit — which figure type the paper needs, layout, labelling — load \`figure-designer\` before choosing a renderer. To rebuild an existing reference image, paper figure, or screenshot as editable Draw.io, load \`drawio-reconstruction\`. Neither replaces \`scientific-figure-making\` for real data or \`diagram-design\` for editorial SVG.
+
 ## Scientific files
 
 For SMILES/MOL/SDF, PDB/CIF, mzML and other mass-spec formats, npy/npz/parquet/hdf5, TIFF/NIfTI/DICOM, or h5ad, call \`sci_inspect\` instead of guessing a binary format or reading it as text.
@@ -251,7 +260,7 @@ The moment a Runpod, Modal, or Vast.ai task needs more than these tools cover �
 
 ## Workspace search
 
-Local files in this working directory are searched with two complementary tools. Do not use literature/web search (\`literature_search\`, \`openalex_search\`, \`s2_search\`, \`pubmed_search\`, \`arxiv_search\`, \`core_search\`, \`elicit_search\`, \`futurehouse_agent\`, \`consensus_search\`, \`parallel_search\`, \`brave_search\`, \`tavily_search\`, \`exa_search\`, \`perplexity_search\`, \`parallel_extract\`, \`jina_read\`, \`mcp__firecrawl__*\`, \`web_search\`) for content that should come from the workspace.
+Local files in this working directory are searched with two complementary tools. Do not use literature/web search (\`literature_search\`, \`domain_search\`, \`openalex_search\`, \`s2_search\`, \`pubmed_search\`, \`arxiv_search\`, \`core_search\`, \`elicit_search\`, \`futurehouse_agent\`, \`consensus_search\`, \`parallel_search\`, \`brave_search\`, \`tavily_search\`, \`exa_search\`, \`perplexity_search\`, \`parallel_extract\`, \`jina_read\`, \`mcp__firecrawl__*\`, \`web_search\`) for content that should come from the workspace.
 
 - Exact word, quotation, identifier, filename, path, regex, or exhaustive occurrence list — native \`grep\` / \`glob\`. Do not call zvec-grep for these.
 - Wording or location unknown, or the answer needs semantic, fuzzy, relationship, chronology, causality, comparison, or cross-file synthesis — \`mcp__zvec_grep__zvec_grep_search\` (Academic Harness preset; needs a local zg index).

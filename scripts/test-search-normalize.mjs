@@ -13,21 +13,29 @@ import { buildCreateBody as buildFutureHouseBody, summarizeTask } from '../futur
 import {
   capText,
   canonicalArxivId,
+  canonicalBibcode,
   canonicalDoi,
+  canonicalScopusId,
+  canonicalWosUid,
+  fromAdsDoc,
   fromArxivEntry,
+  fromBiorxivRecord,
   fromBraveResult,
   fromCoreResult,
   fromCrossrefWork,
   fromElicitPaper,
   fromElicitTrial,
   fromEuropePmcResult,
+  fromInspireHit,
   fromNcbiSummary,
   fromOpenAlexWork,
   fromPerplexityResult,
   fromExaResult,
+  fromScopusEntry,
   fromTavilyResult,
   fromSemanticScholarPaper,
   fromSemanticScholarSnippet,
+  fromWosHit,
   identifierKind,
   mergePapers,
   mergeRanked,
@@ -50,7 +58,17 @@ assert.deepEqual(identifierKind('PMID: 12345678'), { kind: 'pmid', value: '12345
 assert.deepEqual(identifierKind('2301.12345'), { kind: 'arxiv', value: '2301.12345' })
 assert.deepEqual(identifierKind('W2741809807'), { kind: 'openalex', value: 'W2741809807' })
 assert.equal(identifierKind('a'.repeat(40)).kind, 's2')
+assert.deepEqual(identifierKind('recid:12345'), { kind: 'inspire', value: '12345' })
+assert.equal(identifierKind('conf/x/y').kind, 'unknown', 'DBLP identifiers are no longer recognized')
+assert.deepEqual(identifierKind('2024.acl-long.1'), { kind: 'acl', value: '2024.acl-long.1' })
+assert.deepEqual(identifierKind('2-s2.0-123'), { kind: 'scopus', value: '2-s2.0-123' })
+assert.deepEqual(identifierKind('WOS:000123'), { kind: 'wos', value: 'WOS:000123' })
+assert.deepEqual(identifierKind('2024ApJ...123...45L'), { kind: 'bibcode', value: '2024ApJ...123...45L' })
+assert.deepEqual(identifierKind('Q42'), { kind: 'wikidata', value: 'Q42' })
 assert.equal(identifierKind('???').kind, 'unknown')
+assert.equal(canonicalBibcode('2024ApJ...123...45L'), '2024ApJ...123...45L')
+assert.equal(canonicalScopusId('2-s2.0-123'), '2-s2.0-123')
+assert.equal(canonicalWosUid('wos:000123'), 'WOS:000123')
 
 const openalex = fromOpenAlexWork({
   id: 'https://openalex.org/W123',
@@ -181,6 +199,79 @@ assert.equal(ncbi.pmid, '12345678')
 assert.equal(ncbi.doi, '10.1000/abc.1')
 assert.equal(ncbi.oa_status, 'open')
 assert.equal(fromNcbiSummary({ uid: '1', error: 'cannot get document summary' }), null)
+
+const biorxiv = fromBiorxivRecord({
+  doi: '10.1101/2024.01.01.123456',
+  title: 'A <b>Preprint</b>',
+  authors: 'Ada Lovelace; Alan Turing',
+  date: '2024-01-01',
+  version: '2',
+  category: 'microbiology',
+}, { server: 'medrxiv' })
+assert.equal(biorxiv.source, 'biorxiv')
+assert.equal(biorxiv.venue, 'medRxiv')
+assert.equal(biorxiv.title, 'A Preprint')
+assert.equal(biorxiv.authors.length, 2)
+assert.deepEqual(biorxiv.fields, ['microbiology'])
+
+const inspire = fromInspireHit({
+  metadata: {
+    control_number: 123,
+    titles: [{ title: 'An INSPIRE Paper' }],
+    authors: [{ full_name: 'Ada Lovelace' }],
+    publication_info: [{ year: 2024, journal_title: 'JHEP' }],
+    dois: [{ value: '10.1000/inspire' }],
+    arxiv_eprints: [{ value: '2401.12345' }],
+    citation_count: 7,
+    texkeys: ['Lovelace:2024aa'],
+    abstracts: [{ value: 'Inspire abstract' }],
+    subject_terms: [{ term: 'hep-th' }],
+  },
+})
+assert.equal(inspire.inspire_id, '123')
+assert.equal(inspire.texkey, 'Lovelace:2024aa')
+assert.equal(inspire.arxiv_id, '2401.12345')
+assert.equal(inspire.citation_count, 7)
+assert.match(renderPapers([inspire]), /INSPIRE: 123/)
+
+const ads = fromAdsDoc({
+  bibcode: '2024ApJ...123...45L',
+  title: ['An ADS Paper'],
+  author: ['Lovelace, A.'],
+  year: '2024',
+  doi: ['10.1000/ads'],
+  citation_count: 11,
+  pub: 'ApJ',
+})
+assert.equal(ads.bibcode, '2024ApJ...123...45L')
+assert.equal(ads.doi, '10.1000/ads')
+assert.equal(ads.citation_count, 11)
+
+const scopus = fromScopusEntry({
+  eid: '2-s2.0-123',
+  'dc:identifier': 'SCOPUS_ID:123',
+  'dc:title': 'A Scopus Paper',
+  'dc:creator': 'Lovelace A.',
+  'prism:publicationName': 'Journal',
+  'prism:coverDate': '2024-01-01',
+  'citedby-count': '4',
+  'prism:doi': '10.1000/scopus',
+})
+assert.equal(scopus.scopus_id, '2-s2.0-123')
+assert.equal(scopus.licence, 'restricted')
+assert.equal(scopus.citation_count, 4)
+
+const wos = fromWosHit({
+  uid: 'WOS:000123',
+  title: 'A WoS Paper',
+  names: { authors: [{ displayName: 'Lovelace, A.' }] },
+  publicationInfo: { pubYear: '2024', sourceTitle: 'Journal' },
+  identifiers: { doi: '10.1000/wos' },
+  citations: [{ count: 3 }],
+})
+assert.equal(wos.wos_uid, 'WOS:000123')
+assert.equal(wos.licence, 'restricted')
+assert.equal(wos.citation_count, 3)
 
 const grouped = buildOpenAlexParams({ entity: 'works', group_by: 'publication_year' }, null, null)
 assert.equal(grouped.has('select'), false, 'group_by must not send select')
@@ -450,6 +541,15 @@ assert.equal(summarized.status, 'success')
 assert.equal(summarized.answer, 'Yes.')
 assert.equal(summarized.formatted_answer, 'Yes, in 2020.')
 assert.equal(summarized.total_queries, 3)
+
+const restricted = fromScopusEntry({
+  eid: '2-s2.0-123',
+  'dc:identifier': 'SCOPUS_ID:123',
+  'dc:title': 'A Test Paper',
+  'prism:doi': '10.1000/ABC.1',
+})
+const mergedLicence = mergePapers([openalex, restricted])
+assert.equal(mergedLicence[0].licence, null, 'a restricted source must not mark an open merged record restricted')
 
 const merged = mergePapers([openalex, crossref, semantic])
 assert.equal(merged.length, 1, 'DOI duplicates must collapse')

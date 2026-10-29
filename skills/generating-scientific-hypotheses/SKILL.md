@@ -29,6 +29,10 @@ Not a confirmatory analysis. If they already have a question and outcome data to
 - Writing or reviewing a paper, grant, or literature survey
 - Ordinary lookup (“what is known about X”) with no request for new claims
 
+## Related Supervisor-Skills
+
+To vet one idea before committing, use `idea-evaluator`. For a persistent ranked tournament, use `co-scientist-tournament` and the `coscientist` tools. This skill remains the generate–critique–rank procedure.
+
 ## Criteria (score every candidate)
 
 1. **Alignment** — matches the stated goal, constraints, and preferences

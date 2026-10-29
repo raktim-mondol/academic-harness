@@ -8,18 +8,26 @@
  * outranks a paper found once.
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
+import { resolveEnv } from './credential-env.js'
 import { capText, mergeRanked, renderPapers } from './search-normalize.js'
 import { runOpenAlexSearch } from './openalex-search.js'
 import { runS2Search } from './semantic-scholar-search.js'
 import { runPubMedSearch } from './pubmed-search.js'
 import { runArxivSearch } from './arxiv-search.js'
 import { runCrossrefQuery } from './crossref-lookup.js'
+import { runBiorxivSearch } from './biorxiv-search.js'
+import { runInspireSearch } from './inspire-search.js'
+import { runAdsSearch } from './ads-search.js'
+import { runScopusSearch } from './scopus-search.js'
+import { runWosSearch } from './wos-search.js'
 import { libraryLaunch, libraryResolve } from './papermemory-library.js'
 
-const ALLOWED = ['openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints']
+const ALLOWED = ['openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints', 'biorxiv', 'inspire', 'ads', 'scopus', 'wos']
 const BIOMEDICAL = /\b(clinic|clinical|patient|patients|trial|trials|disease|therapy|therapies|treatment|cancer|tumou?r|gene|genes|genetic|protein|proteins|cell|cells|drug|drugs|medical|medicine|health|epidemi\w*|cohort|rct|surgery|surgical|diagnos\w*|psychiatr\w*|neuron\w*|biolog\w*|immun\w*|infect\w*|virus|viral|vaccine|malaria|diabetes|alzheimer|parkinson|cardio\w*|oncology)\b/i
 const PREPRINT = /\b(arxiv|preprints?|neural|machine learning|deep learning|transformer|transformers|llm|llms|language model|computer vision|algorithm|algorithms|quantum|physics|astrophysic\w*|cosmolog\w*|particle|mathematic\w*|theorem|robot\w*|reinforcement learning|dataset|benchmark|computational)\b/i
 const ASKS_FOR_PREPRINTS = /\b(preprints?|biorxiv|medrxiv)\b/i
+const HEP_DOMAIN = /\b(high-energy physics|particle physics|nuclear physics|string theory|gravitation|quantum chromodynamics|qcd|collider|boson|fermion|supersymmetry|hep-th|hep-ph)\b/i
+const ASTRO_DOMAIN = /\b(astro|astronomy|astrophysics|cosmology|cosmological|planetary|solar system|exoplanet|galaxy|galaxies|supernova|black hole)\b/i
 const STOPWORDS = new Set([
   'a', 'an', 'the', 'of', 'for', 'and', 'or', 'in', 'on', 'to', 'with', 'by',
   'from', 'at', 'is', 'are', 'be', 'as', 'that', 'this', 'these', 'those',
@@ -50,13 +58,15 @@ export function parseSources(value) {
   return [...new Set(sources)]
 }
 
-export function chooseSources(query, requested) {
+export function chooseSources(query, requested, { adsToken = false } = {}) {
   const explicit = parseSources(requested)
   if (explicit) return explicit
   const sources = ['openalex', 's2']
   if (BIOMEDICAL.test(query)) sources.push('pubmed')
   if (PREPRINT.test(query)) sources.push('arxiv')
-  if (BIOMEDICAL.test(query) && ASKS_FOR_PREPRINTS.test(query)) sources.push('preprints')
+  if (BIOMEDICAL.test(query) && ASKS_FOR_PREPRINTS.test(query)) sources.push('biorxiv')
+  if (HEP_DOMAIN.test(query)) sources.push('inspire')
+  if (ASTRO_DOMAIN.test(query) && adsToken) sources.push('ads')
   return sources
 }
 
@@ -100,6 +110,19 @@ async function runSource(source, { query, perSource, yearMin, yearMax, openAcces
         preprints: true,
         max_results: Math.min(perSource, 100),
       }, { signal })
+    case 'biorxiv':
+      return runBiorxivSearch({
+        query: openAccessOnly ? `(${query}) AND OPEN_ACCESS:y` : query,
+        limit: Math.min(perSource, 100),
+      }, { signal })
+    case 'inspire':
+      return runInspireSearch({ query, limit: Math.min(perSource, 100) }, { signal })
+    case 'ads':
+      return runAdsSearch({ query, limit: Math.min(perSource, 100) }, { signal })
+    case 'scopus':
+      return runScopusSearch({ query, limit: Math.min(perSource, 100) }, { signal })
+    case 'wos':
+      return runWosSearch({ query, limit: Math.min(perSource, 50) }, { signal })
     case 'crossref': {
       const filters = []
       if (yearMin != null) filters.push(`from-pub-date:${yearMin}-01-01`)
@@ -180,9 +203,9 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'literature_search',
     description: [
-      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries, arXiv for preprint/CS/physics queries, and Europe PMC preprints (SRC:PPR) when a biomedical query asks for preprints; Crossref and preprints are also available explicitly.',
+      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, Scopus, and Web of Science are also available explicitly.',
       'Results are deduplicated and rank-fused across sources (reciprocal-rank fusion), so use this when you want one clean discovery list instead of issuing the same query to several tools. Coverage is the top-N relevance slice per source, not exhaustive; use source-specific tools for filters, citation trails, or pagination.',
-      'Optional year range and open_access_only filters. source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
+      'Optional year range and open_access_only filters. Scopus and Web of Science are never auto-selected and need SCOPUS_API_KEY/WOS_API_KEY; without a key they return key_missing and make no request. Scopus/WoS records are metadata-only. source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
     ].join(' '),
     parameters: {
       query: { type: 'string', required: true, description: 'Natural-language discovery query.' },
@@ -191,7 +214,7 @@ export function apply(ctx) {
           { type: 'string' },
           { type: 'array', items: { type: 'string' } },
         ],
-        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints. Accepts an array or comma-separated string.',
+        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints, biorxiv, inspire, ads, scopus, wos. Accepts an array or comma-separated string. Scopus and Web of Science are explicit-only and keyed.',
       },
       max_results: { type: 'number', description: 'Total unique results to return, 1-100. Default 20. This is a top-N slice, not exhaustive coverage.' },
       year_min: { type: 'number', description: 'Earliest publication year. Records with unknown years are kept.' },
@@ -208,7 +231,8 @@ export function apply(ctx) {
       if (!query) return { error: 'query is required' }
       let sources
       try {
-        sources = chooseSources(query, args.sources)
+        const adsToken = await resolveEnv('ADS_API_TOKEN')
+        sources = chooseSources(query, args.sources, { adsToken: Boolean(adsToken) })
       } catch (error) {
         return { error: error.message }
       }
@@ -254,7 +278,12 @@ export function apply(ctx) {
         }
         const value = entry.value
         if (!value || value.error) {
-          failures.push({ source, error: value?.error || 'no result' })
+          failures.push({
+            source,
+            error: value?.error || 'no result',
+            ...(value?.code ? { code: value.code } : {}),
+            ...(value?.field ? { field: value.field } : {}),
+          })
           return
         }
         const results = (value.results || [])
@@ -269,6 +298,9 @@ export function apply(ctx) {
         ...paper,
         rrf_score: Number(paper.rrf_score.toFixed(5)),
       }))
+      if (papers.some((paper) => paper.licence === 'restricted')) {
+        warnings.push('Scopus/Web of Science records are metadata-only; abstracts and full text are not stored.')
+      }
       const library = await markInLibrary(papers, exec)
       return {
         query,

@@ -240,9 +240,9 @@ assert.match(normalizedReview.url, /forum\?id=f1&noteId=n1$/)
 
 assert.deepEqual(
   chooseSources('semaglutide obesity clinical trial preprints'),
-  ['openalex', 's2', 'pubmed', 'arxiv', 'preprints'],
+  ['openalex', 's2', 'pubmed', 'arxiv', 'biorxiv'],
 )
-assert.ok(!chooseSources('diffusion models preprints').includes('preprints'), 'preprints auto-route is biomedical-only')
+assert.ok(!chooseSources('diffusion models preprints').includes('biorxiv'), 'bioRxiv auto-route is biomedical-only')
 assert.deepEqual(parseSources('openalex,preprints'), ['openalex', 'preprints'])
 assert.equal(buildEuropePmcQuery('GLP-1 obesity', true), '(GLP-1 obesity) AND SRC:PPR')
 assert.equal(buildEuropePmcQuery('GLP-1 obesity AND SRC:PPR', true), 'GLP-1 obesity AND SRC:PPR', 'no double SRC restriction')

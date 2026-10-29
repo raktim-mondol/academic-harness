@@ -1,6 +1,6 @@
 # Specialist agents — gap analysis and implementation plan
 
-Status: **proposed, not implemented** (2026-10-24) · Baseline **v0.19.0**
+Status: **partially implemented** · baseline **v0.19.0** (2026-10-24). The specialist briefs now ship as skills under `skills/`, and the roster lives in `prompt.js`; read this as the gap analysis and design record, not the current list of capabilities.
 
 Source docs: `README.md`, `prompt.js`, `docs/SEARCH-PROVIDERS-PLAN.md`,
 `docs/NON-SEARCH-TOOLS-PLAN.md`, `docs/ACADEMIC-HARNESS-ENGINE.md`,

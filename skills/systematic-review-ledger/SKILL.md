@@ -19,7 +19,8 @@ metadata:
 Use this skill when the deliverable must show *how* studies were selected, not
 just what was found. For an ordinary narrative literature review, use the
 `literature-review` skill instead — a ledger adds bookkeeping that survey does
-not need.
+not need. For a survey-grade report with frozen research questions and
+per-citation verification, use the Supervisor-Skills `deep-research`.
 
 ## Ledger layout
 

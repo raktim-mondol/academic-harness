@@ -768,6 +768,10 @@ resolved per call where applicable. They are not named in the base prompt.
 - Do not build a bioRxiv/medRxiv search API: the public bioRxiv API is
   date/DOI-oriented, not full-text search. Europe PMC already indexes these
   preprints.
+- **Implemented in Phase 2:** `literature_search` adds `biorxiv` for
+  biomedical preprint queries, and `domain_search biorxiv` uses the bioRxiv
+  API only for date/category browse, DOI details, and published-version
+  lookup. `preprints` remains an explicit Europe PMC source.
 - Update the prompt and README; no new tool.
 
 ### 11.4 Phase 6 acceptance

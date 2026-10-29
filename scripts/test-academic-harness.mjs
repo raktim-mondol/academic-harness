@@ -3,7 +3,7 @@
  * Academic Harness DSH adapter: tool argv mapping, hook translation,
  * vendor tree, skills, and a live engine smoke if uv/python can install.
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -47,6 +47,63 @@ ok('vendor SOURCE.txt names commit', /dbc7414/.test(readFileSync(join(vendorDir(
 ok('vendoredVersion is 0.1.0', vendoredVersion() === '0.1.0')
 ok('engine has no earendil import', !readFileSync(join(vendorDir(), 'ah', 'cli.py'), 'utf8').includes('earendil'))
 ok('engine README does not require Pi', !/you use it through \*\*\[Pi\]/.test(readFileSync(join(vendorDir(), 'README.md'), 'utf8')))
+
+// ── skill catalogue ───────────────────────────────────────────────────────
+
+{
+  const skillsDir = join(ROOT, 'skills')
+  const dirs = readdirSync(skillsDir, { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name)
+  const names = new Map()
+  for (const dir of dirs) {
+    const name = readFileSync(join(skillsDir, dir, 'SKILL.md'), 'utf8').match(/^name:\s*(.+)$/m)?.[1]?.trim()
+    if (name) names.set(name, (names.get(name) || 0) + 1)
+  }
+  ok('skill catalogue has 743 entries', dirs.length === 743, String(dirs.length))
+  ok('skill names are unique', names.size === dirs.length, `${names.size} names`)
+  for (const name of [
+    'deep-research',
+    'idea-evaluator',
+    'tech-paper-template',
+    'benchmark-paper-template',
+    'intro-drafter',
+    'paper-writer',
+    'paper-polish',
+    'figure-designer',
+    'drawio-reconstruction',
+    'pre-submission-reviewer',
+    'rebuttal-guidance',
+    'vibe-research-workflow',
+  ]) {
+    const file = join(skillsDir, name, 'SKILL.md')
+    ok(`Supervisor-Skills ${name} is present`, existsSync(file))
+    ok(
+      `Supervisor-Skills ${name} has routing`,
+      existsSync(file) && readFileSync(file, 'utf8').includes('Routing in Academic Harness'),
+    )
+  }
+  const related = [
+    'academic-harness',
+    'abstract-writer',
+    'agentic-data-science-pipeline',
+    'ah-plan-section',
+    'ah-write-unit',
+    'diagram-design',
+    'generating-scientific-hypotheses',
+    'literature-researcher',
+    'literature-review',
+    'manuscript-editor',
+    'peer-reviewer',
+    'remove-ai-signs',
+    'scientific-figure-making',
+    'surveying-prior-work',
+    'systematic-review-ledger',
+  ]
+  ok(
+    'existing skills carry reciprocal Supervisor-Skills routing',
+    related.every((name) => existsSync(join(skillsDir, name, 'SKILL.md'))
+      && readFileSync(join(skillsDir, name, 'SKILL.md'), 'utf8').includes('Supervisor-Skills')),
+  )
+}
 
 // ── findAhRoot ────────────────────────────────────────────────────────────
 

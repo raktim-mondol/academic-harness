@@ -194,6 +194,8 @@ local skill of the same name. Its reference guide, `references/signs.md`, is
 adapted from Wikipedia's "Signs of AI writing" (WP:AICAT) and is licensed
 CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/). It is a prose
 style-editing aid; it makes no detector-evasion or provenance-removal claim.
+A Supervisor-Skills routing note pointing to `paper-polish` was added; that
+modification remains under CC BY-SA 4.0.
 
 The reply-folding engine in `fold-core.js` is adapted from TextFold's
 `plugins/textfold/hooks/fold.ts` (Apache License 2.0), part of
@@ -209,6 +211,49 @@ dependency: on first preset start it installs `textfold==0.10.31` from PyPI into
 `$DSH_HOME/textfold` and calls the documented `get --json` CLI. The package is
 not vendored, and no TextFold source is copied for this tool; `TEXTFOLD_PYTHON`,
 `TEXTFOLD_CLI`, and `TEXTFOLD_SKIP_INSTALL` let a user supply or skip it.
+
+The 12 Supervisor-Skills research-lifecycle skills under `skills/`
+(benchmark-paper-template, deep-research, drawio-reconstruction,
+figure-designer, idea-evaluator, intro-drafter, paper-polish, paper-writer,
+pre-submission-reviewer, rebuttal-guidance, tech-paper-template, and
+vibe-research-workflow) are vendored from
+https://github.com/HKUSTDial/Supervisor-Skills at commit
+`a20d76ef3979b804d7dbf599d577826957e0a8a9` (2026-10-15, upstream v2.1.0).
+Their licences are mixed:
+
+- **CC BY 4.0**: benchmark-paper-template, figure-designer, idea-evaluator,
+  pre-submission-reviewer, tech-paper-template, vibe-research-workflow.
+- **CC BY-NC-SA 4.0**: deep-research, intro-drafter, paper-polish, paper-writer,
+  rebuttal-guidance. These are non-commercial and share-alike; they remain
+  under that licence inside this package, and this package's MIT licence does
+  not relicense them. The full licence text is in
+  `vendor/supervisor-skills/LICENSE`.
+- **MIT**: drawio-reconstruction (Copyright (c) 2026 VCG-Bench Authors; its
+  `LICENSE` is kept in the skill directory).
+
+License texts: https://creativecommons.org/licenses/by/4.0/ and
+https://creativecommons.org/licenses/by-nc-sa/4.0/; the latter is also included
+in `vendor/supervisor-skills/LICENSE`. The suite is © 2026 Yuyu Luo
+(methodology) and contributors, except drawio-reconstruction
+(© 2026 VCG-Bench Authors).
+
+The upstream `handbook/` and `handbook-en/` curricula, the repository and
+per-skill READMEs, and drawio-reconstruction's examples/assets/agent metadata
+were not copied; the skills are self-contained, and handbook references point
+upstream. Local changes: "(separate plugin)" cross-references were removed;
+`license:` frontmatter was added to drawio-reconstruction and
+rebuttal-guidance; short DSH runtime notes were added to drawio-reconstruction
+(use `uv run python`) and vibe-research-workflow (this agent is the runtime);
+and every skill gained a `Routing in Academic Harness` section that names the
+existing skill to use when a task crosses a stage boundary. Reciprocal
+routing notes were added to the plugin's `academic-harness`, `ah-write-unit`,
+`ah-plan-section`, `scientific-figure-making`, `diagram-design`,
+`manuscript-editor`, `peer-reviewer`, `literature-researcher`,
+`literature-review`, `surveying-prior-work`,
+`generating-scientific-hypotheses`, `agentic-data-science-pipeline`,
+`remove-ai-signs`, `abstract-writer`, and `systematic-review-ledger` skills;
+`seed.js` refreshes those known-stale copies on existing installs.
+See `vendor/supervisor-skills/SOURCE.txt` for the exact file list and changes.
 
 ResearchCraft branding and content © ResearchCraft.
 Site: https://researchcraft.dev

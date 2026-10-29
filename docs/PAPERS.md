@@ -53,7 +53,7 @@ TextFold builds levels from the author's own first sentences, so `map` and `sect
 
 ### Runtime and storage
 
-The first preset start installs `textfold==0.10.31` into `$DSH_HOME/textfold/venv` with `uv` (else `python -m venv` + pip). Documents live in `$DSH_HOME/textfold/data`. The install runs in the background; the first `paper_fold` call waits for it. Overrides are environment-only:
+The first preset start installs `textfold==0.10.31` into `$DSH_HOME/textfold/venv` with `uv` (else `python -m venv` + pip). Documents live in `$DSH_HOME/textfold/data`. The install runs in the background; the first `paper_fold` call waits for it. The managed runtime forwards `DEEPSEEK_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENROUTER_API_KEY`, and the Settings/env `GEMINI_API_KEY` to TextFold, which can also read its own `~/.textfold/settings.json`. Overrides are environment-only:
 
 | Variable | Effect |
 |---|---|
@@ -90,7 +90,7 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 
 [PaperMemory](https://github.com/raktim-mondol/papermemory) is the local academic-memory layer on the Academic Harness preset: papers (title, authors, year, venue, DOI, arXiv, bibtex key), claims with quoted evidence, citation graphs, manuscript recap, and cite-check. It is how the agent remembers papers it has read and cites without inventing references — open-web and peer-reviewed discovery stays on Parallel / Consensus / Firecrawl / Scite.
 
-You do **not** install PaperMemory yourself. The first time the Academic Harness preset mounts after `dsh plugin add`, the plugin uses `papermemory` already on `PATH` if present, otherwise installs the vendored package (with `pypdf`) into `~/.dsh/papermemory` via `uv` (or `python -m venv` + pip). It then mounts `mcp__papermemory__*` over stdio (`papermemory mcp`) — no second restart. Startup is **fail-loud**: a missing or broken memory server (and any drift from the expected 14-tool MCP surface (the library is the native `reference_library` tool)) is logged/surfaced instead of silently reading as an empty store. Override with `PAPERMEMORY_CLI` if you already have a binary you want to keep; `PAPERMEMORY_SKIP_INSTALL=1` skips the bundled venv.
+You do **not** install PaperMemory yourself. The first time the Academic Harness preset mounts after `dsh plugin add`, the plugin uses `papermemory` already on `PATH` if present, otherwise installs the vendored package (with `pypdf`) into `~/.dsh/papermemory` via `uv` (or `python -m venv` + pip). It then mounts `mcp__papermemory__*` over stdio (`papermemory mcp`) — no second restart. Startup is **fail-loud**: a missing or broken memory server, or any drift from the expected 14-tool MCP surface (the library is the native `reference_library` tool), is logged/surfaced instead of silently reading as an empty store. Override with `PAPERMEMORY_CLI` if you already have a binary you want to keep; `PAPERMEMORY_SKIP_INSTALL=1` skips the bundled venv.
 
 The SQLite store is PaperMemory's default: `~/.local/share/papermemory/papermemory.db` (override `PAPERMEMORY_DB` or `PAPERMEMORY_DATA_DIR`). A standalone `papermemory` CLI, Grok, and Academic Harness share that same database. No API key.
 
@@ -134,13 +134,15 @@ PaperMemory is also the reference manager. One tool, `reference_library`, keeps 
 
 | Task | How |
 |---|---|
-| Add references | `import` BibTeX, BibLaTeX, RIS (Zotero/EndNote-style and publisher exports) or CSL-JSON; `paper_download` and `papermemory_ingest` add papers automatically. `dry_run` first for a big file. |
+| Add references | `import` BibTeX, BibLaTeX, RIS (Zotero/EndNote-style and publisher exports, including Scopus and Web of Science exports) or CSL-JSON; `paper_download` and `papermemory_ingest` add papers automatically. `dry_run` first for a big file. |
 | Find | `list` with filters — `tag:ml year:2020..2024 has:pdf !tag:skip graph` — or `get` / `resolve` by key, DOI, or id. |
 | Organise | `tag`; `collection` (one level of nesting; can be bound to a project and a `.bib`; its project scopes exports); `note` (an edit keeps the old text). |
 | Write a bibliography | `export` to BibTeX, BibLaTeX, RIS, CSL-JSON, JSON, or CSV. `cited_only: <manuscript>` exports exactly what a manuscript cites, under that project's own keys. A collection created under a project does the same, even when an explicit `out` is given; pass `project` to override, and use a collection with no project for canonical keys. Only BibTeX/BibLaTeX defaults to the collection's bound `.bib`. A project `.bib` is **managed**: re-export rewrites only the managed block, keeps what you wrote after the `hand-added` marker, and refuses to overwrite hand edits unless forced (a backup is kept). |
 | Keep keys stable | A key is set once. `keys` `check` reports problems; `rekey` is a dry run listing the manuscripts that cite the old key, and applying it needs a reason. The old key keeps resolving. |
 | Clean up | `dedupe` lists candidate duplicates (it recognises a preprint and its published version, and does not flag "Part one/two", "Addendum", or yearly items); `merge` previews field by field and applies only with a reason. |
 | Health | `doctor` reports missing required fields, unsafe keys, unverified DOIs, duplicates, retracted papers a manuscript still cites, and `.bib` files out of sync. A paper never integrity-checked is *unknown*, not clean. |
+
+Scopus and Web of Science are import formats here, not live databases: `reference_library` reads the RIS files those services export, does not query their APIs, and needs no Scopus or Web of Science key.
 
 The harness tools use it: `citation` accepts `library: { cited_only | project | collection | query | all }` as a record source, `manuscript_citations` accepts `library: true` (and `project`) to compare cited keys with the library, `literature_search` marks results already stored (`in_library`), and `integrity_check` accepts `library` to check the DOIs of library papers and record each result. `reference_library` is a native tool, not an MCP tool, so it knows each session's workspace: import paths and export targets are relative to it and cannot leave it, and nothing has to be passed. (An MCP server is one process with one fixed working directory, and the host freezes tool arguments, so an MCP tool cannot learn the session's workspace; the plugin hides `papermemory_library` from the MCP surface with `PAPERMEMORY_HIDE_TOOLS` so the model sees one tool.)
 

@@ -1,7 +1,7 @@
 # zg ↔ PaperMemory v2 alignment plan
 
-Status: proposed (not implemented) · Date 2026-10-22 · Target release: plugin **v0.15.0**,
-PaperMemory **v0.2.1**
+Status: historical design record · Date 2026-10-22 · original target: plugin **v0.15.0**,
+PaperMemory **v0.2.1**. The routing, fail-soft/fail-loud split, and indexing rules proposed here are now documented in [Workspace](WORKSPACE.md#workspace-search).
 
 ## 1. Why
 

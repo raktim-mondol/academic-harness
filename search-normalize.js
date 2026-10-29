@@ -29,6 +29,41 @@ export function canonicalArxivId(value) {
   return legacy ? legacy[1].toLowerCase() : null
 }
 
+export function canonicalScopusId(value) {
+  if (!value) return null
+  const raw = String(value).trim().replace(/^scopus:\s*/i, '')
+  const eid = raw.match(/2-s2\.0-\d+/i)
+  if (eid) return eid[0].toLowerCase()
+  const scopus = raw.match(/SCOPUS_ID:\s*(\d+)/i)
+  if (scopus) return `SCOPUS_ID:${scopus[1]}`
+  if (/^\d+$/.test(raw)) return `SCOPUS_ID:${raw}`
+  return null
+}
+
+export function canonicalWosUid(value) {
+  if (!value) return null
+  const match = String(value).trim().match(/WOS:\d+/i)
+  return match ? match[0].toUpperCase() : null
+}
+
+export function canonicalInspireId(value) {
+  if (!value) return null
+  const match = String(value).trim().match(/^(?:inspire|recid):\s*(\d+)$/i)
+  return match ? match[1] : null
+}
+
+export function canonicalAclId(value) {
+  if (!value) return null
+  const raw = String(value).trim().replace(/^acl:\s*/i, '')
+  return /^(?:\d{4}\.[a-z0-9-]+(?:\.[a-z0-9-]+)*\.\d+|[A-Z]\d{2}-\d{4})$/i.test(raw) ? raw : null
+}
+
+export function canonicalBibcode(value) {
+  if (!value) return null
+  const raw = String(value).trim()
+  return /^\d{4}[A-Za-z0-9&.\-?]{15}$/.test(raw) ? raw : null
+}
+
 export function normalizeTitle(title) {
   return String(title || '')
     .replace(/<[^>]+>/g, ' ')
@@ -55,7 +90,7 @@ function stripOpenAlexId(value) {
   return m ? m[1] : null
 }
 
-function yearOf(value) {
+export function yearOf(value) {
   const n = Number.parseInt(String(value ?? ''), 10)
   return Number.isFinite(n) ? n : null
 }
@@ -73,7 +108,7 @@ function yearFromDate(value) {
   return match ? Number(match[0]) : null
 }
 
-function stripMarkup(text) {
+export function stripMarkup(text) {
   if (!text) return null
   return String(text)
     .replace(/<[^>]+>/g, ' ')
@@ -107,6 +142,13 @@ export function emptyPaper(source = 'unknown') {
     arxiv_id: null,
     openalex_id: null,
     s2_id: null,
+    bibcode: null,
+    inspire_id: null,
+    acl_id: null,
+    scopus_id: null,
+    wos_uid: null,
+    wikidata_qid: null,
+    texkey: null,
     title: '',
     authors: [],
     year: null,
@@ -120,6 +162,7 @@ export function emptyPaper(source = 'unknown') {
     oa_url: null,
     url: null,
     type: null,
+    licence: null,
     fields: [],
     snippets: [],
     retrieved_at: NOW(),
@@ -130,11 +173,14 @@ export function fromOpenAlexWork(work) {
   if (!work || typeof work !== 'object') return null
   const ids = work.ids || {}
   const authors = (work.authorships || [])
-    .map((entry) => ({
-      name: entry?.author?.display_name || entry?.raw_author_name || '',
-      orcid: entry?.author?.orcid || undefined,
-    }))
-    .filter((author) => author.name)
+    .map((entry) => {
+      const name = entry?.author?.display_name || entry?.raw_author_name || ''
+      if (!name) return null
+      const author = { name }
+      if (entry?.author?.orcid) author.orcid = entry.author.orcid
+      return author
+    })
+    .filter(Boolean)
   const location = work.primary_location || {}
   const best = work.best_oa_location || {}
   const paper = emptyPaper('openalex')
@@ -425,8 +471,144 @@ export function fromNcbiSummary(summary) {
   return paper
 }
 
+export function fromBiorxivRecord(record, { server = 'biorxiv' } = {}) {
+  if (!record || typeof record !== 'object' || !record.title) return null
+  const paper = emptyPaper('biorxiv')
+  paper.source_id = record.doi || null
+  paper.doi = canonicalDoi(record.doi)
+  paper.title = stripMarkup(record.title) || ''
+  paper.authors = String(record.authors || '')
+    .split(/;\s*/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({ name }))
+  paper.year = yearOf(record.date)
+  paper.venue = server === 'medrxiv' ? 'medRxiv' : 'bioRxiv'
+  paper.abstract = stripMarkup(record.abstract)
+  paper.url = record.doi
+    ? `${server === 'medrxiv' ? 'https://www.medrxiv.org' : 'https://www.biorxiv.org'}/content/${record.doi}v${record.version || 1}`
+    : null
+  paper.type = 'preprint'
+  paper.fields = record.category ? [record.category] : []
+  return paper
+}
+
+export function fromInspireHit(hit) {
+  const metadata = hit?.metadata || hit
+  if (!metadata || typeof metadata !== 'object') return null
+  const title = metadata.titles?.[0]?.title
+  if (!title) return null
+  const publication = (metadata.publication_info || [])[0] || {}
+  const paper = emptyPaper('inspire')
+  paper.source_id = metadata.control_number != null ? String(metadata.control_number) : null
+  paper.inspire_id = paper.source_id
+  paper.texkey = metadata.texkeys?.[0] || null
+  paper.arxiv_id = canonicalArxivId(metadata.arxiv_eprints?.[0]?.value)
+  paper.doi = canonicalDoi(metadata.dois?.[0]?.value)
+  paper.title = stripMarkup(title) || ''
+  paper.authors = (metadata.authors || [])
+    .map((author) => ({ name: author?.full_name || '' }))
+    .filter((author) => author.name)
+  paper.year = yearOf(publication.year || metadata.preprint_date)
+  paper.venue = publication.journal_title || publication.book_title || null
+  paper.abstract = stripMarkup(metadata.abstracts?.[0]?.value)
+  paper.citation_count = Number.isFinite(metadata.citation_count) ? metadata.citation_count : null
+  paper.url = metadata.urls?.[0]?.value
+    || (paper.arxiv_id ? `https://arxiv.org/abs/${paper.arxiv_id}` : null)
+    || (paper.doi ? `https://doi.org/${paper.doi}` : null)
+  paper.type = metadata.document_type?.[0] || null
+  paper.fields = (metadata.subject_terms || []).map((term) => term?.term).filter(Boolean).slice(0, 8)
+  return paper
+}
+
+export function fromAdsDoc(doc) {
+  if (!doc || typeof doc !== 'object') return null
+  const bibcode = canonicalBibcode(doc.bibcode)
+  const title = Array.isArray(doc.title) ? doc.title[0] : doc.title
+  if (!bibcode || !title) return null
+  const paper = emptyPaper('ads')
+  paper.source_id = bibcode
+  paper.bibcode = bibcode
+  paper.title = stripMarkup(title) || ''
+  const rawAuthors = Array.isArray(doc.author) ? doc.author : (doc.author ? [doc.author] : [])
+  paper.authors = rawAuthors
+    .map((name) => ({ name: String(name || '').trim() }))
+    .filter((author) => author.name)
+  paper.year = yearOf(doc.year)
+  paper.venue = doc.pub || doc.pub_raw || null
+  paper.doi = canonicalDoi(Array.isArray(doc.doi) ? doc.doi[0] : doc.doi)
+  paper.arxiv_id = canonicalArxivId(Array.isArray(doc.arxiv) ? doc.arxiv[0] : doc.arxiv)
+  paper.abstract = stripMarkup(doc.abstract)
+  paper.citation_count = Number.isFinite(doc.citation_count) ? doc.citation_count : null
+  paper.url = `https://ui.adsabs.harvard.edu/abs/${bibcode}/abstract`
+  paper.type = doc.doctype || null
+  paper.fields = Array.isArray(doc.keyword) ? doc.keyword.slice(0, 8) : []
+  return paper
+}
+
+export function fromScopusEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null
+  const title = entry['dc:title']
+  if (!title) return null
+  const paper = emptyPaper('scopus')
+  const eid = entry.eid || null
+  paper.source_id = eid || canonicalScopusId(entry['dc:identifier'])
+  paper.scopus_id = canonicalScopusId(eid) || canonicalScopusId(entry['dc:identifier'])
+  paper.doi = canonicalDoi(entry['prism:doi'] || entry.doi)
+  paper.title = stripMarkup(title) || ''
+  paper.authors = String(entry['dc:creator'] || '')
+    .split(/;\s*/)
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({ name }))
+  paper.year = yearOf(entry['prism:coverDate'])
+  paper.venue = entry['prism:publicationName'] || null
+  paper.citation_count = Number.isFinite(Number.parseInt(entry['citedby-count'], 10))
+    ? Number.parseInt(entry['citedby-count'], 10)
+    : null
+  paper.url = entry['prism:url'] || (paper.doi ? `https://doi.org/${paper.doi}` : null)
+  paper.type = entry.subtypeDescription || null
+  paper.licence = 'restricted'
+  return paper
+}
+
+export function fromWosHit(hit) {
+  if (!hit || typeof hit !== 'object') return null
+  const title = hit.title
+  if (!title) return null
+  const paper = emptyPaper('wos')
+  const uid = canonicalWosUid(hit.uid) || hit.uid || null
+  paper.source_id = uid
+  paper.wos_uid = uid
+  paper.title = stripMarkup(title) || ''
+  const rawAuthors = hit.names?.authors || []
+  paper.authors = (Array.isArray(rawAuthors) ? rawAuthors : [rawAuthors])
+    .map((author) => ({
+      name: typeof author === 'string'
+        ? author
+        : author?.displayName || author?.wosStandard || author?.fullName || author?.name || '',
+    }))
+    .filter((author) => author.name)
+  paper.year = yearOf(hit.publicationInfo?.pubYear || hit.publicationInfo?.pubyear)
+  paper.venue = hit.publicationInfo?.sourceTitle || hit.publicationInfo?.journalTitle || null
+  const doi = hit.identifiers?.doi
+  paper.doi = canonicalDoi(Array.isArray(doi) ? doi[0] : doi)
+  if (Number.isFinite(hit.citationCount)) paper.citation_count = hit.citationCount
+  else if (Number.isFinite(hit.citations)) paper.citation_count = hit.citations
+  else if (Array.isArray(hit.citations)) {
+    paper.citation_count = hit.citations.reduce((sum, citation) => sum + (Number(citation?.count) || 0), 0)
+  }
+  paper.url = hit.links?.record || hit.links?.self
+    || (uid ? `https://www.webofscience.com/wos/woscc/full-record/${encodeURIComponent(uid)}` : null)
+  paper.type = hit.documentType || null
+  paper.licence = 'restricted'
+  return paper
+}
+
 const SCALAR_FIELDS = [
   'source_id', 'doi', 'pmid', 'pmcid', 'arxiv_id', 'openalex_id', 's2_id',
+  'bibcode', 'inspire_id', 'acl_id', 'scopus_id', 'wos_uid',
+  'wikidata_qid', 'texkey',
   'title', 'year', 'venue', 'tldr', 'journal_quartile', 'oa_status', 'oa_url',
   'url', 'type', 'full_text',
 ]
@@ -438,6 +620,12 @@ function paperKeys(paper) {
   if (paper.arxiv_id) keys.push(`arxiv:${paper.arxiv_id}`)
   if (paper.openalex_id) keys.push(`openalex:${paper.openalex_id}`)
   if (paper.s2_id) keys.push(`s2:${paper.s2_id}`)
+  if (paper.bibcode) keys.push(`bibcode:${paper.bibcode}`)
+  if (paper.inspire_id) keys.push(`inspire:${paper.inspire_id}`)
+  if (paper.acl_id) keys.push(`acl:${paper.acl_id}`)
+  if (paper.scopus_id) keys.push(`scopus:${paper.scopus_id}`)
+  if (paper.wos_uid) keys.push(`wos:${paper.wos_uid}`)
+  if (paper.wikidata_qid) keys.push(`wikidata:${paper.wikidata_qid}`)
   if (paper.title && paper.year != null) keys.push(`title:${normalizeTitle(paper.title)}:${paper.year}`)
   return keys
 }
@@ -476,6 +664,13 @@ const SOURCE_PRIORITY = {
   consensus: 5,
   parallel: 6,
   brave: 7,
+  biorxiv: 8,
+  inspire: 10,
+  ads: 11,
+  scopus: 12,
+  wos: 13,
+  acl: 14,
+  wikidata: 15,
 }
 
 /** Deterministic order for a merged multi-source list. */
@@ -586,7 +781,14 @@ export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSo
     if (paper.pmid) ids.push(`pmid: ${paper.pmid}`)
     if (paper.arxiv_id) ids.push(`arXiv: ${paper.arxiv_id}`)
     if (paper.openalex_id) ids.push(`openalex: ${paper.openalex_id}`)
+    if (paper.inspire_id) ids.push(`INSPIRE: ${paper.inspire_id}`)
+    if (paper.bibcode) ids.push(`bibcode: ${paper.bibcode}`)
+    if (paper.acl_id) ids.push(`ACL: ${paper.acl_id}`)
+    if (paper.scopus_id) ids.push(`Scopus: ${paper.scopus_id}`)
+    if (paper.wos_uid) ids.push(`WoS: ${paper.wos_uid}`)
+    if (paper.wikidata_qid) ids.push(`Wikidata: ${paper.wikidata_qid}`)
     if (paper.citation_count != null) ids.push(`${paper.citation_count} citations`)
+    if (paper.licence) ids.push(`licence: ${paper.licence}`)
     if (paper.oa_url) ids.push(`oa: ${paper.oa_url}`)
     if (ids.length) bits.push(ids.join(' · '))
     if (paper.tldr) bits.push(paper.tldr)
@@ -620,5 +822,16 @@ export function identifierKind(value) {
   const pmid = raw.match(/^(?:pmid:\s*)?(\d{5,9})$/i)
   if (pmid) return { kind: 'pmid', value: pmid[1] }
   if (/^[0-9a-f]{40}$/i.test(raw)) return { kind: 's2', value: raw }
+  const scopus = raw.match(/^(?:scopus|2-s2\.0-|SCOPUS_ID:).+$/i) ? canonicalScopusId(raw) : null
+  if (scopus) return { kind: 'scopus', value: scopus }
+  const wos = canonicalWosUid(raw)
+  if (wos) return { kind: 'wos', value: wos }
+  const inspire = canonicalInspireId(raw)
+  if (inspire) return { kind: 'inspire', value: inspire }
+  const acl = canonicalAclId(raw)
+  if (acl) return { kind: 'acl', value: acl }
+  const bibcode = canonicalBibcode(raw)
+  if (bibcode) return { kind: 'bibcode', value: bibcode }
+  if (/^Q\d+$/.test(raw)) return { kind: 'wikidata', value: raw }
   return { kind: 'unknown', value: raw }
 }

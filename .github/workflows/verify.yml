@@ -66,6 +66,7 @@ jobs:
           node scripts/test-search-normalize.mjs
           node scripts/test-search-ratelimit.mjs
           node scripts/test-search-execute.mjs
+          node scripts/test-domain-sources.mjs
 
       - name: Run non-search tool tests
         run: |

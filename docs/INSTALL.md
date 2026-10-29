@@ -6,15 +6,15 @@ Academic Harness is a **DeepSeek Harness (DSH) profile**: the DSH web UI and DSH
 
 ## Requirements
 
-- **DeepSeek Harness 0.2.1 or later** (`dsh --version` should report 0.2.1+).
-- Optional Python runtimes are installed automatically on first use, with one exception: the `sci_inspect` helpers need a one-time `cd python-helpers && uv sync`. See [Architecture](ARCHITECTURE.md#runtime-installs).
+- **DeepSeek Harness 0.2.1–0.2.x** (`dsh --version` should report 0.2.1 to 0.2.x; the plugin's engine range is `>=0.2.1-rc.2 <0.3.0`).
+- Optional Python runtimes are installed automatically on first use, with one exception: the `sci_inspect`/`power_analysis` helpers need a one-time `cd python-helpers && uv sync`. See [Architecture](ARCHITECTURE.md#runtime-installs).
 - `modal_run` needs the Modal SDK, which the plugin installs into `$DSH_HOME/modal-sdk` on first use (no restart; set `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` to manage it yourself). `runpod_run` and `vastai_run` need only their API key plus OpenSSH client tools; see [Remote compute](COMPUTE.md).
 
 ## 1. Install DSH
 
 ```sh
 npm install -g @deepseek-ai/dsh
-dsh --version   # should report 0.2.1 or later
+dsh --version   # should report 0.2.1 to 0.2.x
 ```
 
 Without a global install, `npx @deepseek-ai/dsh web` also works. You need a working `dsh` CLI for either installation option below.
@@ -80,7 +80,7 @@ Confirm the preset selector at the top of the message box reads **Academic Harne
 
 The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), `paper_fold`, PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation`, `manuscript_citations`, `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy`/`funder_policy` (datasets and venue/funder policy), and the optional `author_lookup`/`openreview` are only present on this preset. A session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`.
 
-The general-purpose tools below (notebook, fold_text, image_generate, sci_inspect, latex_compile, mermaid_render, pdf_to_markdown, modal_run/runpod_run/vastai_run, workflow) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
+The general-purpose tools below (notebook, fold_text, scientific_result, image_generate, sci_inspect, latex_compile, mermaid_render, pdf_to_markdown, modal_run/runpod_run/vastai_run, research_template) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
 
 See [Architecture](ARCHITECTURE.md) for the host/bundle/preset split and the full tool index in [Tools](TOOLS.md).
 

@@ -698,3 +698,7 @@ This literature-review skill provides:
 
 Conduct thorough, rigorous literature reviews that meet academic standards and provide comprehensive synthesis of current knowledge in any domain.
 
+## Related Supervisor-Skills
+
+For a survey-grade report with frozen research questions, adversarial multi-perspective search, and per-citation verification, use the Supervisor-Skills `deep-research`. This skill remains the comprehensive review generator with markdown/PDF output.
+

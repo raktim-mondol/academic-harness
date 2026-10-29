@@ -62,3 +62,7 @@ memory. After a new paper is worth citing, ingest it
 comes back empty, report its `empty_reason`: only `no-match` licenses "memory has no source
 for this"; `no-match-in-project`, `all-suppressed:*` and `absence-not-licensable` mean the
 corpus exists but the query/filter did not reach it — do not invent a title, year, DOI, or key.
+
+## Related Supervisor-Skills
+
+For a survey-grade report with frozen research questions and per-citation verification, use `deep-research`. For a PRISMA-style screening funnel, use `systematic-review-ledger` and the `review` tool. This brief remains the short delegated synthesis.

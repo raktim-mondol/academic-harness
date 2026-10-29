@@ -29,16 +29,17 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `paper_fold` | Academic Harness preset | Map-first paper reading through TextFold: section map, then one section at a time; local first-sentence levels by default | [Papers](PAPERS.md#read-at-the-right-level) |
 | `pdf_to_markdown` | Every preset | PDF → Markdown with headings, lists, tables, and reading order; optional OCR for scanned pages | [Papers](PAPERS.md#pdf-to-markdown) |
 | `integrity_check` | Academic Harness preset | Retraction / expression-of-concern / correction status from Crossref and OpenAlex, with notice DOIs | [Search](SEARCH.md#publication-integrity) |
-| `paper_resolve` | Academic Harness preset | Convert between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID | [Search](SEARCH.md#academic-databases) |
+| `paper_resolve` | Academic Harness preset | Convert between DOI, PMID, arXiv ID, OpenAlex ID, Semantic Scholar ID, and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers | [Search](SEARCH.md#academic-databases) |
 | `paper_mcp` | Academic Harness preset | Register / status / unregister a Paper2MCP stdio server from `<cwd>/.dsh/paper-mcps.json` | [Papers](PAPERS.md#paper-agents-paper2agent) |
-| `mcp__papermemory__*` | Academic Harness preset | 14-tool local academic memory: search, ingest, cite, cite-check, recap, remember, claim, quote-check, trace, outline, list, register, lesson |
-| `reference_library` | Academic Harness preset | The reference manager over PaperMemory's library: import/export BibTeX, BibLaTeX, RIS, CSL-JSON; tags, collections, notes, keys, duplicates, merge, doctor. Native, so paths are relative to the session workspace | [Papers](PAPERS.md#reference-library) | [Papers](PAPERS.md#paper-memory) |
+| `mcp__papermemory__*` | Academic Harness preset | 14-tool local academic memory: search, ingest, get, cite, cite-check, recap, remember, claim, quote-check, trace, outline, list, register-to-ah, lesson | [Papers](PAPERS.md#paper-memory) |
+| `reference_library` | Academic Harness preset | The reference manager over PaperMemory's library: import/export BibTeX, BibLaTeX, RIS, CSL-JSON; tags, collections, notes, keys, duplicates, merge, doctor. Native, so paths are relative to the session workspace | [Papers](PAPERS.md#reference-library) |
 
 ## Search and discovery
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `literature_search` | Academic Harness preset | One-shot multi-source router; RRF fusion and cross-provider dedupe | [Search](SEARCH.md#the-literature-router) |
+| `literature_search` | Academic Harness preset | One-shot multi-source router; RRF fusion and cross-provider dedupe. Adds bioRxiv/INSPIRE by domain and ADS when keyed; Scopus/WoS explicit-only | [Search](SEARCH.md#the-literature-router) |
+| `domain_search` | Academic Harness preset | Source-specific actions: bioRxiv browse, ACL records, INSPIRE citations/references/texkeys, ADS export/metrics, Scopus/WoS cited-by, Wikidata resolution | [Search](SEARCH.md#domain-sources) |
 | `openalex_search` | Academic Harness preset | OpenAlex works discovery with filters, query, and group-by | [Search](SEARCH.md#academic-databases) |
 | `openalex_citations` | Academic Harness preset | Forward and backward citation edges from a DOI, PMID, or OpenAlex ID | [Search](SEARCH.md#academic-databases) |
 | `s2_search` | Academic Harness preset | Semantic Scholar relevance, bulk, and snippet search with TLDRs and OA PDFs | [Search](SEARCH.md#academic-databases) |
@@ -57,7 +58,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `elicit_search` | Academic Harness preset | Elicit paper/trial search with study and journal filters | [Search](SEARCH.md#additional-sources) |
 | `futurehouse_agent` | Academic Harness preset | FutureHouse Crow/Falcon/Owl agents; async start/status/cancel | [Search](SEARCH.md#additional-sources) |
 | `mcp__parallel__web_search`, `mcp__parallel__web_fetch` | Academic Harness preset | Parallel MCP connector; search is locked to `basic`, fetch reads one URL | [Search](SEARCH.md#mcp-connectors) |
-| `mcp__firecrawl__firecrawl_scrape`, `firecrawl_search`, `firecrawl_parse` | Academic Harness preset | Firecrawl MCP connector | [Search](SEARCH.md#mcp-connectors) |
+| `mcp__firecrawl__firecrawl_scrape`, `mcp__firecrawl__firecrawl_search`, `mcp__firecrawl__firecrawl_parse` | Academic Harness preset | Firecrawl MCP connector | [Search](SEARCH.md#mcp-connectors) |
 | `mcp__scite__*` | Academic Harness preset | Scite Smart Citations and evidence datasets | [Search](SEARCH.md#mcp-connectors) |
 | `web_search`, `web_fetch` | DSH built-in | DeepSeek web search and HTTP fetch; fall back to Parallel/Firecrawl when blocked | [Agents](AGENTS.md#browsing-the-web) |
 
@@ -135,4 +136,4 @@ These are registered only with `AH_ENABLE_OPTIONAL_TOOLS=1` and a `dsh` restart.
 
 ## Settings-only surfaces
 
-The Settings page also has **Image model**, **Complex-task model**, **Image-reading model**, **zvec-grep embedding**, and **Index at session start**. These are preferences, not tools; see [Configuration](CONFIGURATION.md).
+The Settings page also has the API keys, **Image model**, **Complex-task model**, **Image-reading model**, **zvec-grep embedding**, hypothesis-tournament defaults, and **Index at session start**. These are preferences, not tools; see [Configuration](CONFIGURATION.md).

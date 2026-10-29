@@ -28,6 +28,10 @@ touching outcome data, verifying results before claiming them), combine this
 with the `using-science-superpowers` skill catalogue rather than duplicating
 that discipline here.
 
+## Related Supervisor-Skills
+
+For AI-assisted tool choice and research-workflow rules, use `vibe-research-workflow`. This pipeline is for large, staged analysis tasks, not for paper drafting or idea vetting.
+
 ## The loop
 
 ```

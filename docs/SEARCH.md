@@ -11,7 +11,7 @@ Three literature/web MCP servers are wired into the `academic-harness` preset an
 | Connector | Key | Without it |
 |---|---|---|
 | [Parallel](https://parallel.ai) — `mcp__parallel__web_search` (search fallback, always `basic`) and `mcp__parallel__web_fetch` (read a URL) | `PARALLEL_API_KEY` (required) | Connector stays disabled. The key is always sent as a Bearer token so MCP calls are not on the anonymous rate limit. |
-| [Firecrawl](https://firecrawl.dev) — `firecrawl_scrape`, `firecrawl_search`, `firecrawl_parse` | `FIRECRAWL_API_KEY` (required) | Connector stays disabled. Only these three tools are exposed; paper-index tools are not advertised. |
+| [Firecrawl](https://firecrawl.dev) — `mcp__firecrawl__firecrawl_scrape`, `mcp__firecrawl__firecrawl_search`, `mcp__firecrawl__firecrawl_parse` | `FIRECRAWL_API_KEY` (required) | Connector stays disabled. Only these three tools are exposed; paper-index tools are not advertised. |
 | [Scite](https://scite.ai) — Smart Citations, retraction/correction checks, evidence datasets (patents, clinical trials, grants, drug safety, …) | `SCITE_API_KEY` (required) | Connector stays disabled. |
 
 `SCITE_API_KEY` is an `mcp`-scoped key from [scite.ai/users/me/api](https://scite.ai/users/me/api) — Scite's own documented non-interactive path for MCP clients, sent as a bearer token to `https://api.scite.ai/mcp` (no OAuth or token exchange). Scite also offers an OAuth flow, but only for its first-party ChatGPT/Claude plugin and other interactive clients — not relevant here.
@@ -43,7 +43,7 @@ It supports the API's full filter set: study type, year/month range, sample size
 
 ## Academic databases
 
-Five keyless-by-default native tools cover the open bibliographic backbones:
+The keyless-by-default database tools, plus `integrity_check`, cover the open bibliographic backbones:
 
 | Tool | Source | Key | Notes |
 |---|---|---|---|
@@ -57,9 +57,25 @@ Five keyless-by-default native tools cover the open bibliographic backbones:
 Two further tools work across them:
 
 - `openalex_citations` walks forward (`citations`) and backward (`references`) citation edges. Accepts a DOI, PMID, or OpenAlex ID.
-- `paper_resolve` converts between DOI, PMID, arXiv ID, OpenAlex ID, and Semantic Scholar ID. Use it before citing when results came from more than one database, so the same paper is not cited twice under different IDs.
+- `paper_resolve` converts between DOI, PMID, arXiv ID, OpenAlex ID, Semantic Scholar ID, and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers. Use it before citing when results came from more than one database, so the same paper is not cited twice under different IDs.
 
-All eight are native REST tools — no MCP mount and no restart requirement. Shared record normalization and per-provider rate limiting live in `search-normalize.js` and `search-http.js`.
+All of these are native REST tools — no MCP mount and no restart requirement. Shared record normalization and per-provider rate limiting live in `search-normalize.js` and `search-http.js`.
+
+## Domain sources
+
+`literature_search` adds these sources to the router; `domain_search` exposes the source-specific actions that a generic query cannot express. ACL Anthology and Wikidata are `domain_search` only.
+
+| Source | Router source | `domain_search` actions | Key | Notes |
+|---|---|---|---|---|
+| bioRxiv / medRxiv | `biorxiv` | `browse`, `doi`, `published` | none | Keyword discovery goes through Europe PMC (`SRC:PPR` + publisher filter); the bioRxiv API provides date/category browse and published-version lookup. |
+| ACL Anthology | — | `record` | none | No public search API; router coverage comes through Semantic Scholar/OpenAlex, with direct BibTeX/PDF lookup by ACL ID. |
+| INSPIRE-HEP | `inspire` | `record`, `citations`, `references`, `texkey`, `bibtex` | none | High-energy physics; 15 requests in a 5-second window per IP. |
+| NASA ADS | `ads` | `record`, `citations`, `references`, `export`, `metrics` | `ADS_API_TOKEN` | Auto-selected for astronomy only when the token exists; daily quota applies. |
+| Scopus | `scopus` | `record`, `author`, `cited_by` | `SCOPUS_API_KEY` | Explicit-only; access follows institutional IP/VPN. Records are metadata-only and marked `licence: restricted`. |
+| Web of Science | `wos` | `record`, `cited_by` | `WOS_API_KEY` | Explicit-only; Starter has a low daily quota and limited cited-by fields. Records are metadata-only and marked `licence: restricted`. |
+| Wikidata | — | `resolve` | none | Entity search and claims for ORCID/ROR/ISSN/DOI; no free-form SPARQL. |
+
+Keyed sources make no request when their key is unset: they return `key_missing` naming the Settings field. Scopus and Web of Science are never auto-selected; ADS is auto-selected for astronomy only when `ADS_API_TOKEN` is present. ADS/Scopus/WoS quota headers are surfaced as `quota_remaining` when the provider returns them.
 
 ### Publication integrity
 
@@ -74,11 +90,13 @@ All eight are native REST tools — no MCP mount and no restart requirement. Sha
 
 `literature_search` is the router for one-shot discovery:
 
-- **Auto mode** runs OpenAlex + Semantic Scholar, adds PubMed for biomedical queries and arXiv for preprint/CS/physics queries, and accepts explicit sources including Crossref.
+- **Auto mode** runs OpenAlex + Semantic Scholar, adds PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE for high-energy physics, and bioRxiv/medRxiv when a biomedical query asks for preprints. ADS is added for astronomy only when `ADS_API_TOKEN` is set.
+- **Explicit sources** include Crossref, preprints, bioRxiv, INSPIRE, ADS, Scopus, and Web of Science. Scopus and Web of Science are never auto-selected and return `key_missing` without their key.
 - It deduplicates across providers and fuses their rankings with reciprocal-rank fusion, so a paper found high in two indexes outranks one found once.
 - Coverage is the top-N relevance slice per source, not exhaustive; use the source-specific tools afterward for filters, citation trails, or pagination.
+- Scopus/Web of Science records are metadata-only; abstracts and full text are not stored.
 
-The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` added by domain, and keeps `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
+The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` / `domain_search` added by domain, and keeps `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
 
 ## Additional sources
 
@@ -117,6 +135,6 @@ A successful download is ingested into PaperMemory. Ingest failure does not fail
 
 | Works without a key | Needs a key |
 |---|---|
-| OpenAlex (reduced budget), Semantic Scholar (reduced rate), PubMed/Europe PMC, arXiv, Crossref (polite pool email optional), `literature_search`'s keyless sources, `paper_resolve`, `paper_download` (open-access fallbacks; `UNPAYWALL_EMAIL` recommended), `paper_fold` local levels, PaperMemory, notebook, `fold_text`, `citation`, `review`, `coscientist`, `clinicaltrials`, openFDA (low shared quota), DataCite, CORE (base; full text needs a key), DOAJ, TextFold local levels | Parallel, Firecrawl, Scite, Consensus, Brave, Tavily, Exa, Perplexity (search), Elicit, FutureHouse, Sherpa Romeo/Juliet, PatentsView, ORCID (optional), Jina search, Gemini (images/embeddings), Modal, Runpod |
+| OpenAlex (reduced budget), Semantic Scholar (reduced rate), PubMed/Europe PMC, arXiv, Crossref (polite pool email optional), bioRxiv/medRxiv, INSPIRE-HEP, ACL Anthology, Wikidata, `literature_search`'s keyless sources, `domain_search`'s keyless actions, `paper_resolve`, `paper_download` (open-access fallbacks; `UNPAYWALL_EMAIL` recommended), `paper_fold` local levels, PaperMemory, notebook, `fold_text`, `citation`, `review`, `coscientist`, `clinicaltrials`, openFDA (low shared quota), DataCite, CORE (base; full text needs a key), DOAJ, ORCID (public reads; token optional), TextFold local levels | Parallel, Firecrawl, Scite, Consensus, Brave, Tavily, Exa, Perplexity (search), Elicit, FutureHouse, Sherpa Romeo/Juliet, PatentsView, Jina search, Gemini (images/embeddings), **NASA ADS**, **Scopus**, **Web of Science**, Modal, Runpod, Vast.ai |
 
 See [Configuration](CONFIGURATION.md) for the exact field names and restart behavior.

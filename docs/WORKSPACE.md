@@ -8,7 +8,7 @@ This page covers the tools that work on the local workspace: semantic search, th
 
 [zvec-grep](https://github.com/zvec-ai/zvec-grep) (`zg`) is the local-first hybrid search layer on the Academic Harness preset: BM25 + vectors over an on-disk index, exposed as `mcp__zvec_grep__zvec_grep_search`.
 
-Exact words, quotes, identifiers, filenames, regexes, and exhaustive hit lists stay on the preset's native `grep` / `glob` (`@deepseek-ai/dsh-tool-fs-search`). Open-web and literature search stay on the academic database tools (`literature_search`, `openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`), Parallel, Consensus, Firecrawl, and Scite — zg is **workspace-only**.
+Exact words, quotes, identifiers, filenames, regexes, and exhaustive hit lists stay on the preset's native `grep` / `glob` (`@deepseek-ai/dsh-tool-fs-search`). Open-web and literature search stay on the academic database tools (`literature_search`, `domain_search`, `openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`), Parallel, Consensus, Firecrawl, and Scite — zg is **workspace-only**.
 
 ### Install and daemon
 
@@ -57,7 +57,7 @@ Every MCP call needs an **absolute** `root` (the session working directory). Rel
 | Setting / env | What it does |
 |---|---|
 | `ZVEC_GREP_AUTO_INDEX` | `yes` / `no`. Index this workspace when an Academic Harness session opens. Default `no`. Live for the next session (no restart). |
-| `ZVEC_GREP_EMBEDDING` | Default model id for *new* indexes. Unset means `local/potion-retrieval-32m`. Existing indexes keep their stored model. Restart `dsh` after changing — the next start brings up a fresh daemon with the new value. |
+| `ZVEC_GREP_EMBEDDING` | Default model id for *new* indexes. Unset means `local/potion-retrieval-32m`. Existing indexes keep their stored model. A new index run reads the current value; restart `dsh` so the search daemon, which takes the value at mount, uses the same model. |
 | `ZVEC_GREP_API_KEY` | **Not used** with the default local Potion models. Only if you opt into a remote (Qwen) embedding provider. |
 | `ZVEC_GREP_CLI` | Absolute path to `zg` or to `@zvec/zvec-grep`'s `dist/cli/index.js`. Env only. |
 

@@ -10,6 +10,18 @@ flowchart TD
   router --> pubmed[PubMed / Europe PMC]
   router --> arxiv[arXiv]
   router --> crossref[Crossref]
+  router --> biorxiv[bioRxiv / medRxiv]
+  router --> inspire[INSPIRE-HEP]
+  router --> ads[NASA ADS<br/>only with token]
+  router --> scopus[Scopus<br/>explicit + key]
+  router --> wos[Web of Science<br/>explicit + key]
+
+  need -->|source-specific action| domain[domain_search]
+  domain -.-> biorxiv
+  domain -.-> inspire
+  domain -.-> ads
+  domain -.-> scopus
+  domain -.-> wos
 
   need -->|peer-reviewed filters| consensus[Consensus]
   need -->|web or current facts| parallel[parallel_search]
@@ -21,6 +33,11 @@ flowchart TD
   pubmed --> next
   arxiv --> next
   crossref --> next
+  biorxiv --> next
+  inspire --> next
+  ads --> next
+  scopus --> next
+  wos --> next
   consensus --> next
   web --> next
   fetch --> next
@@ -32,5 +49,5 @@ flowchart TD
   classDef next fill:#fff7ed,stroke:#f97316,color:#7c2d12
   class question entry
   class known,need decision
-  class resolve,integrity,router,openalex,s2,pubmed,arxiv,crossref,consensus,parallel,web,fetch source
+  class resolve,integrity,router,domain,openalex,s2,pubmed,arxiv,crossref,biorxiv,inspire,ads,scopus,wos,consensus,parallel,web,fetch source
   class next next

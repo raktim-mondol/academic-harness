@@ -27,6 +27,10 @@ Adapted from the house style in Chen Liu's [figures4papers](https://github.com/C
 - GIS / dominant 3D / Figma-first infographics.
 - The user named a specific journal's column-width spec → still load this for style, then `scientific-visualization` for that venue's millimetre widths.
 
+## Related Supervisor-Skills
+
+For paper-level figure strategy and a design audit before rendering, load `figure-designer`. To reconstruct a raster reference as editable Draw.io, load `drawio-reconstruction`. This skill remains the renderer for real data.
+
 ## Mapping onto this plugin
 
 1. Copy `scripts/publication_figure.py` into the workspace next to the figure script (e.g. `figures/publication_figure.py`), or import it by path.

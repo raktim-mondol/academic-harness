@@ -12,10 +12,10 @@ const preset = read('presets/academic-harness/agent.cordis.yml')
 const prompt = read('prompt.js')
 const settings = read('settings-keys.js')
 
-for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search']) {
+for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
 }
-for (const file of ['citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js']) {
+for (const file of ['citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
   assert.ok(pkg.files?.includes(file), `package files missing ${file}`)
   assert.ok(existsSync(join(root, file)), `missing ${file}`)
 }
@@ -53,6 +53,8 @@ assert.match(read('author-lookup.js'), /name: 'author_lookup'/)
 assert.match(preset, /- id: author-lookup\n  name: academic-harness\/author-lookup/)
 assert.match(read('openreview.js'), /name: 'openreview'/)
 assert.match(preset, /- id: openreview\n  name: academic-harness\/openreview/)
+assert.match(read('domain-search.js'), /name: 'domain_search'/)
+assert.match(preset, /- id: domain-search\n  name: academic-harness\/domain-search/)
 for (const [id, tool] of [['pdf-references', 'pdf_references'], ['stat-audit', 'stat_audit'], ['figure-audit', 'figure_audit'], ['repo-audit', 'repo_audit'], ['grant-search', 'grant_search'], ['patent-search', 'patent_search']]) {
   assert.match(preset, new RegExp(`- id: ${id}\\n  name: academic-harness/${id}`), `preset row missing ${id}`)
   assert.ok(existsSync(join(root, `${id}.js`)), `missing ${id}.js`)
@@ -178,6 +180,10 @@ for (const banned of ['drizzle', 'sqlite', 'bun:', 'transformers', 'p-queue', 'h
   assert.ok(!Object.keys(pkg.dependencies || {}).some((name) => name.includes(banned)), `dependency ${banned} must not be added`)
 }
 for (const key of ['CO_SCIENTIST_MAX_HYPOTHESES', 'CO_SCIENTIST_STEP_BUDGET', 'CO_SCIENTIST_DUP_THRESHOLD', 'CO_SCIENTIST_SEED']) {
+  assert.ok(settings.includes(`'${key}'`), `settings-keys.js missing ${key}`)
+  assert.ok(read('client/ApiKeysSection.jsx').includes(key), `Settings UI missing ${key}`)
+}
+for (const key of ['ADS_API_TOKEN', 'SCOPUS_API_KEY', 'WOS_API_KEY']) {
   assert.ok(settings.includes(`'${key}'`), `settings-keys.js missing ${key}`)
   assert.ok(read('client/ApiKeysSection.jsx').includes(key), `Settings UI missing ${key}`)
 }

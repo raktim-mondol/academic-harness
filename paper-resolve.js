@@ -14,10 +14,13 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {
+  canonicalDoi,
   identifierKind,
+  fromInspireHit,
   fromOpenAlexWork,
   fromSemanticScholarPaper,
 } from './search-normalize.js'
+import { runDomainSearch } from './domain-search.js'
 
 const OPENALEX = 'https://api.openalex.org'
 const S2 = 'https://api.semanticscholar.org/graph/v1'
@@ -71,9 +74,64 @@ export async function fetchSemanticScholarPaper(identifier, { signal, apiKey } =
   throw new Error(`Semantic Scholar API error ${result.status}${hint}${result.detail ? `: ${result.detail}` : ''}`)
 }
 
+function doiFromBibtex(bibtex) {
+  const match = String(bibtex || '').match(/\bdoi\s*=\s*[{"]([^}"]+)[}"]/i)
+  return canonicalDoi(match?.[1])
+}
+
+async function resolveDomainIdentifier(parsed, options) {
+  const signal = options.signal
+  let value
+  try {
+    if (parsed.kind === 'inspire') {
+      value = await runDomainSearch({ source: 'inspire', action: 'record', id: parsed.value }, { signal })
+    } else if (parsed.kind === 'acl') {
+      value = await runDomainSearch({ source: 'acl', action: 'record', id: parsed.value }, { signal })
+    } else if (parsed.kind === 'bibcode') {
+      value = await runDomainSearch({ source: 'ads', action: 'record', bibcode: parsed.value }, { signal })
+    } else if (parsed.kind === 'scopus') {
+      value = await runDomainSearch({ source: 'scopus', action: 'record', id: parsed.value }, { signal })
+    } else if (parsed.kind === 'wos') {
+      value = await runDomainSearch({ source: 'wos', action: 'record', uid: parsed.value }, { signal })
+    } else if (parsed.kind === 'wikidata') {
+      value = await runDomainSearch({ source: 'wikidata', action: 'resolve', qid: parsed.value, type: 'paper' }, { signal })
+    }
+  } catch (error) {
+    return { resolved: false, reason: error.message }
+  }
+  if (!value || value.error) return { resolved: false, reason: value?.error || 'domain lookup failed' }
+
+  if (parsed.kind === 'inspire') {
+    const paper = fromInspireHit({ metadata: value.record || {} })
+    if (paper) return { resolved: true, paper }
+  }
+  if (parsed.kind === 'bibcode' || parsed.kind === 'scopus' || parsed.kind === 'wos') {
+    if (value.record) return { resolved: true, paper: value.record }
+  }
+
+  let doi = null
+  let arxiv = null
+  if (parsed.kind === 'inspire') {
+    const metadata = value.record || {}
+    doi = canonicalDoi(metadata.dois?.[0]?.value)
+    arxiv = metadata.arxiv_eprints?.[0]?.value || null
+  } else if (parsed.kind === 'acl') {
+    doi = doiFromBibtex(value.bibtex)
+  } else if (parsed.kind === 'wikidata') {
+    doi = value.entities?.[0]?.claims?.doi || null
+  }
+
+  if (doi) return resolveIdentifier(doi, options)
+  if (arxiv) return resolveIdentifier(arxiv, options)
+  return { resolved: false, reason: `${parsed.kind} lookup returned no DOI or arXiv ID` }
+}
+
 export async function resolveIdentifier(identifier, options = {}) {
   const parsed = identifierKind(identifier)
   if (parsed.kind === 'unknown') return { resolved: false, reason: 'unrecognized identifier' }
+  if (['inspire', 'acl', 'bibcode', 'scopus', 'wos', 'wikidata'].includes(parsed.kind)) {
+    return resolveDomainIdentifier(parsed, options)
+  }
   const s2Options = { signal: options.signal, apiKey: options.s2Key }
   let openalexError = null
 
@@ -140,9 +198,9 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'paper_resolve',
     description: [
-      'Resolve a paper identifier to its other identifiers: DOI, PMID, arXiv ID, OpenAlex ID, or Semantic Scholar ID.',
+      'Resolve a paper identifier to its other identifiers: DOI, PMID, arXiv ID, OpenAlex ID, Semantic Scholar ID, INSPIRE recid, ACL id, bibcode, Scopus id, WoS UID, or Wikidata QID.',
       'Use this before citing whenever results came from more than one database, so the same paper is not cited twice under different IDs.',
-      'OpenAlex resolves DOI/PMID/OpenAlex IDs; Semantic Scholar resolves arXiv IDs and the rest as a fallback. Both are free; OPENALEX_API_KEY and S2_API_KEY only raise limits.',
+      'OpenAlex resolves DOI/PMID/OpenAlex IDs; Semantic Scholar resolves arXiv IDs and the rest as a fallback. Source-specific identifiers are resolved through domain-search adapters; keyed ADS/Scopus/WoS resolution requires the matching key. All base paths are free; OPENALEX_API_KEY and S2_API_KEY only raise limits.',
       'Accepts one `id` or up to 10 `ids`. Returns `resolved: false` with a reason when neither database knows the identifier.',
     ].join(' '),
     parameters: {

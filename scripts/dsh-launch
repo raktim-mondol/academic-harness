@@ -19,6 +19,11 @@ cmd="$(basename "$0")"
 DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
 WEB_PORT="${DSH_WEB_PORT:-3080}"
 
+# DSH's DeepSeek Messages client requires the Anthropic-compatible root.
+# Always force it: the bare https://api.deepseek.com host returns 404 for the
+# Messages endpoint, which makes every chat turn fail before a tool is called.
+export DEEPSEEK_BASE_URL="https://api.deepseek.com/anthropic"
+
 if ! command -v dsh >/dev/null 2>&1; then
   echo "dsh not found. Install with: npm install -g @deepseek-ai/dsh@latest" >&2
   exit 127

@@ -1,0 +1,44 @@
+Vendored from https://github.com/HKUSTDial/Supervisor-Skills
+Commit: a20d76ef3979b804d7dbf599d577826957e0a8a9
+Date: 2026-10-15
+Version: 2.1.0 (upstream CHANGELOG)
+
+Copied: the 12 skill directories under skills/ that contain SKILL.md —
+benchmark-paper-template, deep-research, drawio-reconstruction, figure-designer,
+idea-evaluator, intro-drafter, paper-polish, paper-writer,
+pre-submission-reviewer, rebuttal-guidance, tech-paper-template, and
+vibe-research-workflow — with their references/ and (for drawio-reconstruction)
+scripts/, requirements.txt, and LICENSE.
+
+Not copied: handbook/, handbook-en/, assets/, the root READMEs, skills/README*,
+and drawio-reconstruction's examples/, assets/, READMEs, and agents/openai.yaml.
+The skills are self-contained; mentions of "handbook 2.3" and similar refer to
+the upstream handbook, which is not bundled here. The drawio examples and
+13 MB of case images were omitted from the npm package; the skill's SKILL.md
+and helper scripts are complete without them.
+
+Per-skill licenses (as declared upstream):
+- CC-BY-4.0: benchmark-paper-template, figure-designer, idea-evaluator,
+  pre-submission-reviewer, tech-paper-template, vibe-research-workflow
+- CC-BY-NC-SA-4.0: deep-research, intro-drafter, paper-polish, paper-writer,
+  rebuttal-guidance (the repository license; rebuttal-guidance had no
+  per-file field, so one was added without changing its body)
+- MIT: drawio-reconstruction (nested LICENSE, Copyright (c) 2026 VCG-Bench Authors)
+
+License texts: https://creativecommons.org/licenses/by/4.0/ and
+https://creativecommons.org/licenses/by-nc-sa/4.0/ (the latter is also in this
+directory). The suite is © 2026 Yuyu Luo (methodology) and contributors,
+except drawio-reconstruction (© 2026 VCG-Bench Authors, MIT).
+
+Local changes for this plugin:
+- Removed the "(separate plugin)" parenthetical from benchmark-paper-template
+  cross-references, because all 12 skills now ship in one catalogue.
+- Added `license:` frontmatter to drawio-reconstruction (MIT) and
+  rebuttal-guidance (CC-BY-NC-SA-4.0).
+- Added short DeepSeek Harness runtime notes to drawio-reconstruction
+  (use `uv run python` for its helpers) and vibe-research-workflow (the
+  upstream Cursor/Claude Code/Codex comparisons are external context; this
+  agent is the runtime).
+- Added a `Routing in Academic Harness` section to every skill, naming the
+  existing skill to use when a task crosses a stage boundary. Reciprocal
+  routing notes were added to the plugin's related skills; see NOTICE.

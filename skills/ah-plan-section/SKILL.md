@@ -14,3 +14,7 @@ The author states what to write and what it must support. You propose an outline
 3. Call `ah_plan` with `action: propose`, an `id`, plus `thesis`, `sections` and `claims`. This writes `plans/<id>.yaml` only.
 4. Call `ah_plan` with `action: diff` and that id so the author can see the change.
 5. Stop. Tell the author they can approve with `ah_author` `action: plan-approve` (DSH will ask them to confirm). You cannot approve. Leave `.tex` files, `\input` lines and briefs for files the outline does not yet name until after that approval.
+
+## Outside an ah.yaml project
+
+For pre-writing paper structure without an Academic Harness project, use the Supervisor-Skills `tech-paper-template` (or `benchmark-paper-template`). This skill is active only inside an Academic Harness project.
