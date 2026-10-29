@@ -6,7 +6,7 @@ The Academic Harness preset adds a specialist roster and two model-pinned delega
 
 ## Subagent model routing
 
-Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-harness` preset adds two optional model-routed tools. Each can select a registered provider route and model via `agentOptions`; with no model it inherits the session model:
+Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-harness` preset adds two optional model-routed tools. Each can register a custom OpenAI/Anthropic-compatible route from its endpoint URL, model, and API key; with no complete route it inherits the session model:
 
 | Tool | Use it for | Route (Settings or env) | Default |
 |---|---|---|---|
