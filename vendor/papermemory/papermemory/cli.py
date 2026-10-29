@@ -886,9 +886,9 @@ def cmd_log(args: argparse.Namespace) -> int:
 
 
 def cmd_tools(args: argparse.Namespace) -> int:
-    from papermemory.mcp_server import TOOLS
+    from papermemory.mcp_server import active_tools
 
-    names = [tool["name"] for tool in TOOLS]
+    names = [tool["name"] for tool in active_tools()]
     return _emit(names, args.json, "\n".join(names))
 
 

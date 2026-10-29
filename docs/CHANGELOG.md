@@ -2,6 +2,12 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.27.1
+
+- **The reference library is now a native tool, `reference_library`, so nothing has to be told where the workspace is.** An MCP server is a single process with one fixed working directory, but every DSH session has its own workspace, and the host freezes tool arguments, so a hook cannot supply it either. The MCP version needed the model to pass `cwd` on every import, export, and doctor call. The native tool receives the session, resolves paths against its workspace, and refuses any path that leaves it (symlinks included). It runs the same `papermemory library` code as before.
+- The plugin hides the MCP copy (`PAPERMEMORY_HIDE_TOOLS=papermemory_library`, honoured by the PaperMemory server and its `tools` command) so the model sees one library tool, not two. The start-up check now expects 14 MCP tools. Standalone PaperMemory, Grok, and any other host still get the 15th as `papermemory_library`.
+- Prompt, `papermemory` skill, docs, and the seeder rule updated (existing installs get the refreshed skill). `scripts/test-reference-library.mjs` covers argument translation for every action, workspace confinement, inline imports, and an end-to-end run against the vendored PaperMemory.
+
 ## 0.27.0
 
 - **New `power_analysis` tool** for planning a study before data exist: sample size, power, smallest detectable effect, or alpha (`power`, `sensitivity`); effect-size conversion and computation (`effect_size`); Bonferroni, Holm, Hochberg, Benjamini–Hochberg, and Benjamini–Yekutieli adjustment and per-test alpha planning (`correct`); seeded Monte-Carlo power (`simulate`); and sample size for sensitivity/specificity precision (`diagnostic_precision`). Covers t, proportion, ANOVA, chi-square, correlation, regression, log-rank, equivalence (TOST), and non-inferiority designs.

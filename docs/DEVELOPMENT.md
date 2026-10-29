@@ -17,7 +17,7 @@ The tool tests are plain Node scripts and need no network (the Python-helper cas
 
 ```sh
 for t in citation-format review-store review-tool integrity registries \
-         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold compute library power; do
+         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold compute library power reference-library; do
   node scripts/test-$t.mjs
 done
 node scripts/test-compute-http.mjs

@@ -113,3 +113,17 @@ def test_organise_keys_merge_doctor_integrity(call):
     assert report["summary"]["problems"]["integrity_flagged"] == 1 and report["summary"]["ok"] is False
     flagged, _ = call(action="list", query="integrity:retracted")
     assert [r["key"] for r in flagged["rows"]] == ["roe2021vision"]
+
+
+def test_host_can_hide_the_library_tool(monkeypatch, tmp_path):
+    monkeypatch.setenv("PAPERMEMORY_DB", str(tmp_path / "pm.db"))
+    from papermemory.cli import main as cli_main
+
+    assert "papermemory_library" in [t["name"] for t in mcp_server.active_tools()]
+    monkeypatch.setenv("PAPERMEMORY_HIDE_TOOLS", "papermemory_library, nothing-else")
+    names = [t["name"] for t in mcp_server.active_tools()]
+    assert "papermemory_library" not in names and len(names) == len(mcp_server.TOOLS) - 1
+    refused = mcp_server._call("papermemory_library", {"action": "list"})
+    assert refused["isError"] and json.loads(refused["content"][0]["text"])["code"] == "tool-disabled"
+    assert mcp_server._call("papermemory_search", {"query": "x"})["content"]  # the rest still works
+    assert cli_main(["tools", "--json"]) == 0

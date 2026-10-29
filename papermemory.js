@@ -24,7 +24,11 @@ import {
   run,
 } from './papermemory-cli.js'
 
-const EXPECTED_TOOL_COUNT = 15
+// PaperMemory itself has 15 tools. The plugin hides the MCP copy of the reference library
+// (`papermemory_library`) and offers it as the native `reference_library` tool instead, because only a
+// native tool knows each session's workspace; an MCP server has one fixed working directory.
+export const HIDDEN_MCP_TOOLS = ['papermemory_library']
+const EXPECTED_TOOL_COUNT = 14
 
 export const name = 'academic-harness-papermemory'
 // Same as mcp-connectors.js / zvec-grep.js: this row only registers into the
@@ -43,7 +47,7 @@ export {
 } from './papermemory-cli.js'
 
 function mcpEnv() {
-  const extra = { PYTHONUNBUFFERED: '1' }
+  const extra = { PYTHONUNBUFFERED: '1', PAPERMEMORY_HIDE_TOOLS: HIDDEN_MCP_TOOLS.join(',') }
   const db = process.env.PAPERMEMORY_DB?.trim()
   const dataDir = process.env.PAPERMEMORY_DATA_DIR?.trim()
   if (db) extra.PAPERMEMORY_DB = db
@@ -62,7 +66,7 @@ export async function apply(ctx) {
   }
 
   await ensurePaperMemoryDb(launch)
-  const probe = await run(launch.command, cliArgs(launch, ['tools', '--json']), { timeoutMs: 20_000, silent: true })
+  const probe = await run(launch.command, cliArgs(launch, ['tools', '--json']), { timeoutMs: 20_000, silent: true, env: { ...process.env, ...mcpEnv() } })
   try {
     const names = JSON.parse(probe.out)
     if (!Array.isArray(names) || names.length !== EXPECTED_TOOL_COUNT) {

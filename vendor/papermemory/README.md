@@ -145,6 +145,8 @@ papermemory library doctor --cwd .                                # library heal
 
 `papermemory mcp` exposes the library as one tool, `papermemory_library`, with an `action` argument (`list get resolve import export tag collection note keys dedupe merge doctor set_integrity`). Reads change nothing; anything hard to undo is a dry run unless `apply` (with a `reason`), `force`, or `adopt` is set. Paths must stay inside the allowed roots, and export paths inside `cwd`.
 
+A host that has its own front end for the library (the Academic Harness plugin does, because it knows each session's workspace) can hide this tool with `PAPERMEMORY_HIDE_TOOLS=papermemory_library`; the server then neither lists nor runs it.
+
 A new paper gets a library record when it is ingested, and a key as soon as it has enough metadata to build a good one (an author, DOI, or arXiv id, and a real title). Others are keyed on request or on first export.
 
 ### Citation keys

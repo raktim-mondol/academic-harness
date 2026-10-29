@@ -32,7 +32,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 
 | Page | What it covers |
 |---|---|
-| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 to 0.27.0 |
+| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 to 0.27.1 |
 | [Development](DEVELOPMENT.md) | Build, tests, docs diagrams, bundle patch, repository layout |
 | [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) | Why the writing engine is vendored and the open decision about its home |
 | [Co-Scientist integration](CO-SCIENTIST-INTEGRATION-PLAN.md) | Tournament design and implementation record |

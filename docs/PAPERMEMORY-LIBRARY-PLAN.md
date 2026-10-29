@@ -360,3 +360,7 @@ Deviations from the plan: `skills/citation-management` is vendored third-party m
 
 Remaining before release: push `~/papermemory` `main` and the `v0.3.0` tag (the vendored `SOURCE.txt` pins that commit), review the plugin branch, and run a real DSH boot (`.github/workflows/verify.yml` does this in CI) to confirm the preset mounts with 15 tools and no validation error.
 
+### Follow-up — native `reference_library` tool (plugin v0.27.1, branch `native-library-tool`)
+
+The Phase 5 MCP tool needed the model to pass `cwd` on every import, export, and doctor call, because an MCP server is one process with one fixed working directory while each session has its own workspace. The host freezes tool arguments, so a `tools/pre-execute` hook cannot add the directory either. The library is therefore also offered as a **native plugin tool**, `reference_library` (`reference-library.js`), which receives the session and uses its workspace: paths are relative to it, confined to it (symlinks included), and nothing is passed by the model. It runs the same `papermemory library ...` code. PaperMemory gained `PAPERMEMORY_HIDE_TOOLS`; the plugin sets it so the MCP copy is hidden and the model sees one library tool. The plugin's start-up check now expects 14 MCP tools; standalone PaperMemory and other hosts still get the 15th as `papermemory_library`. Earlier statements in this plan that the model passes `cwd` are superseded for the plugin.
+

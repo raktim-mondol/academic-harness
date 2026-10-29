@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -195,6 +196,21 @@ TOOLS = [
 ]
 
 
+def hidden_tools() -> set[str]:
+    """Tool names the host asked not to expose (PAPERMEMORY_HIDE_TOOLS, comma separated).
+
+    A host that provides its own front end for part of the surface, such as the Academic Harness plugin
+    with its workspace-aware reference-library tool, hides the MCP copy so the model sees one tool, not two.
+    """
+    raw = os.environ.get("PAPERMEMORY_HIDE_TOOLS", "")
+    return {name.strip() for name in raw.split(",") if name.strip()}
+
+
+def active_tools() -> list[dict[str, Any]]:
+    hidden = hidden_tools()
+    return [tool for tool in TOOLS if tool["name"] not in hidden]
+
+
 def _ok(value: Any) -> dict[str, Any]:
     return {"content": [{"type": "text", "text": json.dumps(value, indent=2, default=str, ensure_ascii=False)}]}
 
@@ -278,6 +294,8 @@ def _claim_payload(store, row) -> dict[str, Any]:
 
 def _call(name: str, args: dict[str, Any]) -> dict[str, Any]:
     store = None
+    if name in hidden_tools():
+        return _err(f"{name} is not exposed by this host", "tool-disabled")
     try:
         store = Store()
         if name == "papermemory_library":
@@ -653,7 +671,7 @@ def _handle(message: dict[str, Any]) -> None:
     if method == "notifications/initialized":
         return
     if method == "tools/list":
-        _write_message({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": TOOLS}})
+        _write_message({"jsonrpc": "2.0", "id": msg_id, "result": {"tools": active_tools()}})
         return
     if method == "tools/call":
         params = message.get("params") or {}

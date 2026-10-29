@@ -487,6 +487,11 @@
 - id: funder-policy
   name: academic-harness/funder-policy
 
+# Reference library (PaperMemory) as a native tool, so it knows each session's workspace.
+# The MCP copy (papermemory_library) is hidden by papermemory.js. See reference-library.js.
+- id: reference-library
+  name: academic-harness/reference-library
+
 # Study planning: power, sample size, effect sizes, multiplicity correction, and
 # simulation for designing a study before data exist. Local (numpy + scipy via
 # python-helpers/power_helper.py), no key, no network. Requires effect_source for
