@@ -25,6 +25,8 @@ assert.match(read('subagent-models.js'), /subagent_vision/)
 assert.match(prompt, /subagent_pro/)
 assert.match(prompt, /subagent_vision/)
 assert.match(prompt, /only when the user explicitly asks for the Pro route/i)
+assert.match(prompt, /only when the user explicitly asks for the Vision route/i)
+assert.match(prompt, /merely because the task involves an image/i)
 assert.equal(buildCustomRoute({}), null)
 assert.deepEqual(
   buildCustomRoute({ baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k' }),

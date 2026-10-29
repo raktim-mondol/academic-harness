@@ -261,7 +261,7 @@ tools.
 |---|---|
 | `subagent` (default) | `submission-compliance-editor`, `data-steward`, `reference-librarian`, `prisma-auditor`, `math-checker`, `methodology-reviewer`, `ml-auditor`, `research-integrity-auditor` (hard forensic judgment) |
 | `subagent_pro` (only when the user asks for Pro or says a custom route is configured) | The same difficulty-bound agents above |
-| `subagent_vision` | Figure-panel comparison, microscopy/gel review, compiled-PDF layout audits |
+| `subagent_vision` (only when the user asks for Vision or says a custom route is configured; otherwise `subagent`) | Figure-panel comparison, microscopy/gel review, compiled-PDF layout audits |
 | `subagent_fork` | Continuity only; never for independent verification |
 
 Independent verification must be a fresh `subagent` (or `subagent_pro` when a

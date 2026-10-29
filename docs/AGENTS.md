@@ -6,16 +6,16 @@ The Academic Harness preset adds a specialist roster and two model-pinned delega
 
 ## Subagent model routing
 
-Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-harness` preset adds two optional model-routed tools. Each can select a registered provider route and model via `agentOptions`; with no model it inherits the session model:
+Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-harness` preset adds two optional, user-triggered model-routed tools. Each can register a custom OpenAI/Anthropic-compatible route from its endpoint URL, model, and API key; with no complete route it inherits the session model:
 
 | Tool | Use it for | Route (Settings or env) | Default |
 |---|---|---|---|
-| `subagent` | Delegated work, including difficulty-bound specialist calls | — (inherits the parent session's model) | — |
+| `subagent` | Delegated work, including difficulty-bound and image-reading tasks when the session model supports images | — (inherits the parent session's model) | — |
 | `subagent_fork` | Forked delegation that inherits the parent preset and history | — (inherits the parent) | — |
 | `subagent_pro` | Difficulty-bound work, only when the user explicitly asks for the Pro route or says a custom Pro route is configured | Pro endpoint URL + model + API key (Settings) | Inherit session model |
-| `subagent_vision` | Tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | Vision endpoint URL + model + API key (Settings) | Inherit session model |
+| `subagent_vision` | Image-reading work with `read_image` — only when the user explicitly asks for the Vision route or says a custom Vision route is configured | Vision endpoint URL + model + API key (Settings) | Inherit session model |
 
-Both routes are optional. Set the endpoint URL, model, and API key to register a custom OpenAI/Anthropic-compatible route; with none set they inherit the session model (DeepSeek-V4.1-Flash by default). A partial set is ignored. The endpoint URL selects Anthropic Messages when it contains `anthropic` (for example `https://api.deepseek.com/anthropic`) and OpenAI Chat Completions otherwise. The plugin registers the route on the host's pi-ai adapter and stores the key in the credential service. The legacy model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
+Both routes are optional and user-triggered: use Pro or Vision only when the user explicitly asks for that route or says a custom route is configured. Otherwise `subagent` handles the task, including image reading when the session model supports images. A request to "delegate" or "use a subagent" is not a request for Pro or Vision; this applies to image tasks too. Set the endpoint URL, model, and API key to register a custom OpenAI/Anthropic-compatible route; with none set they inherit the session model (DeepSeek-V4.1-Flash by default). A partial set is ignored. The endpoint URL selects Anthropic Messages when it contains `anthropic` (for example `https://api.deepseek.com/anthropic`) and OpenAI Chat Completions otherwise. The plugin registers the route on the host's pi-ai adapter and stores the key in the credential service. The legacy model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
 
 All four delegation tools use DSH 0.2.1's managed activations: a call returns a `subagentId` immediately, the child's final answer arrives as a completion notice, and `send_message` / `interrupt_agent` handle follow-ups and stops.
 
@@ -36,9 +36,9 @@ It explicitly steers away from routine review, lookup, simple data validation, o
 
 ### What gets routed to `subagent_vision`
 
-`subagent_vision` only routes the child to a model; the child still calls `read_image` (`@deepseek-ai/dsh-tool-fs`) itself, which refuses to read an image unless the calling route's resolved model actually declares `image` input in this deployment's model catalog. A custom vision endpoint must declare image input; with no custom route the session model is used (DeepSeek-V4.1-Flash accepts images).
+Use `subagent_vision` only when the user explicitly asks for the Vision route or says a custom Vision route is configured; otherwise use `subagent` (or read the image directly when the session model supports it). Do not choose it merely because the task involves an image or because the user said "use a subagent"; only the user naming the Vision route (or declaring a custom Vision route) opts in. `subagent_vision` only routes the child to a model; the child still calls `read_image` (`@deepseek-ai/dsh-tool-fs`) itself, which refuses to read an image unless the calling route's resolved model actually declares `image` input in this deployment's model catalog. A custom vision endpoint must declare image input; with no custom route the session model is used (DeepSeek-V4.1-Flash accepts images).
 
-Beyond a plain "look at this image" request, the system prompt steers the agent to delegate to `subagent_vision` for scientific reading tasks specifically:
+When the user has asked for the Vision route, use it for scientific reading tasks such as:
 
 - interpreting a plot or trend,
 - comparing panels in a multi-panel figure,
