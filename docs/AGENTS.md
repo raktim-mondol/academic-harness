@@ -6,24 +6,24 @@ The Academic Harness preset adds a specialist roster and two model-pinned delega
 
 ## Subagent model routing
 
-Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-harness` preset adds two more that pin a delegated child to a specific model via `agentOptions.model`:
+Besides the plain `subagent`/`subagent_fork` delegation tools, the `academic-harness` preset adds two optional model-routed tools. Each can select a registered provider route and model via `agentOptions`; with no model it inherits the session model:
 
-| Tool | Use it for | Model (Settings or env) | Default |
+| Tool | Use it for | Route (Settings or env) | Default |
 |---|---|---|---|
-| `subagent` | Ordinary delegated work — most specialist calls | — (inherits the parent session's model) | — |
+| `subagent` | Delegated work, including difficulty-bound specialist calls | — (inherits the parent session's model) | — |
 | `subagent_fork` | Forked delegation that inherits the parent preset and history | — (inherits the parent) | — |
-| `subagent_pro` | Tasks where difficulty, not length, is the bottleneck: a hard proof/derivation, a causal-inference or experimental-design critique, tracing a subtle methodological flaw, multi-step reaction/pathway reasoning, a large multi-file refactor | `SUBAGENT_MODEL_COMPLEX` | `deepseek-flash` |
-| `subagent_vision` | Delegated tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | `SUBAGENT_MODEL_VISION` | `deepseek-flash` |
+| `subagent_pro` | Difficulty-bound work: a hard proof/derivation, a causal-inference or experimental-design critique, tracing a subtle methodological flaw, multi-step reaction/pathway reasoning, a large multi-file refactor | Pro API type + endpoint URL + model + API key (Settings) | Inherit session model |
+| `subagent_vision` | Tasks that need to *see* something with `read_image` — a figure, scan, diagram, screenshot, or a rendered LaTeX PDF page | Vision API type + endpoint URL + model + API key (Settings) | Inherit session model |
 
-Both pinned tools default to `deepseek-flash` (DeepSeek-V4.1-Flash). The legacy names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
+Both routes are optional. Set all four fields (API type, endpoint URL, model, API key) to register a custom OpenAI/Anthropic-compatible route; with none set they inherit the session model (DeepSeek-V4.1-Flash by default). A partial set is ignored. The plugin registers the route on the host's pi-ai adapter and stores the key in the credential service. The legacy model names `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
 
 All four delegation tools use DSH 0.2.1's managed activations: a call returns a `subagentId` immediately, the child's final answer arrives as a completion notice, and `send_message` / `interrupt_agent` handle follow-ups and stops.
 
-`subagent` is deliberately left without a pinned model: forcing every routine delegation onto a hardcoded model id would break delegation outright wherever that id isn't registered under the session's provider. Only the two escalation paths are pinned, and only where the agent is choosing to opt into a specific model rather than falling back to whatever it's already using.
+`subagent` is deliberately left without a pinned model: it inherits whichever model the session is already on. Forcing every delegation onto a hardcoded model id would break delegation outright wherever that id isn't registered under the session's provider. The two optional routes also inherit the session model unless a model is configured.
 
 ### What gets routed to `subagent_pro`
 
-The system prompt steers `subagent_pro` toward difficulty, not length:
+When a custom route is configured, the system prompt steers `subagent_pro` toward difficulty, not length. With no route, `subagent` is the same delegation on the session model:
 
 - verifying a mathematical derivation step-by-step,
 - propagating uncertainty through a multi-stage calculation,
@@ -36,7 +36,7 @@ It explicitly steers away from routine review, lookup, simple data validation, o
 
 ### What gets routed to `subagent_vision`
 
-`subagent_vision` only routes the child to a model; the child still calls `read_image` (`@deepseek-ai/dsh-tool-fs`) itself, which refuses to read an image unless the calling route's resolved model actually declares `image` input in this deployment's model catalog — pick a `SUBAGENT_MODEL_VISION` value that's registered that way.
+`subagent_vision` only routes the child to a model; the child still calls `read_image` (`@deepseek-ai/dsh-tool-fs`) itself, which refuses to read an image unless the calling route's resolved model actually declares `image` input in this deployment's model catalog. A custom vision endpoint must declare image input; with no custom route the session model is used (DeepSeek-V4.1-Flash accepts images).
 
 Beyond a plain "look at this image" request, the system prompt steers the agent to delegate to `subagent_vision` for scientific reading tasks specifically:
 
@@ -50,7 +50,7 @@ It also covers a case text tools can't: auditing a compiled LaTeX PDF's page lay
 
 ### Configuration
 
-Set `SUBAGENT_MODEL_COMPLEX`/`SUBAGENT_MODEL_VISION` via Settings → Academic Harness API keys (two dropdowns beside Image model) or the matching env var — env wins when both are set, same resolution order as the API keys above. Unlike Image model, these two need a `dsh` restart to take effect (see [Configuration](CONFIGURATION.md#when-a-change-takes-effect)).
+Set the API type, endpoint URL, model, and API key for Pro and Vision in Settings → Academic Harness API keys (or the matching `SUBAGENT_PRO_*` / `SUBAGENT_VISION_*` env vars; env wins). Set all four fields to register the custom route; leave all four blank to inherit the session model, and a partial set is ignored. The plugin writes the route onto the host's pi-ai adapter and stores the key in the credential service. These fields need a `dsh` restart to take effect (see [Configuration](CONFIGURATION.md#when-a-change-takes-effect)).
 
 ## Specialist briefs and skills
 

@@ -73,18 +73,11 @@ For a task centered on a specific scientific or engineering discipline none of t
 
 Reviewers report findings by severity with file:line or quoted claims; they do not silently edit unless asked.
 
-Three delegation tools route to different models by task, so pick deliberately instead of defaulting to the first one every time:
+The preset adds two optional model-routed delegation tools alongside \`subagent\` and \`subagent_fork\`:
 
-- \`subagent\` — the default for ordinary delegated work (most specialist calls above).
-- \`subagent_pro\` — reach for this instead of \`subagent\` when the task's *difficulty*, not its length, is the bottleneck: something a fast model plausibly gets subtly wrong rather than just slowly right. Common scientific uses:
-  - A hard mathematical derivation or proof: verifying each step of a paper's derivation, propagating uncertainty through a multi-stage calculation, checking dimensional/unit consistency across a long formula chain.
-  - Experimental-design or causal-inference critique with many interacting parts: spotting a hidden confounder or collider in a proposed causal diagram, auditing a multi-factor design for a subtle power or multiple-comparisons problem, weighing conflicting evidence quality across several studies rather than just summarizing them.
-  - Tracing a subtle methodological flaw through many interacting pieces: data leakage buried in a multi-stage ML pipeline, a nested cross-validation setup that's silently wrong, an inconsistency between a paper's stated method and what its code or results actually show.
-  - Multi-step chemistry/biology reasoning: proposing or checking a multi-step reaction mechanism or synthesis route, tracing a metabolic or signaling pathway with several interacting branches.
-  - A large multi-file refactor of an analysis pipeline where correctness depends on keeping many call sites consistent.
-
-  Don't use it for routine review, straightforward lookup, simple data validation, or literature search — those get the same quality on \`subagent\` for a fraction of the cost and latency. When unsure, start on \`subagent\`.
-- \`subagent_vision\` — delegate anything that requires actually *seeing* a raster image, not just its bytes, extracted text, or metadata. It reads with \`read_image\`, so give it the file path(s) (rendered to PNG/JPEG/WebP/GIF first if needed — see below) and exactly what to look for; don't just say "check this image." Common scientific uses:
+- \`subagent\` — the default for delegated work, including difficulty-bound tasks: a hard mathematical derivation or proof, a causal-inference or experimental-design critique, tracing a subtle methodological flaw through a multi-stage pipeline, multi-step reaction/pathway reasoning, or a large multi-file refactor. It inherits the session's current model.
+- \`subagent_pro\` — the same delegation with an optional custom endpoint for difficulty-bound work. Configure API type, endpoint URL, model, and API key for Pro in Settings → Academic Harness API keys; all four are required to activate it. With no complete route it inherits the session model and is equivalent to \`subagent\`; do not assume it is a stronger model.
+- \`subagent_vision\` — delegate anything that requires actually *seeing* a raster image, not just its bytes, extracted text, or metadata. When its four custom API/endpoint/model/key fields are set it uses that route; otherwise it inherits the session model, which already accepts images. It reads with \`read_image\`, so give it the file path(s) (rendered to PNG/JPEG/WebP/GIF first if needed — see below) and exactly what to look for; don't just say "check this image." Common scientific uses:
   - Reading a figure: describing a trend or curve's shape, comparing panels in a multi-panel figure, reading axis labels/units/legends, spotting an outlier or a mismatch between the figure and the text describing it.
   - Reviewing microscopy, gel/blot, or medical-imaging scans (histology, X-ray, MRI, fluorescence) for qualitative features called out in the task — not for a diagnosis or a measurement that should instead come from real analysis code or \`sci_inspect\`.
   - Checking a chemical structure, reaction scheme, phylogenetic tree, network/pathway diagram, or other scientific illustration for correctness, mislabeling, or legibility.

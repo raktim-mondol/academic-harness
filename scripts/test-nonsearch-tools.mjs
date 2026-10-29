@@ -4,6 +4,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { buildCustomRoute, customRouteProfile } from '../subagent-models.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
@@ -11,6 +12,35 @@ const pkg = JSON.parse(read('package.json'))
 const preset = read('presets/academic-harness/agent.cordis.yml')
 const prompt = read('prompt.js')
 const settings = read('settings-keys.js')
+
+for (const key of [
+  'SUBAGENT_PRO_API', 'SUBAGENT_PRO_BASE_URL', 'SUBAGENT_PRO_MODEL', 'SUBAGENT_PRO_API_KEY',
+  'SUBAGENT_VISION_API', 'SUBAGENT_VISION_BASE_URL', 'SUBAGENT_VISION_MODEL', 'SUBAGENT_VISION_API_KEY',
+]) {
+  assert.ok(settings.includes(`'${key}'`), `settings-keys.js missing ${key}`)
+}
+assert.match(read('client/ApiKeysSection.jsx'), /SUBAGENT_PRO_API/)
+assert.match(read('subagent-models.js'), /subagent_pro/)
+assert.match(read('subagent-models.js'), /subagent_vision/)
+assert.match(prompt, /subagent_pro/)
+assert.match(prompt, /subagent_vision/)
+assert.equal(buildCustomRoute({}), null)
+assert.deepEqual(
+  buildCustomRoute({
+    api: 'anthropic-messages', baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k',
+  }),
+  {
+    api: 'anthropic-messages', baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k',
+  },
+)
+assert.equal(buildCustomRoute({ api: 'anthropic-messages', baseURL: 'https://x', model: 'm' }).incomplete, true)
+assert.match(buildCustomRoute({ api: 'nope', baseURL: 'https://x', model: 'm', apiKey: 'k' }).invalid, /API type/)
+assert.match(buildCustomRoute({ api: 'openai-completions', baseURL: 'ftp://x', model: 'm', apiKey: 'k' }).invalid, /HTTP/)
+const visionProfile = customRouteProfile({
+  api: 'anthropic-messages', baseURL: 'https://x', model: 'm', credential: 'AH_SUBAGENT_VISION_KEY',
+}, { vision: true })
+assert.deepEqual(visionProfile.models[0].input, ['text', 'image'])
+assert.equal(visionProfile.apiKeyEnv, 'AH_SUBAGENT_VISION_KEY')
 
 for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './agreement', './appraisal', './papermemory-mcp', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)

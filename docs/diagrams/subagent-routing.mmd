@@ -1,11 +1,12 @@
 flowchart TD
   task[Delegated task] --> q{What is the bottleneck?}
-  q -->|ordinary work| sub[subagent or subagent_fork<br/>inherits the parent model]
-  q -->|difficulty, not length| pro[subagent_pro<br/>SUBAGENT_MODEL_COMPLEX]
-  q -->|must see an image| vision[subagent_vision<br/>SUBAGENT_MODEL_VISION]
+  q -->|ordinary or no custom route| sub[subagent or subagent_fork<br/>inherits the session model]
+  q -->|difficulty with a custom route| pro[subagent_pro<br/>custom endpoint/model from Settings<br/>else session model]
+  q -->|must see an image| vision[subagent_vision<br/>custom endpoint/model from Settings<br/>else session model]
 
   sub --> routine[Review, lookup, validation,<br/>literature search]
-  pro --> hard[Proof or derivation<br/>causal-inference critique<br/>subtle methodological flaw<br/>large multi-file refactor]
+  sub --> hard[Proof or derivation<br/>causal-inference critique<br/>subtle methodological flaw<br/>large multi-file refactor]
+  pro --> custom[The same difficulty-bound work<br/>on the configured route]
   vision --> image[read_image in the child<br/>plot, figure, scan, PDF page]
   image --> render[PDF pages rendered first<br/>pdftoppm -png -r 150]
 
@@ -14,4 +15,4 @@ flowchart TD
   classDef use fill:#f8fafc,stroke:#94a3b8,color:#0f172a
   class q route
   class sub,pro,vision model
-  class routine,hard,image,render,task use
+  class routine,hard,custom,image,render,task use

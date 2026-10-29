@@ -56,7 +56,7 @@ Findings:
 |---|---|---|
 | `code-reviewer` | `code-reviewer.md` | Keep; read-only |
 | `statistical-reviewer` | `statistician.md` | Pick one canonical name; alias the other |
-| `math-checker` | — | Add; route to `subagent_pro` |
+| `math-checker` | — | Add; route to `subagent` by default, or `subagent_pro` when a custom API/endpoint/model route is configured |
 | `ml-auditor` | — | Add |
 | `data-validator` | `data-scientist.md` | Split validator from analyst, or alias |
 | `reproducibility-auditor` | — | Add; owns `repo_audit` |
@@ -118,7 +118,9 @@ owner. "Gated" means the tool requires `AH_ENABLE_OPTIONAL_TOOLS=1`.
 Add full briefs for: `ml-auditor`, `math-checker`, `methodology-reviewer`,
 `fact-checker`, `ethics-reviewer`, `protocol-writer`, `results-interpreter`.
 Route `math-checker`, `methodology-reviewer`, and `ml-auditor` to
-`subagent_pro`; they are difficulty-bound rather than length-bound.
+`subagent` by default; they are difficulty-bound rather than length-bound.
+Use `subagent_pro` only when a custom API/endpoint/model route is configured for
+heavy tasks.
 
 Defer or drop:
 
@@ -256,13 +258,13 @@ tools.
 
 | Routing | Agents |
 |---|---|
-| `subagent` (default) | `submission-compliance-editor`, `data-steward`, `reference-librarian`, `prisma-auditor` |
-| `subagent_pro` | `math-checker`, `methodology-reviewer`, `ml-auditor`, `research-integrity-auditor` (when the call is a hard forensic judgment) |
+| `subagent` (default) | `submission-compliance-editor`, `data-steward`, `reference-librarian`, `prisma-auditor`, `math-checker`, `methodology-reviewer`, `ml-auditor`, `research-integrity-auditor` (hard forensic judgment) |
+| `subagent_pro` (when a custom API/endpoint/model route is configured) | The same difficulty-bound agents above |
 | `subagent_vision` | Figure-panel comparison, microscopy/gel review, compiled-PDF layout audits |
 | `subagent_fork` | Continuity only; never for independent verification |
 
-Independent verification must be a fresh `subagent`/`subagent_pro`, not a fork
-of the author's session.
+Independent verification must be a fresh `subagent` (or `subagent_pro` when a
+custom route is configured), not a fork of the author's session.
 
 ## 7. Verification
 

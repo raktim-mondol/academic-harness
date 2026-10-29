@@ -225,21 +225,23 @@
         provider: fork
         toolName: subagent_fork
 
-    # Two more spawn-backed delegation tools, each pinned to a fixed model via
-    # `agentOptions.model` so the top-level agent can route a delegated task
-    # to the model that fits it: `subagent_pro` for unusually heavy reasoning,
-    # `subagent_vision` for tasks that need to read an image (paired with the
-    # shared `read_image` tool from `@deepseek-ai/dsh-tool-fs`, gated on the
-    # child's route actually declaring image input). Mounted programmatically
-    # rather than as static rows so the model ids can come from Settings ->
-    # Academic Harness API keys as well as SUBAGENT_MODEL_COMPLEX/
-    # SUBAGENT_MODEL_VISION — see subagent-models.js for the resolution order
-    # and the restart caveat this shares with the MCP connectors below, and
-    # for the `inject` declaration a `ctx.plugin()`-mounted child like this
-    # one needs.
+    # Two optional spawn-backed delegation tools. Each can register a custom
+    # OpenAI/Anthropic-compatible route from its four Settings fields (API
+    # type, endpoint URL, model, API key); the plugin writes that route onto
+    # the llm-pi-ai entry and stores the key in the credential service. With
+    # no complete custom route the tool inherits the session model.
+    # `subagent_pro` is for difficulty-bound work, `subagent_vision` for image
+    # reading (paired with the shared `read_image` tool from
+    # `@deepseek-ai/dsh-tool-fs`, gated on the child's route actually declaring
+    # image input). Mounted programmatically rather than as static rows so the
+    # custom route can come from Settings -> Academic Harness API keys as well
+    # as SUBAGENT_PRO_* / SUBAGENT_VISION_* env vars; see subagent-models.js
+    # for the resolution order and the restart caveat this shares with the MCP
+    # connectors below, and for the `inject` declaration a
+    # `ctx.plugin()`-mounted child like this one needs.
     #
-    # `agentOptions.model` is forwarded by `@deepseek-ai/dsh-tool-subagent`.
-    # Pin that dependency to the same line as `npm install -g @deepseek-ai/dsh`
+    # `agentOptions` is forwarded by `@deepseek-ai/dsh-tool-subagent`. Pin that
+    # dependency to the same line as `npm install -g @deepseek-ai/dsh`
     # (`latest`). Spawn-in-process on 0.2.1 advertises `agentOptions`; a
     # mismatched older spawn provider throws at mount and drops
     # `subagent_pro`/`subagent_vision` as "unknown tool".

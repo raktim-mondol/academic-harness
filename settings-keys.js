@@ -1,14 +1,16 @@
 /**
  * The `academic-harness` host entry Config: API keys for the MCP
  * connectors, image generation, and remote-compute tools, plus a handful of
- * non-secret preferences (IMAGE_MODEL, SUBAGENT_MODEL_COMPLEX,
- * SUBAGENT_MODEL_VISION, ZVEC_GREP_EMBEDDING, ZVEC_GREP_AUTO_INDEX) that ride
+ * non-secret preferences (IMAGE_MODEL, SUBAGENT_PRO_API,
+ * SUBAGENT_PRO_BASE_URL, SUBAGENT_PRO_MODEL, SUBAGENT_VISION_API,
+ * SUBAGENT_VISION_BASE_URL, SUBAGENT_VISION_MODEL, ZVEC_GREP_EMBEDDING,
+ * ZVEC_GREP_AUTO_INDEX) that ride
  * along in the same schema/UI section for convenience — editable from
  * Settings -> Academic Harness API keys.
  * Registered at plugin load; resolveEnv() (credential-env.js) reads the live
  * value on every call, so a value entered in Settings works without a
  * restart for fields read per-call (IMAGE_MODEL, ZVEC_GREP_AUTO_INDEX) —
- * process.env still wins when set. The two SUBAGENT_MODEL_* fields and
+ * process.env still wins when set. The SUBAGENT_* custom-route fields and
  * ZVEC_GREP_EMBEDDING / ZVEC_GREP_API_KEY feed standing preset mounts (see
  * subagent-models.js and zvec-grep.js) and need a `dsh` restart to apply,
  * same as the MCP connector keys below. ZVEC_GREP_INDEX_STATE /
@@ -70,8 +72,14 @@ export const KEY_FIELDS = [
   'PATENTSVIEW_API_KEY',
   'GEMINI_API_KEY',
   'IMAGE_MODEL',
-  'SUBAGENT_MODEL_COMPLEX',
-  'SUBAGENT_MODEL_VISION',
+  'SUBAGENT_PRO_API',
+  'SUBAGENT_PRO_BASE_URL',
+  'SUBAGENT_PRO_MODEL',
+  'SUBAGENT_PRO_API_KEY',
+  'SUBAGENT_VISION_API',
+  'SUBAGENT_VISION_BASE_URL',
+  'SUBAGENT_VISION_MODEL',
+  'SUBAGENT_VISION_API_KEY',
   'MODAL_TOKEN_ID',
   'MODAL_TOKEN_SECRET',
   'RUNPOD_API_KEY',

@@ -53,10 +53,10 @@ No credential is required to install or boot. Each connector or tool stays disab
 |---|---|---|
 | `GEMINI_API_KEY` | Gemini API key. `IMAGE_API_KEY` (env only) overrides it | Next call |
 | `IMAGE_MODEL` | Image model id. Default `gemini-2.5-flash-image` ("nano banana"); also `gemini-3.1-flash-image`, `gemini-3-pro-image`, or a custom id | Immediate on selection — no Save |
-| `SUBAGENT_MODEL_COMPLEX` | Model for `subagent_pro` | Needs a `dsh` restart |
-| `SUBAGENT_MODEL_VISION` | Model for `subagent_vision` | Needs a `dsh` restart |
+| `SUBAGENT_PRO_API`, `SUBAGENT_PRO_BASE_URL`, `SUBAGENT_PRO_MODEL`, `SUBAGENT_PRO_API_KEY` | Optional custom route for `subagent_pro`; all four required | Needs a `dsh` restart |
+| `SUBAGENT_VISION_API`, `SUBAGENT_VISION_BASE_URL`, `SUBAGENT_VISION_MODEL`, `SUBAGENT_VISION_API_KEY` | Optional custom route for `subagent_vision`; all four required | Needs a `dsh` restart |
 
-Both subagent-model fields default to `deepseek-flash` (DeepSeek-V4.1-Flash). The legacy ids `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
+Each route can use Anthropic Messages or an OpenAI-compatible API. Set all four fields to register the route; with none set the tool inherits the session model (a partial set is ignored). The plugin writes the route onto the host's pi-ai adapter and stores the API key in the credential service. The legacy ids `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
 
 `IMAGE_PROVIDER`, `IMAGE_BASE_URL`, and `IMAGE_API_KEY` select an OpenAI-compatible Images API instead of Gemini. `IMAGE_API_KEY` is also accepted as a Gemini override. These are environment variables.
 
@@ -101,7 +101,7 @@ The Academic Harness preset mounts once as a **standing composition** for the li
 | Tournament numbers | New tournaments; explicit arguments win |
 | `ZVEC_GREP_AUTO_INDEX` | The next Academic Harness session, no restart |
 | MCP connector keys (Parallel, Firecrawl, Scite) | After stopping and restarting `dsh` |
-| `SUBAGENT_MODEL_COMPLEX`, `SUBAGENT_MODEL_VISION` | After a `dsh` restart |
+| `SUBAGENT_PRO_*`, `SUBAGENT_VISION_*` | After a `dsh` restart |
 | `ZVEC_GREP_EMBEDDING`, `ZVEC_GREP_API_KEY` | New index runs read the current value; a `dsh` restart also hands it to `zg server on` for the search daemon |
 | `AH_ENABLE_OPTIONAL_TOOLS` | After a `dsh` restart; the preset rows exist either way |
 | Modal SDK | No restart: the first `modal_run` call installs it into `$DSH_HOME/modal-sdk` (unless `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1`); a manual profile install still needs a restart |

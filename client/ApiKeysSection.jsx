@@ -6,11 +6,11 @@ const IMAGE_MODEL_OPTIONS = [
   { value: 'gemini-3.1-flash-image', label: 'gemini-3.1-flash-image — nano banana 2' },
   { value: 'gemini-3-pro-image', label: 'gemini-3-pro-image — nano banana pro' },
 ]
-const SUBAGENT_MODEL_COMPLEX_OPTIONS = [
-  { value: 'deepseek-flash', label: 'deepseek-flash (default)' },
-]
-const SUBAGENT_MODEL_VISION_OPTIONS = [
-  { value: 'deepseek-flash', label: 'deepseek-flash (default)' },
+const SUBAGENT_API_OPTIONS = [
+  { value: '', label: 'Inherit session model (default)' },
+  { value: 'anthropic-messages', label: 'Anthropic Messages' },
+  { value: 'openai-completions', label: 'OpenAI Chat Completions' },
+  { value: 'openai-responses', label: 'OpenAI Responses' },
 ]
 const ZVEC_GREP_EMBEDDING_OPTIONS = [
   { value: 'local/potion-retrieval-32m', label: 'local/potion-retrieval-32m — papers / notes (default)' },
@@ -55,8 +55,14 @@ const KEYS = [
   { field: 'ORCID_TOKEN', label: 'ORCID', group: 'Identity', hint: 'Optional — used by the optional author_lookup tool as a Bearer token for higher ORCID rate limits. Public reads work without it; ROR needs no key.' },
   { field: 'GEMINI_API_KEY', label: 'Gemini', group: 'Image generation', hint: 'Enables image_generate and coscientist embed.' },
   { field: 'IMAGE_MODEL', label: 'Image model', group: 'Image generation', type: 'select', options: IMAGE_MODEL_OPTIONS, hint: 'Which Gemini model image_generate uses by default. Defaults to nano banana if unset.' },
-  { field: 'SUBAGENT_MODEL_COMPLEX', label: 'Complex-task model', group: 'Subagent model routing', type: 'select', options: SUBAGENT_MODEL_COMPLEX_OPTIONS, hint: 'Model for the subagent_pro delegation tool (unusually heavy reasoning). Requires restarting dsh to apply — same as the MCP connector keys above, not like Image model.' },
-  { field: 'SUBAGENT_MODEL_VISION', label: 'Image-reading model', group: 'Subagent model routing', type: 'select', options: SUBAGENT_MODEL_VISION_OPTIONS, hint: 'Model for the subagent_vision delegation tool (reads images via read_image). Requires restarting dsh to apply — same as the MCP connector keys above, not like Image model.' },
+  { field: 'SUBAGENT_PRO_API', label: 'Pro API type', group: 'Subagent model routing', type: 'select', options: SUBAGENT_API_OPTIONS, hideCustom: true, hint: 'Anthropic Messages or an OpenAI-compatible API. Set all four Pro fields to activate a custom route; leave the API type unset to inherit the session model.' },
+  { field: 'SUBAGENT_PRO_BASE_URL', label: 'Pro endpoint URL', group: 'Subagent model routing', type: 'text', hint: 'Endpoint root, for example https://api.deepseek.com/anthropic or https://api.openai.com/v1.' },
+  { field: 'SUBAGENT_PRO_MODEL', label: 'Pro model', group: 'Subagent model routing', type: 'text', hint: 'Model id sent to this endpoint. Leave all four Pro fields blank to inherit the session model.' },
+  { field: 'SUBAGENT_PRO_API_KEY', label: 'Pro API key', group: 'Subagent model routing', hint: 'Stored in the DSH credential store and used only for this route. Required with the other three Pro fields.' },
+  { field: 'SUBAGENT_VISION_API', label: 'Vision API type', group: 'Subagent model routing', type: 'select', options: SUBAGENT_API_OPTIONS, hideCustom: true, hint: 'Anthropic Messages or an OpenAI-compatible API. Set all four Vision fields to activate a custom route; leave the API type unset to inherit the session model.' },
+  { field: 'SUBAGENT_VISION_BASE_URL', label: 'Vision endpoint URL', group: 'Subagent model routing', type: 'text', hint: 'Endpoint root for the image-reading route, for example https://api.deepseek.com/anthropic or https://api.openai.com/v1.' },
+  { field: 'SUBAGENT_VISION_MODEL', label: 'Vision model', group: 'Subagent model routing', type: 'text', hint: 'Image-capable model id sent to this endpoint. Leave all four Vision fields blank to inherit the session model.' },
+  { field: 'SUBAGENT_VISION_API_KEY', label: 'Vision API key', group: 'Subagent model routing', hint: 'Stored in the DSH credential store and used only for this route. Required with the other three Vision fields.' },
   { field: 'MODAL_TOKEN_ID', label: 'Modal — token ID', group: 'Remote compute', hint: 'From modal.com/settings.' },
   { field: 'MODAL_TOKEN_SECRET', label: 'Modal — token secret', group: 'Remote compute', hint: 'From modal.com/settings.' },
   { field: 'RUNPOD_API_KEY', label: 'Runpod', group: 'Remote compute', hint: 'From console.runpod.io/user/settings.' },
@@ -114,7 +120,7 @@ function SelectField({ k, scope, snapshot, writable }) {
       <label style={fieldLabel}>
         {k.label}
         {' — '}
-        {stored || `default (${k.options[0].value})`}
+        {stored || (k.options[0].value ? `default (${k.options[0].value})` : k.options[0].label)}
       </label>
       <select
         value={customMode ? CUSTOM_MODEL : (stored || k.options[0].value)}
@@ -213,6 +219,71 @@ function SecretField({ k, scope, snapshot, writable }) {
   )
 }
 
+/** A non-secret text field that shows its stored value and saves on demand. */
+function TextField({ k, scope, snapshot, writable }) {
+  const stored = snapshot.value?.[k.field] || ''
+  const [draft, setDraft] = useState(stored)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState()
+
+  useEffect(() => { setDraft(stored) }, [stored])
+
+  const save = async () => {
+    const value = draft.trim()
+    setBusy(true)
+    setError(undefined)
+    try {
+      await scope.set(k.field, value)
+      setDraft(value)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const clear = async () => {
+    setBusy(true)
+    setError(undefined)
+    try {
+      await scope.unset(k.field)
+      setDraft('')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div key={k.field} style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+      <label style={fieldLabel}>
+        {k.label}
+        {' — '}
+        {stored || 'not set'}
+      </label>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        <input
+          type="text"
+          autoComplete="off"
+          value={draft}
+          disabled={busy || !writable}
+          onChange={(e) => setDraft(e.target.value)}
+          style={{ flex: 1 }}
+        />
+        <button type="button" disabled={busy || !writable || !draft.trim() || draft.trim() === stored} onClick={save}>
+          Save
+        </button>
+        <button type="button" disabled={busy || !writable || !stored} onClick={clear}>
+          Clear
+        </button>
+      </div>
+      {error && <p style={errorText}>{error}</p>}
+      {k.hint && <p style={hintText}>{k.hint}</p>}
+    </div>
+  )
+}
+
 /** Props supplied by our own client/index.js registration: { scope }. */
 export function ApiKeysSection(props) {
   const { scope } = props
@@ -255,7 +326,9 @@ export function ApiKeysSection(props) {
           {KEYS.filter((k) => k.group === group).map((k) => (
             k.type === 'select'
               ? <SelectField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
-              : <SecretField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
+              : k.type === 'text'
+                ? <TextField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
+                : <SecretField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
           ))}
           {group === 'Workspace search (zvec-grep)' && (
             <IndexProgressPanel scope={scope} />

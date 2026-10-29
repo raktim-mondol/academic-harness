@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.31.0
+
+- **`subagent_pro` and `subagent_vision` now take optional custom routes.** Each tool has four fields in Settings → Academic Harness API keys — API type (Anthropic Messages or an OpenAI-compatible API), endpoint URL, model, and API key. Setting all four registers an `academic-harness-pro`/`academic-harness-vision` route on the host's pi-ai adapter; the key is stored in the credential service. With no complete route, both tools inherit the session model (DeepSeek-V4.1-Flash by default, which also accepts images); a partial set is ignored. This replaces the old fixed model defaults that pinned both tools to `deepseek-flash`.
+
 ## 0.30.1
 
 - **Fixed the `rob-figure` layout.** The traffic-light panel clipped its title and the rotated domain labels, and long summary y-axis labels could run off the left edge. The traffic-light figure now reserves space for labels with a right-anchored rotation, both panels size from the study/domain counts, and the note stays visible. Verified in the DSH web UI.
