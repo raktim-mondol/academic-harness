@@ -63,11 +63,11 @@ def traffic_svg(title, note, domains, styles, studies, warnings):
     from matplotlib.figure import Figure
     from matplotlib.patches import Patch, Rectangle
 
-    width = max(5.0, 1.45 * max(1, len(domains)) + 3.2)
-    height = max(3.0, min(60.0, 0.32 * max(1, len(studies)) + 2.6))
+    width = max(7.5, 1.45 * max(1, len(domains)) + 3.8)
+    height = max(4.6, min(60.0, 0.32 * max(1, len(studies)) + 0.18 * len(domains) + 3.4))
     figure = Figure(figsize=(width, height))
-    axes = figure.add_axes([0.27, 0.2, 0.7, 0.62])
-    axes.set_title(title, fontsize=11, pad=28)
+    axes = figure.add_axes([0.24, 0.2, 0.72, 0.5])
+    figure.text(0.5, 0.94, title, ha="center", va="top", fontsize=11)
     if note:
         figure.text(0.5, 0.985, truncate(note, 180), ha="center", va="top",
                     fontsize=6, color="#616161", wrap=True)
@@ -75,12 +75,13 @@ def traffic_svg(title, note, domains, styles, studies, warnings):
     axes.set_ylim(0, max(1, len(studies)))
     axes.invert_yaxis()
     axes.set_xticks([index + 0.5 for index in range(len(domains))])
-    axes.set_xticklabels([truncate(domain["label"], 28) for domain in domains],
-                         rotation=35, ha="left", fontsize=7)
+    axes.set_xticklabels([truncate(domain["label"], 32) for domain in domains],
+                         rotation=35, ha="right", va="bottom", fontsize=6.5,
+                         rotation_mode="anchor")
     axes.xaxis.tick_top()
-    axes.tick_params(axis="x", length=0, pad=2)
+    axes.tick_params(axis="x", length=0, pad=4)
     axes.set_yticks([index + 0.5 for index in range(len(studies))])
-    axes.set_yticklabels([truncate(study["label"]) for study in studies], fontsize=7)
+    axes.set_yticklabels([truncate(study["label"], 40) for study in studies], fontsize=7)
     axes.tick_params(axis="y", length=0)
     for spine in axes.spines.values():
         spine.set_visible(False)
@@ -130,10 +131,10 @@ def summary_svg(title, note, domains, styles, studies, warnings):
             row[value] += 1
         counts.append(row)
 
-    width = max(6.0, min(12.0, 0.5 * len(studies) + 4.0))
-    height = max(2.6, min(60.0, 0.36 * max(1, len(domains)) + 2.2))
+    width = max(9.0, min(16.0, 0.6 * max(1, len(studies)) + 6.0))
+    height = max(3.4, min(60.0, 0.36 * max(1, len(domains)) + 2.6))
     figure = Figure(figsize=(width, height))
-    axes = figure.add_axes([0.3, 0.18, 0.66, 0.64])
+    axes = figure.add_axes([0.38, 0.18, 0.58, 0.62])
     axes.set_title(title, fontsize=11, pad=10)
     if note:
         figure.text(0.5, 0.985, truncate(note, 180), ha="center", va="top",
@@ -141,7 +142,7 @@ def summary_svg(title, note, domains, styles, studies, warnings):
     axes.set_xlim(0, max(1, len(studies)))
     axes.set_ylim(-0.6, max(0.6, len(domains) - 0.4))
     axes.set_yticks(range(len(domains)))
-    axes.set_yticklabels([truncate(domain["label"]) for domain in domains], fontsize=7)
+    axes.set_yticklabels([truncate(domain["label"], 45) for domain in domains], fontsize=7)
     axes.set_xlabel("Studies", fontsize=8)
     axes.tick_params(axis="both", labelsize=7)
     for spine in ("top", "right", "left"):

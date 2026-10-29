@@ -441,12 +441,14 @@ export function buildRobTable(evaluation, template = evaluation.template) {
   const rows = evaluation.records.map((row) => {
     const values = {}
     const reviewers = new Set()
+    const reconciledBy = new Set()
     let unverified = 0
     const collect = (resolution) => {
       for (const entry of resolution?.by_reviewer || []) {
         reviewers.add(entry.reviewer)
         if (entry.quote_status && entry.quote_status !== 'verified') unverified += 1
       }
+      if (resolution?.reconcile?.reviewer) reconciledBy.add(resolution.reconcile.reviewer)
     }
     for (const cell of row.cells) {
       values[cell.key] = displayValue(cell.resolution)
@@ -461,6 +463,7 @@ export function buildRobTable(evaluation, template = evaluation.template) {
       doi: row.record?.doi ?? null,
       values,
       reviewers: [...reviewers],
+      reconciled_by: [...reconciledBy],
       unverified_quotes: unverified,
       overall_basis: row.overall ? (row.overall.derived ? 'derived' : row.overall.value != null ? 'explicit' : row.overall.state) : null,
       total_stars: row.total_stars,
@@ -588,6 +591,7 @@ export function buildFigureRequest(evaluation, template = evaluation.template, {
     domains.push({ id: 'overall', label: template.overall.name, axis: null })
   }
   const reviewers = new Set()
+  const reconciledBy = new Set()
   let unverified = 0
   const studies = evaluation.records.map((row) => {
     const values = {}
@@ -597,6 +601,7 @@ export function buildFigureRequest(evaluation, template = evaluation.template, {
         reviewers.add(entry.reviewer)
         if (entry.quote_status && entry.quote_status !== 'verified') unverified += 1
       }
+      if (cell.resolution.reconcile?.reviewer) reconciledBy.add(cell.resolution.reconcile.reviewer)
     }
     if (row.overall) {
       values.overall = {
@@ -607,11 +612,13 @@ export function buildFigureRequest(evaluation, template = evaluation.template, {
         reviewers.add(entry.reviewer)
         if (entry.quote_status && entry.quote_status !== 'verified') unverified += 1
       }
+      if (row.overall.reconcile?.reviewer) reconciledBy.add(row.overall.reconcile.reviewer)
     }
     return { id: row.record_id, label: row.record?.title || row.record_id, cells: values }
   })
   const names = [...reviewers]
-  const note = `Unverified quotes: ${unverified}. Reviewers: ${names.join(', ') || '(none)'}.${names.some((name) => name.startsWith('ai:')) ? ' AI judgements are marked ai:.' : ''}`
+  const reconciledNote = reconciledBy.size ? ` Reconciled by: ${[...reconciledBy].join(', ')}.` : ''
+  const note = `Unverified quotes: ${unverified}. Reviewers: ${names.join(', ') || '(none)'}.${reconciledNote}${names.some((name) => name.startsWith('ai:')) ? ' AI judgements are marked ai:.' : ''}`
   return {
     title: `${template.name} ${template.version} — ${evaluation.records.length} included studies`,
     note,

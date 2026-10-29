@@ -27,6 +27,9 @@ for (const instrument of instruments) {
   assert.match(instrument.source_url, /^https:\/\//)
   assert.ok(fingerprint(instrument).length === 64)
 }
+assert.match(byId['rob-2'].notes, /overall is derived/i)
+assert.match(byId['robins-i'].notes, /overall is derived/i)
+assert.match(byId['quadas-2'].notes, /does not define a derived overall/i)
 
 assert.equal(resolveInstrument('rob2').id, 'rob-2')
 assert.equal(resolveInstrument('RoB-2@2019').id, 'rob-2')
@@ -287,18 +290,22 @@ try {
   assert.equal(filtered.population, 1)
   assert.equal(filtered.instruments[0].records[0].overall.value, 'high')
   assert.equal(filtered.instruments[0].records[0].overall.derived, true)
+  const d1Cell = filtered.instruments[0].records[0].cells.find((cell) => cell.key === 'd1:risk_of_bias')
+  assert.equal(d1Cell.reconcile.reviewer, 'human:carol')
+  assert.equal(d1Cell.reconcile.value, 'high')
 
   const table = exportReview({ cwd, slug, format: 'rob-table' })
   const tableBody = readFileSync(join(cwd, table.path), 'utf8')
   assert.match(tableBody, /Risk-of-bias table — RoB 2 2019/)
   assert.match(tableBody, /high \(derived\)/)
-  assert.match(tableBody, /\| Reviewers \| Unverified \| Status \|/)
+  assert.match(tableBody, /\| Reviewers \| Reconciled by \| Unverified \| Status \|/)
   assert.match(tableBody, /human:alice/)
+  assert.match(tableBody, /human:carol/)
   assert.doesNotMatch(tableBody, /compliant|low risk|high quality|ready for submission|guarantee/i)
   const tableCsv = exportReview({ cwd, slug, format: 'rob-table', table_format: 'csv' })
   const tableCsvBody = readFileSync(join(cwd, tableCsv.path), 'utf8')
   assert.match(tableCsvBody.split('\n')[0], /record_id,title,year,doi,d1:risk_of_bias/)
-  assert.match(tableCsvBody.split('\n')[0], /reviewers,unverified_quotes,status/)
+  assert.match(tableCsvBody.split('\n')[0], /reviewers,reconciled_by,unverified_quotes,status/)
 
   const summary = exportReview({ cwd, slug, format: 'rob-summary' })
   const summaryBody = readFileSync(join(cwd, summary.path), 'utf8')
@@ -334,7 +341,7 @@ try {
   const nosMarkdown = exportReview({ cwd, slug: nosSlug, format: 'rob-table' })
   assert.match(
     readFileSync(join(cwd, nosMarkdown.path), 'utf8'),
-    /\| Total stars \| Reviewers \| Unverified \| Status \|/,
+    /\| Total stars \| Reviewers \| Reconciled by \| Unverified \| Status \|/,
   )
 
   const zeroEvents = [

@@ -5,7 +5,7 @@
   "study_designs": ["non-randomised intervention", "cohort", "case-control"],
   "source_url": "https://www.riskofbias.info/welcome/home/current-version-of-robins-i",
   "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
-  "notes": "The overall judgement is derived as the worst domain, with no_information placed between moderate and serious. Signalling answers are supporting detail only.",
+  "notes": "The overall is derived as the worst domain, with no_information placed between moderate and serious. Signalling answers are supporting detail only; the official signalling-answer algorithms are not implemented.",
   "scale": {
     "type": "ordinal",
     "values": [

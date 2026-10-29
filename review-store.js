@@ -843,6 +843,7 @@ export function deriveAppraisalStatus(cwd, slug, { id = null, instrument = null,
           value: row.overall.value,
           derived: row.overall.derived,
           by_reviewer: row.overall.by_reviewer,
+          reconcile: row.overall.reconcile,
         } : null,
         cells: row.cells.map((cell) => ({
           key: cell.key,
@@ -852,6 +853,7 @@ export function deriveAppraisalStatus(cwd, slug, { id = null, instrument = null,
           value: cell.resolution.value,
           missing_reviewers: cell.resolution.missing_reviewers,
           by_reviewer: cell.resolution.by_reviewer,
+          reconcile: cell.resolution.reconcile,
         })),
       })),
       outstanding: { conflicts: evaluation.conflicts, missing },
@@ -1127,9 +1129,9 @@ function robStudyLabel(row) {
 function robTableMarkdown(template, table) {
   const stars = template.scale.type === 'stars'
   const trailing = stars
-    ? '| Total stars | Reviewers | Unverified | Status |'
-    : '| Reviewers | Unverified | Status |'
-  const trailingDivider = stars ? '|---:|---|---:|---|' : '|---|---:|---|'
+    ? '| Total stars | Reviewers | Reconciled by | Unverified | Status |'
+    : '| Reviewers | Reconciled by | Unverified | Status |'
+  const trailingDivider = stars ? '|---:|---|---|---:|---|' : '|---|---|---|---:|---|'
   const lines = [
     `# Risk-of-bias table — ${template.name} ${template.version}`,
     '',
@@ -1151,12 +1153,13 @@ function robTableMarkdown(template, table) {
       return value == null ? '' : String(value)
     })
     const reviewers = row.reviewers.length ? row.reviewers.join('; ') : '(none)'
+    const reconciled = row.reconciled_by.length ? row.reconciled_by.join('; ') : ''
     const end = stars
-      ? `| ${row.total_stars ?? ''} | ${mdCell(reviewers)} | ${row.unverified_quotes} | ${row.status} |`
-      : `| ${mdCell(reviewers)} | ${row.unverified_quotes} | ${row.status} |`
+      ? `| ${row.total_stars ?? ''} | ${mdCell(reviewers)} | ${mdCell(reconciled)} | ${row.unverified_quotes} | ${row.status} |`
+      : `| ${mdCell(reviewers)} | ${mdCell(reconciled)} | ${row.unverified_quotes} | ${row.status} |`
     lines.push(`| ${row.record_id} | ${mdCell(robStudyLabel(row))} | ${cells.map(mdCell).join(' | ')} ${end}`)
   }
-  lines.push('', 'A cell may read "conflict" or "pending"; neither is a judgement. An overall marked (derived) follows the instrument rule, not a new reviewer decision. AI reviewers are marked ai:. Unverified counts quotes not confirmed through PaperMemory.', '')
+  lines.push('', 'A cell may read "conflict" or "pending"; neither is a judgement. An overall marked (derived) follows the instrument rule, not a new reviewer decision. "Reconciled by" names the reviewer whose consensus decision resolved a disagreement. AI reviewers are marked ai:. Unverified counts quotes not confirmed through PaperMemory.', '')
   return lines.join('\n')
 }
 
@@ -1164,7 +1167,7 @@ function robTableCsv(table, template) {
   const header = [
     'record_id', 'title', 'year', 'doi',
     ...table.columns.map((column) => column.key),
-    'overall_basis', 'reviewers', 'unverified_quotes', 'status',
+    'overall_basis', 'reviewers', 'reconciled_by', 'unverified_quotes', 'status',
   ]
   if (template.scale.type === 'stars') header.push('total_stars')
   const lines = [header.map(csvCell).join(',')]
@@ -1173,7 +1176,8 @@ function robTableCsv(table, template) {
     const line = [
       row.record_id, row.title, row.year ?? '', row.doi ?? '',
       ...values,
-      row.overall_basis ?? '', row.reviewers.join('; '), row.unverified_quotes, row.status,
+      row.overall_basis ?? '', row.reviewers.join('; '), row.reconciled_by.join('; '),
+      row.unverified_quotes, row.status,
     ]
     if (template.scale.type === 'stars') line.push(row.total_stars ?? '')
     lines.push(line.map(csvCell).join(','))

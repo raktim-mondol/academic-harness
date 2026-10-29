@@ -2,6 +2,13 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.30.1
+
+- **Fixed the `rob-figure` layout.** The traffic-light panel clipped its title and the rotated domain labels, and long summary y-axis labels could run off the left edge. The traffic-light figure now reserves space for labels with a right-anchored rotation, both panels size from the study/domain counts, and the note stays visible. Verified in the DSH web UI.
+- **Reconcile provenance in exports.** `rob-table` and its CSV gain a `Reconciled by` column, the `rob-figure` note names the reconciling reviewer, and `appraisal_status` exposes each cell's reconcile event. A consensus decision no longer looks like agreement between the original appraisers.
+- **Clearer instrument notes.** The RoB 2 and ROBINS-I template notes now state that the overall is derived from the domain judgements and that only the official signalling-answer algorithms are unimplemented. This removes an agent-facing ambiguity found during end-to-end UI testing.
+- Regression assertions for the template notes and reconcile provenance.
+
 ## 0.30.0
 
 - **Added Phase 4: risk-of-bias appraisal in the `review` ledger.** New actions `appraise`, `reconcile`, `agreement`, and `appraisal_status`; four paraphrased, versioned instruments — RoB 2 (2019, 5 domains + derived overall), ROBINS-I v1 (7 + overall), QUADAS-2 (4 domains, 7 risk-of-bias/applicability cells), and Newcastle-Ottawa (3 star-count domains). The full instrument definition is frozen into `.dsh/review/<slug>/instruments.json` at `start` or first use, so a running review cannot change its rubric.

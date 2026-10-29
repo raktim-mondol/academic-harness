@@ -5,7 +5,7 @@
   "study_designs": ["randomised trial"],
   "source_url": "https://www.riskofbias.info/welcome/rob-2-0-tool",
   "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
-  "notes": "Effect-of-assignment signalling questions. Signalling answers are supporting detail only; the official answer-to-judgement algorithms are not implemented.",
+  "notes": "Effect-of-assignment signalling questions. The overall is derived from the five domain judgements by the rule below; signalling answers are supporting detail only, and the official signalling-answer algorithms are not implemented.",
   "scale": {
     "type": "ordinal",
     "values": [
