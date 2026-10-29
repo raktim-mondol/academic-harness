@@ -2,6 +2,7 @@
 
 [![verify](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml/badge.svg)](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml)
 ![DeepSeek Harness 0.2.1+](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1%2B-5b7bd5)
+![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
 **A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review and hypothesis ledgers, 731 scientific skills, and local self-improvement, all inside the DSH web UI.
 
@@ -22,7 +23,7 @@ Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset wi
 
 ## Install
 
-Requires **DeepSeek Harness 0.2.1 or later**.
+Requires **DeepSeek Harness 0.2.1 or later** and **Linux** (the only platform tested so far; see [Requirements](#requirements-and-scope)).
 
 ```sh
 npm install -g @deepseek-ai/dsh
@@ -50,7 +51,7 @@ Full instructions, migration from `researchcraft`, troubleshooting, and the "one
 | Surface | Highlights | Guide |
 |---|---|---|
 | **Search and discovery** | `literature_search` router, OpenAlex, Semantic Scholar, PubMed, arXiv, Crossref, Consensus, Parallel, Firecrawl, Scite, Tavily, Exa, Perplexity, Jina, CORE, Elicit, FutureHouse | [Search](docs/SEARCH.md) |
-| **Papers and evidence** | `paper_download`, `paper_fold`, `pdf_to_markdown`, PaperMemory's 14 tools, `reference_library`, `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
+| **Papers and evidence** | `paper_download`, `paper_fold`, `pdf_to_markdown`, PaperMemory's 14 tools, `reference_library` (the native reference manager: BibTeX, BibLaTeX, RIS, and CSL-JSON in and out), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
 | **Writing and citation** | `ah_*` writing oracle and gate, `citation`, `manuscript_citations`, LaTeX, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
 | **Reviews and hypotheses** | `review` PRISMA-style ledger, `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors | [Research](docs/RESEARCH.md) |
 | **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
@@ -82,6 +83,7 @@ Discovery finds candidate papers, `paper_resolve` collapses their identifiers, a
 
 ## Requirements and scope
 
+- **Tested on Linux only.** The plugin, its runtime installs (PaperMemory, zvec-grep, TextFold), and the end-to-end browser tests have been run on Linux (Python 3.13, Node 24). macOS and Windows have not been tested and may not work; Python is needed for PaperMemory, `power_analysis`, and the compute helpers.
 - **DSH 0.2.1+.** The plugin's bundle patches the web-app layer, so the profile must include `@deepseek-ai/dsh-web-app`; the standard `web` profile does.
 - **A preset check matters.** The research persona, search connectors, PaperMemory, zvec-grep, paper tools, citation/review/tournament tools, and the `subagent_pro`/`subagent_vision` routes are scoped to the Academic Harness preset. Only the general-purpose tools (notebook, fold, images, LaTeX, PDF, Mermaid, compute, templates) are on every preset.
 - **Keys are optional.** No credential is needed to install or start; each connector stays disabled until its key is present. Some runtimes install in the background on first use — see [Architecture](docs/ARCHITECTURE.md#runtime-installs).

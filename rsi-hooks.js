@@ -229,13 +229,13 @@ async function pluginMessage(text) {
     const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
     return createUserMessage({
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: 'academic-harness-rsi' },
+      source: { kind: 'plugin:academic-harness-rsi' },
     })
   } catch {
     return {
       role: 'user',
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: 'academic-harness-rsi' },
+      source: { kind: 'plugin:academic-harness-rsi' },
     }
   }
 }

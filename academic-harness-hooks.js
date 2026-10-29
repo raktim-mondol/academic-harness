@@ -97,13 +97,13 @@ async function pluginMessage(text) {
     const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
     return createUserMessage({
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: PLUGIN },
+      source: { kind: `plugin:${PLUGIN}` },
     })
   } catch {
     return {
       role: 'user',
       content: [{ type: 'text', text }],
-      source: { kind: 'plugin', plugin: PLUGIN },
+      source: { kind: `plugin:${PLUGIN}` },
     }
   }
 }

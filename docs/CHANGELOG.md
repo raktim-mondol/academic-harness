@@ -2,6 +2,11 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.27.2
+
+- **Fixed turns failing with `format v4 message requires a producer-owned source kind`.** The hooks tagged the messages they inject (the RSI lesson block, the Academic Harness state card, the stop-gate hand-off) with the retired `{ kind: 'plugin', plugin }` wrapper, which DSH 0.2.1-rc.2's session format refuses. The turn that carried an injected message failed outright; a session with no lesson selected and no Academic Harness project never noticed. They now use the producer-owned kinds `plugin:academic-harness-ah` and `plugin:academic-harness-rsi`. Found by driving a real DSH web session through a browser: the third prompt of a session failed the moment a lesson was injected.
+- `scripts/test-phase7.mjs` now fails if either hook file goes back to the retired wrapper.
+
 ## 0.27.1
 
 - **The reference library is now a native tool, `reference_library`, so nothing has to be told where the workspace is.** An MCP server is a single process with one fixed working directory, but every DSH session has its own workspace, and the host freezes tool arguments, so a hook cannot supply it either. The MCP version needed the model to pass `cwd` on every import, export, and doctor call. The native tool receives the session, resolves paths against its workspace, and refuses any path that leaves it (symlinks included). It runs the same `papermemory library` code as before.

@@ -53,6 +53,13 @@ check(mount.includes('failOnStartupError: true'), 'papermemory.js must fail loud
 check(mount.includes('EXPECTED_TOOL_COUNT = 14'), 'papermemory.js missing tool-count drift check (15 tools minus the hidden library tool)')
 check(mount.includes("HIDDEN_MCP_TOOLS = ['papermemory_library']") && mount.includes('PAPERMEMORY_HIDE_TOOLS'), 'papermemory.js must hide the MCP library tool in favour of the native reference_library')
 
+// DSH session format v4 refuses the retired `{ kind: 'plugin', plugin }` wrapper and fails the whole turn.
+for (const file of ['academic-harness-hooks.js', 'rsi-hooks.js']) {
+  const hookSource = readFileSync(join(root, file), 'utf8')
+  check(!/kind:\s*['"`]plugin['"`]/.test(hookSource), `${file} still uses the retired plugin source wrapper`)
+  check(/kind:\s*[`'"]plugin:/.test(hookSource), `${file} must tag injected messages with a producer-owned plugin:<name> kind`)
+}
+
 const pdf = readFileSync(join(root, 'pdf-to-markdown.js'), 'utf8')
 check(pdf.includes('converter:'), 'pdf-to-markdown.js does not forward converter signals')
 check(pdf.includes('originChannel'), 'pdf-to-markdown.js does not forward originChannel')
