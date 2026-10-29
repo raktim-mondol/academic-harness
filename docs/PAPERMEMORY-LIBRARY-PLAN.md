@@ -343,9 +343,9 @@ Design points: the managed `.bib` records a hash of its block, so an unchanged f
 
 ### Phase 5 — done (PaperMemory `main` at tag `v0.3.0`, plugin branch `library-v0.26.0`; nothing pushed)
 
-PaperMemory: `papermemory_library` MCP tool (13 actions, dry runs by default, sandboxed paths), library records and keys created at ingest, export assigns missing keys (a check never writes), `library resolve`, `library integrity set`, version 0.3.0, tag `v0.3.0` (local). 203 tests pass.
+PaperMemory: `papermemory_library` MCP tool (13 actions, dry runs by default, sandboxed paths), library records and keys created at ingest, export assigns missing keys (a check never writes), `library resolve`, `library integrity set`, version 0.3.0, tag `v0.3.0` (local). 205 tests pass.
 
-Plugin (v0.26.0): re-vendored PaperMemory 0.3.0 (`SOURCE.txt` pins the commit), `papermemory-library.js` (non-throwing CLI bridge), `papermemory.js` expects 15 tools, `papermemory-cli.js` requires 0.3.0 and **backs up then migrates an existing store on first start**, `citation` library source, `manuscript_citations` library check, `literature_search` `in_library`, `integrity_check` library sweep, prompt section, refreshed `papermemory` skill (and a seeder rule so existing installs get it), docs and changelog, `scripts/test-library.mjs`. All 47 plugin test scripts pass.
+Plugin (v0.26.0): re-vendored PaperMemory 0.3.0 (`SOURCE.txt` pins the commit), `papermemory-library.js` (non-throwing CLI bridge), `papermemory.js` expects 15 tools, `papermemory-cli.js` requires 0.3.0 and **backs up then migrates an existing store on first start**, `citation` library source, `manuscript_citations` library check, `literature_search` `in_library`, `integrity_check` library sweep, prompt section, refreshed `papermemory` skill (and a seeder rule so existing installs get it), docs and changelog, `scripts/test-library.mjs`. All 34 plugin test scripts pass (the live paper_fold test is opt-in and not run).
 
 Problems found while integrating, and fixed:
 
