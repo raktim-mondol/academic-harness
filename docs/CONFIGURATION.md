@@ -58,6 +58,8 @@ No credential is required to install or boot. Each connector or tool stays disab
 
 Set all three fields to register the route; with none set the tool inherits the session model (a partial set is ignored). The endpoint URL selects Anthropic Messages when it contains `anthropic` (for example `https://api.deepseek.com/anthropic`) and OpenAI Chat Completions otherwise. The plugin writes the route onto the host's pi-ai adapter and stores the API key in the credential service. The legacy ids `deepseek-v4-flash` and `deepseek-v4-flash-vision-exp` are still accepted by the API, but those models have been retired and their requests are served by Flash.
 
+The top-level agent's own `read_image` is hidden and guarded, so file-based image inspection always goes through `subagent_vision`; only the spawned child reads image files. Each `subagent_pro`/`subagent_vision` call automatically writes a routing-tagged `decision` entry and, when the child settles, an `observation` entry to the session notebook.
+
 `IMAGE_PROVIDER`, `IMAGE_BASE_URL`, and `IMAGE_API_KEY` select an OpenAI-compatible Images API instead of Gemini. `IMAGE_API_KEY` is also accepted as a Gemini override. These are environment variables.
 
 The bundled launcher (`scripts/dsh-launch`, installed as `academic-harness`) forces `DEEPSEEK_BASE_URL=https://api.deepseek.com/anthropic`. That is the Messages-compatible root DSH expects; the bare `https://api.deepseek.com` host returns 404 for chat requests.

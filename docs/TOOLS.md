@@ -113,7 +113,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `modal_run` | Every preset | Offload a command to a Modal CPU/GPU instance; optional Volume; terminate when done | [Compute](COMPUTE.md) |
 | `runpod_run` | Every preset | Offload a command to a Runpod pod; optional network volume | [Compute](COMPUTE.md) |
 | `vastai_run` | Every preset | Rent the cheapest matching Vast.ai offer, run a command, destroy it; spot bids and volumes | [Compute](COMPUTE.md) |
-| `subagent` | DSH built-in | Delegated work, including difficulty-bound specialist calls; inherits the parent session's model. The preset adds optional `subagent_pro`/`subagent_vision` routes alongside it. | [Agents](AGENTS.md#subagent-model-routing) |
+| `subagent` | DSH built-in | Ordinary delegated work; inherits the parent session's model. The preset adds `subagent_pro` for difficulty-bound tasks and `subagent_vision` for image reading alongside it. | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_fork` | DSH built-in | Fork delegation that inherits the parent preset and history | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_pro` | Academic Harness preset | Difficulty-bound delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_vision` | Academic Harness preset | Image-reading delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |

@@ -46,6 +46,13 @@ export function notebookFile(exec) {
   return join(workspaceRoot(exec), '.dsh', 'notebook', `${sessionKey(exec)}.jsonl`)
 }
 
+/** Append one entry to a resolved notebook file. */
+export function appendNotebookEntryAt(file, entry) {
+  mkdirSync(dirname(file), { recursive: true })
+  appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf8')
+  return file
+}
+
 function readEntries(file) {
   try {
     const raw = readFileSync(file, 'utf8')
@@ -189,8 +196,7 @@ export function applyNotebook(ctx) {
       if (args.stance) entry.stance = args.stance
       if (args.supersedes) entry.supersedes = args.supersedes
 
-      mkdirSync(dirname(file), { recursive: true })
-      appendFileSync(file, `${JSON.stringify(entry)}\n`, 'utf8')
+      appendNotebookEntryAt(file, entry)
       return {
         id: entry.id,
         type: entry.type,

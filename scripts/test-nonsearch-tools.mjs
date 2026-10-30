@@ -4,7 +4,14 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildCustomRoute, customRouteProfile } from '../subagent-models.js'
+import {
+  READ_IMAGE_DENIAL,
+  buildCustomRoute,
+  customRouteProfile,
+  routingDecisionEntry,
+  routingOutcomeEntry,
+  topLevelPresetAgent,
+} from '../subagent-models.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
@@ -24,7 +31,42 @@ assert.match(read('subagent-models.js'), /subagent_pro/)
 assert.match(read('subagent-models.js'), /subagent_vision/)
 assert.match(prompt, /subagent_pro/)
 assert.match(prompt, /subagent_vision/)
-assert.match(prompt, /only when the user explicitly asks for the Pro route/i)
+assert.match(prompt, /Choose .*subagent_pro.* by task difficulty/i, 'Pro is selected by task difficulty')
+assert.match(prompt, /These are Pro-only/i, 'difficulty-bound work is Pro-only')
+assert.match(prompt, /do not write the analysis or critique yourself/i, 'hard work must be delegated, not answered inline')
+assert.match(prompt, /merely because no route is set/i, 'a missing Pro route must not downgrade a hard task')
+assert.doesNotMatch(prompt, /only when the user explicitly asks for the Pro route/i, 'Pro must not require an explicit user request')
+assert.match(prompt, /records the routing decision and the child's outcome/i, 'routing record must be automatic')
+assert.match(prompt, /do not duplicate those entries/i, 'the model must not add duplicate routing entries')
+assert.match(prompt, /read_image.*hidden from this top-level agent/i, 'the top-level read_image restriction must be documented')
+assert.match(read('subagent-models.js'), /tools\.restrict\(\{ deny: \[READ_IMAGE_TOOL\] \}\)/, 'the top-level agent must lose read_image')
+assert.match(read('subagent-models.js'), /tools\.guard\(/, 'a guard must refuse direct read_image calls')
+assert.match(read('subagent-models.js'), /'tools\/result'/, 'routing decisions must be recorded from tool results')
+assert.match(read('subagent-models.js'), /'subagent\/end'/, 'routing outcomes must be recorded from child settlement')
+assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-harness' } } }), true)
+assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-harness', delegationDepth: 1 } } }), false)
+assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-harness', origin: 'subagent' } } }), false)
+assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'standard' } } }), false)
+assert.equal(topLevelPresetAgent({ session: { header: {} } }), false)
+assert.match(READ_IMAGE_DENIAL, /subagent_vision/)
+const decision = routingDecisionEntry({
+  callId: 'call_1', toolName: 'subagent_vision', description: 'Read chart trend', prompt: 'Read /tmp/x.png and report the trend.',
+  route: 'custom route academic-harness-vision/deepseek-flash (anthropic-messages)', now: 1,
+})
+assert.equal(decision.id, 'routing-call_1-decision')
+assert.equal(decision.type, 'decision')
+assert.deepEqual(decision.tags, ['routing'])
+assert.equal(decision.timestamp, 1)
+assert.match(decision.body, /academic-harness-vision\/deepseek-flash/)
+const outcome = routingOutcomeEntry({
+  callId: 'call_1', toolName: 'subagent_vision', description: 'Read chart trend', subagentId: 'child_1',
+  stopReason: 'completed', output: [{ type: 'text', text: 'The trend rises.' }], durationMs: 2500, now: 2,
+})
+assert.equal(outcome.id, 'routing-call_1-outcome')
+assert.equal(outcome.type, 'observation')
+assert.equal(outcome.relatesTo, 'routing-call_1-decision')
+assert.equal(outcome.stance, 'neutral')
+assert.match(outcome.body, /The trend rises/)
 assert.equal(buildCustomRoute({}), null)
 assert.deepEqual(
   buildCustomRoute({ baseURL: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', apiKey: 'k' }),

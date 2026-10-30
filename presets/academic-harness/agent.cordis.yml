@@ -235,7 +235,10 @@
     # `subagent_pro` is for difficulty-bound work, `subagent_vision` for image
     # reading (paired with the shared `read_image` tool from
     # `@deepseek-ai/dsh-tool-fs`, gated on the child's route actually declaring
-    # image input). Mounted programmatically rather than as static rows so the
+    # image input). The plugin also hides and guards `read_image` for the
+    # top-level agent so image reads cannot bypass the vision child, and it
+    # records each Pro/Vision routing decision and outcome in the session
+    # notebook. Mounted programmatically rather than as static rows so the
     # custom route can come from Settings -> Academic Harness API keys as well
     # as SUBAGENT_PRO_* / SUBAGENT_VISION_* env vars; see subagent-models.js
     # for the resolution order and the restart caveat this shares with the MCP
