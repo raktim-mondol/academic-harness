@@ -23,7 +23,7 @@ Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset wi
 
 ## Install
 
-Requires **DeepSeek Harness 0.2.1–0.2.x** (`>=0.2.1-rc.2 <0.3.0`, the range in `package.json`) and **Linux** (the only platform tested so far; see [Requirements](#requirements-and-scope)).
+Requires **DeepSeek Harness 0.2.1–0.2.x** (`>=0.2.1-rc.5 <0.3.0`, the range in `package.json`) and **Linux** (the only platform tested so far; see [Requirements](#requirements-and-scope)).
 
 ```sh
 npm install -g @deepseek-ai/dsh

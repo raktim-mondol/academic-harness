@@ -1,6 +1,6 @@
 {
   "name": "academic-harness",
-  "version": "0.32.0",
+  "version": "0.32.1",
   "description": "Academic Harness as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",
@@ -300,11 +300,11 @@
     "@citation-js/plugin-bibtex": "^0.9.0",
     "@citation-js/plugin-csl": "^0.9.0",
     "@citation-js/plugin-ris": "^0.9.0",
-    "@deepseek-ai/dsh-mcp-client": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-settings": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-tool-subagent": "0.2.1-rc.2",
-    "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
-    "@deepseek-ai/schemastery": "~3.18.4",
+    "@deepseek-ai/dsh-mcp-client": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-tool-subagent": "0.2.1-rc.5",
+    "@deepseek-ai/dsh-tools": "0.2.1-rc.5",
+    "@deepseek-ai/schemastery": "~3.18.5",
     "@firecrawl/pdf-inspector": "^1.25.2",
     "adm-zip": "^0.6.0",
     "pdfjs-dist": "^4.10.38",
@@ -326,7 +326,7 @@
     "react-dom": "^18.3.1"
   },
   "engines": {
-    "dsh": ">=0.2.1-rc.2 <0.3.0"
+    "dsh": ">=0.2.1-rc.5 <0.3.0"
   },
   "keywords": [
     "dsh-plugin",

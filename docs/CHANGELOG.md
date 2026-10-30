@@ -2,6 +2,12 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.1
+
+- **DSH 0.2.1-rc.5 dependency alignment.** The plugin now pins `@deepseek-ai/dsh-tools`, `dsh-settings`, `dsh-tool-subagent`, `dsh-mcp-client`, and `schemastery` to the rc.5 line and requires dsh `>=0.2.1-rc.5 <0.3.0`. With the rc.2 pins, dsh 0.2.1-rc.5 disabled the `tool-subagent`, `subagent-model-selection-settings`, Claude Code hook/subagent, and `subagent_pro`/`subagent_vision` rows at startup as incompatible. The plugin-facing APIs (`defineTool`, `McpClient`, `agentOptions`, settings methods) are unchanged in rc.5.
+- The profile's own DSH packages must match too: `@deepseek-ai/dsh-hook-protocol`, `dsh-hooks-claude-code`, `dsh-subagent-claude-code`, and `dsh-working-directory` at `0.2.1-rc.5`.
+- Verified with a clean `academic-harness` boot (no version warnings), `test:deep-review`, `test:review`, `test:compute`, `test-academic-harness`, and a live `deep_review status` on rc.5.
+
 ## 0.32.0
 
 - **Added `deep_review`, a stateful full-manuscript Deep Review pass.** The tool wraps the vendored [open-deepreview](https://github.com/raktim-mondol/open-deepreview) engine: cost estimate, multi-pass segmented critique, page/quote-anchored comments, a scholar-peer summary with a claim-evidence map, reproducibility checklist and author questions, and OpenAlex/Crossref reference verification. Actions are `review`, `estimate`, `pdf2md`, `verify_citations`, `status`, `show`, and `list`; `show` pages comments, questions, checklist items, claims, flagged citations, and the rendered Markdown without loading the whole report into context.
