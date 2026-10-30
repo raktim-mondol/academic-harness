@@ -466,6 +466,16 @@
 - id: reporting-check
   name: academic-harness/reporting-check
 
+# Full-manuscript deep review with the vendored Open Deep Review engine
+# (vendor/open-deepreview): estimate, multi-pass segmented critique with
+# page/quote-anchored comments, scholar-peer summary with author questions,
+# and reference verification. Artifacts live under <cwd>/.dsh/deep-review/<key>/.
+# `review` calls the configured DEEPREVIEW_* endpoint and is token-expensive;
+# estimate/pdf2md/status/show/list make no model call. Node-only, no Bun.
+# See deep-review.js and vendor/open-deepreview/SOURCE.txt.
+- id: deep-review
+  name: academic-harness/deep-review
+
 # Co-Scientist hypothesis tournament (docs/CO-SCIENTIST-INTEGRATION-PLAN.md,
 # Phase 1): generate, review, rank, and evolve candidate hypotheses with state
 # that outlives the context window. Append-only event logs under

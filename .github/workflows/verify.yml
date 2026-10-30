@@ -74,6 +74,7 @@ jobs:
           node scripts/test-manuscript-tools.mjs
           node scripts/test-review-store.mjs
           node scripts/test-review-tool.mjs
+          node scripts/test-deep-review-tool.mjs
           node scripts/test-agreement.mjs
           node scripts/test-appraisal.mjs
           node scripts/test-reporting-check.mjs

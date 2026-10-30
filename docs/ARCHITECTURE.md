@@ -63,6 +63,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 |---|---|---|
 | `<cwd>/.dsh/notebook/<sessionId>.jsonl` | `notebook` | Running lab-notebook entries, shared across a delegation tree |
 | `<cwd>/.dsh/review/<slug>/` | `review` | Write-once `protocol.json`; append-only screening, evidence, and appraisal logs; frozen `instruments.json`; exports |
+| `<cwd>/.dsh/deep-review/<key>/` | `deep_review` | `review.json`, `review.md`, parsed `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `meta.json`, append-only `runs.jsonl` |
 | `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl` |
 | `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
 | `<cwd>/.zvec-grep/` | zvec-grep | Workspace index |
@@ -85,7 +86,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Search providers | `literature-search.js`, `openalex-search.js`, `openalex-cite.js`, `semantic-scholar-search.js`, `crossref-lookup.js`, `arxiv-search.js`, `pubmed-search.js`, `consensus-search.js`, `parallel-search.js`, `parallel-extract.js`, `brave-search.js`, `tavily-search.js`, `exa-search.js`, `perplexity-search.js`, `jina-reader.js`, `core-search.js`, `elicit-search.js`, `futurehouse-agent.js`, `search-normalize.js`, `search-http.js` |
 | Papers and memory | `paper-resolve.js`, `paper-download.js`, `paper-fold.js`, `textfold-runtime.js`, `pdf-to-markdown.js`, `papermemory.js`, `paper-mcp.js` |
 | Citation and writing | `citation.js`, `citation-format.js`, `manuscript-citations.js`, `integrity-check.js`, `academic-harness.js`, `academic-harness-hooks.js`, `academic-harness-cli.js`, `vendor/academic-harness/` |
-| Reviews and hypotheses | `review.js`, `review-store.js`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js` |
+| Reviews and hypotheses | `review.js`, `review-store.js`, `deep-review.js`, `vendor/open-deepreview/`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js` |
 | Clinical, datasets, policy | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js` |
 | Workspace and notebook | `notebook.js`, `notebook-export.js`, `notebook-zip.js`, `zvec-grep.js`, `zvec-index.js`, `zvec-index-engine.js`, `fold-core.js`, `fold-text.js`, `scientific-result.js` |
 | Figures and file formats | `image-generate.js`, `image-gen-client.js`, `mermaid-render.js`, `sci-inspect.js`, `latex-compile.js`, `python-helpers/` |
@@ -93,7 +94,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (745 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (746 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

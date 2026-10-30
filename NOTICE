@@ -156,6 +156,15 @@ verifier backend that can shell out to a `pi` binary is unused unless a
 project sets `verifier.backend: pi`. Skills were rewritten for DSH tool
 names; the engine Python is unmodified.
 
+open-deepreview (`vendor/open-deepreview/`) is vendored from
+`raktim-mondol/open-deepreview` (MIT License) —
+https://github.com/raktim-mondol/open-deepreview — at commit
+`c48e29450134d7a41559a73112962377f9602bce`. The TypeScript source under
+`src/` is unmodified. The plugin adds only a Node runner, a TypeScript loader
+hook, and `SOURCE.txt`, and does not expose the Bun-only web viewer, the
+development fixture command, or upstream tests. See
+`vendor/open-deepreview/SOURCE.txt`.
+
 PaperMemory (`vendor/papermemory/` plus `skills/papermemory/SKILL.md`) is
 vendored from the open-source `raktim-mondol/papermemory` project (MIT
 License) — https://github.com/raktim-mondol/papermemory. The Python package

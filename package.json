@@ -1,6 +1,6 @@
 {
   "name": "academic-harness",
-  "version": "0.31.1",
+  "version": "0.32.0",
   "description": "Academic Harness as a DeepSeek Harness profile: DSH web UI and agent, scientific skills, lab notebook, specialist subagents.",
   "icon": "assets/icon.svg",
   "license": "MIT",
@@ -59,6 +59,7 @@
     "./manuscript-citations": "./manuscript-citations.js",
     "./integrity-check": "./integrity-check.js",
     "./review": "./review.js",
+    "./deep-review": "./deep-review.js",
     "./coscientist": "./coscientist.js",
     "./coscientist-rank": "./coscientist-rank.js",
     "./coscientist-store": "./coscientist-store.js",
@@ -194,6 +195,7 @@
     "manuscript-citations.js",
     "integrity-check.js",
     "review.js",
+    "deep-review.js",
     "review-store.js",
     "agreement.js",
     "appraisal.js",
@@ -286,6 +288,7 @@
     "test:paper-fold": "node scripts/test-paper-fold.mjs",
     "test:reply-fold": "node scripts/test-reply-fold.mjs",
     "test:review": "node scripts/test-review-store.mjs && node scripts/test-review-tool.mjs && node scripts/test-agreement.mjs && node scripts/test-appraisal.mjs",
+    "test:deep-review": "node scripts/test-deep-review-tool.mjs",
     "test:reporting": "node scripts/test-reporting-check.mjs",
     "test:rsi": "node scripts/test-rsi.mjs",
     "test:coscientist": "node scripts/test-coscientist-models.mjs && node scripts/test-coscientist-store.mjs && node scripts/test-coscientist-tool.mjs && node scripts/test-coscientist-verify.mjs && node scripts/test-coscientist-embed.mjs && node scripts/test-coscientist-graph.mjs && node scripts/test-coscientist-routing.mjs",
@@ -302,8 +305,9 @@
     "@deepseek-ai/dsh-tool-subagent": "0.2.1-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "~3.18.4",
-    "@firecrawl/pdf-inspector": "^1.17.0",
+    "@firecrawl/pdf-inspector": "^1.25.2",
     "adm-zip": "^0.6.0",
+    "pdfjs-dist": "^4.10.38",
     "pele": "^1.9.0"
   },
   "peerDependencies": {

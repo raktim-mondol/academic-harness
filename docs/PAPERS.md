@@ -86,6 +86,26 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 
 `pdf_to_markdown write_to` auto-ingests the converted Markdown into PaperMemory (page-subset conversions are deliberately not ingested) and forwards converter/OCR signals.
 
+## Deep review
+
+`deep_review` runs a full Deep-Review-style pass over one manuscript with the vendored [open-deepreview](https://github.com/raktim-mondol/open-deepreview) engine. The paper is segmented, each segment is reviewed in parallel passes with the whole manuscript in context, comments are anchored to a page or quote, and a scholar-peer pass adds a summary, strengths and weaknesses, a claim-evidence map, a nine-item reproducibility checklist, and questions for the authors. Reference verification runs against OpenAlex and Crossref, with optional LLM search grounding.
+
+| Action | Meaning |
+|---|---|
+| `estimate` | Heuristic low/median/high cost for the current model, topology, and thinking level. No model call; run this first |
+| `review` | Run the pipeline and store the result. Slow and token-expensive; asks the model once per segment and pass |
+| `pdf2md` | Parse a PDF and store its Markdown plus page and OCR metadata |
+| `verify_citations` | Check bibliography entries without running a full review |
+| `status` | Stored state for a manuscript, including whether it is stale |
+| `show` | Read back `summary`, `comments`, `questions`, `checklist`, `claims`, `citations`, or `markdown` |
+| `list` | Stored deep reviews under `.dsh/deep-review/` |
+
+`review` returns a compact summary (severity counts, top comments, question and flagged-citation counts, quality-audit scores) and never the full report. Use `show` for details; `show comments` pages with `limit`/`offset` and only includes comment bodies with `include_body: true`. `show citations` covers only references the engine flagged — clean references are omitted upstream, so "no flagged references" is the accurate phrasing.
+
+Topology controls the review depth: `LOW` (1 pass), `MID` (2, default), `HIGH` (3), `EXTRA_HIGH` (4). `thinking_level` controls the model's reasoning budget. Both raise cost, and a long paper is re-sent once per segment and pass, so estimate and confirm with the user before running `HIGH` or `EXTRA_HIGH`.
+
+Artifacts live under `<cwd>/.dsh/deep-review/<key>/`: `review.json`, `review.md`, `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `meta.json`, and append-only `runs.jsonl`. The key is derived from the workspace-relative path, so a manuscript keeps one directory across edits; `status` compares hashes and reports staleness. The engine runs under Node (no Bun) and calls the host's LLM service through a loopback OpenAI-compatible bridge. `review` and `verify_citations` therefore run on the **session model** — the same provider and model as the chat — with no separate API key or endpoint; switching the session model switches the reviewer. `estimate`, `pdf2md`, `status`, `show`, and `list` make no model call.
+
 ## Paper memory
 
 [PaperMemory](https://github.com/raktim-mondol/papermemory) is the local academic-memory layer on the Academic Harness preset: papers (title, authors, year, venue, DOI, arXiv, bibtex key), claims with quoted evidence, citation graphs, manuscript recap, and cite-check. It is how the agent remembers papers it has read and cites without inventing references — open-web and peer-reviewed discovery stays on Parallel / Consensus / Firecrawl / Scite.
@@ -197,6 +217,7 @@ Do not run `claude mcp add`. GPU papers use `runpod_run` / `modal_run` / `vastai
 | Get PDF | `paper_download` | Academic Harness preset | No |
 | Orient | `paper_fold` | Academic Harness preset | No |
 | Full text | `pdf_to_markdown` | Every preset | No |
+| Critique manuscript | `deep_review` | Academic Harness preset | Quote-anchored comments; verify before use |
 | Store | PaperMemory `ingest` | Academic Harness preset | Yes, after verification |
 | Quote / trace | PaperMemory `quote_check` / `trace` | Academic Harness preset | Yes |
 | Cite | `cite` + `citation` | Academic Harness preset | Key only from memory |

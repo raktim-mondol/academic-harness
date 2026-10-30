@@ -1,0 +1,18 @@
+open-deepreview (vendored)
+==========================
+Upstream: https://github.com/raktim-mondol/open-deepreview
+Commit:   c48e29450134d7a41559a73112962377f9602bce (2026-10-30)
+License:  MIT (see LICENSE; attribution also in ../../NOTICE)
+
+Vendored here: src/, README.md, LICENSE, and the upstream package.json as
+package.upstream.json. Local additions: runner.mjs, register.mjs, this file.
+src/ is unmodified.
+
+Not vendored: tests/, fixtures/. The `serve` command is Bun-only and the
+`fixture` command is a development aid; neither is exposed by the plugin.
+
+Sync: check out the upstream commit, copy src/ over this directory, update the
+commit line above and package.upstream.json. Keep runner.mjs and register.mjs.
+
+Runtime: Node only. review, pdf2md, verify-citations, and estimate-cost run
+through runner.mjs; the web viewer (`serve`) is unsupported here.

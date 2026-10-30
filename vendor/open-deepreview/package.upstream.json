@@ -1,0 +1,43 @@
+{
+  "name": "open-deepreview",
+  "version": "1.0.0",
+  "description": "Reverse-engineered open-source recreation of Google Deep Review (Paper Assistant Tool) for analyzing technical papers with any LLM (custom base URL, API key, and model name).",
+  "type": "module",
+  "bin": {
+    "deepreview": "./src/cli.ts",
+    "open-deepreview": "./src/cli.ts"
+  },
+  "scripts": {
+    "start": "bun run src/cli.ts",
+    "review": "bun run src/cli.ts review",
+    "pdf2md": "bun run src/cli.ts pdf2md",
+    "serve": "bun run src/cli.ts serve",
+    "verify-citations": "bun run src/cli.ts verify-citations",
+    "estimate-cost": "bun run src/cli.ts estimate-cost",
+    "fixture": "bun run src/cli.ts fixture",
+    "test": "bun test",
+    "typecheck": "bun x tsc --noEmit"
+  },
+  "keywords": [
+    "deepreview",
+    "google-deep-review",
+    "paper-assistant-tool",
+    "academic-paper-review",
+    "multi-agent",
+    "citation-verification",
+    "openalex",
+    "crossref",
+    "llm",
+    "bun",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@firecrawl/pdf-inspector": "^1.25.2",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}
