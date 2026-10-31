@@ -4,12 +4,26 @@ flowchart TB
     ui[Web UI / TUI] --> agent[Agent session] --> model[Model route]
   end
 
-  bundle[Plugin bundle - every preset<br/>notebook · fold_text · scientific_result<br/>image_generate · sci_inspect · latex_compile<br/>pdf_to_markdown · mermaid_render<br/>modal_run · runpod_run · vastai_run<br/>research_template<br/>Settings - API keys, model ids, index options]
+  subgraph bundle[Plugin bundle - every preset]
+    direction LR
+    b1[Notebook and results]
+    b2[Documents and figures]
+    b3[Data and templates]
+    b4[Remote compute]
+    b5[Settings]
+  end
 
-  preset[Academic Harness preset<br/>persona + research prompt<br/>search and evidence<br/>writing oracle and citation<br/>review and hypothesis ledgers<br/>workspace search, skills, subagents<br/>clinical and policy tools, local RSI]
+  subgraph preset[Academic Harness preset]
+    direction LR
+    p1[Search and evidence]
+    p2[Writing and citation]
+    p3[Reviews and tournaments]
+    p4[Skills and subagents]
+    p5[Specialist workflows]
+  end
 
-  providers[External providers<br/>REST APIs and MCP servers]
-  state[Local state<br/>DSH_HOME: papermemory · textfold · zvec-grep · ah-rsi<br/>workspace: .dsh/ · .zvec-grep/ · papers · ah.yaml]
+  providers[External providers]
+  state[Local state]
 
   host ==> bundle
   host ==> preset
@@ -23,7 +37,7 @@ flowchart TB
   classDef state fill:#fff7ed,stroke:#f97316,color:#7c2d12
   classDef external fill:#fdf2f8,stroke:#db2777,color:#831843
   class ui,agent,model host
-  class bundle bundle
-  class preset preset
+  class b1,b2,b3,b4,b5 bundle
+  class p1,p2,p3,p4,p5 preset
   class state state
   class providers external
