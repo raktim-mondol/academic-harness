@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.5
+
+- **No separate-cost framing for deep review.** Deep review runs on the session model, so the routing question and default workflow now describe depth and duration only. The prompt, `deep_review` tool description, and `deep-review` skill no longer mention money; `estimate` is optional and used only when the user asks for it. Docs describe it as an optional engine heuristic. Verified live: the question offered normal vs deep review without any cost or billing language.
+
 ## 0.32.4
 
 - **Always offer deep review on paper-review requests.** Any paper or manuscript review, critique, referee report, feedback, assessment, or pre-submission request now asks the user to choose between the deep review engine and a normal session review, and explains the deep option because the user may not know it exists. The question appears every time a paper review is requested unless the user explicitly chose a mode. The routing rule is carried by the prompt, the `deep_review` tool description, and the `deep-review` skill, with a regression guard. Verified live with "Give me feedback on the paper": the agent asked with Normal, Deep review engine, and Referee report options before doing any review.

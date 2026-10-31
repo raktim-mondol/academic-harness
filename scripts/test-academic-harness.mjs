@@ -236,12 +236,23 @@ ok(
     && /normal session review/i.test(promptSource),
 )
 {
+  const deepLine = promptSource.split('\n').find(
+    (line) => line.includes('deep_review') && line.includes('runs a vendored'),
+  )
+  ok(
+    'deep-review prompt omits separate-cost framing',
+    Boolean(deepLine) && !/cost|paid|dollar/i.test(deepLine),
+  )
   const skill = readFileSync(join(ROOT, 'skills', 'deep-review', 'SKILL.md'), 'utf8')
   ok(
     'deep-review skill asks before every paper review',
     /Route every paper-review request/.test(skill)
       && /do not assume the user knows `deep_review`/i.test(skill)
-      && /Do not run `estimate` or `review` before the user has chosen/i.test(skill),
+      && /Do not run `review` before the user has chosen/i.test(skill),
+  )
+  ok(
+    'deep-review skill omits separate-cost framing',
+    !/cost|paid|dollar/i.test(skill),
   )
 }
 try {

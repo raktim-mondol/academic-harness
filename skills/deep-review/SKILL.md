@@ -1,6 +1,6 @@
 ---
 name: deep-review
-description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — cost estimate, segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, with artifacts stored under `.dsh/deep-review/`. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, or a second opinion beyond the session model.
+description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, with artifacts stored under `.dsh/deep-review/`. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, or a second opinion beyond the session model.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
@@ -15,8 +15,8 @@ metadata:
 > every artifact under `.dsh/deep-review/<key>/`, and returns compact summaries.
 > `review` and `verify_citations` run on the session model through the host LLM
 > service — the same provider and model as the chat, with no separate key or
-> endpoint. `estimate`, `pdf2md`, `status`, `show`, and `list` make no model
-> call.
+> endpoint. `pdf2md`, `status`, `show`, and `list` make no model call; `estimate`
+> is optional.
 
 Use this skill for a full-manuscript critique produced by an external multi-pass
 engine. It is not a fast proofread, not a systematic-review ledger, and not a
@@ -44,31 +44,27 @@ path, and do not assume the user knows `deep_review`. Always ask, describing bot
 options, unless the user explicitly chose deep or normal in this conversation:
 
 > Do you want a deep review (multi-pass engine with page/quote-anchored comments,
-> author questions, and reference checks; I’ll estimate the cost first and it may
-> take several minutes) or a normal session review (faster, written by this
-> session’s model)?
+> author questions, and reference checks; it may take several minutes) or a
+> normal session review (faster, written by this session’s model)?
 
-- **Deep review:** continue with the workflow below — `estimate`, confirm the
-  cost, then `review` and `show`.
+- **Deep review:** continue with the workflow below — confirm the run, then
+  `review` and `show`.
 - **Normal review:** delegate to the `peer-reviewer` subagent (or review inline
   when the request is small). Do not call `deep_review`.
 
-Do not run `estimate` or `review` before the user has chosen the deep review.
+Do not run `review` before the user has chosen the deep review.
 
 ## Workflow
 
-### 1. Estimate the cost and confirm it
+### 1. Confirm the run
 
-Always estimate before running a review:
+Deep review runs on the session model, so there is no separate key or endpoint.
+Confirm the scope and that the user wants the multi-pass run; it can take
+several minutes. Never start a `review` unprompted, and never pick `EXTRA_HIGH`
+to be safe: it multiplies run time for a marginal quality gain.
 
-```text
-deep_review action=estimate path=paper/main.pdf topology=HIGH thinking_level=MEDIUM
-```
-
-The estimate is a heuristic based on page count, topology, and thinking level —
-not a meter. Show the low/median/high range to the user and wait for explicit
-confirmation. Never start a `review` unprompted, and never pick `EXTRA_HIGH` to
-be safe: it multiplies cost and latency for a marginal quality gain.
+`estimate` is optional: use it only when the user asks for an engine-run
+estimate. It makes no model call.
 
 ### 2. Run the review
 
@@ -85,9 +81,9 @@ Optional controls:
 - `timeout_minutes`: 1–120; review defaults to 30.
 
 The engine accepts PDF, TeX, Markdown, and plain text. For PDFs it also saves the
-parsed paper Markdown as `paper.md`. A full run can take minutes and send the
-manuscript to the configured endpoint repeatedly (once per segment and pass);
-warn the user before a `HIGH`/`EXTRA_HIGH` run of a long paper.
+parsed paper Markdown as `paper.md`. A full run can take minutes and sends the
+manuscript through the session model repeatedly (once per segment and pass);
+confirm the scope before a `HIGH`/`EXTRA_HIGH` run of a long paper.
 
 Topology and thinking levels:
 
@@ -99,7 +95,8 @@ Topology and thinking levels:
 | `EXTRA_HIGH` | 4 passes | Rare; only when the user asks for maximum depth |
 
 `thinking_level` controls the model's reasoning budget (`LOW`, `MEDIUM`,
-`HIGH`). `HIGH` is expensive and only worth it for difficult theory or methods.
+`HIGH`). `HIGH` adds model work and latency and only helps difficult theory or
+methods.
 
 ### 3. Read the compact result first
 
@@ -133,7 +130,7 @@ it in the manuscript. Keep the engine's quote as the anchor; do not invent page
 numbers. Route statistical concerns to `statistical-reviewer`, citation support
 to `citation-checker`, and reporting items to `reporting_check`. After substantive
 edits, `status` reports the stored review as stale; re-run only if the user wants
-a fresh review, and estimate again first.
+a fresh review, and confirm the run again.
 
 ## State and artifacts
 
@@ -144,7 +141,7 @@ a fresh review, and estimate again first.
   paper.md          parsed PDF Markdown (pdf2md or review of a PDF)
   pdf-meta.json     page count, PDF type, OCR flags (pdf2md)
   citations.json    standalone verify-citations report
-  estimate.json     last cost estimate
+  estimate.json     last optional engine estimate
   meta.json         input hash, engine/model, params, last run, summary, artifact sizes
   runs.jsonl        append-only run history
 ```
