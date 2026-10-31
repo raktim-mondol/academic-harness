@@ -4,7 +4,7 @@
 ![DeepSeek Harness 0.2.1–0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1--0.2.x-5b7bd5)
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
-**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 757 scientific skills, and local self-improvement, all inside the DSH web UI.
+**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 762 scientific skills, and local self-improvement, all inside the DSH web UI.
 
 Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset with a research persona and academic tools, and keeps the general-purpose tools available on every preset.
 
@@ -58,10 +58,11 @@ Full instructions, migration from `researchcraft`, troubleshooting, and the "one
 | **Reproducible analysis and data** | `analysis_run` frozen plans with immutable run manifests (argv execution, hashed inputs/outputs, redacted logs, timeouts, run diffs); `experiment_log` sweeps with best-by-named-metric; `dataset_get` DOI downloads with checksums and licenses; `data_profile` leakage and split-overview profiling; `repro_package` reader-facing reproducibility packages with confirm-gated Zenodo drafts | [Reproducible analysis](docs/ANALYSIS.md) |
 | **Provenance audit** | `provenance_audit` read-only cross-ledger index: joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH claim sidecars by stored ids and hashes; coverage, unsupported (`no_link`/`not_checked`/`unverified`/`stale`/`not_found`), stale hashes, impact, and Markdown/CSV/JSON/GraphML/Mermaid exports | [Provenance audit](docs/PROVENANCE.md) |
 | **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
+| **Study conduct, ethics, and grants** | `preregister` hashed write-once plans; `causal_dag` identification diagnostics and E-values; `design` seeded randomization/DOE; `ethics_protocol` and `deidentify` for ethics and PHI/PII review; `dmp` funder-shaped data-management plans; `grant_budget` multi-year budgets with arithmetic checks. None submits or certifies compliance | [Research](docs/RESEARCH.md#pre-registration) |
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
 | **Workspace and notebook** | zvec-grep semantic search, lab notebook, `scientific_result`, `fold_text`, `research_template`, `sci_inspect` | [Workspace](docs/WORKSPACE.md) |
 | **Compute and delegation** | `runpod_run`/`modal_run`/`vastai_run`, `subagent` with optional `subagent_pro`/`subagent_vision` routes, specialist briefs, `agent-browser` | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) |
-| **Skills** | 757 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
+| **Skills** | 762 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
 | **Self-improvement** | Local RSI: capture, diagnose, admit, inject, compare against control, promote or quarantine | [RSI](docs/RSI.md) |
 | **Configuration** | Settings → Academic Harness API keys; every credential is optional at install | [Configuration](docs/CONFIGURATION.md) |
 
@@ -92,6 +93,20 @@ The complete tool list, with scope and links, is the **[tool index](docs/TOOLS.m
 ![Request lifecycle](docs/assets/diagrams/request-lifecycle.svg)
 
 Discovery finds candidate papers, `paper_resolve` collapses their identifiers, `paper_get` produces one merged metadata/BibTeX record, and `integrity_check` reports retraction status. A downloaded PDF is stored as content-addressed Markdown in PaperMemory, and a quotation must pass `quote_check` or `trace` before the agent treats it as evidence. The notebook records the work; `scientific_result` records the final finding.
+
+## Deep review
+
+![Deep review](docs/assets/diagrams/deep-review.svg)
+
+`deep_review` runs a full Deep-Review-style critique of one manuscript with the vendored
+[open-deepreview](https://github.com/raktim-mondol/open-deepreview) engine. The paper is segmented
+and every segment is reviewed with the whole manuscript in context; comments are anchored to a page
+or a quotation, and a scholar-peer pass adds strengths and weaknesses, a claim-evidence map, a
+nine-item reproducibility checklist and questions for the authors. `estimate` prices a run before it
+starts, `review` runs on the session model (no separate key or endpoint), `show` reads a stored
+review back, and `status` marks it stale after the manuscript changes. Artifacts stay in
+`.dsh/deep-review/<key>/`, and `provenance_audit` indexes the claims stored there.
+[Read more](docs/PAPERS.md#deep-review)
 
 ## Documentation
 

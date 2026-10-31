@@ -103,6 +103,8 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 
 ## Deep review
 
+![Deep review](assets/diagrams/deep-review.svg)
+
 `deep_review` runs a full Deep-Review-style pass over one manuscript with the vendored [open-deepreview](https://github.com/raktim-mondol/open-deepreview) engine. The paper is segmented, each segment is reviewed in parallel passes with the whole manuscript in context, comments are anchored to a page or quote, and a scholar-peer pass adds a summary, strengths and weaknesses, a claim-evidence map, a nine-item reproducibility checklist, and questions for the authors. Reference verification runs against OpenAlex and Crossref, with optional LLM search grounding.
 
 | Action | Meaning |

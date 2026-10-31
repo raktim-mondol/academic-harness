@@ -22,6 +22,9 @@ flowchart TD
   router --> scopus[Scopus<br/>explicit + key]
   router --> wos[Web of Science<br/>explicit + key]
 
+  need -->|keyed scholarly APIs| keyed[core_search · elicit_search<br/>futurehouse_agent]
+  keyed --> next
+
   need -->|venue metrics| journal[journal_search<br/>OpenAlex · DOAJ · Crossref]
   journal --> next
 
@@ -38,7 +41,7 @@ flowchart TD
 
   need -->|peer-reviewed filters| consensus[Consensus]
   need -->|web or current facts| parallel[parallel_search]
-  parallel --> web[Brave · Tavily · Exa<br/>Perplexity · Jina]
+  parallel --> web[brave_search · tavily_search<br/>exa_search · perplexity_search · jina_read]
   need -->|broad web reading| fetch[Parallel Extract<br/>Firecrawl · Jina Reader]
 
   openalex --> next
@@ -61,5 +64,5 @@ flowchart TD
   classDef next fill:#fff7ed,stroke:#f97316,color:#7c2d12
   class question entry
   class known,need decision
-  class resolve,get,integrity,context,citations,journal,router,domain,catalog,openalex,s2,pubmed,arxiv,crossref,biorxiv,inspire,ads,scopus,wos,consensus,parallel,web,fetch source
+  class resolve,get,integrity,context,citations,journal,router,domain,catalog,keyed,openalex,s2,pubmed,arxiv,crossref,biorxiv,inspire,ads,scopus,wos,consensus,parallel,web,fetch source
   class next next
