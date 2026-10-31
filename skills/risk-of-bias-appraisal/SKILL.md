@@ -1,6 +1,6 @@
 ---
 name: risk-of-bias-appraisal
-description: Appraise included studies for risk of bias with the native `review` ledger — RoB 2, ROBINS-I, QUADAS-2, and Newcastle-Ottawa domains, named reviewers, verbatim quotes, consensus reconciliation, agreement statistics, and rob-table/rob-summary/rob-figure exports. Use when a systematic review needs a risk-of-bias assessment, dual-reviewer appraisal, or an auditable appraisal table.
+description: Appraise included studies for risk of bias with the native `review` ledger — RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, and CASP cohort/case-control/qualitative checklists, with named reviewers, verbatim quotes, consensus reconciliation, agreement statistics, and rob-table/rob-summary/rob-figure exports. Use when a systematic review needs a risk-of-bias assessment, dual-reviewer appraisal, or an auditable appraisal table.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
@@ -28,10 +28,17 @@ instrument-bound judgement, not a review essay.
 | `robins-i` | non-randomised interventions | 7 + derived overall | low / moderate / serious / critical / no information |
 | `quadas-2` | diagnostic accuracy | 4 domains, 7 risk-of-bias/applicability cells | low / unclear / high |
 | `nos` | cohort or case-control | 3 star-count domains | 0 to the domain maximum |
+| `amstar-2` | systematic reviews of interventions | 16 item domains, critical items flagged | yes / partial yes / no |
+| `probast` | prediction models | 4 domains, 7 risk-of-bias/applicability cells | low / unclear / high |
+| `quips` | prognostic-factor cohort studies | 6 domains | low / unclear / moderate / high |
+| `syrcle` | animal intervention studies | 6 domains (incl. external validity) | low / unclear / high |
+| `casp-cohort`, `casp-case-control`, `casp-qualitative` | CASP checklists per design | 9–10 consolidated questions | yes / can't tell / no |
 
-RoB 2 and ROBINS-I derive the overall from the domain judgements. QUADAS-2 and
-Newcastle-Ottawa have no derived overall: report the domain cells, and report
-the NOS star total as a count, not a grade.
+RoB 2 and ROBINS-I derive the overall from the domain judgements. Every other
+instrument has no derived overall — AMSTAR 2's confidence rating counts
+critical flaws (not a worst-domain rule), and PROBAST, QUIPS, SYRCLE, and CASP
+explicitly avoid an aggregate score. Report the domain cells, and report the
+NOS star total as a count, not a grade.
 
 ## Reviewer identities
 
@@ -70,8 +77,9 @@ review action=appraise slug=<name> id=r0001 instrument=rob-2 domain=d2 \
   location="Methods, p. 4" paper=<papermemory-key>
 ```
 
-- `low`/`high` for RoB 2 and QUADAS-2, and `low`/`critical` for ROBINS-I,
-  require a verbatim quote and a location. Other judgements do not.
+- `low`/`high` for RoB 2, QUADAS-2, PROBAST, QUIPS, and SYRCLE, `low`/`critical`
+  for ROBINS-I, and `yes`/`no` for AMSTAR 2 and the CASP checklists require a
+  verbatim quote and a location. Intermediate or unclear ratings do not.
 - With `paper`, the tool calls `papermemory_quote_check`. A quote absent from a
   resolved paper, or found only in the bibliography, is rejected and nothing is
   stored. If the paper cannot be resolved or the check cannot run, the event is

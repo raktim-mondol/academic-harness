@@ -73,8 +73,19 @@ jobs:
         run: |
           node scripts/test-citation-format.mjs
           node scripts/test-manuscript-tools.mjs
+          node scripts/test-ledger-kit.mjs
           node scripts/test-review-store.mjs
           node scripts/test-review-tool.mjs
+          node scripts/test-review-extract.mjs
+          node scripts/test-prisma-flow.mjs
+          node scripts/test-meta-analysis.mjs
+          node scripts/test-grade.mjs
+          node scripts/test-analysis-run.mjs
+          node scripts/test-experiment-log.mjs
+          node scripts/test-dataset-get.mjs
+          node scripts/test-data-profile.mjs
+          node scripts/test-repro-package.mjs
+          node scripts/test-provenance-audit.mjs
           node scripts/test-deep-review-tool.mjs
           node scripts/test-agreement.mjs
           node scripts/test-appraisal.mjs

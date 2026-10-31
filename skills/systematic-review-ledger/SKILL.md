@@ -32,9 +32,11 @@ per-citation verification, use the Supervisor-Skills `deep-research`.
   search_log.jsonl   one row per `add`: source, query, added, skipped
   screening.jsonl    decision events (latest per record+stage+reviewer) and reconciles
   evidence.jsonl     append-only evidence rows (e0001, …)
+  extraction_template.json  write-once structured-extraction field definitions
+  extractions.jsonl  append-only extraction events (x0001, …) and field reconciles
   appraisal.jsonl    domain judgements and reconciles (a0001, …)
   instruments.json   frozen risk-of-bias instrument definitions
-  exports/           review.md, evidence.csv, review.json, rob-table/rob-summary, SVGs
+  exports/           review.md, evidence.csv, review.json, extraction tables, PRISMA flow, rob-table/rob-summary, SVGs
 ```
 
 Never edit these files by hand. The event logs are the audit trail; rewriting
@@ -113,7 +115,27 @@ review action=evidence slug=<name> id=r0001 claim="X reduced Y by 20%" \
 - `scan`/OCR-recovered papers are capped at `extracted` in PaperMemory; carry
   that caveat into the report.
 
-### 5. Status before counts
+### 5. Structured extraction
+
+Freeze a template at `start` or on the first `extract`:
+
+```text
+review action=start slug=<name> question="…" extraction_template="pico"
+review action=extract slug=<name> id=r0001 reviewer=human:alice \
+  values={"population":"Adults","intervention":"X","comparator":"Placebo","outcome":"Y","design":"RCT","n":120,"effect":0.74,"effect_measure":"RR"} \
+  quotes={"effect":{"quote":"RR 0.74 (95% CI 0.61–0.90)","location":"Results, p. 4"}} \
+  paper=<papermemory-id>
+review action=extract_status slug=<name>
+```
+
+- Built-in templates: `generic`, `pico`, `peco`, `diagnostic_accuracy`, `prognostic`, `qualitative`. An inline template is `{id, name, version, fields:[{id, label, type, required, options?, unit?}]}`.
+- `values` keys must match template field ids. Missing required fields are counted, never filled. Unknown fields and wrong types are rejected.
+- Use `row_id` for multiple outcomes, arms, or comparisons; each row is a separate extraction, not an overwrite.
+- Field-level `quotes` need a location. With `paper`, the quote is re-found through `papermemory_quote_check`; a quote absent from a resolved paper is rejected, an unresolved paper is stored `unverified`.
+- Dual extraction conflicts are field-level. Resolve one with `review action=reconcile scope=extraction id=r0001 field=n value=110 reviewer=human:alice reason="consensus"`; both originals stay.
+- `extract_status` reports complete/incomplete/conflict/pending rows, missing required fields, and verified/unverified quotes. Never present a conflicted field as a value.
+
+### 6. Status before counts
 
 ```text
 review action=status slug=<name>
@@ -127,32 +149,45 @@ Resolve pendings, conflicts, and missing evidence with the user before writing
 `agreement scope=screening` for inter-rater agreement; report it with N,
 percent agreement, κ, and the marginal/prevalence caveat, never as a verdict.
 
-### 6. Export the deliverable
+### 7. Export the deliverable
 
 ```text
 review action=export slug=<name> format=markdown
 review action=export slug=<name> format=csv
 review action=export slug=<name> format=json
+review action=export slug=<name> format=extraction-table table_format=markdown
+review action=export slug=<name> format=extraction-matrix table_format=csv
+review action=export slug=<name> format=extraction-json
+review action=export slug=<name> format=prisma-flow
 review action=export slug=<name> format=rob-table table_format=markdown
 review action=export slug=<name> format=rob-summary table_format=csv
 review action=export slug=<name> format=rob-figure
 ```
 
 - `markdown` — protocol, PRISMA-style table, exclusion reasons, included
-  records, evidence table, review checklist.
+  records, evidence table, extraction table (when a template is frozen), and
+  review checklist.
 - `csv` — evidence rows with record title/DOI.
 - `json` — full protocol, derived status, records, screening events, evidence,
-  and (when present) appraisal events and frozen instruments.
-- `rob-table` / `rob-summary` / `rob-figure` — risk-of-bias outputs; see
-  `risk-of-bias-appraisal`.
+  extraction template/status/events, and (when present) appraisal events and
+  frozen instruments.
+- `extraction-table` / `extraction-matrix` — one row per study × outcome;
+  Markdown or CSV. Missing required fields are blank and counted; a conflicted
+  cell reads `conflict`.
+- `extraction-json` — template, derived extraction status, and raw events.
+- `prisma-flow` — `prisma-flow.svg` plus `prisma-flow.json`; counts come from
+  the ledger, missing counts read `not recorded`, and the diagram is labelled
+  PRISMA-style, not a compliance statement.
 
 Exports refuse to overwrite unless `overwrite: true`; a second export of the
 same format is a deliberate replacement, not routine.
 
 ## Reporting rules
 
-- Label counts as **PRISMA-style**, derived from this ledger — not as a formal
-  PRISMA 2020 flow diagram unless the user builds one.
+- Label counts as **PRISMA-style**, derived from this ledger. The
+  `prisma-flow` export is a PRISMA-style flow diagram generated from recorded
+  counts; it is not a compliance statement, and missing counts must stay
+  `not recorded`.
 - Name every database and the date of search from the search log. Never
   present a ledger built from one source as a multi-database review.
 - Duplicates skipped is a counted outcome, not an error to hide.
@@ -163,3 +198,6 @@ same format is a deliberate replacement, not routine.
 - Inter-rater agreement is descriptive: report κ with its CI, N, and marginal
   caveats. Do not treat κ as proof that the screening is correct.
 - Publication status comes from `integrity_check`, not from this ledger.
+- Extraction values are records of what a reviewer reported, not verified
+  facts. Report quote verification separately; never fill a missing field or
+  silently choose one side of a conflict.

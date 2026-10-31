@@ -1,0 +1,16 @@
+{
+  "journal": "Example Journal",
+  "manuscript": "manuscript.pdf",
+  "files": [
+    { "path": "manuscript.pdf", "role": "manuscript", "sha256": "sha256:..." },
+    { "path": "figures/fig1.pdf", "role": "figure", "sha256": "sha256:..." },
+    { "path": "cover-letter.md", "role": "cover_letter", "sha256": "sha256:..." }
+  ],
+  "checks": [
+    { "id": "abstract_word_limit", "status": "pass", "detail": "198 / 250 words" },
+    { "id": "figure_dpi", "status": "manual_check", "detail": "Journal requirement not available" }
+  ],
+  "missing": [
+    "data_availability_statement"
+  ]
+}

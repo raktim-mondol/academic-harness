@@ -1,0 +1,30 @@
+{
+  "run_id": "run-20260101T000000Z-a1b2c3",
+  "slug": "primary-analysis",
+  "plan_hash": "sha256:...",
+  "command": "uv run python analysis/main.py",
+  "kind": "python",
+  "seed": 42,
+  "inputs": [
+    { "path": "data/raw.csv", "sha256": "sha256:..." }
+  ],
+  "outputs": [
+    { "path": "results/table1.csv", "sha256": "sha256:..." }
+  ],
+  "environment": {
+    "python": "3.13.x",
+    "packages": "runs/run-20260101T000000Z-a1b2c3/environment/python-freeze.txt",
+    "r": null,
+    "node": "v26.x",
+    "os": "Linux",
+    "git_commit": "..."
+  },
+  "exit_code": 0,
+  "duration_ms": 12345,
+  "stdout": "runs/run-20260101T000000Z-a1b2c3/stdout.log",
+  "stderr": "runs/run-20260101T000000Z-a1b2c3/stderr.log",
+  "artifacts": [
+    "results/table1.csv",
+    "results/figure1.pdf"
+  ]
+}

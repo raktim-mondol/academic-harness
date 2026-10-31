@@ -1,0 +1,239 @@
+{
+  "id": "syrcle",
+  "name": "SYRCLE Risk of Bias Tool",
+  "version": "2014",
+  "study_designs": [
+    "animal intervention study"
+  ],
+  "source_url": "https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0089679",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "The official tool lists 18 signalling questions across bias domains; they are stored here as supporting detail per domain, and reviewers judge each domain directly. No overall judgement is derived, matching the tool's own guidance. External validity items are separate from the bias domains.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      {
+        "id": "low",
+        "label": "Low risk",
+        "rank": 1,
+        "requires_quote": true
+      },
+      {
+        "id": "unclear",
+        "label": "Unclear",
+        "rank": 2,
+        "requires_quote": false
+      },
+      {
+        "id": "high",
+        "label": "High risk",
+        "rank": 3,
+        "requires_quote": true
+      }
+    ]
+  },
+  "domains": [
+    {
+      "id": "selection_bias",
+      "name": "Selection bias",
+      "axes": [
+        "risk_of_bias"
+      ],
+      "short_prompt": "Whether allocation was random, concealed, and baseline groups were similar through housing and management.",
+      "signalling": [
+        {
+          "id": "s1",
+          "prompt": "Was randomisation of animals to intervention groups reported?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "s2",
+          "prompt": "Was allocation concealed from the investigator assigning animals?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "s3",
+          "prompt": "Were animals in all groups housed identically (conditions, diet, caging)?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "s4",
+          "prompt": "Were groups similar at baseline for important characteristics?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "performance_bias",
+      "name": "Performance bias",
+      "axes": [
+        "risk_of_bias"
+      ],
+      "short_prompt": "Whether investigators interacting with animals were blinded to intervention assignment.",
+      "signalling": [
+        {
+          "id": "p1",
+          "prompt": "Was the care provider or investigator interacting with animals blinded?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "detection_bias",
+      "name": "Detection bias",
+      "axes": [
+        "risk_of_bias"
+      ],
+      "short_prompt": "Whether outcome assessors were blinded and outcome measurement was valid.",
+      "signalling": [
+        {
+          "id": "d1",
+          "prompt": "Was the outcome assessor blinded to intervention?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "d2",
+          "prompt": "Was the outcome measured with valid and reliable methods?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "attrition_bias",
+      "name": "Attrition bias",
+      "axes": [
+        "risk_of_bias"
+      ],
+      "short_prompt": "Whether all allocated animals were accounted for and incomplete outcome data handled appropriately.",
+      "signalling": [
+        {
+          "id": "a1",
+          "prompt": "Were outcome data reported for all animals, or all excluded animals described?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "reporting_bias",
+      "name": "Reporting bias",
+      "axes": [
+        "risk_of_bias"
+      ],
+      "short_prompt": "Whether all pre-specified and expected outcomes are reported, without selective measurement or reporting.",
+      "signalling": [
+        {
+          "id": "r1",
+          "prompt": "Are all measured outcome data reported for this outcome?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "r2",
+          "prompt": "Are all reported outcomes addressed, without selective reporting?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "external_validity",
+      "name": "External validity",
+      "axes": [
+        "risk_of_bias"
+      ],
+      "short_prompt": "Whether the animals studied (sex, age, strain, relevant disease model) support generalising the result.",
+      "signalling": [
+        {
+          "id": "e1",
+          "prompt": "Were animals of both sexes, or is sex justified?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "e2",
+          "prompt": "Were young and old animals included, or is age justified?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        },
+        {
+          "id": "e3",
+          "prompt": "Is the animal model relevant to the target human condition?",
+          "answers": [
+            "yes",
+            "probably_yes",
+            "probably_no",
+            "no",
+            "no_information"
+          ]
+        }
+      ]
+    }
+  ]
+}

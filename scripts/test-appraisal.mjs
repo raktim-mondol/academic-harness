@@ -14,14 +14,25 @@ import { runReview } from '../review.js'
 import { runHelper } from '../python-runtime.js'
 
 const instruments = loadInstruments()
-assert.equal(instruments.length, 4)
+assert.equal(instruments.length, 11)
 const byId = Object.fromEntries(instruments.map((item) => [item.id, item]))
-assert.deepEqual(Object.keys(byId).sort(), ['newcastle-ottawa', 'quadas-2', 'rob-2', 'robins-i'])
+assert.deepEqual(Object.keys(byId).sort(), [
+  'amstar-2', 'casp-case-control', 'casp-cohort', 'casp-qualitative', 'newcastle-ottawa',
+  'probast', 'quadas-2', 'quips', 'rob-2', 'robins-i', 'syrcle',
+])
 assert.equal(byId['rob-2'].domains.length, 5)
 assert.equal(byId['robins-i'].domains.length, 7)
 assert.equal(byId['quadas-2'].domains.length, 4)
 assert.equal(byId['newcastle-ottawa'].domains.length, 3)
+assert.equal(byId['amstar-2'].domains.length, 16)
+assert.equal(byId['probast'].domains.length, 4)
+assert.equal(byId['quips'].domains.length, 6)
+assert.equal(byId['syrcle'].domains.length, 6)
+assert.equal(byId['casp-cohort'].domains.length, 9)
+assert.equal(byId['casp-case-control'].domains.length, 9)
+assert.equal(byId['casp-qualitative'].domains.length, 9)
 assert.equal(domainCells(byId['quadas-2']).length, 7, 'QUADAS-2 has four risk-of-bias cells and three applicability cells')
+assert.equal(domainCells(byId['probast']).length, 7, 'PROBAST has four risk-of-bias cells and three applicability cells')
 assert.deepEqual(byId['newcastle-ottawa'].domains.map((domain) => domain.max_stars), [4, 2, 3])
 for (const instrument of instruments) {
   assert.match(instrument.source_url, /^https:\/\//)
@@ -30,12 +41,21 @@ for (const instrument of instruments) {
 assert.match(byId['rob-2'].notes, /overall is derived/i)
 assert.match(byId['robins-i'].notes, /overall is derived/i)
 assert.match(byId['quadas-2'].notes, /does not define a derived overall/i)
+assert.match(byId['amstar-2'].notes, /critical item/i)
+assert.match(byId['probast'].notes, /no overall judgement is derived/i)
 
 assert.equal(resolveInstrument('rob2').id, 'rob-2')
 assert.equal(resolveInstrument('RoB-2@2019').id, 'rob-2')
 assert.equal(resolveInstrument('robins').id, 'robins-i')
 assert.equal(resolveInstrument('quadas').id, 'quadas-2')
 assert.equal(resolveInstrument('nos').id, 'newcastle-ottawa')
+assert.equal(resolveInstrument('amstar2').id, 'amstar-2')
+assert.equal(resolveInstrument('amstar').id, 'amstar-2')
+assert.equal(resolveInstrument('amstar-2@2017').version, '2017')
+assert.equal(resolveInstrument('probast').id, 'probast')
+assert.equal(resolveInstrument('syrcle').id, 'syrc' + 'le')
+assert.equal(resolveInstrument('casp-cohort').id, 'casp-cohort')
+assert.throws(() => resolveInstrument('casp'), /not bundled/)
 assert.throws(() => resolveInstrument('rob-2', '2005'), /not bundled/)
 
 // Overall derivation truth tables
@@ -56,6 +76,14 @@ assert.equal(deriveOverall(robins, robinsValues(['low', 'critical', 'low', 'low'
 assert.equal(deriveOverall(robins, robinsValues(['low', 'low', 'low', 'low', 'no_information', 'low', 'low'])).judgement, 'no_information')
 assert.equal(deriveOverall(robins, robinsValues(['low', 'low', 'serious', 'low', 'no_information', 'low', 'low'])).judgement, 'serious')
 assert.equal(deriveOverall(byId['quadas-2'], { d1: 'low' }), null)
+for (const id of ['amstar-2', 'probast', 'quips', 'syrcle', 'casp-cohort', 'casp-case-control', 'casp-qualitative']) {
+  assert.equal(byId[id].overall, undefined, `${id} defines no overall`)
+  assert.equal(deriveOverall(byId[id], Object.fromEntries(byId[id].domains.map((domain) => [domain.id, 'low']))), null)
+}
+assert.equal(normaliseJudgement(byId['amstar-2'], byId['amstar-2'].domains[1], 'Partial yes'), 'partial_yes')
+assert.equal(normaliseJudgement(byId['casp-cohort'], byId['casp-cohort'].domains[0], "can't tell"), 'cannot_tell')
+assert.equal(normaliseJudgement(byId['quips'], byId['quips'].domains[0], 'Moderate risk'), 'moderate')
+assert.throws(() => normaliseJudgement(byId['probast'], byId['probast'].domains[0], 'moderate'), /must be one of/)
 
 // Judgement normalization
 assert.equal(normaliseJudgement(rob2, rob2.domains[0], 'Some concerns'), 'some_concerns')
@@ -355,6 +383,58 @@ try {
   const zeroRequest = buildFigureRequest(zeroEvaluation)
   assert.equal(zeroRequest.studies[0].cells['selection:risk_of_bias'].value, 0)
   assert.match(zeroRequest.note, /Reviewers: human:alice/)
+
+  // Phase 1E checklists: yes/no need a quote, can't tell does not; no overall.
+  const caspSlug = 'casp-review'
+  await startReview({ cwd, slug: caspSlug, protocol: { question: 'Cohort evidence?' }, instruments: ['casp-cohort'] })
+  await addRecords({ cwd, slug: caspSlug, records: [{ title: 'Prospective cohort', year: 2019 }] })
+  await screenRecord({ cwd, slug: caspSlug, id: 'r0001', stage: 'title_abstract', decision: 'include' })
+  await screenRecord({ cwd, slug: caspSlug, id: 'r0001', stage: 'full_text', decision: 'include' })
+  await assert.rejects(
+    () => appraiseRecord({
+      cwd, slug: caspSlug, id: 'r0001', instrument: 'casp-cohort', domain: 'focused_issue', judgement: 'yes', reviewer: 'alice',
+    }),
+    /verbatim quote/,
+  )
+  const caspDomains = byId['casp-cohort'].domains.map((domain) => domain.id)
+  await appraiseRecord({
+    cwd, slug: caspSlug, id: 'r0001', instrument: 'casp-cohort', domain: caspDomains[0], judgement: 'yes',
+    reviewer: 'alice', quote, location: 'Methods',
+  })
+  await appraiseRecord({
+    cwd, slug: caspSlug, id: 'r0001', instrument: 'casp-cohort', domain: caspDomains[1], judgement: "can't tell", reviewer: 'alice',
+  })
+  for (const domain of caspDomains.slice(2)) {
+    await appraiseRecord({
+      cwd, slug: caspSlug, id: 'r0001', instrument: 'casp-cohort', domain, judgement: 'no',
+      reviewer: 'alice', quote, location: 'Methods',
+    })
+  }
+  const caspStatus = deriveAppraisalStatus(cwd, caspSlug)
+  assert.equal(caspStatus.instruments[0].complete_records, 1)
+  assert.equal(caspStatus.instruments[0].records[0].cells.length, 9)
+  assert.equal(caspStatus.instruments[0].records[0].overall, null)
+
+  // PROBAST carries risk-of-bias and applicability cells like QUADAS-2.
+  const probastSlug = 'probast-review'
+  await startReview({ cwd, slug: probastSlug, protocol: { question: 'Prediction model?' }, instruments: ['probast'] })
+  await addRecords({ cwd, slug: probastSlug, records: [{ title: 'Model study', year: 2021 }] })
+  await screenRecord({ cwd, slug: probastSlug, id: 'r0001', stage: 'title_abstract', decision: 'include' })
+  await screenRecord({ cwd, slug: probastSlug, id: 'r0001', stage: 'full_text', decision: 'include' })
+  await appraiseRecord({
+    cwd, slug: probastSlug, id: 'r0001', instrument: 'probast', domain: 'patient_selection',
+    axis: 'risk_of_bias', judgement: 'low', reviewer: 'alice', quote, location: 'Methods',
+  })
+  await appraiseRecord({
+    cwd, slug: probastSlug, id: 'r0001', instrument: 'probast', domain: 'patient_selection',
+    axis: 'applicability', judgement: 'high', reviewer: 'alice', quote, location: 'Methods',
+  })
+  const probastStatus = deriveAppraisalStatus(cwd, probastSlug)
+  assert.equal(probastStatus.instruments[0].records[0].cells.length, 7)
+  const probastApplicability = probastStatus.instruments[0].records[0].cells
+    .find((cell) => cell.key === 'patient_selection:applicability')
+  assert.equal(probastApplicability.state, 'single')
+  assert.equal(probastApplicability.value, 'high')
 
   // A declared roster is the appraisal panel: a single appraiser is incomplete.
   const rosterSlug = 'roster-review'

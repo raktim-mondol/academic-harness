@@ -465,6 +465,71 @@
 - id: review
   name: academic-harness/review
 
+# Pairwise meta-analysis ledger (Phase 1C of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+# effect-size conversion, fixed/random pooling with DL/PM/REML tau^2, normal or
+# Hartung-Knapp CIs, heterogeneity, subgroup and meta-regression analyses,
+# leave-one-out, Egger/Begg/funnel publication-bias diagnostics, univariate
+# diagnostic-accuracy pooling, and forest/funnel/SROC SVG plots. State lives
+# under <cwd>/.dsh/meta/<slug>/; the statistics live in meta_helper.py. The tool
+# reports computed estimates and warnings, never a certainty or clinical
+# recommendation.
+- id: meta-analysis
+  name: academic-harness/meta-analysis
+
+# Reproducible analysis runs (Phase 2A of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+# a frozen analysis plan plus immutable run manifests — argv execution (no
+# shell), environment allowlist with secret redaction, hashed inputs/outputs,
+# hard timeouts, notebook execution, run diffs, and lab-notebook entries.
+# State lives under <cwd>/.dsh/analysis/<slug>/. The tool records what ran and
+# never interprets the science. See analysis-run.js and analysis-store.js.
+- id: analysis-run
+  name: academic-harness/analysis-run
+
+# Experiment registry (Phase 2B): sweeps, simulations, pilots, and model
+# comparisons as append-only runs with params, metrics, hashed artifacts,
+# seeds, and links; best is always by a named metric and direction. State
+# lives under <cwd>/.dsh/experiments/<slug>/. See experiment-log.js and
+# experiment-store.js.
+- id: experiment-log
+  name: academic-harness/experiment-log
+
+# Dataset downloads with provenance (Phase 2C): resolve a DOI through DataCite
+# and the Zenodo/Figshare file APIs, download into data/<slug>/ with size
+# caps, verify checksums, and keep a manifest under <cwd>/.dsh/data/<slug>/.
+# dataset_search stays search-only. See dataset-get.js.
+- id: dataset-get
+  name: academic-harness/dataset-get
+
+# Local data profiling (Phase 2C): schema, missingness, duplicates, ID/date
+# heuristics, target balance, split overlap, and leakage risks for one
+# workspace file through python-helpers/data_profile.py. Reports not_checked
+# items instead of implying safety. See data-profile.js.
+- id: data-profile
+  name: academic-harness/data-profile
+
+# Reproducibility packages (Phase 2D): a frozen inventory plus a built
+# package (manifest with SHA-256, environment snapshot, generated Dockerfile,
+# README, CITATION.cff, codemeta.json, RO-Crate, checksums) under a workspace
+# output dir; verify re-hashes; Zenodo deposit is confirm-gated and draft-only.
+# See repro-package.js and repro-package-store.js.
+- id: repro-package
+  name: academic-harness/repro-package
+
+# Cross-ledger provenance audit (Phase 3 of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+# a strictly READ-ONLY index that joins the ledgers that already exist — review
+# records, screening, evidence, extraction, appraisal and GRADE events,
+# reporting_check verdicts, stored deep reviews, notebook entries, analysis and
+# experiment runs, dataset downloads, meta-analysis studies, and Academic
+# Harness claim sidecars — by the ids and hashes they already store. It reports
+# which claims have no verified support (no_link / not_checked / unverified /
+# stale / not_found), what depends on a paper, quote, file, or run, and exports
+# Markdown, CSV, JSON, GraphML, and Mermaid views. Support is never inferred
+# from co-occurrence or a model judgement, and an unreadable ledger is reported
+# as unknown with its reason. It writes only its own cache under
+# .dsh/provenance/<slug>/; see provenance-audit.js and provenance-store.js.
+- id: provenance-audit
+  name: academic-harness/provenance-audit
+
 # Reporting-guideline checker (Phase 3 of docs/REPORTING-AND-APPRAISAL-PLAN.md):
 # list/suggest/start/items/candidates/judge/status/export against versioned
 # CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, and STARD checklists. The

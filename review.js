@@ -11,22 +11,30 @@ import {
 import { join, relative, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
-  addEvidence, addRecords, appraiseRecord, deriveAppraisalStatus, deriveStatus, exportReview,
-  frozenInstrument, readJsonl, readProtocol, reconcileRecord, reviewDir, screenRecord,
-  screeningResolutions, startReview, SCREENING_DECISIONS, SCREENING_STAGES,
+  addEvidence, addExtraction, addRecords, appraiseRecord, deriveAppraisalStatus,
+  deriveExtractionStatus, deriveStatus, exportReview, frozenInstrument, readJsonl,
+  readProtocol, reconcileRecord, reviewDir, screenRecord, screeningResolutions,
+  startReview, SCREENING_DECISIONS, SCREENING_STAGES,
 } from './review-store.js'
 import { reviewerKey, summarizeAgreement, WEIGHTINGS } from './agreement.js'
 import { buildFigureRequest, evaluateInstrument, scaleValues } from './appraisal.js'
+import {
+  addGradeJudgement, addGradeOverall, deriveGradeStatus, exportGradeProfile, exportSofTable,
+  startGrade, GRADE_CERTAINTIES,
+} from './grade-store.js'
+import { sha256, stableStringify } from './ledger-kit.js'
 import { mcpText, paperMemoryCall } from './papermemory-mcp.js'
 import { resolvePaperMemoryLaunch } from './papermemory-cli.js'
 import { runHelper } from './python-runtime.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 
 const ACTIONS = [
-  'start', 'add', 'screen', 'evidence', 'status',
-  'appraise', 'reconcile', 'agreement', 'appraisal_status', 'export',
+  'start', 'add', 'screen', 'evidence', 'extract', 'extract_status', 'status',
+  'appraise', 'reconcile', 'agreement', 'appraisal_status',
+  'grade_start', 'grade_judge', 'grade_overall', 'grade_status', 'export',
 ]
 const SCORING_SCOPES = ['screening', 'appraisal']
+const RECONCILE_SCOPES = [...SCORING_SCOPES, 'extraction']
 const MAX_INPUT_BYTES = 50 * 1024 * 1024
 const MAX_SVG_BYTES = 8 * 1024 * 1024
 
@@ -83,6 +91,86 @@ async function verifyPaperMemoryQuote(paper, quote) {
     throw new Error(`PaperMemory: ${detail.error || detail.code || 'quote check failed'}`)
   }
   return mcpText(result)
+}
+
+/**
+ * Turn a PaperMemory quote check into a stored status. A quote that clearly
+ * does not occur in a resolved paper is rejected; an unresolved paper is
+ * stored `unverified` with the reason.
+ */
+async function quoteCheckFor(paper, quote, deps, label = 'the evidence quote') {
+  const verify = deps.verifyQuote || verifyPaperMemoryQuote
+  let result
+  try {
+    result = await verify(paper, quote)
+  } catch (error) {
+    return {
+      check: {
+        status: 'unverified',
+        via: 'papermemory_quote_check',
+        detail: `quote check failed: ${error instanceof Error ? error.message : String(error)}`,
+      },
+    }
+  }
+  if (result?.found === true) {
+    const occurrences = Array.isArray(result.occurrences) ? result.occurrences : []
+    const bibliographyOnly = result.reason === 'bibliography-only'
+      || (occurrences.length > 0 && occurrences.every((entry) => Number(entry.is_bibliography) === 1))
+    if (bibliographyOnly) {
+      return {
+        error: `${label} only occurs in the bibliography of PaperMemory paper "${paper}". Quote the study text, not a reference-list entry.`,
+      }
+    }
+    if (!occurrences.length || result.checked_against?.sha256 == null) {
+      return {
+        check: {
+          status: 'unverified',
+          via: 'papermemory_quote_check',
+          detail: 'PaperMemory returned found:true without a resolved occurrence',
+        },
+      }
+    }
+    if (result.reason) {
+      return {
+        check: {
+          status: 'unverified',
+          via: 'papermemory_quote_check',
+          detail: `PaperMemory: ${result.reason}`,
+          checked_against: result.checked_against,
+        },
+      }
+    }
+    return {
+      check: {
+        status: 'verified',
+        via: 'papermemory_quote_check',
+        detail: 'found',
+        checked_against: result.checked_against,
+      },
+    }
+  }
+  if (result?.found === false && result.checked_against?.sha256 != null) {
+    const reason = result.reason ? ` (${result.reason})` : ''
+    return {
+      error: `${label} was not found in PaperMemory paper "${paper}"${reason}. A quote that does not appear is rejected and not stored.`,
+    }
+  }
+  if (result?.found === false) {
+    return {
+      check: {
+        status: 'unverified',
+        via: 'papermemory_quote_check',
+        detail: `PaperMemory could not resolve paper "${paper}" (${result.reason || 'no-match'})`,
+      },
+    }
+  }
+  return {
+    check: {
+      status: 'unverified',
+      via: 'papermemory_quote_check',
+      detail: 'PaperMemory returned an unexpected result',
+    },
+  }
 }
 
 function filterRaters(ratings, raters) {
@@ -235,6 +323,61 @@ async function writeRobFigure({ cwd, slug, args, deps }) {
   }
 }
 
+async function writePrismaFlow({ cwd, slug, args, deps }) {
+  const protocol = readProtocol(cwd, slug)
+  const status = deriveStatus(cwd, slug)
+  const searchLog = readJsonl(cwd, slug, 'searchLog')
+  const request = {
+    slug,
+    question: protocol.question,
+    generated_at: new Date().toISOString(),
+    databases: protocol.databases || [],
+    search: status.search,
+    records_total: status.records_total,
+    screening: status.screening,
+    included: status.included,
+    exclusion_reasons: status.exclusion_reasons,
+    ledger_hash: `sha256:${sha256(stableStringify({ protocol, status, searchLog }))}`,
+  }
+  const helper = deps.runHelper || runHelper
+  const result = helper('prisma_flow.py', request)
+  if (result?.error) throw new Error(`prisma-flow helper failed: ${result.error}`)
+  const svg = result?.svg
+  if (typeof svg !== 'string' || !svg.includes('<svg')) {
+    throw new Error('prisma-flow helper returned no SVG')
+  }
+  if (Buffer.byteLength(svg) > MAX_SVG_BYTES) throw new Error('prisma-flow SVG is larger than 8MB')
+  const dir = join(reviewDir(cwd, slug), 'exports')
+  mkdirSync(dir, { recursive: true })
+  const json = `${JSON.stringify({
+    ...request,
+    counts: result.counts ?? null,
+    warnings: Array.isArray(result.warnings) ? result.warnings : [],
+    svg_sha256: `sha256:${sha256(svg)}`,
+  }, null, 2)}\n`
+  const files = [
+    { name: 'prisma-flow.svg', body: svg },
+    { name: 'prisma-flow.json', body: json },
+  ]
+  for (const file of files) {
+    const out = join(dir, file.name)
+    if (existsSync(out) && !args.overwrite) {
+      throw new Error(`${displayPath(cwd, out)} already exists; pass overwrite: true to replace it`)
+    }
+  }
+  for (const file of files) writeFileSync(join(dir, file.name), file.body)
+  return {
+    action: 'export',
+    format: 'prisma-flow',
+    files: files.map((file) => ({
+      path: displayPath(cwd, join(dir, file.name)),
+      bytes: Buffer.byteLength(file.body),
+    })),
+    counts: result.counts ?? null,
+    warnings: Array.isArray(result.warnings) ? result.warnings : [],
+  }
+}
+
 function renderStatus(status) {
   const ta = status.screening.title_abstract
   const ft = status.screening.full_text
@@ -282,6 +425,88 @@ function renderStatus(status) {
   }
   if (!status.exclusion_reasons.length && !status.included.length) lines.push('\nNo screening decisions yet.')
   return lines.join('\n')
+}
+
+function renderGradeStatus(value) {
+  const status = value.status
+  if (!status.outcomes.length) {
+    return [{ type: 'text', text: status.note || 'No GRADE outcomes are defined for this review yet.' }]
+  }
+  const lines = [
+    'GRADE certainty',
+    '',
+    'Domain ratings are recorded human judgements; the stored overall is the human decision. The suggestion is derived from the domains and is not stored.',
+  ]
+  for (const outcome of status.outcomes) {
+    lines.push(
+      '',
+      `Outcome: ${outcome.name}${outcome.comparison ? ` — ${outcome.comparison}` : ''}`,
+      `Suggestion: ${outcome.suggestion.certainty || 'not available'}${outcome.suggestion.reason ? ` (${outcome.suggestion.reason})` : ''}`,
+      `Stored overall: ${outcome.overall.value || outcome.overall.state}`,
+    )
+    for (const [domainId, cell] of Object.entries(outcome.domains)) {
+      const values = cell.by_reviewer.length
+        ? cell.by_reviewer.map((entry) => `${entry.reviewer}=${entry.value}`).join(', ')
+        : '(none)'
+      lines.push(`- ${cell.label}: ${cell.value || cell.state} (${values})`)
+    }
+    for (const warning of outcome.warnings) lines.push(`- Warning: ${warning}`)
+  }
+  lines.push('', 'Recorded certainty judgements only; not a recommendation or a guarantee.')
+  return [{ type: 'text', text: lines.join('\n') }]
+}
+
+function renderGradeEvent(value) {
+  const event = value.event
+  const outcome = value.outcomes?.find((entry) => entry.outcome === event.outcome)
+  const suggestion = outcome?.suggestion?.certainty
+  const overall = outcome?.overall?.value
+  const label = event.kind === 'overall'
+    ? `Overall certainty ${event.certainty}`
+    : `${event.domain} → ${event.rating}`
+  const quote = event.quote_check
+    ? ` · quote ${event.quote_check.status}${event.quote_check.detail ? ` (${event.quote_check.detail})` : ''}`
+    : ''
+  return [{
+    type: 'text',
+    text: `${event.grade_id} · ${event.outcome} · ${label} · ${event.reviewer}${quote}${event.override ? ' (override; previous event kept)' : ''}\nSuggestion now: ${suggestion || 'not available'}; stored overall: ${overall || outcome?.overall?.state || 'not recorded'}${event.reason ? `\nReason: ${event.reason}` : ''}`,
+  }]
+}
+
+function renderExtractionStatus(value) {
+  const status = value.status
+  if (!status.template) {
+    return [{ type: 'text', text: status.note || 'No extraction template is frozen for this review yet.' }]
+  }
+  const summary = status.summary
+  const lines = [
+    `Extraction — ${status.template.name} ${status.template.version}`,
+    '',
+    `Population: ${summary.population} included record(s); ${summary.records_with_extraction} with extraction; ${summary.rows} row(s).`,
+    `${summary.complete_rows} complete, ${summary.incomplete_rows} incomplete, ${summary.conflict_rows} conflict, ${summary.pending_rows} pending; ${summary.missing_required_fields} missing required field(s).`,
+    `Quotes: ${summary.quote_checks.verified} verified, ${summary.quote_checks.unverified} unverified.`,
+  ]
+  if (status.rows.length) {
+    lines.push('', 'Rows:')
+    for (const row of status.rows.slice(0, 20)) {
+      const missing = row.missing_required.length ? `; missing ${row.missing_required.join(', ')}` : ''
+      const awaiting = (row.missing_reviewers || []).length ? `; awaiting ${row.missing_reviewers.join(', ')}` : ''
+      const rowLabel = row.row_id === 'main' ? row.record_id : `${row.record_id} [${row.row_id}]`
+      lines.push(`- ${rowLabel}: ${row.status}${missing}${awaiting}${row.reviewers.length ? ` · ${row.reviewers.join(', ')}` : ''}`)
+    }
+    if (status.rows.length > 20) lines.push(`- +${status.rows.length - 20} more row(s)`)
+  }
+  if (status.conflicts.length) {
+    lines.push('', 'Conflicts:')
+    for (const conflict of status.conflicts.slice(0, 10)) {
+      const values = conflict.by_reviewer.map((entry) => `${entry.reviewer}=${entry.value}`).join(', ')
+      const rowLabel = conflict.row_id === 'main' ? conflict.record_id : `${conflict.record_id} [${conflict.row_id}]`
+      lines.push(`- ${rowLabel} ${conflict.field}: ${conflict.state} (${values})`)
+    }
+  }
+  if (status.note) lines.push('', status.note)
+  lines.push('', 'This reports recorded extraction values, not verified facts; use quote_check/trace for evidence.')
+  return [{ type: 'text', text: lines.join('\n') }]
 }
 
 function renderAppraise(value) {
@@ -366,6 +591,9 @@ function renderReview(value) {
       protocol.instruments?.length
         ? `Instruments: ${protocol.instruments.map((entry) => `${entry.id}@${entry.version}`).join(', ')}`
         : null,
+      protocol.extraction_template
+        ? `Extraction template: ${protocol.extraction_template.id}@${protocol.extraction_template.version}`
+        : null,
       protocol.databases?.length ? `Databases: ${protocol.databases.join(', ')}` : null,
       protocol.inclusion?.length ? `Inclusion: ${protocol.inclusion.join('; ')}` : null,
       protocol.exclusion?.length ? `Exclusion: ${protocol.exclusion.join('; ')}` : null,
@@ -390,14 +618,33 @@ function renderReview(value) {
       text: `Evidence ${value.evidence_id} stored for ${value.record_id} (${value.location}). Quote must still be verified against the paper — use PaperMemory quote_check when the paper is ingested.`,
     }]
   }
+  if (value.action === 'extract') {
+    const checks = value.quote_check
+      ? ` · quotes ${value.quote_check.verified}/${value.quote_check.total} verified`
+      : ''
+    const row = value.row_id === 'main' ? '' : ` [${value.row_id}]`
+    return [{
+      type: 'text',
+      text: `Extraction ${value.extraction_id} stored for ${value.record_id}${row} · ${value.reviewer}${value.override ? ' (override; previous event kept)' : ''}${checks}`,
+    }]
+  }
+  if (value.action === 'extract_status') return renderExtractionStatus(value)
+  if (value.action === 'grade_start') {
+    const names = value.grade?.outcomes?.map((outcome) => outcome.name).join(', ') || '(none)'
+    return [{ type: 'text', text: `GRADE outcomes ${value.resumed ? 'resumed' : 'started'} for "${value.slug}": ${names}.` }]
+  }
+  if (value.action === 'grade_judge' || value.action === 'grade_overall') return renderGradeEvent(value)
+  if (value.action === 'grade_status') return renderGradeStatus(value)
   if (value.action === 'appraise') return renderAppraise(value)
   if (value.action === 'reconcile') {
     const event = value.event
     const target = value.scope === 'screening'
       ? `${event.record_id} · ${event.stage}`
-      : `${event.record_id} · ${event.instrument.id}@${event.instrument.version} · ${event.domain}`
+      : value.scope === 'extraction'
+        ? `${event.record_id}${event.row_id === 'main' ? '' : ` [${event.row_id}]`} · ${event.field}`
+        : `${event.record_id} · ${event.instrument.id}@${event.instrument.version} · ${event.domain}`
     const state = value.resolution?.state ?? 'recorded'
-    const resolved = value.resolution?.value ?? event.judgement
+    const resolved = value.resolution?.value ?? event.judgement ?? event.value
     return [{
       type: 'text',
       text: `Reconciled ${target} → ${resolved} (${state}) · ${event.basis}; ${event.supersedes.length} event(s) superseded, originals kept.`,
@@ -426,6 +673,7 @@ export async function runReview(args, exec, deps = {}) {
       resume: Boolean(args.resume),
       reviewers: args.reviewers,
       instruments: args.instruments,
+      extractionTemplate: args.extraction_template,
       protocol: {
         question: args.question,
         databases: args.databases,
@@ -480,6 +728,124 @@ export async function runReview(args, exec, deps = {}) {
     return { action, ...event }
   }
 
+  if (action === 'extract') {
+    if (!args.values || typeof args.values !== 'object' || Array.isArray(args.values)) {
+      throw new Error('values must be an object keyed by extraction field id')
+    }
+    if (args.quotes != null && (typeof args.quotes !== 'object' || Array.isArray(args.quotes))) {
+      throw new Error('quotes must be an object keyed by extraction field id')
+    }
+    const quotes = args.quotes ?? null
+    const quoteChecks = {}
+    if (quotes && args.paper) {
+      for (const [fieldId, entry] of Object.entries(quotes)) {
+        const quote = typeof entry === 'string'
+          ? entry.trim()
+          : String(entry?.quote ?? '').trim()
+        if (!quote) continue
+        const result = await quoteCheckFor(args.paper, quote, deps, `the quote for "${fieldId}"`)
+        if (result.error) return { error: result.error }
+        quoteChecks[fieldId] = result.check
+      }
+    }
+    const event = await addExtraction({
+      cwd,
+      slug,
+      id: requireString(args.id, 'id'),
+      rowId: args.row_id,
+      values: args.values,
+      quotes,
+      notes: args.notes,
+      reviewer: requireString(args.reviewer, 'reviewer'),
+      paper: args.paper,
+      quoteChecks,
+      override: Boolean(args.override),
+      reason: args.reason,
+      template: args.extraction_template,
+    })
+    return { action, ...event }
+  }
+
+  if (action === 'extract_status') {
+    readProtocol(cwd, slug)
+    return {
+      action,
+      status: deriveExtractionStatus(cwd, slug, { id: args.id }),
+    }
+  }
+
+  if (action === 'grade_start') {
+    const started = await startGrade({
+      cwd,
+      slug,
+      resume: Boolean(args.resume),
+      outcomes: args.outcomes,
+    })
+    return { action, ...started, dir: displayPath(cwd, started.dir) }
+  }
+
+  if (action === 'grade_judge') {
+    const outcome = requireString(args.outcome, 'outcome')
+    const domain = requireString(args.domain, 'domain')
+    const rating = requireString(args.rating, 'rating')
+    const reviewer = requireString(args.reviewer, 'reviewer')
+    const reason = requireString(args.reason, 'reason')
+    const quote = String(args.quote ?? '').trim()
+    let quoteCheck = null
+    if (quote) {
+      if (!String(args.location ?? '').trim()) throw new Error('location is required when a GRADE quote is supplied')
+      if (args.paper) {
+        const result = await quoteCheckFor(args.paper, quote, deps, 'the GRADE quote')
+        if (result.error) return { error: result.error }
+        quoteCheck = result.check
+      } else {
+        quoteCheck = {
+          status: 'unverified',
+          via: null,
+          detail: 'no PaperMemory paper supplied',
+        }
+      }
+    }
+    const result = await addGradeJudgement({
+      cwd,
+      slug,
+      outcome,
+      domain,
+      rating,
+      reason,
+      reviewer,
+      quote,
+      location: args.location,
+      page: args.page,
+      section: args.section,
+      quoteCheck,
+      paper: args.paper,
+      override: Boolean(args.override),
+    })
+    return { action, ...result }
+  }
+
+  if (action === 'grade_overall') {
+    const result = await addGradeOverall({
+      cwd,
+      slug,
+      outcome: requireString(args.outcome, 'outcome'),
+      certainty: requireString(args.certainty, 'certainty'),
+      reason: args.reason,
+      reviewer: requireString(args.reviewer, 'reviewer'),
+      override: Boolean(args.override),
+    })
+    return { action, ...result }
+  }
+
+  if (action === 'grade_status') {
+    readProtocol(cwd, slug)
+    return {
+      action,
+      status: deriveGradeStatus(cwd, slug, { outcome: args.outcome }),
+    }
+  }
+
   if (action === 'appraise') {
     const recordId = requireString(args.id, 'id')
     const instrument = requireString(args.instrument, 'instrument')
@@ -489,67 +855,9 @@ export async function runReview(args, exec, deps = {}) {
     const quote = String(args.quote ?? '').trim()
     let quoteCheck = null
     if (quote && args.paper) {
-      const verify = deps.verifyQuote || verifyPaperMemoryQuote
-      let result
-      try {
-        result = await verify(args.paper, quote)
-      } catch (error) {
-        quoteCheck = {
-          status: 'unverified',
-          via: 'papermemory_quote_check',
-          detail: `quote check failed: ${error instanceof Error ? error.message : String(error)}`,
-        }
-      }
-      if (!quoteCheck) {
-        if (result?.found === true) {
-          const occurrences = Array.isArray(result.occurrences) ? result.occurrences : []
-          const bibliographyOnly = result.reason === 'bibliography-only'
-            || (occurrences.length > 0 && occurrences.every((entry) => Number(entry.is_bibliography) === 1))
-          if (bibliographyOnly) {
-            return {
-              error: `the evidence quote only occurs in the bibliography of PaperMemory paper "${args.paper}". Quote the study text, not a reference-list entry.`,
-            }
-          }
-          if (!occurrences.length || result.checked_against?.sha256 == null) {
-            quoteCheck = {
-              status: 'unverified',
-              via: 'papermemory_quote_check',
-              detail: 'PaperMemory returned found:true without a resolved occurrence',
-            }
-          } else if (result.reason) {
-            quoteCheck = {
-              status: 'unverified',
-              via: 'papermemory_quote_check',
-              detail: `PaperMemory: ${result.reason}`,
-              checked_against: result.checked_against,
-            }
-          } else {
-            quoteCheck = {
-              status: 'verified',
-              via: 'papermemory_quote_check',
-              detail: 'found',
-              checked_against: result.checked_against,
-            }
-          }
-        } else if (result?.found === false && result.checked_against?.sha256 != null) {
-          const reason = result.reason ? ` (${result.reason})` : ''
-          return {
-            error: `the evidence quote was not found in PaperMemory paper "${args.paper}"${reason}. A quote that does not appear is rejected and not stored.`,
-          }
-        } else if (result?.found === false) {
-          quoteCheck = {
-            status: 'unverified',
-            via: 'papermemory_quote_check',
-            detail: `PaperMemory could not resolve paper "${args.paper}" (${result.reason || 'no-match'})`,
-          }
-        } else {
-          quoteCheck = {
-            status: 'unverified',
-            via: 'papermemory_quote_check',
-            detail: 'PaperMemory returned an unexpected result',
-          }
-        }
-      }
+      const result = await quoteCheckFor(args.paper, quote, deps)
+      if (result.error) return { error: result.error }
+      quoteCheck = result.check
     }
     const event = await appraiseRecord({
       cwd,
@@ -578,7 +886,7 @@ export async function runReview(args, exec, deps = {}) {
 
   if (action === 'reconcile') {
     const scope = requireString(args.scope, 'scope')
-    if (!SCORING_SCOPES.includes(scope)) throw new Error(`scope must be one of ${SCORING_SCOPES.join(', ')}`)
+    if (!RECONCILE_SCOPES.includes(scope)) throw new Error(`scope must be one of ${RECONCILE_SCOPES.join(', ')}`)
     const result = await reconcileRecord({
       cwd,
       slug,
@@ -593,6 +901,9 @@ export async function runReview(args, exec, deps = {}) {
       judgement: args.judgement,
       reason: args.reason,
       reviewer: requireString(args.reviewer, 'reviewer'),
+      field: args.field,
+      value: args.value,
+      rowId: args.row_id,
     })
     return { action, ...result }
   }
@@ -628,6 +939,17 @@ export async function runReview(args, exec, deps = {}) {
   if (action === 'export') {
     const format = args.format || 'markdown'
     if (format === 'rob-figure') return writeRobFigure({ cwd, slug, args, deps })
+    if (format === 'prisma-flow') return writePrismaFlow({ cwd, slug, args, deps })
+    if (format === 'grade-profile') {
+      return { action: 'export', ...exportGradeProfile({
+        cwd, slug, table_format: args.table_format, overwrite: Boolean(args.overwrite),
+      }) }
+    }
+    if (format === 'sof-table') {
+      return { action: 'export', ...exportSofTable({
+        cwd, slug, table_format: args.table_format, overwrite: Boolean(args.overwrite),
+      }) }
+    }
     const exported = exportReview({
       cwd,
       slug,
@@ -650,15 +972,15 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'review',
     description: [
-      'Maintain a systematic/scoping-review ledger (protocol, records, screening, evidence, appraisals, PRISMA-style counts) under `.dsh/review/<slug>/.',
-      'Actions: `start` (protocol; optional reviewers and risk-of-bias instruments; refuses to overwrite unless resume: true), `add` (records from a search tool or a workspace JSON/JSONL file; dedupes by DOI, arXiv/PMID, then normalized title+year), `screen` (title_abstract or full_text; include/exclude/maybe; a reason is required to exclude or mark maybe), `evidence` (only after a resolved full_text include), `appraise` (record a domain-level risk-of-bias judgement by a named reviewer, with a quote for low/high), `reconcile` (record a consensus or third-reviewer decision over a disagreement; originals kept), `agreement` (percent agreement and Cohen/weighted kappa; human-vs-human primary, AI reported separately), `appraisal_status` (completeness and outstanding disagreements), `status` (screening counts and conflicts), `export` (markdown, csv, json, rob-table, rob-summary, rob-figure).',
-      'This tool never makes an inclusion, appraisal, or consensus decision — every value and reason comes from a named reviewer. Reviewer identities are human:<name> or ai:<model>; a legacy event with no reviewer is `default`. The quote in `evidence` and `appraise` is stored verbatim; with a PaperMemory `paper`, a quote is checked through papermemory_quote_check and a quote that does not appear is rejected. Exports report recorded judgements and verified evidence, never a compliance or quality verdict. Load the systematic-review-ledger and risk-of-bias-appraisal skills for the workflows.',
+      'Maintain a systematic/scoping-review ledger (protocol, records, screening, evidence, structured extraction, appraisals, GRADE certainty, PRISMA-style counts) under `.dsh/review/<slug>/.',
+      'Actions: `start` (protocol; optional extraction template, reviewers, and risk-of-bias instruments; refuses to overwrite unless resume: true), `add` (records from a search tool or a workspace JSON/JSONL file; dedupes by DOI, arXiv/PMID, then normalized title+year), `screen` (title_abstract or full_text; include/exclude/maybe; a reason is required to exclude or mark maybe), `evidence` (only after a resolved full_text include), `extract` (record one reviewer’s structured extraction for an included record; one row per outcome/arm/comparison via `row_id`), `extract_status` (completeness, required-field gaps, field conflicts, quote verification), `appraise` (record a domain-level judgement by a named reviewer, with a quote for decisive ratings such as low/high or checklist yes/no), `reconcile` (record a consensus or third-reviewer decision over a screening, appraisal, or extraction disagreement; originals kept), `agreement` (percent agreement and Cohen/weighted kappa; human-vs-human primary, AI reported separately), `appraisal_status` (completeness and outstanding disagreements), `grade_start` (define GRADE outcomes/comparisons), `grade_judge` (one domain rating with a reason), `grade_overall` (human certainty for an outcome), `grade_status` (domain completeness, conflicts, suggestion, and stored overalls), `status` (screening counts and conflicts), `export` (markdown, csv, json, extraction-table, extraction-matrix, extraction-json, prisma-flow, grade-profile, sof-table, rob-table, rob-summary, rob-figure).',
+      'This tool never makes an inclusion, extraction, appraisal, GRADE, or consensus decision — every value and reason comes from a named reviewer. Reviewer identities are human:<name> or ai:<model>; a legacy event with no reviewer is `default`. Extraction values are recorded, not inferred; missing required fields are counted, never filled. A quote in `evidence`, `extract`, `appraise`, or `grade_judge` is stored verbatim; with a PaperMemory `paper`, a quote is checked through papermemory_quote_check and a quote that does not appear is rejected. GRADE suggestions are derived from the recorded domains; the stored overall is the human decision. Exports report recorded judgements, extraction values, and verified evidence, never a compliance or quality verdict. Load the systematic-review-ledger, risk-of-bias-appraisal, and grade-certainty skills for the workflows.',
     ].join(' '),
     parameters: {
       action: {
         type: 'string',
         enum: ACTIONS,
-        description: 'start, add, screen, evidence, appraise, reconcile, agreement, appraisal_status, status, or export. Default status.',
+        description: 'start, add, screen, evidence, extract, extract_status, appraise, reconcile, agreement, appraisal_status, grade_start, grade_judge, grade_overall, grade_status, status, or export. Default status.',
       },
       slug: { type: 'string', description: 'Review slug (stable short name; letters, digits, dashes).' },
       question: { type: 'string', description: 'Review question (start). Required for a new review.' },
@@ -670,7 +992,7 @@ export function apply(ctx) {
       inclusion: { type: 'array', items: { type: 'string' }, description: 'Inclusion criteria (start).' },
       exclusion: { type: 'array', items: { type: 'string' }, description: 'Exclusion criteria (start).' },
       date_range: { type: 'string', description: 'Date range covered, e.g. "2015-2026" (start).' },
-      notes: { type: 'string', description: 'Protocol notes (start).' },
+      notes: { type: 'string', description: 'Protocol notes (start) or extraction notes (extract).' },
       reviewers: {
         type: 'array',
         items: { type: 'string' },
@@ -679,7 +1001,11 @@ export function apply(ctx) {
       instruments: {
         type: 'array',
         items: { type: 'string' },
-        description: 'Risk-of-bias instruments to freeze for the review (start), e.g. ["rob-2"] or ["robins-i@1"]. Instruments can also be frozen on first appraise.',
+        description: 'Risk-of-bias/critical-appraisal instruments to freeze for the review (start), e.g. ["rob-2"] or ["probast@2019"]. Instruments can also be frozen on first appraise.',
+      },
+      extraction_template: {
+        type: 'json',
+        description: 'Structured-extraction template (start/extract): a built-in id ("generic", "pico", "peco", "diagnostic_accuracy", "prognostic", "qualitative") or an inline {id, name, version, fields:[{id, label, type, required, options?, unit?}]}. Frozen on first use.',
       },
       resume: { type: 'boolean', description: 'Continue an existing review instead of failing (start).' },
       records: {
@@ -690,7 +1016,7 @@ export function apply(ctx) {
       path: { type: 'string', description: 'Workspace-relative JSON/JSONL file of records (add). Used when records is absent.' },
       source: { type: 'string', description: 'Source of the records, e.g. openalex or literature_search (add).' },
       query: { type: 'string', description: 'The query that produced these records (add).' },
-      id: { type: 'string', description: 'Record id such as r0001 (screen/evidence/appraise/reconcile/appraisal_status).' },
+      id: { type: 'string', description: 'Record id such as r0001 (screen/evidence/extract/extract_status/appraise/reconcile/appraisal_status).' },
       stage: {
         type: 'string',
         enum: SCREENING_STAGES,
@@ -701,33 +1027,57 @@ export function apply(ctx) {
         enum: SCREENING_DECISIONS,
         description: 'include, exclude, or maybe (screen/reconcile screening).',
       },
-      reason: { type: 'string', description: 'Why the record was excluded/marked maybe (screen); required for exclude/maybe, overrides, reconcile, and an explicit overall judgement.' },
-      reviewer: { type: 'string', description: 'Reviewer identity, e.g. human:alice or ai:model (screen/appraise/reconcile).' },
+      reason: { type: 'string', description: 'Why the record was excluded/marked maybe (screen); required for exclude/maybe, overrides, reconcile, GRADE judgements, and an explicit overall judgement.' },
+      reviewer: { type: 'string', description: 'Reviewer identity, e.g. human:alice or ai:model (screen/extract/appraise/reconcile).' },
       override: { type: 'boolean', description: 'Replace this reviewer’s earlier decision at the same key; both events are kept (screen/appraise). A reason is required in a multi-reviewer screening review and for every appraisal override.' },
       claim: { type: 'string', description: 'What the record supports (evidence).' },
       quote: { type: 'string', description: 'Verbatim supporting quote (evidence/appraise). Checked through PaperMemory when paper is supplied.' },
       location: { type: 'string', description: 'Where the quote is, e.g. "Results, p. 4" (evidence/appraise).' },
       page: { type: 'string', description: 'Page number (evidence/appraise).' },
       section: { type: 'string', description: 'Section name (evidence/appraise).' },
-      instrument: { type: 'string', description: 'Risk-of-bias instrument id, e.g. rob-2, robins-i, quadas-2, nos (appraise/reconcile/agreement/appraisal_status/export).' },
+      instrument: { type: 'string', description: 'Instrument id: rob-2, robins-i, quadas-2, nos, amstar-2, probast, quips, syrcle, casp-cohort, casp-case-control, casp-qualitative (appraise/reconcile/agreement/appraisal_status/export).' },
       version: { type: 'string', description: 'Instrument version, e.g. 2019 (optional).' },
-      domain: { type: 'string', description: 'Domain id from the instrument, or "overall" for an explicit overall override (appraise/reconcile/agreement).' },
+      domain: { type: 'string', description: 'Domain id from the appraisal instrument, or a GRADE domain: risk_of_bias, inconsistency, indirectness, imprecision, publication_bias, large_effect, dose_response, plausible_confounding (appraise/reconcile/agreement/grade_judge).' },
       axis: {
         type: 'string',
         enum: ['risk_of_bias', 'applicability'],
         description: 'Domain axis (QUADAS-2 uses applicability on three domains). Default risk_of_bias.',
       },
       judgement: { type: 'string', description: 'Instrument judgement, e.g. low, some_concerns, high, moderate, serious, critical, no_information, unclear, or a star count (appraise/reconcile).' },
+      outcomes: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: true },
+        description: 'GRADE outcomes (grade_start): [{id, name, comparison, importance, studies, participants, effect, effect_ci, measure, notes}].',
+      },
+      outcome: { type: 'string', description: 'GRADE outcome id (grade_judge/grade_overall/grade_status).' },
+      rating: { type: 'string', description: 'GRADE domain rating: not_serious, serious, very_serious for downgrade domains; upgrade or not_applicable for upgrade domains.' },
+      certainty: { type: 'string', enum: GRADE_CERTAINTIES, description: 'Overall GRADE certainty (grade_overall): high, moderate, low, or very_low.' },
       signalling: {
         type: 'object',
         additionalProperties: true,
         description: 'Signalling-question answers keyed by question id (appraise). Supporting detail only; never converted into a judgement.',
       },
-      paper: { type: 'string', description: 'PaperMemory paper key used to verify the quote (appraise).' },
+      paper: { type: 'string', description: 'PaperMemory paper key used to verify a quote (extract/appraise/grade_judge).' },
+      values: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'Structured extraction values keyed by template field id (extract). Missing fields are counted, never filled.',
+      },
+      quotes: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'Optional field-level quotes (extract): field id -> {quote, location, page?, section?}. Checked through PaperMemory when paper is supplied.',
+      },
+      row_id: {
+        type: 'string',
+        description: 'Extraction row key for multiple outcomes/arms/comparisons (extract/reconcile extraction). Default "main".',
+      },
+      field: { type: 'string', description: 'Extraction field id (reconcile scope=extraction).' },
+      value: { type: 'json', description: 'New extraction field value (reconcile scope=extraction).' },
       scope: {
         type: 'string',
-        enum: SCORING_SCOPES,
-        description: 'screening or appraisal (reconcile/agreement).',
+        enum: RECONCILE_SCOPES,
+        description: 'screening, appraisal, or extraction (reconcile). Agreement uses screening or appraisal only.',
       },
       weighting: {
         type: 'string',
@@ -741,13 +1091,17 @@ export function apply(ctx) {
       },
       table_format: {
         type: 'string',
-        enum: ['markdown', 'csv'],
-        description: 'File format for rob-table and rob-summary (export). Default markdown.',
+        enum: ['markdown', 'csv', 'latex'],
+        description: 'File format for rob-table/rob-summary (markdown/csv), grade-profile (markdown/csv), and sof-table (markdown/csv/latex). Default markdown.',
       },
       format: {
         type: 'string',
-        enum: ['markdown', 'csv', 'json', 'rob-table', 'rob-summary', 'rob-figure'],
-        description: 'Export format. markdown = report skeleton + PRISMA counts; csv = evidence table; json = full ledger; rob-table/rob-summary = appraisal tables; rob-figure = traffic-light and summary SVGs. Default markdown.',
+        enum: [
+          'markdown', 'csv', 'json', 'extraction-table', 'extraction-matrix',
+          'extraction-json', 'prisma-flow', 'grade-profile', 'sof-table',
+          'rob-table', 'rob-summary', 'rob-figure',
+        ],
+        description: 'Export format. markdown = report skeleton + PRISMA counts + extraction table; csv = evidence table; json = full ledger; extraction-table/extraction-matrix = one row per study × outcome; extraction-json = template, status, and events; prisma-flow = PRISMA-style flow SVG plus a counts JSON sidecar; grade-profile = GRADE domain ratings and overall certainty; sof-table = summary-of-findings table; rob-table/rob-summary = appraisal tables; rob-figure = traffic-light and summary SVGs. Default markdown.',
       },
       overwrite: { type: 'boolean', description: 'Replace existing export files (export). Default false.' },
     },

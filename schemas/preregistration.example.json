@@ -1,0 +1,22 @@
+{
+  "slug": "prereg-01",
+  "title": "Pre-registered test of X on Y",
+  "question": "Does intervention X improve outcome Y?",
+  "design": "Two-arm randomized trial",
+  "sample_size": {
+    "n": 128,
+    "basis": "power_analysis: two-sample t-test, d=0.5, power=0.8, alpha=0.05",
+    "dropout": 0.1
+  },
+  "hypotheses": [
+    { "id": "H1", "statement": "X improves Y at 12 weeks.", "direction": "greater" }
+  ],
+  "outcomes": [
+    { "id": "primary", "name": "Y at 12 weeks", "type": "continuous", "analysis": "Welch t-test" }
+  ],
+  "exclusions": "Participants without a baseline measurement.",
+  "stopping_rules": "No interim efficacy analysis.",
+  "analysis_plan": "See analysis-plan.example.json.",
+  "frozen_at": "2026-01-01T00:00:00Z",
+  "hash": "sha256:..."
+}

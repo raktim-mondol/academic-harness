@@ -104,17 +104,35 @@ export async function runDatasetSearch(args, exec, deps = {}) {
     const url = zenodo
       ? `${ZENODO}/${zenodo[1]}/files?size=100`
       : `${FIGSHARE}/${figshare[1]}/files`
-    const result = await limiter.run(() => http(url, {
+    let result = await limiter.run(() => http(url, {
       signal: exec?.signal,
       headers: authHeaders({ key, scheme: zenodo ? 'Bearer' : 'token' }),
     }))
+    let entries = Array.isArray(result.data) ? result.data : (result.data?.entries || [])
+    if (zenodo && (!result.ok || !entries.length)) {
+      // Zenodo's newer API inlines the file list in the record payload and can
+      // 404 the /files endpoint; fall back to it before declaring the record
+      // unavailable.
+      const record = await limiter.run(() => http(`${ZENODO}/${zenodo[1]}`, {
+        signal: exec?.signal,
+        headers: authHeaders({ key, scheme: 'Bearer' }),
+      }))
+      if (record.ok) {
+        result = record
+        entries = Array.isArray(record.data?.files) ? record.data.files : (record.data?.files?.entries || [])
+      } else if (!result.ok) {
+        if (result.status === 404 || record.status === 404) {
+          return { doi, files_unavailable: true, reason: 'repository record not public or not found', landing_url: landing }
+        }
+        return { error: `Zenodo API error ${result.status}${result.detail ? `: ${result.detail}` : ''}` }
+      }
+    }
     if (!result.ok) {
       if (result.status === 404) {
         return { doi, files_unavailable: true, reason: 'repository record not public or not found', landing_url: landing }
       }
       return { error: `${zenodo ? 'Zenodo' : 'Figshare'} API error ${result.status}${result.detail ? `: ${result.detail}` : ''}` }
     }
-    const entries = Array.isArray(result.data) ? result.data : (result.data?.entries || [])
     const files = entries.map((entry) => ({
       name: entry.key || entry.name || null,
       size: entry.size ?? null,

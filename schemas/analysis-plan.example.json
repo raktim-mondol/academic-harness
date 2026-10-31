@@ -1,0 +1,28 @@
+{
+  "slug": "primary-analysis",
+  "question": "Does intervention X improve outcome Y?",
+  "hypotheses": [
+    "X increases Y relative to control."
+  ],
+  "data": [
+    { "path": "data/raw.csv", "sha256": "sha256:..." }
+  ],
+  "variables": {
+    "outcome": "y",
+    "treatment": "x",
+    "covariates": ["age", "sex"]
+  },
+  "primary_outcome": "y",
+  "secondary_outcomes": [],
+  "statistical_methods": "Two-sided Welch t-test; alpha 0.05.",
+  "alpha": 0.05,
+  "corrections": "Holm for secondary outcomes",
+  "missing_data": "Report complete-case and multiple-imputation sensitivity analyses.",
+  "exclusion_rules": "Exclude records without outcome Y, documented in the run log.",
+  "stopping_rules": "No interim analysis.",
+  "software": "Python 3.13, NumPy/SciPy versions recorded per run.",
+  "seed": 42,
+  "sensitivity_analyses": [
+    "Mann-Whitney sensitivity analysis"
+  ]
+}

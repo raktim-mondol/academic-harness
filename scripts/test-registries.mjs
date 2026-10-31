@@ -288,6 +288,18 @@ const dataciteItem = {
 }
 
 {
+  const data = await runDatasetSearch({ action: 'files', doi: '10.5281/zenodo.123' }, {}, {
+    fetchJson: async (url) => {
+      if (/\/files/.test(url)) return { ok: false, status: 404, error: 'HTTP 404' }
+      assert.match(url, /zenodo\.org\/api\/records\/123$/)
+      return { ok: true, status: 200, data: { files: [{ key: 'meta.yaml', size: 12, checksum: 'md5:def', links: { self: 'https://zenodo.org/api/records/124/files/meta.yaml/content' } }] } }
+    },
+  })
+  assert.equal(data.files[0].name, 'meta.yaml', 'newer Zenodo API inlines files in the record payload')
+  assert.match(data.files[0].download_url, /meta\.yaml\/content$/)
+}
+
+{
   const data = await runDatasetSearch({ action: 'files', doi: '10.6084/m9.figshare.33560125.v2' }, {}, {
     fetchJson: async (url) => {
       assert.match(url, /figshare\.com\/v2\/articles\/33560125\/files/)

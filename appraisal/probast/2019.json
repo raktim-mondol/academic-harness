@@ -1,0 +1,63 @@
+{
+  "id": "probast",
+  "name": "PROBAST",
+  "version": "2019",
+  "study_designs": ["prediction model development or validation"],
+  "source_url": "https://www.probast-nl.org/probast.html",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "The first three domains are judged on both risk of bias and applicability; participant flow is judged on risk of bias only. PROBAST explicitly discourages an overall quality score, so no overall judgement is derived.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "low", "label": "Low", "rank": 1, "requires_quote": true },
+      { "id": "unclear", "label": "Unclear", "rank": 2, "requires_quote": false },
+      { "id": "high", "label": "High", "rank": 3, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    {
+      "id": "patient_selection",
+      "name": "Patient selection",
+      "axes": ["risk_of_bias", "applicability"],
+      "short_prompt": "Whether participants were consecutive or randomly sampled, met eligibility criteria without bias from predictors, and represent the review's target population.",
+      "signalling": [
+        { "id": "1.1", "prompt": "Were participant eligibility criteria prespecified and appropriate for the research question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.2", "prompt": "Were participants recruited from a consecutive or random series without eligibility based on predictor values?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.3", "prompt": "Do the included participants represent the target population of the review question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"], "axis": "applicability" }
+      ]
+    },
+    {
+      "id": "predictors",
+      "name": "Predictors",
+      "axes": ["risk_of_bias", "applicability"],
+      "short_prompt": "Whether predictor definitions were clear, pre-specified, and assessed the same way for all participants, and whether they match the review question.",
+      "signalling": [
+        { "id": "2.1", "prompt": "Were predictor definitions clear, and assessment methods pre-specified?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.2", "prompt": "Were predictors measured the same way for all participants, blind to outcome status where relevant?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.3", "prompt": "Are the predictors similar to those in the review's target prediction setting?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"], "axis": "applicability" }
+      ]
+    },
+    {
+      "id": "outcome",
+      "name": "Outcome",
+      "axes": ["risk_of_bias", "applicability"],
+      "short_prompt": "Whether outcome definitions and ascertainment were pre-specified, appropriate, independent of predictors, and match the review question.",
+      "signalling": [
+        { "id": "3.1", "prompt": "Was the outcome definition clear and appropriate for the research question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.2", "prompt": "Was outcome ascertainment pre-specified and independent of predictor information?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.3", "prompt": "Is the outcome similar to the target outcome of the review question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"], "axis": "applicability" }
+      ]
+    },
+    {
+      "id": "participant_flow",
+      "name": "Participant flow",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether follow-up was long enough, complete, with an appropriate interval, and analysed with an adequate number of outcome events.",
+      "signalling": [
+        { "id": "4.1", "prompt": "Was the follow-up period long enough for the outcome to occur?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.2", "prompt": "Was follow-up complete, or missing outcome data handled appropriately?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.3", "prompt": "Is the number of outcome events sufficient for the analysis performed?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    }
+  ]
+}

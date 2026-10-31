@@ -1,0 +1,28 @@
+{
+  "id": "casp-cohort",
+  "name": "CASP Cohort Study Checklist",
+  "version": "1",
+  "study_designs": ["cohort study"],
+  "source_url": "https://casp-uk.net/casp-tools-checklists/",
+  "license_note": "Questions are consolidated paraphrases of the official checklist. The official wording is linked, not bundled.",
+  "notes": "CASP questions are answered yes / can't tell / no and CASP defines no scoring or overall judgement, so none is derived. The domain list consolidates the official sections; consult the linked checklist for the full question set.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "yes", "label": "Yes", "rank": 1, "requires_quote": true },
+      { "id": "cannot_tell", "label": "Can't tell", "rank": 2, "requires_quote": false },
+      { "id": "no", "label": "No", "rank": 3, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    { "id": "focused_issue", "name": "Clearly focused issue", "axes": ["risk_of_bias"], "short_prompt": "Whether the study states its population, exposure, outcome, and results clearly enough to appraise." },
+    { "id": "group_selection", "name": "Similar groups from the same population", "axes": ["risk_of_bias"], "short_prompt": "Whether the exposed and unexposed groups were similar and recruited from the same population at the same time." },
+    { "id": "exposure_measurement", "name": "Exposure measured similarly", "axes": ["risk_of_bias"], "short_prompt": "Whether exposure was measured the same way in both groups, with quantified exposure and blind assessment where feasible." },
+    { "id": "confounders", "name": "Confounders identified and controlled", "axes": ["risk_of_bias"], "short_prompt": "Whether all important confounders were identified and strategies to deal with them were appropriate." },
+    { "id": "follow_up", "name": "Follow-up complete and long enough", "axes": ["risk_of_bias"], "short_prompt": "Whether the follow-up was long enough for outcomes, sufficiently complete, and losses explained." },
+    { "id": "outcome_measurement", "name": "Outcome measurement valid and reliable", "axes": ["risk_of_bias"], "short_prompt": "Whether outcomes were measured in a way that was valid, reliable, and blind to exposure status." },
+    { "id": "precision", "name": "Precise results", "axes": ["risk_of_bias"], "short_prompt": "Whether the results are precise — effect estimates with confidence intervals and appropriate statistical tests." },
+    { "id": "dose_response", "name": "Dose-response pattern", "axes": ["risk_of_bias"], "short_prompt": "Whether the results show a dose-response pattern if the exposure is one that could plausibly have one." },
+    { "id": "conclusions", "name": "Conclusions justified", "axes": ["risk_of_bias"], "short_prompt": "Whether the conclusions follow from the results and acknowledge confounding, bias, and imprecision." }
+  ]
+}

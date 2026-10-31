@@ -20,11 +20,13 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Search and discovery](SEARCH.md) | Literature databases, Consensus, Parallel, MCP connectors, web indexes, publication integrity |
 | [Papers and evidence](PAPERS.md) | Download, `paper_fold`, PDF conversion, PaperMemory, Paper2Agent |
 | [Writing, citation, and figures](WRITING.md) | The `ah_*` writing oracle, bibliography tools, LaTeX, figures, `image_generate`, `mermaid_render` |
-| [Reviews, hypotheses, and records](RESEARCH.md) | Systematic reviews, dual-reviewer screening, risk-of-bias appraisal, agreement statistics, hypothesis tournaments, clinical/regulatory records, dataset and policy tools |
+| [Reviews, synthesis, and records](RESEARCH.md) | Systematic reviews, dual-reviewer screening, structured extraction, meta-analysis, GRADE certainty and summary-of-findings tables, risk-of-bias appraisal, agreement statistics, hypothesis tournaments, clinical/regulatory records, dataset and policy tools |
+| [Reproducible analysis and data](ANALYSIS.md) | Frozen plans and auditable `analysis_run` executions, `experiment_log` sweeps, `dataset_get` provenance downloads, `data_profile` leakage review, `repro_package` shipping and Zenodo drafts |
+| [Provenance audit](PROVENANCE.md) | The read-only cross-ledger index: how `provenance_audit` joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH records, and what its seven states do and do not mean |
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 745-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 752-skill catalogue, its sources, and workflow skills |
 | [Optional tools](OPTIONAL-TOOLS.md) | The tools behind `AH_ENABLE_OPTIONAL_TOOLS=1` |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 
@@ -40,6 +42,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Non-search tools](NON-SEARCH-TOOLS-PLAN.md) | Citation, review, clinical, dataset, and policy tool plan |
 | [PaperMemory v2](PAPERMEMORY-V2-PLAN.md) | Memory v2 design record |
 | [Reporting and appraisal](REPORTING-AND-APPRAISAL-PLAN.md) | Phase 3 reporting-guideline checker and Phase 4 risk-of-bias/appraisal ledger |
+| [Scientific expansion](SCIENTIFIC-EXPANSION-PLAN.md) | Phased plan for synthesis, reproducible analysis, provenance, submission, study conduct, science data, and discovery intelligence |
 | [Search providers](SEARCH-PROVIDERS-PLAN.md) | Search provider plan |
 | [Specialist agents](AGENTS-PLAN.md) | Specialist-roster gap analysis (partially implemented; current briefs live in `skills/` and `prompt.js`) |
 | [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md) | Historical workspace-search and memory-boundary design record |

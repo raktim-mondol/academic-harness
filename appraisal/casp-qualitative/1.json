@@ -1,0 +1,28 @@
+{
+  "id": "casp-qualitative",
+  "name": "CASP Qualitative Research Checklist",
+  "version": "1",
+  "study_designs": ["qualitative study"],
+  "source_url": "https://casp-uk.net/casp-tools-checklists/",
+  "license_note": "Questions are consolidated paraphrases of the official checklist. The official wording is linked, not bundled.",
+  "notes": "CASP questions are answered yes / can't tell / no and CASP defines no scoring or overall judgement, so none is derived. Qualitative appraisal is about the adequacy of the reported reasoning, not a bias direction.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "yes", "label": "Yes", "rank": 1, "requires_quote": true },
+      { "id": "cannot_tell", "label": "Can't tell", "rank": 2, "requires_quote": false },
+      { "id": "no", "label": "No", "rank": 3, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    { "id": "aims", "name": "Clear statement of aims", "axes": ["risk_of_bias"], "short_prompt": "Whether the aims of the research and why the qualitative approach was chosen are stated clearly." },
+    { "id": "approach", "name": "Appropriate qualitative approach", "axes": ["risk_of_bias"], "short_prompt": "Whether a qualitative approach is appropriate for the research issue and the design fits the aims." },
+    { "id": "recruitment", "name": "Appropriate recruitment", "axes": ["risk_of_bias"], "short_prompt": "Whether the recruitment strategy is appropriate to the aims and its limitations are discussed." },
+    { "id": "data_collection", "name": "Data collection addresses the issue", "axes": ["risk_of_bias"], "short_prompt": "Whether the data collection methods (interview, focus group, observation) address the research issue and the justification is adequate." },
+    { "id": "reflexivity", "name": "Researcher reflexivity", "axes": ["risk_of_bias"], "short_prompt": "Whether the relationship between researcher and participants is considered, including the researcher's potential influence." },
+    { "id": "ethics", "name": "Ethical considerations", "axes": ["risk_of_bias"], "short_prompt": "Whether ethical issues — consent, harm, confidentiality, power imbalance — have been considered." },
+    { "id": "rigorous_analysis", "name": "Sufficiently rigorous analysis", "axes": ["risk_of_bias"], "short_prompt": "Whether the data analysis was sufficiently rigorous — adequate description, systematic discussion of findings, counter-examples considered." },
+    { "id": "valuable_findings", "name": "Value of the findings", "axes": ["risk_of_bias"], "short_prompt": "Whether the findings are valuable — clear primary findings, discussion of their significance, and contribution to existing knowledge." },
+    { "id": "scope_statement", "name": "Culture, practice, and scope", "axes": ["risk_of_bias"], "short_prompt": "Whether there is a statement of local culture and practice, and whether the lack of generalisability is discussed." }
+  ]
+}

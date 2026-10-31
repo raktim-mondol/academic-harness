@@ -86,10 +86,10 @@ const visionProfile = customRouteProfile({
 assert.deepEqual(visionProfile.models[0].input, ['text', 'image'])
 assert.equal(visionProfile.apiKeyEnv, 'AH_SUBAGENT_VISION_KEY')
 
-for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './agreement', './appraisal', './papermemory-mcp', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
+for (const modulePath of ['./citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './grade-store', './meta-analysis', './meta-analysis-store', './ledger-kit', './provenance', './provenance-audit', './provenance-store', './analysis-run', './analysis-store', './experiment-log', './experiment-store', './dataset-get', './data-profile', './repro-package', './repro-package-store', './agreement', './appraisal', './papermemory-mcp', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
 }
-for (const file of ['citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'agreement.js', 'appraisal.js', 'papermemory-mcp.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
+for (const file of ['citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'grade-store.js', 'meta-analysis.js', 'meta-analysis-store.js', 'ledger-kit.js', 'provenance.js', 'provenance-audit.js', 'provenance-store.js', 'analysis-run.js', 'analysis-store.js', 'experiment-log.js', 'experiment-store.js', 'dataset-get.js', 'data-profile.js', 'repro-package.js', 'repro-package-store.js', 'agreement.js', 'appraisal.js', 'papermemory-mcp.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
   assert.ok(pkg.files?.includes(file), `package files missing ${file}`)
   assert.ok(existsSync(join(root, file)), `missing ${file}`)
 }
@@ -112,6 +112,17 @@ assert.match(preset, /- id: integrity-check\n  name: academic-harness\/integrity
 assert.match(read('review.js'), /name: 'review'/)
 assert.match(preset, /- id: review\n  name: academic-harness\/review/)
 assert.ok(existsSync(join(root, 'skills/systematic-review-ledger/SKILL.md')), 'missing systematic-review-ledger skill')
+assert.match(read('meta-analysis.js'), /name: 'meta_analysis'/)
+assert.match(preset, /- id: meta-analysis\n  name: academic-harness\/meta-analysis/)
+assert.ok(existsSync(join(root, 'skills/meta-analysis/SKILL.md')), 'missing meta-analysis skill')
+assert.ok(existsSync(join(root, 'skills/grade-certainty/SKILL.md')), 'missing grade-certainty skill')
+for (const [id, toolName] of [['analysis-run', 'analysis_run'], ['experiment-log', 'experiment_log'], ['dataset-get', 'dataset_get'], ['data-profile', 'data_profile'], ['repro-package', 'repro_package'], ['provenance-audit', 'provenance_audit']]) {
+  assert.match(preset, new RegExp(`- id: ${id}\n  name: academic-harness/${id}`), `preset row missing ${id}`)
+  assert.ok(read(`${id}.js`).includes(`name: '${toolName}'`), `${id}.js must register ${toolName}`)
+}
+for (const skill of ['reproducible-analysis', 'experiment-tracking', 'provenance-audit']) {
+  assert.ok(existsSync(join(root, `skills/${skill}/SKILL.md`)), `missing ${skill} skill`)
+}
 assert.ok(existsSync(join(root, 'skills/risk-of-bias-appraisal/SKILL.md')), 'missing risk-of-bias-appraisal skill')
 assert.ok(existsSync(join(root, 'skills/remove-ai-signs/SKILL.md')), 'missing remove-ai-signs skill')
 assert.ok(existsSync(join(root, 'skills/remove-ai-signs/scripts/scan_ai_signs.py')), 'missing remove-ai-signs scanner')
@@ -135,9 +146,11 @@ for (const [id, tool] of [['pdf-references', 'pdf_references'], ['stat-audit', '
   assert.ok(existsSync(join(root, `${id}.js`)), `missing ${id}.js`)
   assert.ok(read(`${id}.js`).includes(`name: '${tool}'`), `${id}.js must register ${tool}`)
 }
-for (const helper of ['stat_audit.py', 'figure_audit.py', 'rob_figure.py']) {
+for (const helper of ['stat_audit.py', 'figure_audit.py', 'rob_figure.py', 'prisma_flow.py', 'meta_helper.py', 'data_profile.py']) {
   assert.ok(existsSync(join(root, 'python-helpers', helper)), `missing python helper ${helper}`)
 }
+assert.ok(pkg.files?.includes('schemas'), 'package files missing schemas')
+assert.ok(existsSync(join(root, 'schemas/extraction-template.example.json')), 'missing extraction schema example')
 assert.ok(read('client/ApiKeysSection.jsx').includes('OPENFDA_API_KEY'), 'Settings UI missing OPENFDA_API_KEY')
 assert.ok(read('client/ApiKeysSection.jsx').includes('SHERPA_ROMERO_API_KEY'), 'Settings UI missing SHERPA_ROMERO_API_KEY')
 assert.ok(read('client/ApiKeysSection.jsx').includes('PATENTSVIEW_API_KEY'), 'Settings UI missing PATENTSVIEW_API_KEY')
@@ -154,6 +167,10 @@ assert.ok(!preset.includes('academic-harness/zotero'), 'Zotero preset row must b
 
 for (const marker of [
   '## References and citation', 'Chicago author-date', '### Paper integrity', '## Systematic reviews',
+  '### Structured extraction', 'prisma-flow', '## Meta-analysis', 'meta_analysis',
+  '## GRADE certainty', 'grade_start', 'sof-table', 'grade-profile',
+  '## Reproducible analysis', 'analysis_run', 'experiment_log', 'dataset_get', 'data_profile', 'repro_package',
+  '## Provenance audit', 'provenance_audit', 'no_link', 'not_checked', 'not_found',
   'risk-of-bias', 'rob-table', 'appraise', 'reconcile',
   '### Clinical and regulatory evidence', '### Data and journal policy',
   'manuscript_citations', 'funder_policy', '## Writing quality', 'remove-ai-signs',
@@ -180,6 +197,9 @@ assert.equal(citation.formatCitations([{ title: 'T', type: 'article', author: [{
 
 const review = await import('../review-store.js')
 assert.equal(typeof review.deriveStatus, 'function')
+assert.equal(typeof review.deriveExtractionStatus, 'function')
+assert.equal(typeof review.addExtraction, 'function')
+assert.equal(typeof review.freezeExtractionTemplate, 'function')
 
 const citationTool = await import('../citation.js')
 assert.equal(typeof citationTool.apply, 'function')
@@ -196,6 +216,18 @@ assert.equal(integrity.classifyIntegrity({
 const reviewTool = await import('../review.js')
 assert.equal(typeof reviewTool.apply, 'function')
 assert.equal(typeof reviewTool.runReview, 'function')
+
+const metaTool = await import('../meta-analysis.js')
+assert.equal(typeof metaTool.apply, 'function')
+assert.equal(typeof metaTool.runMetaAnalysis, 'function')
+const metaStore = await import('../meta-analysis-store.js')
+assert.equal(typeof metaStore.startMetaAnalysis, 'function')
+assert.equal(typeof metaStore.importReviewStudies, 'function')
+
+const gradeStore = await import('../grade-store.js')
+assert.equal(typeof gradeStore.startGrade, 'function')
+assert.equal(typeof gradeStore.deriveGradeStatus, 'function')
+assert.equal(typeof gradeStore.exportSofTable, 'function')
 
 if (spawnSync('python3', ['--version'], { encoding: 'utf8' }).status === 0) {
   const dir = mkdtempSync(join(tmpdir(), 'ah-signs-'))

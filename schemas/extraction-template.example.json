@@ -1,0 +1,19 @@
+{
+  "id": "pico",
+  "name": "PICO extraction",
+  "version": 1,
+  "fields": [
+    { "id": "population", "label": "Population", "type": "text", "required": true },
+    { "id": "intervention", "label": "Intervention", "type": "text", "required": true },
+    { "id": "comparator", "label": "Comparator", "type": "text", "required": true },
+    { "id": "outcome", "label": "Outcome", "type": "text", "required": true },
+    { "id": "timepoint", "label": "Timepoint", "type": "text", "required": false },
+    { "id": "design", "label": "Study design", "type": "enum", "options": ["RCT", "cohort", "case-control", "cross-sectional", "other"], "required": true },
+    { "id": "n", "label": "Sample size", "type": "number", "required": true },
+    { "id": "effect", "label": "Effect estimate", "type": "number", "required": false },
+    { "id": "effect_measure", "label": "Effect measure", "type": "enum", "options": ["OR", "RR", "HR", "MD", "SMD", "RD"], "required": false },
+    { "id": "ci_low", "label": "CI lower", "type": "number", "required": false },
+    { "id": "ci_high", "label": "CI upper", "type": "number", "required": false },
+    { "id": "notes", "label": "Notes", "type": "text", "required": false }
+  ]
+}

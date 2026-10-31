@@ -1,0 +1,35 @@
+{
+  "id": "amstar-2",
+  "name": "AMSTAR 2",
+  "version": "2017",
+  "study_designs": ["systematic review of interventions"],
+  "source_url": "https://amstar.ca/Amstar-2.php",
+  "license_note": "Item wording is paraphrased. The official checklist is linked, not bundled.",
+  "notes": "Sixteen items judged yes / partial yes / no. Items 2, 4, 7, 9, 11, 13, and 15 are the official critical items; the overall confidence rating counts non-critical and critical flaws and is not a worst-domain rule, so no overall judgement is derived here. Judgements are entered by reviewers; the tool never infers them from the signalling answers.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "yes", "label": "Yes", "rank": 1, "requires_quote": true },
+      { "id": "partial_yes", "label": "Partial yes", "rank": 2, "requires_quote": false },
+      { "id": "no", "label": "No", "rank": 3, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    { "id": "item_01", "name": "PICO in question and criteria", "axes": ["risk_of_bias"], "short_prompt": "Whether the review question and inclusion criteria name population, intervention, comparator, and outcome." },
+    { "id": "item_02", "name": "Priori protocol", "axes": ["risk_of_bias"], "short_prompt": "Whether methods were established before the review began and deviations were explained. Critical item." },
+    { "id": "item_03", "name": "Justified study designs", "axes": ["risk_of_bias"], "short_prompt": "Whether the explanation for which study designs were eligible is justified." },
+    { "id": "item_04", "name": "Comprehensive search", "axes": ["risk_of_bias"], "short_prompt": "Whether the search strategy is comprehensive (multiple databases, grey literature, appropriate years and language restrictions). Critical item." },
+    { "id": "item_05", "name": "Duplicate study selection", "axes": ["risk_of_bias"], "short_prompt": "Whether study selection was performed in at least duplicate." },
+    { "id": "item_06", "name": "Duplicate data extraction", "axes": ["risk_of_bias"], "short_prompt": "Whether data extraction was performed in at least duplicate." },
+    { "id": "item_07", "name": "Justified exclusions", "axes": ["risk_of_bias"], "short_prompt": "Whether a list of excluded studies with justifications is provided. Critical item." },
+    { "id": "item_08", "name": "Adequate study characteristics", "axes": ["risk_of_bias"], "short_prompt": "Whether included studies are described in adequate detail (PICO, design, funding sources)." },
+    { "id": "item_09", "name": "Satisfactory RoB appraisal", "axes": ["risk_of_bias"], "short_prompt": "Whether a satisfactory technique was used to assess risk of bias in the included studies. Critical item." },
+    { "id": "item_10", "name": "Funding of included studies", "axes": ["risk_of_bias"], "short_prompt": "Whether the sources of funding of the included studies are reported." },
+    { "id": "item_11", "name": "Appropriate meta-analysis methods", "axes": ["risk_of_bias"], "short_prompt": "If a meta-analysis was performed, whether the pooling methods are appropriate. Critical item; answer without meta-analysis from the report's statement." },
+    { "id": "item_12", "name": "Explained heterogeneity", "axes": ["risk_of_bias"], "short_prompt": "If a meta-analysis was performed, whether likely important sources of heterogeneity are explored and discussed." },
+    { "id": "item_13", "name": "Assessed publication bias", "axes": ["risk_of_bias"], "short_prompt": "If a meta-analysis was performed, whether the likelihood of publication bias is assessed. Critical item." },
+    { "id": "item_14", "name": "Discussion of results", "axes": ["risk_of_bias"], "short_prompt": "Whether results are discussed in terms of bias, both in the primary studies and in the review process." },
+    { "id": "item_15", "name": "RoB as explanations", "axes": ["risk_of_bias"], "short_prompt": "Whether the authors used RoB of included studies when interpreting or discussing results. Critical item." },
+    { "id": "item_16", "name": "Conflicts of interest", "axes": ["risk_of_bias"], "short_prompt": "Whether the review reports and discusses its own and its included studies' conflicts of interest." }
+  ]
+}

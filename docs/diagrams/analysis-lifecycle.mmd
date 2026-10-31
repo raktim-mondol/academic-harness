@@ -1,0 +1,18 @@
+flowchart TD
+  acquire[dataset_get get / download<br/>DOI, license, checksums] --> data[(data/slug/)]
+  data --> profile[data_profile<br/>schema, missingness, split overlap,<br/>leakage risks, not_checked]
+  profile --> plan[analysis_run plan<br/>question, inputs, outputs,<br/>methods, alpha, seed — frozen]
+  plan --> run[analysis_run run<br/>argv command, env allowlist,<br/>hashed inputs and outputs]
+  run -->|exploratory batch| sweep[experiment_log<br/>params, metrics, best by<br/>named metric]
+  sweep -->|confirm a setting| run
+  run --> manifest[(runs/id/<br/>manifest.json, logs)]
+  manifest --> diff[analysis_run diff<br/>run vs run, run vs plan]
+  manifest --> result[scientific_result<br/>notebook entry]
+  result --> package[repro_package build<br/>manifest, environment, Dockerfile,<br/>README, CFF, RO-Crate, checksums]
+  package -->|preview then confirm| deposit[Zenodo draft deposit<br/>never publishes]
+
+  plan -. write-once versions .-> ledger[(.dsh/analysis/slug/)]
+  run -.-> ledger
+  sweep -.-> expledger[(.dsh/experiments/slug/)]
+  acquire -.-> dsledger[(.dsh/data/slug/)]
+  package -.-> rpledger[(.dsh/repro/slug/)]

@@ -1,0 +1,82 @@
+{
+  "id": "quips",
+  "name": "QUIPS",
+  "version": "2011",
+  "study_designs": ["prognostic cohort study"],
+  "source_url": "https://www.spower.bristol.ac.uk/quips/",
+  "license_note": "Domain names and prompts are paraphrases. The official wording is linked, not bundled.",
+  "notes": "Six domain-level judgements for prognostic factor studies. The official guidance derives no aggregate score, so no overall judgement is derived. Judgements are entered by reviewers with quotes; signalling answers are supporting detail only.",
+  "scale": {
+    "type": "ordinal",
+    "values": [
+      { "id": "low", "label": "Low risk", "rank": 1, "requires_quote": true },
+      { "id": "unclear", "label": "Unclear", "rank": 2, "requires_quote": false },
+      { "id": "moderate", "label": "Moderate risk", "rank": 3, "requires_quote": true },
+      { "id": "high", "label": "High risk", "rank": 4, "requires_quote": true }
+    ]
+  },
+  "domains": [
+    {
+      "id": "study_participation",
+      "name": "Study participation",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the source cohort and enrolled participants are representative of the population in which the prognosis applies.",
+      "signalling": [
+        { "id": "1.1", "prompt": "Is the source of the cohort clearly described and appropriate?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "1.2", "prompt": "Are included participants representative of people with the disease in the review question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "study_attrition",
+      "name": "Study attrition",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether follow-up is complete enough, with similar reasons for withdrawal across exposure groups.",
+      "signalling": [
+        { "id": "2.1", "prompt": "Are completers and non-completers comparable at baseline?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.2", "prompt": "Is follow-up sufficiently long and complete?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "2.3", "prompt": "Are withdrawal or loss-to-follow-up reasons similar across prognostic groups?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "prognostic_factor_measurement",
+      "name": "Prognostic factor measurement",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the prognostic factor is measured with a valid and reliable, pre-specified assessment.",
+      "signalling": [
+        { "id": "3.1", "prompt": "Is the prognostic factor defined with inclusion and exclusion criteria?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "3.2", "prompt": "Was measurement valid and reliable, and assessed blind to outcome where relevant?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "outcome_measurement",
+      "name": "Outcome measurement",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the outcome is clearly defined, well described, and assessed with suitable methods without knowledge of the prognostic factor.",
+      "signalling": [
+        { "id": "4.1", "prompt": "Is the outcome clearly defined and appropriate for the research question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "4.2", "prompt": "Was outcome assessment blind to prognostic factor status?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "study_confounding",
+      "name": "Study confounding",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the effect of important confounders is minimised or controlled in design or analysis.",
+      "signalling": [
+        { "id": "5.1", "prompt": "Are confounding factors identified from previous work or sensible reasoning?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "5.2", "prompt": "Are measured confounders controlled in the analysis?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    },
+    {
+      "id": "prognostic_factor_analysis",
+      "name": "Statistical analysis and reporting",
+      "axes": ["risk_of_bias"],
+      "short_prompt": "Whether the number of events is adequate, analyses appropriate, and results reported without selective or post-hoc choices driving the finding.",
+      "signalling": [
+        { "id": "6.1", "prompt": "Is the number of events and participants sufficient for the analysis performed?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "6.2", "prompt": "Is the statistical analysis appropriate for the prognostic question?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] },
+        { "id": "6.3", "prompt": "Was the analysis pre-specified, or is a post-hoc or selective analysis a concern?", "answers": ["yes", "probably_yes", "probably_no", "no", "no_information"] }
+      ]
+    }
+  ]
+}

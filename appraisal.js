@@ -25,6 +25,9 @@ const ALIASES = {
   'newcastle-ottawa': 'newcastle-ottawa',
   'newcastle-ottawa-scale': 'newcastle-ottawa',
   nos: 'newcastle-ottawa',
+  amstar: 'amstar-2',
+  amstar2: 'amstar-2',
+  'amstar-ii': 'amstar-2',
 }
 
 const AXES = ['risk_of_bias', 'applicability']
@@ -549,6 +552,10 @@ const STYLE = {
   no_information: { color: '#9e9e9e', symbol: '?' },
   serious: { color: '#ef6c00', symbol: '−' },
   high: { color: '#c62828', symbol: '−' },
+  yes: { color: '#2e7d32', symbol: '+' },
+  no: { color: '#c62828', symbol: '−' },
+  partial_yes: { color: '#f9a825', symbol: '?' },
+  cannot_tell: { color: '#9e9e9e', symbol: '?' },
   critical: { color: '#6a1b9a', symbol: '!' },
   conflict: { color: '#6a1b9a', symbol: '!' },
   pending: { color: '#bdbdbd', symbol: '·' },

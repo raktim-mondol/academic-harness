@@ -16,12 +16,18 @@ npm run build # after any client/ change — rebuilds lib/client.js
 The tool tests are plain Node scripts and need no network (the Python-helper cases skip themselves when SciPy/Pillow are unavailable):
 
 ```sh
-for t in citation-format review-store review-tool agreement appraisal reporting-check integrity registries \
+for t in ledger-kit citation-format review-store review-tool review-extract prisma-flow meta-analysis grade agreement appraisal reporting-check integrity registries \
          optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold compute library power reference-library; do
   node scripts/test-$t.mjs
 done
 node scripts/test-compute-http.mjs
 ```
+
+The ledger layers add their own suites, all local and fixture-driven:
+`test-analysis-run`, `test-experiment-log`, `test-dataset-get`, `test-data-profile`,
+`test-repro-package`, and `test-provenance-audit` (the cross-ledger audit hashes
+every file outside its own cache before and after a run to prove it never writes
+to a source ledger). `npm run test:provenance` runs the last one on its own.
 
 The full CI matrix also runs the search-provider tests, the PaperMemory test suite, and a real DSH boot; see [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
 
@@ -65,11 +71,12 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `presets/academic-harness/` | Preset source |
 | `prompt.js`, `prompt-section.js` | Research system prompt |
 | `client/` | Settings page source; `lib/client.js` is the committed build |
-| `skills/` | 745 bundled skills |
+| `skills/` | 752 bundled skills |
 | `python-helpers/` | Python helpers for `sci_inspect` and `power_analysis` |
 | `vendor/academic-harness/` | Vendored writing engine |
 | `vendor/papermemory/` | Vendored PaperMemory package |
 | `docs/` | User guides, design notes, and diagram sources |
+| `schemas/` | Example JSON contracts for extraction templates, analysis plans, run manifests, preregistration, and submission manifests |
 | `scripts/` | Tests, profile migration, patch build, docs diagrams |
 
 See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
@@ -82,6 +89,7 @@ See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
 - [Non-search tools](NON-SEARCH-TOOLS-PLAN.md)
 - [PaperMemory v2](PAPERMEMORY-V2-PLAN.md)
 - [RSI](RSI.md)
+- [Scientific expansion](SCIENTIFIC-EXPANSION-PLAN.md)
 - [Search providers](SEARCH-PROVIDERS-PLAN.md)
 - [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md)
 

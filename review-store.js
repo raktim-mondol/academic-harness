@@ -10,6 +10,7 @@ import {
 } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { withLock, writeJsonAtomic } from './store-lock.js'
+import { sha256, stableStringify } from './ledger-kit.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 import {
   normalizeReviewer, resolveSeries, reviewerKey, reviewerLabel, reviewerType,
@@ -22,11 +23,128 @@ import {
 export const SCREENING_STAGES = ['title_abstract', 'full_text']
 export const SCREENING_DECISIONS = ['include', 'exclude', 'maybe']
 
+export const EXTRACTION_FIELD_TYPES = ['text', 'number', 'integer', 'boolean', 'date', 'enum', 'effect']
+
+/**
+ * Built-in extraction templates are deliberately small and generic. They are
+ * starting points; a review can pass an inline template with its own fields.
+ */
+export const BUILTIN_EXTRACTION_TEMPLATES = {
+  generic: {
+    name: 'Generic study extraction',
+    description: 'Design, population, exposure/comparator, outcomes, sample size, funding, and conflicts.',
+    fields: [
+      { id: 'study_design', label: 'Study design', type: 'text', required: true },
+      { id: 'population', label: 'Population', type: 'text', required: true },
+      { id: 'setting', label: 'Setting', type: 'text' },
+      { id: 'intervention_or_exposure', label: 'Intervention or exposure', type: 'text', required: true },
+      { id: 'comparator', label: 'Comparator', type: 'text' },
+      { id: 'outcomes', label: 'Outcomes', type: 'text', required: true },
+      { id: 'n', label: 'Sample size', type: 'number', required: true },
+      { id: 'follow_up', label: 'Follow-up', type: 'text' },
+      { id: 'funding', label: 'Funding', type: 'text' },
+      { id: 'conflicts_of_interest', label: 'Conflicts of interest', type: 'text' },
+      { id: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+  pico: {
+    name: 'PICO extraction',
+    description: 'Population, intervention, comparator, outcomes, design, and effect estimate.',
+    fields: [
+      { id: 'population', label: 'Population', type: 'text', required: true },
+      { id: 'intervention', label: 'Intervention', type: 'text', required: true },
+      { id: 'comparator', label: 'Comparator', type: 'text', required: true },
+      { id: 'outcome', label: 'Outcome', type: 'text', required: true },
+      { id: 'timepoint', label: 'Timepoint', type: 'text' },
+      { id: 'arm', label: 'Arm', type: 'text' },
+      { id: 'comparison', label: 'Comparison', type: 'text' },
+      { id: 'design', label: 'Study design', type: 'enum', options: ['RCT', 'cohort', 'case-control', 'cross-sectional', 'other'], required: true },
+      { id: 'n', label: 'Sample size', type: 'number', required: true },
+      { id: 'effect', label: 'Effect estimate', type: 'effect' },
+      { id: 'effect_measure', label: 'Effect measure', type: 'enum', options: ['OR', 'RR', 'HR', 'MD', 'SMD', 'RD'] },
+      { id: 'ci_low', label: 'CI lower', type: 'number' },
+      { id: 'ci_high', label: 'CI upper', type: 'number' },
+      { id: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+  peco: {
+    name: 'PECO extraction',
+    description: 'Population, exposure, comparator, outcomes, design, and adjusted effect estimate.',
+    fields: [
+      { id: 'population', label: 'Population', type: 'text', required: true },
+      { id: 'exposure', label: 'Exposure', type: 'text', required: true },
+      { id: 'comparator', label: 'Comparator', type: 'text', required: true },
+      { id: 'outcome', label: 'Outcome', type: 'text', required: true },
+      { id: 'timepoint', label: 'Timepoint', type: 'text' },
+      { id: 'design', label: 'Study design', type: 'enum', options: ['cohort', 'case-control', 'cross-sectional', 'ecological', 'other'], required: true },
+      { id: 'n', label: 'Sample size', type: 'number', required: true },
+      { id: 'effect', label: 'Effect estimate', type: 'effect' },
+      { id: 'effect_measure', label: 'Effect measure', type: 'enum', options: ['OR', 'RR', 'HR', 'MD', 'SMD', 'RD'] },
+      { id: 'ci_low', label: 'CI lower', type: 'number' },
+      { id: 'ci_high', label: 'CI upper', type: 'number' },
+      { id: 'adjustment', label: 'Adjusted for', type: 'text' },
+      { id: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+  diagnostic_accuracy: {
+    name: 'Diagnostic accuracy extraction',
+    description: 'Index test, reference standard, target condition, 2×2 counts, sensitivity, and specificity.',
+    fields: [
+      { id: 'population', label: 'Population', type: 'text', required: true },
+      { id: 'index_test', label: 'Index test', type: 'text', required: true },
+      { id: 'reference_standard', label: 'Reference standard', type: 'text', required: true },
+      { id: 'target_condition', label: 'Target condition', type: 'text', required: true },
+      { id: 'design', label: 'Study design', type: 'enum', options: ['cross-sectional', 'cohort', 'case-control', 'other'], required: true },
+      { id: 'n', label: 'Sample size', type: 'number', required: true },
+      { id: 'tp', label: 'True positives', type: 'integer' },
+      { id: 'fp', label: 'False positives', type: 'integer' },
+      { id: 'fn', label: 'False negatives', type: 'integer' },
+      { id: 'tn', label: 'True negatives', type: 'integer' },
+      { id: 'sensitivity', label: 'Sensitivity', type: 'number' },
+      { id: 'specificity', label: 'Specificity', type: 'number' },
+      { id: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+  prognostic: {
+    name: 'Prognostic factor extraction',
+    description: 'Population, prognostic factor, outcome, follow-up, and adjusted effect.',
+    fields: [
+      { id: 'population', label: 'Population', type: 'text', required: true },
+      { id: 'prognostic_factor', label: 'Prognostic factor', type: 'text', required: true },
+      { id: 'outcome', label: 'Outcome', type: 'text', required: true },
+      { id: 'follow_up', label: 'Follow-up', type: 'text' },
+      { id: 'design', label: 'Study design', type: 'enum', options: ['cohort', 'case-control', 'other'], required: true },
+      { id: 'n', label: 'Sample size', type: 'number', required: true },
+      { id: 'effect', label: 'Effect estimate', type: 'effect' },
+      { id: 'effect_measure', label: 'Effect measure', type: 'enum', options: ['OR', 'RR', 'HR', 'MD', 'SMD'] },
+      { id: 'ci_low', label: 'CI lower', type: 'number' },
+      { id: 'ci_high', label: 'CI upper', type: 'number' },
+      { id: 'adjustment', label: 'Adjusted for', type: 'text' },
+      { id: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+  qualitative: {
+    name: 'Qualitative study extraction',
+    description: 'Population, phenomenon, context, method, themes, and key quotes.',
+    fields: [
+      { id: 'population', label: 'Population', type: 'text', required: true },
+      { id: 'phenomenon', label: 'Phenomenon of interest', type: 'text', required: true },
+      { id: 'context', label: 'Context', type: 'text' },
+      { id: 'method', label: 'Method', type: 'text', required: true },
+      { id: 'themes', label: 'Themes', type: 'text', required: true },
+      { id: 'key_quotes', label: 'Key quotes', type: 'text' },
+      { id: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+}
+
 const FILES = {
   protocol: 'protocol.json',
   records: 'records.jsonl',
   screening: 'screening.jsonl',
   evidence: 'evidence.jsonl',
+  extractionTemplate: 'extraction_template.json',
+  extractions: 'extractions.jsonl',
   appraisal: 'appraisal.jsonl',
   searchLog: 'search_log.jsonl',
 }
@@ -64,7 +182,7 @@ function ensureReview(cwd, slug) {
 function ensureFiles(dir) {
   mkdirSync(dir, { recursive: true })
   mkdirSync(join(dir, 'exports'), { recursive: true })
-  for (const key of ['records', 'screening', 'evidence', 'appraisal', 'searchLog']) {
+  for (const key of ['records', 'screening', 'evidence', 'extractions', 'appraisal', 'searchLog']) {
     const file = join(dir, FILES[key])
     if (!existsSync(file)) writeFileSync(file, '')
   }
@@ -116,8 +234,229 @@ function reviewerList(value) {
   return out.length ? out : null
 }
 
+function cleanValue(value) {
+  return String(value ?? '').trim()
+}
+
+function extractionTemplateFile(cwd, slug) {
+  return join(reviewDir(cwd, slug), FILES.extractionTemplate)
+}
+
+export function readExtractionTemplate(cwd, slug) {
+  const file = extractionTemplateFile(cwd, slug)
+  if (!existsSync(file)) return null
+  try {
+    return JSON.parse(readFileSync(file, 'utf8'))
+  } catch (error) {
+    throw new Error(`extraction_template.json is not valid JSON: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function extractionFieldId(value) {
+  const id = String(value ?? '').toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80)
+  if (!id) throw new Error('extraction field ids must contain at least one letter, digit, or underscore')
+  return id
+}
+
+function normalizeExtractionField(field, index) {
+  if (!field || typeof field !== 'object' || Array.isArray(field)) {
+    throw new Error(`extraction field ${index + 1} must be an object`)
+  }
+  const id = extractionFieldId(field.id ?? field.name ?? `field_${index + 1}`)
+  const type = cleanValue(field.type || 'text').toLowerCase()
+  if (!EXTRACTION_FIELD_TYPES.includes(type)) {
+    throw new Error(`extraction field "${id}" has unsupported type "${type}"; use ${EXTRACTION_FIELD_TYPES.join(', ')}`)
+  }
+  const options = type === 'enum'
+    ? (Array.isArray(field.options) ? field.options.map((option) => cleanValue(option)).filter(Boolean) : [])
+    : []
+  if (type === 'enum' && !options.length) throw new Error(`extraction field "${id}" is enum but has no options`)
+  const normalized = {
+    id,
+    label: text(field.label) || id,
+    type,
+    required: Boolean(field.required),
+  }
+  if (options.length) normalized.options = options
+  if (text(field.unit)) normalized.unit = text(field.unit)
+  if (text(field.description)) normalized.description = text(field.description)
+  return normalized
+}
+
+/**
+ * Normalize a built-in template id or an inline `{ id, name, version, fields }`
+ * object. The fingerprint covers the definition; `frozen_at` is added later.
+ */
+export function normalizeExtractionTemplate(input) {
+  let raw
+  let source
+  if (typeof input === 'string') {
+    const key = cleanValue(input).toLowerCase()
+    const builtin = BUILTIN_EXTRACTION_TEMPLATES[key]
+    if (!builtin) {
+      throw new Error(`unknown extraction template "${input}"; use ${Object.keys(BUILTIN_EXTRACTION_TEMPLATES).join(', ')} or pass an inline template object`)
+    }
+    raw = { ...builtin, id: key }
+    source = `builtin:${key}`
+  } else if (input && typeof input === 'object' && !Array.isArray(input)) {
+    raw = input
+    source = 'inline'
+  } else {
+    throw new Error('extraction_template must be a built-in id or an object with fields')
+  }
+  if (!Array.isArray(raw.fields) || raw.fields.length === 0) {
+    throw new Error('extraction template needs a non-empty fields array')
+  }
+  const fields = raw.fields.map(normalizeExtractionField)
+  const seen = new Set()
+  for (const field of fields) {
+    if (seen.has(field.id)) throw new Error(`duplicate extraction field id "${field.id}"`)
+    seen.add(field.id)
+  }
+  const id = reviewSlug(raw.id || 'custom')
+  const versionValue = Number(raw.version)
+  const version = Number.isFinite(versionValue) && versionValue > 0 ? versionValue : 1
+  const name = text(raw.name) || id
+  const description = text(raw.description) || null
+  const fingerprint = sha256(stableStringify({ id, name, version, description, fields }))
+  return { id, name, version, description, source, fingerprint, fields }
+}
+
+export function freezeExtractionTemplate(cwd, slug, input, { declaredAtStart = false } = {}) {
+  const template = normalizeExtractionTemplate(input)
+  const existing = readExtractionTemplate(cwd, slug)
+  if (existing) {
+    if (existing.fingerprint !== template.fingerprint) {
+      throw new Error(`extraction template ${existing.id}@${existing.version} is already frozen for this review; start a new review to change it`)
+    }
+    return existing
+  }
+  const stored = {
+    ...template,
+    frozen_at: nowIso(),
+    declared_at_start: Boolean(declaredAtStart),
+  }
+  writeJsonAtomic(extractionTemplateFile(cwd, slug), stored)
+  return stored
+}
+
+function templateMetadata(template) {
+  return { id: template.id, version: template.version, fingerprint: template.fingerprint }
+}
+
+function recordTemplateInProtocol(cwd, slug, template) {
+  const protocol = readProtocol(cwd, slug)
+  const current = protocol.extraction_template
+  if (current && current.fingerprint !== template.fingerprint) {
+    throw new Error(`protocol records extraction template ${current.id}@${current.version} but a different template is frozen; do not edit ledger files by hand`)
+  }
+  if (!current) {
+    protocol.extraction_template = templateMetadata(template)
+    writeJsonAtomic(fileOf(cwd, slug, 'protocol'), protocol)
+  }
+}
+
+export function ensureExtractionTemplate(cwd, slug, input = null) {
+  const template = input != null
+    ? freezeExtractionTemplate(cwd, slug, input)
+    : readExtractionTemplate(cwd, slug)
+  if (!template) {
+    throw new Error('no extraction template is frozen for this review; start with extraction_template: "pico" or pass extraction_template on extract')
+  }
+  const protocol = readProtocol(cwd, slug)
+  if (protocol.extraction_template && protocol.extraction_template.fingerprint !== template.fingerprint) {
+    throw new Error('protocol and extraction_template.json disagree; do not edit ledger files by hand')
+  }
+  recordTemplateInProtocol(cwd, slug, template)
+  return template
+}
+
+function coerceExtractionValue(field, value) {
+  if (value == null) throw new Error(`field "${field.id}" needs a value`)
+  if (typeof value === 'string' && !value.trim()) throw new Error(`field "${field.id}" needs a non-empty value`)
+  if (field.type === 'number' || field.type === 'effect') {
+    const number = Number(value)
+    if (!Number.isFinite(number)) throw new Error(`field "${field.id}" must be a finite number`)
+    return number
+  }
+  if (field.type === 'integer') {
+    const number = Number(value)
+    if (!Number.isInteger(number)) throw new Error(`field "${field.id}" must be an integer`)
+    return number
+  }
+  if (field.type === 'boolean') {
+    if (typeof value === 'boolean') return value
+    const raw = cleanValue(value).toLowerCase()
+    if (raw === 'true') return true
+    if (raw === 'false') return false
+    throw new Error(`field "${field.id}" must be true or false`)
+  }
+  if (field.type === 'enum') {
+    const raw = cleanValue(value)
+    if (!field.options.includes(raw)) {
+      throw new Error(`field "${field.id}" must be one of ${field.options.join(', ')}`)
+    }
+    return raw
+  }
+  if (field.type === 'date') return cleanValue(value)
+  return cleanValue(value)
+}
+
+function normalizeExtractionValues(template, input) {
+  if (input == null) return {}
+  if (typeof input !== 'object' || Array.isArray(input)) throw new Error('values must be an object keyed by extraction field id')
+  const byId = new Map(template.fields.map((field) => [field.id, field]))
+  const unknown = Object.keys(input).filter((key) => !byId.has(key))
+  if (unknown.length) {
+    throw new Error(`unknown extraction field(s): ${unknown.join(', ')}; allowed: ${[...byId.keys()].join(', ')}`)
+  }
+  const values = {}
+  for (const field of template.fields) {
+    if (!Object.prototype.hasOwnProperty.call(input, field.id)) continue
+    const raw = input[field.id]
+    if (raw == null) continue
+    if (typeof raw === 'string' && !raw.trim()) continue
+    values[field.id] = coerceExtractionValue(field, raw)
+  }
+  if (!Object.keys(values).length) throw new Error('values must include at least one extraction field')
+  return values
+}
+
+function normalizeExtractionQuotes(template, input) {
+  if (input == null) return {}
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('quotes must be an object keyed by extraction field id')
+  }
+  const byId = new Map(template.fields.map((field) => [field.id, field]))
+  const unknown = Object.keys(input).filter((key) => !byId.has(key))
+  if (unknown.length) {
+    throw new Error(`unknown quote field(s): ${unknown.join(', ')}; allowed: ${[...byId.keys()].join(', ')}`)
+  }
+  const quotes = {}
+  for (const [fieldId, raw] of Object.entries(input)) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error(`quote for "${fieldId}" must be an object with quote and location`)
+    }
+    const quote = String(raw.quote ?? '').trim()
+    const location = text(raw.location)
+    if (!quote) throw new Error(`quote for "${fieldId}" is empty`)
+    if (!location) throw new Error(`location is required for the quote on "${fieldId}"`)
+    quotes[fieldId] = {
+      quote,
+      location,
+      page: raw.page == null ? null : text(raw.page) || null,
+      section: raw.section == null ? null : text(raw.section) || null,
+    }
+  }
+  return quotes
+}
+
 export async function startReview({
-  cwd, slug, protocol = {}, reviewers = null, instruments = null, resume = false,
+  cwd, slug, protocol = {}, reviewers = null, instruments = null,
+  extractionTemplate = null, resume = false,
 }) {
   const dir = reviewDir(cwd, slug)
   ensureFiles(dir)
@@ -161,6 +500,10 @@ export async function startReview({
         }))
       }
     }
+    if (extractionTemplate != null) {
+      const frozen = freezeExtractionTemplate(cwd, slug, extractionTemplate, { declaredAtStart: true })
+      stored.extraction_template = templateMetadata(frozen)
+    }
     writeJsonAtomic(protocolPath, stored)
     for (const template of declaredInstruments) freezeInstrument(cwd, slug, template, { declaredAtStart: true })
     return { slug: stored.slug, dir, protocol: stored, resumed: false }
@@ -193,6 +536,33 @@ export async function startReview({
     const same = requested.length === current.length
       && requested.every((reference, index) => reference === current[index])
     if (!same) throw new Error('instruments cannot be changed after the review starts')
+  }
+  if (extractionTemplate != null) {
+    const current = readExtractionTemplate(cwd, slug)
+    const normalized = normalizeExtractionTemplate(extractionTemplate)
+    if (current && current.fingerprint !== normalized.fingerprint) {
+      throw new Error(`extraction template ${current.id}@${current.version} is already frozen for this review; start a new review to change it`)
+    }
+    if (!current) {
+      if (readJsonl(cwd, slug, 'extractions').length) {
+        throw new Error('cannot add an extraction template after extraction events exist')
+      }
+      const frozen = freezeExtractionTemplate(cwd, slug, extractionTemplate)
+      stored.extraction_template = templateMetadata(frozen)
+      writeJsonAtomic(protocolPath, stored)
+    } else if (!stored.extraction_template) {
+      stored.extraction_template = templateMetadata(current)
+      writeJsonAtomic(protocolPath, stored)
+    }
+  }
+  if (stored.extraction_template) {
+    const current = readExtractionTemplate(cwd, slug)
+    if (!current) {
+      throw new Error('protocol records an extraction template but extraction_template.json is missing; do not edit ledger files by hand')
+    }
+    if (current.fingerprint !== stored.extraction_template.fingerprint) {
+      throw new Error('protocol and extraction_template.json disagree; do not edit ledger files by hand')
+    }
   }
   return { slug: reviewSlug(slug), dir, protocol: stored, resumed: true }
 }
@@ -464,6 +834,311 @@ export async function addEvidence({
   })
 }
 
+/* -------------------------------------------------------------- extraction */
+
+function extractionEventId(events) {
+  return `x${String(events.length + 1).padStart(4, '0')}`
+}
+
+function extractionReviewer(protocol, reviewer) {
+  const reviewerName = normalizeReviewer(reviewer)
+  if (!reviewerName) throw new Error('reviewer is required for an extraction')
+  const roster = Array.isArray(protocol.reviewers) ? protocol.reviewers : []
+  if (roster.length && !roster.some((entry) => reviewerKey(entry) === reviewerKey(reviewerName))) {
+    throw new Error(`reviewer ${reviewerName} is not in the declared list (${roster.join(', ')})`)
+  }
+  return reviewerName
+}
+
+export async function addExtraction({
+  cwd, slug, id, rowId = 'main', values, quotes = null, notes = null,
+  reviewer = null, paper = null, quoteChecks = null, override = false,
+  reason = null, template = null,
+}) {
+  const dir = ensureReview(cwd, slug)
+  const recordId = text(id)
+  if (!recordId) throw new Error('id is required')
+  const protocol = readProtocol(cwd, slug)
+  const reviewerName = extractionReviewer(protocol, reviewer)
+  const frozen = ensureExtractionTemplate(cwd, slug, template)
+  const normalizedValues = normalizeExtractionValues(frozen, values)
+  const normalizedQuotes = normalizeExtractionQuotes(frozen, quotes)
+  const row = reviewSlug(rowId || 'main')
+  const note = text(notes) || null
+  const paperId = text(paper) || null
+  const reasonText = text(reason) || null
+
+  return withReviewLock(dir, () => {
+    requireIncludedRecord(cwd, slug, recordId, { action: 'extracted' })
+    const events = readJsonl(cwd, slug, 'extractions')
+    const previous = [...events].reverse().find((event) => event.kind !== 'reconcile'
+      && event.record_id === recordId
+      && (event.row_id || 'main') === row
+      && reviewerKey(event.reviewer) === reviewerKey(reviewerName))
+    if (previous && !override) {
+      throw new Error(`record ${recordId} row ${row} already has an extraction by ${reviewerName}; pass override: true with a reason`)
+    }
+    if (previous && override && !reasonText) throw new Error('overriding an extraction requires a reason')
+
+    const checks = {}
+    for (const fieldId of Object.keys(normalizedQuotes)) {
+      checks[fieldId] = quoteChecks?.[fieldId]
+        || { status: 'unverified', via: null, detail: 'no PaperMemory paper supplied' }
+    }
+    const checkValues = Object.values(checks)
+    const quoteCheck = checkValues.length
+      ? {
+        status: checkValues.every((check) => check.status === 'verified') ? 'verified' : 'unverified',
+        verified: checkValues.filter((check) => check.status === 'verified').length,
+        total: checkValues.length,
+      }
+      : null
+    const eventId = extractionEventId(events)
+    const event = {
+      extraction_id: eventId,
+      event_id: eventId,
+      kind: 'extract',
+      ts: nowIso(),
+      record_id: recordId,
+      row_id: row,
+      template: templateMetadata(frozen),
+      values: normalizedValues,
+      quotes: normalizedQuotes,
+      quote_checks: checks,
+      quote_check: quoteCheck,
+      notes: note,
+      reviewer: reviewerName,
+      paper: paperId,
+      override: Boolean(override),
+      supersedes: previous?.event_id ?? null,
+      reason: reasonText,
+    }
+    appendJsonl(fileOf(cwd, slug, 'extractions'), [event])
+    return event
+  })
+}
+
+export function deriveExtractionStatus(cwd, slug, { id = null } = {}) {
+  const protocol = readProtocol(cwd, slug)
+  const template = readExtractionTemplate(cwd, slug)
+  const { records, resolutions } = screeningResolutions(cwd, slug)
+  const includedIds = records.map((record) => record.id)
+    .filter((recordId) => resolutions.get(recordId)?.full?.value === 'include')
+  const onlyRecordId = id == null ? null : text(id)
+  const population = onlyRecordId
+    ? includedIds.filter((recordId) => recordId === onlyRecordId)
+    : includedIds
+  if (!template) {
+    return {
+      template: null,
+      population: population.length,
+      rows: [],
+      summary: {
+        population: population.length,
+        records_with_extraction: 0,
+        rows: 0,
+        complete_rows: 0,
+        incomplete_rows: 0,
+        conflict_rows: 0,
+        pending_rows: 0,
+        missing_required_fields: 0,
+        quote_checks: { total: 0, verified: 0, unverified: 0 },
+      },
+      conflicts: [],
+      note: 'No extraction template is frozen for this review yet.',
+    }
+  }
+  const events = readJsonl(cwd, slug, 'extractions')
+  const expectedReviewers = Array.isArray(protocol.reviewers) && protocol.reviewers.length >= 2
+    ? protocol.reviewers
+    : null
+  const byId = new Map(records.map((record) => [record.id, record]))
+  const rows = []
+  const conflicts = []
+
+  for (const recordId of population) {
+    const recordEvents = events.filter((event) => event.record_id === recordId)
+    const rowIds = [...new Set(recordEvents.map((event) => event.row_id || 'main'))]
+    if (!rowIds.length) rowIds.push('main')
+    rowIds.sort()
+    for (const rowId of rowIds) {
+      const rowEvents = recordEvents.filter((event) => (event.row_id || 'main') === rowId)
+      const fields = {}
+      const missingRequired = []
+      let hasConflict = false
+      for (const field of template.fields) {
+        const fieldEvents = rowEvents.filter((event) => (event.kind === 'reconcile'
+          ? event.field === field.id
+          : Object.prototype.hasOwnProperty.call(event.values || {}, field.id)))
+        const resolution = resolveSeries(fieldEvents, {
+          valueOf: (event) => (event.kind === 'reconcile' ? event.value : event.values[field.id]),
+          reviewerOf: (event) => event.reviewer,
+          expectedReviewers,
+        })
+        // A required field counts as missing only when no reviewer supplied it;
+        // a reviewer who has not extracted yet is a row-level missing reviewer.
+        const provided = (resolution.by_reviewer || []).some((entry) => entry.value != null)
+        const fieldMissing = Boolean(field.required) && !provided
+        if (fieldMissing) missingRequired.push(field.id)
+        if (resolution.state === 'conflict' || resolution.state === 'reopened') {
+          hasConflict = true
+          conflicts.push({
+            record_id: recordId,
+            row_id: rowId,
+            field: field.id,
+            state: resolution.state,
+            by_reviewer: resolution.conflict?.by_reviewer ?? [],
+            reconcile: resolution.conflict?.reconcile ?? null,
+          })
+        }
+        fields[field.id] = {
+          field: field.id,
+          label: field.label,
+          type: field.type,
+          required: Boolean(field.required),
+          state: resolution.state,
+          value: resolution.value,
+          by_reviewer: resolution.by_reviewer,
+          missing_reviewers: resolution.missing_reviewers,
+          conflict: resolution.conflict,
+          reconcile: resolution.reconcile,
+          value_event: resolution.value_event,
+          missing: fieldMissing,
+        }
+      }
+      const latestByReviewer = new Map()
+      for (const event of rowEvents) {
+        if (event.kind !== 'reconcile') latestByReviewer.set(reviewerKey(event.reviewer), event)
+      }
+      const missingReviewers = expectedReviewers
+        ? expectedReviewers.map((entry) => reviewerKey(entry)).filter((key) => !latestByReviewer.has(key))
+        : []
+      const reviewers = [...new Set([...latestByReviewer.values()]
+        .map((event) => reviewerLabel(event.reviewer)))]
+      const quoteStates = [...latestByReviewer.values()].flatMap((event) => Object.values(event.quote_checks || {})
+        .map((check) => check.status))
+      const quoteChecks = {
+        total: quoteStates.length,
+        verified: quoteStates.filter((status) => status === 'verified').length,
+        unverified: quoteStates.filter((status) => status !== 'verified').length,
+      }
+      const status = !rowEvents.length
+        ? 'pending'
+        : hasConflict
+          ? 'conflict'
+          : missingRequired.length || missingReviewers.length
+            ? 'incomplete'
+            : 'complete'
+      const record = byId.get(recordId)
+      rows.push({
+        record_id: recordId,
+        title: record?.title ?? null,
+        year: record?.year ?? null,
+        doi: record?.doi ?? null,
+        row_id: rowId,
+        status,
+        missing_required: missingRequired,
+        missing_reviewers: missingReviewers,
+        reviewers,
+        quote_checks: quoteChecks,
+        fields,
+      })
+    }
+  }
+
+  const summary = {
+    population: population.length,
+    records_with_extraction: new Set(rows.filter((row) => row.status !== 'pending').map((row) => row.record_id)).size,
+    rows: rows.length,
+    complete_rows: rows.filter((row) => row.status === 'complete').length,
+    incomplete_rows: rows.filter((row) => row.status === 'incomplete').length,
+    conflict_rows: rows.filter((row) => row.status === 'conflict').length,
+    pending_rows: rows.filter((row) => row.status === 'pending').length,
+    missing_required_fields: rows.reduce((sum, row) => sum + row.missing_required.length, 0),
+    quote_checks: rows.reduce((sum, row) => ({
+      total: sum.total + row.quote_checks.total,
+      verified: sum.verified + row.quote_checks.verified,
+      unverified: sum.unverified + row.quote_checks.unverified,
+    }), { total: 0, verified: 0, unverified: 0 }),
+  }
+  return {
+    template: {
+      id: template.id,
+      name: template.name,
+      version: template.version,
+      fingerprint: template.fingerprint,
+      fields: template.fields,
+    },
+    population: population.length,
+    rows,
+    summary,
+    conflicts,
+    ...(rows.length ? {} : { note: 'No extraction rows yet.' }),
+  }
+}
+
+export async function reconcileExtraction({
+  cwd, slug, id, rowId = 'main', field, value, reason, reviewer,
+}) {
+  const dir = ensureReview(cwd, slug)
+  const recordId = text(id)
+  if (!recordId) throw new Error('id is required')
+  if (!text(field)) throw new Error('field is required for an extraction reconcile')
+  const fieldId = extractionFieldId(field)
+  const row = reviewSlug(rowId || 'main')
+  const reasonText = text(reason)
+  if (!reasonText) throw new Error('reconcile requires a reason')
+  const protocol = readProtocol(cwd, slug)
+  const reviewerName = extractionReviewer(protocol, reviewer)
+  const template = ensureExtractionTemplate(cwd, slug)
+  const fieldDef = template.fields.find((entry) => entry.id === fieldId)
+  if (!fieldDef) {
+    throw new Error(`field "${fieldId}" is not in the extraction template; fields: ${template.fields.map((entry) => entry.id).join(', ')}`)
+  }
+  const coerced = coerceExtractionValue(fieldDef, value)
+
+  return withReviewLock(dir, () => {
+    requireIncludedRecord(cwd, slug, recordId, { action: 'extracted' })
+    const events = readJsonl(cwd, slug, 'extractions')
+    const fieldEvents = events.filter((event) => event.record_id === recordId
+      && (event.row_id || 'main') === row
+      && (event.kind === 'reconcile'
+        ? event.field === fieldId
+        : Object.prototype.hasOwnProperty.call(event.values || {}, fieldId)))
+    const resolution = resolveSeries(fieldEvents, {
+      valueOf: (event) => (event.kind === 'reconcile' ? event.value : event.values[fieldId]),
+      reviewerOf: (event) => event.reviewer,
+    })
+    if (!['conflict', 'reopened'].includes(resolution.state)) {
+      throw new Error(`record ${recordId} row ${row} has no ${fieldId} extraction disagreement to reconcile`)
+    }
+    const eventId = extractionEventId(events)
+    const event = {
+      extraction_id: eventId,
+      event_id: eventId,
+      kind: 'reconcile',
+      ts: nowIso(),
+      record_id: recordId,
+      row_id: row,
+      template: templateMetadata(template),
+      field: fieldId,
+      value: coerced,
+      reason: reasonText,
+      reviewer: reviewerName,
+      basis: reconcileBasis(resolution, reviewerName),
+      supersedes: (resolution.conflict?.by_reviewer || []).map((entry) => entry.event_id).filter(Boolean),
+    }
+    appendJsonl(fileOf(cwd, slug, 'extractions'), [event])
+    const after = deriveExtractionStatus(cwd, slug, { id: recordId })
+    const afterRow = after.rows.find((rowStatus) => rowStatus.record_id === recordId && rowStatus.row_id === row)
+    return {
+      scope: 'extraction',
+      event,
+      resolution: afterRow?.fields?.[fieldId] ?? null,
+    }
+  })
+}
+
 /* --------------------------------------------------------------- appraisal */
 
 function instrumentsFile(cwd, slug) {
@@ -573,22 +1248,22 @@ function judgementNeedsQuote(template, judgement) {
   return Boolean(template.scale.values.find((value) => value.id === judgement)?.requires_quote)
 }
 
-function requireIncludedRecord(cwd, slug, recordId) {
+function requireIncludedRecord(cwd, slug, recordId, { action = 'appraised' } = {}) {
   const { resolutions } = screeningResolutions(cwd, slug)
   const recordResolution = resolutions.get(recordId)
   const titleResolution = recordResolution?.title
   if (titleResolution?.state === 'conflict' || titleResolution?.state === 'reopened') {
-    throw new Error(`record ${recordId} has a title_abstract disagreement; reconcile it before appraising`)
+    throw new Error(`record ${recordId} has a title_abstract disagreement; reconcile it before ${action}`)
   }
   if (!titleResolution || titleResolution.value !== 'include') {
-    throw new Error(`record ${recordId} must be a full_text include before it can be appraised`)
+    throw new Error(`record ${recordId} must be a full_text include before it can be ${action}`)
   }
   const fullResolution = recordResolution?.full
   if (fullResolution?.state === 'conflict' || fullResolution?.state === 'reopened') {
-    throw new Error(`record ${recordId} has a full_text disagreement; reconcile it before appraising`)
+    throw new Error(`record ${recordId} has a full_text disagreement; reconcile it before ${action}`)
   }
   if (!fullResolution || fullResolution.value !== 'include') {
-    throw new Error(`record ${recordId} must be a full_text include before it can be appraised`)
+    throw new Error(`record ${recordId} must be a full_text include before it can be ${action}`)
   }
 }
 
@@ -685,10 +1360,13 @@ function reconciliationSupersedes(resolution) {
 export async function reconcileRecord({
   cwd, slug, scope, id, stage = null, decision = null, instrument = null, version = null,
   domain = null, axis = null, judgement = null, reason = null, reviewer = null,
+  field = null, value = null, rowId = 'main',
 }) {
   const dir = ensureReview(cwd, slug)
   const scopeId = text(scope)
-  if (!['screening', 'appraisal'].includes(scopeId)) throw new Error('scope must be screening or appraisal')
+  if (!['screening', 'appraisal', 'extraction'].includes(scopeId)) {
+    throw new Error('scope must be screening, appraisal, or extraction')
+  }
   const recordId = text(id)
   if (!recordId) throw new Error('id is required')
   const reasonText = text(reason)
@@ -698,6 +1376,12 @@ export async function reconcileRecord({
   const protocol = readProtocol(cwd, slug)
   const records = readJsonl(cwd, slug, 'records')
   if (!records.some((record) => record.id === recordId)) throw new Error(`record ${recordId} not found`)
+
+  if (scopeId === 'extraction') {
+    return reconcileExtraction({
+      cwd, slug, id: recordId, rowId, field, value, reason: reasonText, reviewer: reviewerName,
+    })
+  }
 
   if (scopeId === 'screening') {
     if (!SCREENING_STAGES.includes(stage)) throw new Error(`stage must be one of ${SCREENING_STAGES.join(', ')}`)
@@ -1042,7 +1726,75 @@ function mdCell(value) {
   return String(value ?? '').replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim()
 }
 
-function markdownReport(protocol, status, records, evidence) {
+function extractionFieldDisplay(row, fieldId) {
+  const field = row.fields?.[fieldId]
+  if (!field) return ''
+  if (field.state === 'conflict' || field.state === 'reopened') return 'conflict'
+  return field.value == null ? '' : String(field.value)
+}
+
+function extractionTableLines(extraction) {
+  const fields = extraction.template?.fields || []
+  const lines = [
+    `| Record | Study | Row | ${fields.map((field) => mdCell(field.label)).join(' | ')} | Status | Missing required | Awaiting | Reviewers |`,
+    `|---|---|---|---|${fields.map(() => '---').join('|')}|---|---|---|---|`,
+  ]
+  for (const row of extraction.rows) {
+    const study = row.year ? `${row.title || '(missing title)'} (${row.year})` : (row.title || '(missing title)')
+    lines.push(`| ${row.record_id} | ${mdCell(study)} | ${row.row_id} | ${fields.map((field) => mdCell(extractionFieldDisplay(row, field.id))).join(' | ')} | ${row.status} | ${row.missing_required.join('; ')} | ${(row.missing_reviewers || []).join('; ')} | ${mdCell(row.reviewers.join('; '))} |`)
+  }
+  return lines
+}
+
+function extractionSummaryLine(extraction) {
+  const summary = extraction.summary
+  return `${summary.complete_rows}/${summary.rows} row(s) complete; ${summary.incomplete_rows} incomplete, ${summary.conflict_rows} conflict, ${summary.pending_rows} pending; ${summary.missing_required_fields} missing required field(s); quotes ${summary.quote_checks.verified} verified / ${summary.quote_checks.unverified} unverified.`
+}
+
+function extractionTableMarkdown(extraction) {
+  const lines = [
+    `# Extracted data — ${extraction.template.name} ${extraction.template.version}`,
+    '',
+    extractionSummaryLine(extraction),
+    '',
+    'Values are recorded extraction values, not verified facts. Quote verification is reported separately.',
+    '',
+    ...extractionTableLines(extraction),
+    '',
+    'A cell reading "conflict" has no resolved value. Missing required fields are counted, never filled.',
+    '',
+  ]
+  return lines.join('\n')
+}
+
+function extractionTableCsv(extraction) {
+  const fields = extraction.template?.fields || []
+  const header = [
+    'record_id', 'title', 'year', 'doi', 'row_id',
+    ...fields.map((field) => field.id),
+    'status', 'missing_required', 'missing_reviewers', 'reviewers', 'quote_verified', 'quote_unverified',
+  ]
+  const lines = [header.map(csvCell).join(',')]
+  for (const row of extraction.rows) {
+    lines.push([
+      row.record_id,
+      row.title || '',
+      row.year ?? '',
+      row.doi || '',
+      row.row_id,
+      ...fields.map((field) => extractionFieldDisplay(row, field.id)),
+      row.status,
+      row.missing_required.join('; '),
+      (row.missing_reviewers || []).join('; '),
+      row.reviewers.join('; '),
+      row.quote_checks.verified,
+      row.quote_checks.unverified,
+    ].map(csvCell).join(','))
+  }
+  return `${lines.join('\n')}\n`
+}
+
+function markdownReport(protocol, status, records, evidence, extraction = null) {
   const byId = new Map(records.map((record) => [record.id, record]))
   const lines = [
     `# Systematic review: ${protocol.slug}`,
@@ -1098,6 +1850,18 @@ function markdownReport(protocol, status, records, evidence) {
       lines.push(`| ${mdCell(row.record_id)} | ${mdCell(row.claim)} | ${mdCell(row.quote)} | ${mdCell(row.location)} |`)
     }
   } else lines.push('_No evidence rows yet._')
+  if (extraction?.template) {
+    lines.push(
+      '',
+      '## Extracted data',
+      '',
+      extractionSummaryLine(extraction),
+      '',
+      ...extractionTableLines(extraction),
+      '',
+      'Values are recorded extraction values, not verified facts. A cell reading "conflict" has no resolved value; missing required fields are counted, never filled.',
+    )
+  }
   lines.push('', '## Review checklist', '', '- [ ] Confirm every included record has a full-text decision', '- [ ] Confirm every include has at least one evidence row', '- [ ] Verify quotes against the stored paper text', '- [ ] Resolve remaining maybe/pending records', '')
   return lines.join('\n')
 }
@@ -1248,9 +2012,11 @@ export function exportReview({
   let name
   let body
   let tableFormat = null
+  const extractionTemplate = readExtractionTemplate(cwd, slug)
   if (kind === 'markdown' || kind === 'md') {
     name = 'review.md'
-    body = markdownReport(protocol, status, records, evidence)
+    const extraction = extractionTemplate ? deriveExtractionStatus(cwd, slug) : null
+    body = markdownReport(protocol, status, records, evidence, extraction)
   } else if (kind === 'csv') {
     name = 'evidence.csv'
     body = evidenceCsv(status, records, evidence)
@@ -1260,9 +2026,36 @@ export function exportReview({
     const payload = {
       protocol, status, records, screening: readJsonl(cwd, slug, 'screening'), evidence,
     }
+    if (extractionTemplate) {
+      payload.extraction = {
+        template: extractionTemplate,
+        status: deriveExtractionStatus(cwd, slug),
+        events: readJsonl(cwd, slug, 'extractions'),
+      }
+    }
     if (appraisal.length) payload.appraisal = appraisal
     if (registry.instruments.length) payload.instruments = registry.instruments
     name = 'review.json'
+    body = `${JSON.stringify(payload, null, 2)}\n`
+  } else if (kind === 'extraction-table' || kind === 'extraction-matrix') {
+    if (!extractionTemplate) throw new Error('no extraction template is frozen for this review')
+    const extraction = deriveExtractionStatus(cwd, slug)
+    tableFormat = text(table_format).toLowerCase()
+    if (tableFormat === 'md') tableFormat = 'markdown'
+    if (!['markdown', 'csv'].includes(tableFormat)) {
+      throw new Error('table_format must be markdown or csv')
+    }
+    const prefix = kind === 'extraction-matrix' ? 'extraction-matrix' : 'extraction-table'
+    name = tableFormat === 'csv' ? `${prefix}.csv` : `${prefix}.md`
+    body = tableFormat === 'csv' ? extractionTableCsv(extraction) : extractionTableMarkdown(extraction)
+  } else if (kind === 'extraction-json') {
+    if (!extractionTemplate) throw new Error('no extraction template is frozen for this review')
+    const payload = {
+      template: extractionTemplate,
+      status: deriveExtractionStatus(cwd, slug),
+      events: readJsonl(cwd, slug, 'extractions'),
+    }
+    name = 'extraction.json'
     body = `${JSON.stringify(payload, null, 2)}\n`
   } else if (kind === 'rob-table' || kind === 'rob-summary') {
     const template = frozenInstrument(cwd, slug, instrument, version)
@@ -1292,8 +2085,10 @@ export function exportReview({
     }
   } else if (kind === 'rob-figure') {
     throw new Error('rob-figure is rendered by the review tool, not the store; use action export format rob-figure')
+  } else if (kind === 'prisma-flow') {
+    throw new Error('prisma-flow is rendered by the review tool, not the store; use action export format prisma-flow')
   } else {
-    throw new Error('format must be markdown, csv, json, rob-table, rob-summary, or rob-figure')
+    throw new Error('format must be markdown, csv, json, extraction-table, extraction-matrix, extraction-json, rob-table, rob-summary, or rob-figure')
   }
   const out = join(dir, 'exports', name)
   if (existsSync(out) && !overwrite) {

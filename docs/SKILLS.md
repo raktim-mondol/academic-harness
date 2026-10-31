@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **747 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **752 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -24,7 +24,7 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 747.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 752.
 
 ## Workflow and tool skills
 
@@ -36,7 +36,12 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `academic-harness-notebook` | Lab-notebook discipline for research sessions; see [Lab notebook](WORKSPACE.md#lab-notebook) |
 | `academic-search` | Routing across discovery, journal metrics, merged paper/BibTeX, and focused full-text context; see [Search](SEARCH.md) |
 | `systematic-review-ledger` | Full `review` tool workflow; see [Systematic reviews](RESEARCH.md#systematic-reviews) |
-| `risk-of-bias-appraisal` | `review` risk-of-bias workflow (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa), reconciliation, agreement, and rob exports; see [Risk-of-bias appraisal](RESEARCH.md#risk-of-bias-appraisal) |
+| `meta-analysis` | Pairwise pooling, heterogeneity, subgroup/meta-regression, publication-bias diagnostics, diagnostic accuracy, and forest/funnel/SROC plots; see [Meta-analysis](RESEARCH.md#meta-analysis) |
+| `reproducible-analysis` | Plan freeze, auditable `analysis_run` executions, `dataset_get` provenance downloads, `data_profile` leakage review, and `repro_package` shipping; see [Reproducible analysis](ANALYSIS.md) |
+| `experiment-tracking` | `experiment_log` sweeps with named-metric best, compare, links, and MLflow-compatible export; see [Reproducible analysis](ANALYSIS.md#experiment_log) |
+| `provenance-audit` | Reading and acting on the read-only cross-ledger index — the seven states, coverage, unsupported, stale, impact, and graph exports; see [Provenance audit](PROVENANCE.md) |
+| `grade-certainty` | GRADE domain judgements, derived suggestion, human overall certainty, evidence profile, and summary-of-findings exports; see [GRADE certainty](RESEARCH.md#grade-certainty) |
+| `risk-of-bias-appraisal` | `review` risk-of-bias workflow (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), reconciliation, agreement, and rob exports; see [Risk-of-bias appraisal](RESEARCH.md#risk-of-bias-appraisal) |
 | `co-scientist-tournament` | The tournament loop, subagent briefs, and budget defaults; see [Hypothesis tournaments](RESEARCH.md#hypothesis-tournaments) |
 | `power-and-sample-size` | Study-planning workflow for `power_analysis`; see [Study planning](RESEARCH.md#study-planning) |
 | `reporting-guidelines` | `reporting_check` workflow, evidence rules, and subagent item batches; see [Reporting checklists](WRITING.md#reporting-checklists) |
