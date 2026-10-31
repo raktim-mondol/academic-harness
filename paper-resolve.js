@@ -25,7 +25,7 @@ import { runDomainSearch } from './domain-search.js'
 const OPENALEX = 'https://api.openalex.org'
 const S2 = 'https://api.semanticscholar.org/graph/v1'
 const OA_SELECT = 'id,doi,ids,title,publication_year,authorships,primary_location,best_oa_location,open_access,cited_by_count,type,topics,abstract_inverted_index'
-const S2_FIELDS = 'paperId,externalIds,title,abstract,year,venue,authors,citationCount,influentialCitationCount,openAccessPdf,tldr,publicationTypes,fieldsOfStudy,url'
+const S2_FIELDS = 'paperId,externalIds,title,abstract,year,venue,authors,citationCount,influentialCitationCount,referenceCount,openAccessPdf,tldr,publicationTypes,fieldsOfStudy,url,journal,publicationVenue,citationStyles'
 
 function encodeDoiPath(doi) {
   return encodeURIComponent(doi).replace(/%2F/gi, '/')
@@ -48,6 +48,8 @@ export async function fetchOpenAlexWork(identifier, { signal, apiKey, email } = 
   if (parsed.kind === 'openalex') path = `/works/${parsed.value}`
   else if (parsed.kind === 'doi') path = `/works/doi:${encodeDoiPath(parsed.value)}`
   else if (parsed.kind === 'pmid') path = `/works/pmid:${parsed.value}`
+  else if (parsed.kind === 'pmcid') path = `/works/pmcid:${parsed.value}`
+  else if (parsed.kind === 'arxiv') path = `/works/doi:10.48550/arXiv.${encodeURIComponent(parsed.value)}`
   else return null
 
   const limiter = getLimiter('openalex', { minIntervalMs: apiKey ? 34 : 100 })
@@ -135,7 +137,7 @@ export async function resolveIdentifier(identifier, options = {}) {
   const s2Options = { signal: options.signal, apiKey: options.s2Key }
   let openalexError = null
 
-  if (parsed.kind === 'openalex' || parsed.kind === 'doi' || parsed.kind === 'pmid') {
+  if (parsed.kind === 'openalex' || parsed.kind === 'doi' || parsed.kind === 'pmid' || parsed.kind === 'pmcid' || parsed.kind === 'arxiv') {
     try {
       const work = await fetchOpenAlexWork(identifier, options)
       if (work) return { resolved: true, paper: fromOpenAlexWork(work) }
@@ -144,8 +146,8 @@ export async function resolveIdentifier(identifier, options = {}) {
     }
   }
 
-  if (parsed.kind === 'doi' || parsed.kind === 'pmid') {
-    const prefix = parsed.kind === 'doi' ? 'DOI' : 'PMID'
+  if (parsed.kind === 'doi' || parsed.kind === 'pmid' || parsed.kind === 'pmcid') {
+    const prefix = parsed.kind === 'doi' ? 'DOI' : (parsed.kind === 'pmid' ? 'PMID' : 'PMCID')
     const raw = await fetchSemanticScholarPaper(`${prefix}:${parsed.value}`, s2Options)
     if (raw) return { resolved: true, paper: fromSemanticScholarPaper(raw) }
   }

@@ -94,6 +94,15 @@ const searchModules = {
   'arxiv-search.js': 'arxiv_search',
   'pubmed-search.js': 'pubmed_search',
   'literature-search.js': 'literature_search',
+  'journal-search.js': 'journal_search',
+  'paper-get.js': 'paper_get',
+  'paper-context.js': 'paper_context',
+  'academic-databases.js': 'database_catalog',
+  'bibtex-resolve.js': null,
+  'html-sections.js': null,
+  'publisher-members.js': null,
+  'publisher-search.js': null,
+  'publisher-tdm.js': null,
 }
 for (const [file, tool] of Object.entries(searchModules)) {
   const path = join(root, file)
@@ -108,18 +117,17 @@ for (const [file, tool] of Object.entries(searchModules)) {
 
 const pkg = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
 for (const [file, tool] of Object.entries(searchModules)) {
-  if (!tool) continue
   const slug = file.replace(/\.js$/, '')
   check(pkg.exports?.[`./${slug}`] === `./${file}`, `package.json missing export ${slug}`)
   check(pkg.files?.includes(file), `package.json files missing ${file}`)
 }
 
 const presetSource = readFileSync(join(root, 'presets/academic-harness/agent.cordis.yml'), 'utf8')
-for (const slug of ['paper-resolve', 'openalex-search', 'openalex-cite', 'semantic-scholar-search', 'crossref-lookup', 'arxiv-search', 'pubmed-search', 'literature-search', 'parallel-extract', 'brave-search', 'tavily-search', 'exa-search', 'perplexity-search', 'jina-reader', 'core-search', 'elicit-search', 'futurehouse-agent']) {
+for (const slug of ['paper-resolve', 'openalex-search', 'openalex-cite', 'semantic-scholar-search', 'crossref-lookup', 'arxiv-search', 'pubmed-search', 'literature-search', 'journal-search', 'paper-get', 'paper-context', 'academic-databases', 'parallel-extract', 'brave-search', 'tavily-search', 'exa-search', 'perplexity-search', 'jina-reader', 'core-search', 'elicit-search', 'futurehouse-agent']) {
   check(presetSource.includes(`academic-harness/${slug}`), `preset missing row ${slug}`)
 }
 
-for (const marker of ['literature_search', 'openalex_search', 's2_search', 'pubmed_search', 'arxiv_search', 'crossref_lookup', 'paper_resolve', 'openalex_citations', 'brave_search', 'parallel_extract', 'tavily_search', 'exa_search', 'perplexity_search', 'jina_read', 'core_search', 'elicit_search', 'futurehouse_agent', 'Academic databases']) {
+for (const marker of ['literature_search', 'openalex_search', 's2_search', 'pubmed_search', 'arxiv_search', 'crossref_lookup', 'paper_resolve', 'paper_get', 'paper_context', 'journal_search', 'database_catalog', 'openalex_citations', 'brave_search', 'parallel_extract', 'tavily_search', 'exa_search', 'perplexity_search', 'jina_read', 'core_search', 'elicit_search', 'futurehouse_agent', 'Academic databases']) {
   check(prompt.includes(marker), `prompt.js missing search marker: ${marker}`)
 }
 
@@ -151,8 +159,26 @@ for (const [file, tool] of Object.entries({ ...webModules, ...gatedModules })) {
   check(pkg.files?.includes(file), `package.json files missing ${file}`)
 }
 
+const academicSkill = readFileSync(join(root, 'skills/academic-search/SKILL.md'), 'utf8')
+for (const marker of ['journal_search', 'paper_get', 'paper_context', 'openalex_citations', 'database_catalog', 'bot-challenge bypasses']) {
+  check(academicSkill.includes(marker), `academic-search SKILL.md missing ${marker}`)
+}
+
+const readmeSource = readFileSync(join(root, 'README.md'), 'utf8')
+for (const marker of ['journal_search', 'paper_get', 'paper_context', 'paper_resolve', 'openalex_citations', 'database_catalog']) {
+  check(readmeSource.includes(marker), `README.md missing search marker: ${marker}`)
+}
+const searchRoutingSource = readFileSync(join(root, 'docs/diagrams/search-routing.mmd'), 'utf8')
+for (const marker of ['journal_search', 'paper_get', 'paper_context', 'openalex_citations', 'database_catalog']) {
+  check(searchRoutingSource.includes(marker), `search-routing.mmd missing ${marker}`)
+}
+const capabilityMapSource = readFileSync(join(root, 'docs/diagrams/capability-map.mmd'), 'utf8')
+for (const marker of ['paper_get', 'paper_context', '747 skills']) {
+  check(capabilityMapSource.includes(marker), `capability-map.mmd missing ${marker}`)
+}
+
 const settingsSource = readFileSync(join(root, 'settings-keys.js'), 'utf8')
-for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY', 'CORE_API_KEY', 'ELICIT_API_KEY', 'FUTUREHOUSE_API_KEY']) {
+for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY', 'CORE_API_KEY', 'ELICIT_API_KEY', 'FUTUREHOUSE_API_KEY', 'ELSEVIER_INSTTOKEN', 'WILEY_TDM_TOKEN', 'SPRINGER_API_KEY', 'IEEE_API_KEY']) {
   check(settingsSource.includes(key), `settings-keys.js missing ${key}`)
 }
 

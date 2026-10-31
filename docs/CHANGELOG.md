@@ -2,6 +2,14 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.33.0
+
+- **Academic-search parity tools.** Added `journal_search` (OpenAlex/DOAJ/Crossref journals, APC/OA/ISSN metrics, optional Elsevier CiteScore/SJR/SNIP and WoS JCR), `paper_get` (merged OpenAlex/S2/Crossref/Europe PMC/arXiv record, OA enrichment, canonical BibTeX), `paper_context` (S2 snippets, arXiv HTML, PMC BioC/PubTator3, keyed publisher TDM, OA PDF), and `database_catalog`. Extended `literature_search` with DOAJ and keyless publisher Crossref deposits, and added OpenCitations fallback plus a `both` direction to `openalex_citations`. `citation` now accepts an `identifier` for DOI/arXiv/INSPIRE/title BibTeX.
+- **Free providers tested; paid tiers implemented but not tested.** OpenAlex, S2, Crossref, arXiv HTML, Europe PMC/PMC BioC/PubTator3, DOAJ, OpenCitations, publisher Crossref search, and the catalog have fixture tests and live smoke coverage. Elsevier Serial/ScienceDirect, WoS JCR, Wiley TDM, Springer API/JATS, and IEEE are implemented for use with the user's keys but are deliberately outside the automated/live suite.
+- **No bot-challenge bypasses.** Sources that require one are not included. ar5iv was removed after repeated timeouts; arXiv's native HTML remains the full-text tier.
+- Added the `academic-search` skill and reference bundle, docs, settings fields (`ELSEVIER_INSTTOKEN`, `WILEY_TDM_TOKEN`, `SPRINGER_API_KEY`, `IEEE_API_KEY`), preset rows, and golden checks.
+- **README and diagrams.** Added the complete Search tools table, named the source-specific search tools, and updated the search-routing, capability-map, paper-pipeline, and request-lifecycle diagrams (including `paper_get`, `paper_context`, `journal_search`, `openalex_citations`, and `database_catalog`). The capability map now reflects 747 skills.
+
 ## 0.32.7
 
 - **README links the upstream open-deepreview repository.** The Papers and evidence section now points to [open-deepreview](https://github.com/raktim-mondol/open-deepreview) where `deep_review` is introduced. Docs-only; no behavior change.

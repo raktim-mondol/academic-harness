@@ -1,8 +1,14 @@
 flowchart TD
   question[Research question] --> known{Known paper?}
-  known -->|yes - DOI, PMID, or arXiv ID| resolve[paper_resolve]
-  resolve --> integrity[integrity_check]
-  known -->|no| need{Literature or web?}
+  known -->|yes - DOI, PMID, PMCID, or arXiv ID| resolve[paper_resolve]
+  resolve --> get[paper_get<br/>merged record + BibTeX]
+  get --> integrity[integrity_check]
+  get --> context[paper_context<br/>focused sections/snippets]
+  get --> citations[openalex_citations<br/>OpenAlex + OpenCitations]
+  context --> next[Full-text and evidence pipeline<br/>see Papers and evidence]
+  citations --> next
+  integrity --> next
+  known -->|no| need{Literature, venue, or web?}
 
   need -->|literature| router[literature_search router]
   router --> openalex[OpenAlex]
@@ -16,6 +22,9 @@ flowchart TD
   router --> scopus[Scopus<br/>explicit + key]
   router --> wos[Web of Science<br/>explicit + key]
 
+  need -->|venue metrics| journal[journal_search<br/>OpenAlex · DOAJ · Crossref]
+  journal --> next
+
   need -->|source-specific action| domain[domain_search]
   domain -.-> biorxiv
   domain -.-> inspire
@@ -23,12 +32,16 @@ flowchart TD
   domain -.-> scopus
   domain -.-> wos
 
+  need -->|source/key check| catalog[database_catalog]
+  catalog -.-> router
+  catalog -.-> domain
+
   need -->|peer-reviewed filters| consensus[Consensus]
   need -->|web or current facts| parallel[parallel_search]
   parallel --> web[Brave · Tavily · Exa<br/>Perplexity · Jina]
   need -->|broad web reading| fetch[Parallel Extract<br/>Firecrawl · Jina Reader]
 
-  openalex --> next[Full-text pipeline<br/>see Papers and evidence]
+  openalex --> next
   s2 --> next
   pubmed --> next
   arxiv --> next
@@ -41,7 +54,6 @@ flowchart TD
   consensus --> next
   web --> next
   fetch --> next
-  integrity --> next
 
   classDef entry fill:#ecfdf5,stroke:#059669,color:#064e3b
   classDef decision fill:#eef2ff,stroke:#6366f1,color:#312e81
@@ -49,5 +61,5 @@ flowchart TD
   classDef next fill:#fff7ed,stroke:#f97316,color:#7c2d12
   class question entry
   class known,need decision
-  class resolve,integrity,router,domain,openalex,s2,pubmed,arxiv,crossref,biorxiv,inspire,ads,scopus,wos,consensus,parallel,web,fetch source
+  class resolve,get,integrity,context,citations,journal,router,domain,catalog,openalex,s2,pubmed,arxiv,crossref,biorxiv,inspire,ads,scopus,wos,consensus,parallel,web,fetch source
   class next next

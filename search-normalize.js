@@ -29,6 +29,12 @@ export function canonicalArxivId(value) {
   return legacy ? legacy[1].toLowerCase() : null
 }
 
+export function canonicalPmcid(value) {
+  if (!value) return null
+  const match = String(value).match(/(PMC\d+)/i)
+  return match ? match[1].toUpperCase() : null
+}
+
 export function canonicalScopusId(value) {
   if (!value) return null
   const raw = String(value).trim().replace(/^scopus:\s*/i, '')
@@ -157,9 +163,18 @@ export function emptyPaper(source = 'unknown') {
     tldr: null,
     citation_count: null,
     influential_citation_count: null,
+    reference_count: null,
     journal_quartile: null,
+    journal: null,
+    publisher: null,
+    volume: null,
+    issue: null,
+    pages: null,
+    bibtex: null,
     oa_status: null,
     oa_url: null,
+    pdf_url: null,
+    html_url: null,
     url: null,
     type: null,
     licence: null,
@@ -193,10 +208,24 @@ export function fromOpenAlexWork(work) {
   paper.authors = authors
   paper.year = yearOf(work.publication_year)
   paper.venue = location.source?.display_name || null
+  paper.journal = location.source?.display_name ? {
+    name: location.source.display_name,
+    issn_l: location.source.issn_l || null,
+    issns: Array.isArray(location.source.issn) ? [...location.source.issn] : [],
+    publisher: location.source.host_organization_name || null,
+    is_oa: location.source.is_oa ?? null,
+    is_in_doaj: location.source.is_in_doaj ?? null,
+    source_id: stripOpenAlexId(location.source.id),
+  } : null
   paper.abstract = reconstructAbstract(work.abstract_inverted_index)
   paper.citation_count = Number.isFinite(work.cited_by_count) ? work.cited_by_count : null
+  paper.reference_count = Number.isFinite(work.referenced_works_count)
+    ? work.referenced_works_count
+    : (Array.isArray(work.referenced_works) ? work.referenced_works.length : null)
   paper.oa_status = work.open_access?.oa_status || null
   paper.oa_url = best.pdf_url || best.landing_page_url || location.pdf_url || null
+  paper.pdf_url = best.pdf_url || location.pdf_url || null
+  paper.html_url = best.html_url || null
   paper.url = location.landing_page_url || (paper.doi ? `https://doi.org/${paper.doi}` : null) || work.id || null
   paper.type = work.type || null
   paper.fields = (work.topics || []).map((topic) => topic?.display_name).filter(Boolean).slice(0, 8)
@@ -211,16 +240,28 @@ export function fromSemanticScholarPaper(raw) {
   paper.s2_id = raw.paperId || null
   paper.doi = canonicalDoi(ext.DOI)
   paper.pmid = stripPmid(ext.PubMed)
+  paper.pmcid = stripPmcid(ext.PubMedCentral)
   paper.arxiv_id = canonicalArxivId(ext.ArXiv)
   paper.title = stripMarkup(raw.title) || ''
   paper.authors = (raw.authors || []).map((author) => ({ name: author?.name || '' })).filter((a) => a.name)
   paper.year = yearOf(raw.year)
-  paper.venue = raw.venue || null
+  paper.venue = raw.venue || raw.journal?.name || raw.publicationVenue?.name || null
+  paper.journal = paper.venue ? {
+    name: paper.venue,
+    issn_l: raw.publicationVenue?.issn || null,
+    issns: raw.publicationVenue?.issn ? [raw.publicationVenue.issn] : [],
+    publisher: null,
+  } : null
+  paper.volume = raw.journal?.volume || null
+  paper.pages = raw.journal?.pages || null
   paper.abstract = raw.abstract || null
   paper.tldr = raw.tldr?.text || null
   paper.citation_count = Number.isFinite(raw.citationCount) ? raw.citationCount : null
   paper.influential_citation_count = Number.isFinite(raw.influentialCitationCount) ? raw.influentialCitationCount : null
+  paper.reference_count = Number.isFinite(raw.referenceCount) ? raw.referenceCount : null
+  paper.bibtex = raw.citationStyles?.bibtex || null
   paper.oa_url = raw.openAccessPdf?.url || null
+  paper.pdf_url = raw.openAccessPdf?.url || null
   paper.oa_status = paper.oa_url ? 'open' : null
   paper.url = raw.url || (paper.doi ? `https://doi.org/${paper.doi}` : null)
   paper.type = Array.isArray(raw.publicationTypes) ? raw.publicationTypes[0] : null
@@ -249,8 +290,23 @@ export function fromCrossrefWork(work) {
     .filter((author) => author.name)
   paper.year = yearOf(work.issued?.['date-parts']?.[0]?.[0] ?? work.created?.['date-parts']?.[0]?.[0])
   paper.venue = (Array.isArray(work['container-title']) ? work['container-title'][0] : work['container-title']) || work.publisher || null
+  const issns = Array.isArray(work.ISSN) ? [...work.ISSN] : (work.ISSN ? [work.ISSN] : [])
+  paper.journal = paper.venue ? {
+    name: paper.venue,
+    issn_l: issns[0] || null,
+    issns,
+    publisher: work.publisher || null,
+  } : null
+  paper.publisher = work.publisher || null
+  paper.volume = work.volume || null
+  paper.issue = work.issue || null
+  paper.pages = work.page || null
+  paper.pmcid = stripPmcid(work.PMCID)
   paper.abstract = stripMarkup(work.abstract)
   paper.citation_count = Number.isFinite(work['is-referenced-by-count']) ? work['is-referenced-by-count'] : null
+  paper.reference_count = Number.isFinite(work['references-count']) ? work['references-count'] : null
+  const pdfLink = (work.link || []).find((link) => link?.['content-type'] === 'application/pdf' && link.URL)
+  paper.pdf_url = pdfLink?.URL || null
   paper.url = work.URL || (paper.doi ? `https://doi.org/${paper.doi}` : null)
   paper.type = work.type || null
   paper.fields = Array.isArray(work.subject) ? work.subject.filter(Boolean) : []
@@ -267,8 +323,11 @@ export function fromArxivEntry(entry) {
   paper.authors = (entry.authors || []).map((name) => ({ name: String(name).trim() })).filter((a) => a.name)
   paper.year = yearOf(String(entry.published || '').slice(0, 4))
   paper.venue = entry.journalRef || 'arXiv'
+  paper.journal = { name: paper.venue, issns: [] }
   paper.abstract = stripMarkup(entry.summary)
   paper.oa_url = entry.pdfUrl || null
+  paper.pdf_url = entry.pdfUrl || null
+  paper.html_url = paper.arxiv_id ? `https://arxiv.org/html/${paper.arxiv_id}` : null
   paper.url = entry.absUrl || entry.id || null
   paper.type = 'preprint'
   for (const value of [entry.primaryCategory, ...(entry.categories || [])]) {
@@ -289,16 +348,27 @@ export function fromEuropePmcResult(result) {
     ? result.authorList.author.map((author) => ({ name: author.fullName || author.name || '' })).filter((a) => a.name)
     : String(result.authorString || '').split(/,\s*/).filter(Boolean).map((name) => ({ name: name.trim() }))
   paper.year = yearOf(result.pubYear || String(result.firstPublicationDate || '').slice(0, 4))
-  paper.venue = result.journalTitle || result.bookOrReportDetails?.publisher || null
+  paper.venue = result.journalTitle || result.journalInfo?.journal?.title || result.bookOrReportDetails?.publisher || null
+  paper.journal = result.journalInfo?.journal?.title ? {
+    name: result.journalInfo.journal.title,
+    issn_l: result.journalInfo.journal.issn || result.journalInfo.journal.essn || null,
+    issns: [result.journalInfo.journal.issn, result.journalInfo.journal.essn].filter(Boolean),
+    publisher: result.journalInfo.journal.publisher || null,
+  } : (paper.venue ? { name: paper.venue, issns: [] } : null)
+  paper.volume = result.journalInfo?.volume || null
+  paper.issue = result.journalInfo?.issue || null
+  paper.pages = result.pageInfo || null
   paper.abstract = stripMarkup(result.abstractText)
   paper.citation_count = Number.isFinite(result.citedByCount) ? result.citedByCount : null
   const urls = Array.isArray(result.fullTextUrlList?.fullTextUrl) ? result.fullTextUrlList.fullTextUrl : []
-  const fullText = urls.find((entry) => /pdf/i.test(entry?.documentStyle || ''))
-    || urls.find((entry) => /html/i.test(entry?.documentStyle || ''))
-    || urls[0]
+  const pdfText = urls.find((entry) => /pdf/i.test(entry?.documentStyle || ''))
+  const htmlText = urls.find((entry) => /html/i.test(entry?.documentStyle || ''))
+  const fullText = pdfText || htmlText || urls[0]
   const isOpen = result.isOpenAccess === 'Y'
   paper.oa_status = isOpen ? 'open' : (result.isOpenAccess === 'N' ? 'closed' : null)
   paper.oa_url = isOpen ? (fullText?.url || null) : null
+  paper.pdf_url = isOpen ? (pdfText?.url || null) : null
+  paper.html_url = isOpen ? (htmlText?.url || null) : null
   paper.url = paper.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/` : `https://europepmc.org/article/${result.source || 'MED'}/${result.id}`
   paper.type = result.pubTypeList?.pubType?.[0] || result.resultType || null
   return paper
@@ -610,13 +680,42 @@ const SCALAR_FIELDS = [
   'bibcode', 'inspire_id', 'acl_id', 'scopus_id', 'wos_uid',
   'wikidata_qid', 'texkey',
   'title', 'year', 'venue', 'tldr', 'journal_quartile', 'oa_status', 'oa_url',
-  'url', 'type', 'full_text',
+  'pdf_url', 'html_url', 'url', 'type', 'full_text', 'bibtex', 'publisher',
+  'volume', 'issue', 'pages',
 ]
+
+function mergeJournalFields(target, source) {
+  if (!source) return
+  if (!target.journal) {
+    target.journal = {
+      ...source,
+      issns: Array.isArray(source.issns) ? [...source.issns] : [],
+    }
+    return
+  }
+  const journal = target.journal
+  for (const field of ['name', 'issn_l', 'publisher', 'source_id', 'apc_usd', 'oa_license', 'homepage_url']) {
+    if (!journal[field] && source[field]) journal[field] = source[field]
+  }
+  for (const field of ['is_oa', 'is_in_doaj']) {
+    if (journal[field] == null && source[field] != null) journal[field] = source[field]
+  }
+  journal.issns = [...new Set([...(journal.issns || []), ...(source.issns || [])])]
+  if (source.metrics) {
+    journal.metrics = { ...(journal.metrics || {}), ...Object.fromEntries(
+      Object.entries(source.metrics).filter(([, value]) => value != null),
+    ) }
+  }
+  if (Array.isArray(source.topics)) {
+    journal.topics = [...new Set([...(journal.topics || []), ...source.topics])]
+  }
+}
 
 function paperKeys(paper) {
   const keys = []
   if (paper.doi) keys.push(`doi:${paper.doi}`)
   if (paper.pmid) keys.push(`pmid:${paper.pmid}`)
+  if (paper.pmcid) keys.push(`pmcid:${paper.pmcid}`)
   if (paper.arxiv_id) keys.push(`arxiv:${paper.arxiv_id}`)
   if (paper.openalex_id) keys.push(`openalex:${paper.openalex_id}`)
   if (paper.s2_id) keys.push(`s2:${paper.s2_id}`)
@@ -643,6 +742,10 @@ function mergeInto(target, source) {
   if ((source.influential_citation_count ?? -1) > (target.influential_citation_count ?? -1)) {
     target.influential_citation_count = source.influential_citation_count
   }
+  if ((source.reference_count ?? -1) > (target.reference_count ?? -1)) {
+    target.reference_count = source.reference_count
+  }
+  if (source.journal) mergeJournalFields(target, source.journal)
   if ((source.authors?.length || 0) > (target.authors?.length || 0)) target.authors = source.authors
   for (const field of source.fields || []) {
     if (!target.fields.includes(field)) target.fields.push(field)
@@ -819,6 +922,8 @@ export function identifierKind(value) {
   }
   const openalex = stripOpenAlexId(raw)
   if (openalex && /openalex|^W\d+$/i.test(raw)) return { kind: 'openalex', value: openalex }
+  const pmcid = canonicalPmcid(/^(?:pmcid:\s*)?PMC\d+$/i.test(raw) ? raw : null)
+  if (pmcid) return { kind: 'pmcid', value: pmcid }
   const pmid = raw.match(/^(?:pmid:\s*)?(\d{5,9})$/i)
   if (pmid) return { kind: 'pmid', value: pmid[1] }
   if (/^[0-9a-f]{40}$/i.test(raw)) return { kind: 's2', value: raw }

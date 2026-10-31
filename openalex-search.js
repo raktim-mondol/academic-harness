@@ -13,6 +13,7 @@ import { fromOpenAlexWork, renderPapers } from './search-normalize.js'
 const API = 'https://api.openalex.org'
 const ENTITIES = ['works', 'authors', 'sources', 'topics']
 const DEFAULT_SELECT = 'id,doi,ids,title,publication_year,authorships,primary_location,best_oa_location,open_access,cited_by_count,type,topics'
+const DEFAULT_SOURCE_SELECT = 'id,display_name,issn_l,issn,host_organization_name,is_oa,is_in_doaj,apc_usd,homepage_url,summary_stats,works_count,cited_by_count,topics,counts_by_year,type,country_code'
 
 export function buildParams(args, apiKey, mailto) {
   const params = new URLSearchParams()
@@ -28,6 +29,7 @@ export function buildParams(args, apiKey, mailto) {
     const select = Array.isArray(args.select) ? args.select.join(',') : args.select
     if (select) params.set('select', select)
     else if (args.entity === 'works') params.set('select', DEFAULT_SELECT)
+    else if (args.entity === 'sources') params.set('select', DEFAULT_SOURCE_SELECT)
   }
   params.set('per_page', String(Math.min(Math.max(Number(args.per_page) || 25, 1), 100)))
   if (args.cursor) params.set('cursor', String(args.cursor).trim())
@@ -40,15 +42,23 @@ export function buildParams(args, apiKey, mailto) {
 function renderEntities(entity, results) {
   return results.map((item, i) => {
     const title = item.display_name || item.title || item.id || '(unnamed)'
+    const stats = item.summary_stats || {}
     const meta = [
       item.works_count != null ? `${item.works_count} works` : null,
       item.cited_by_count != null ? `${item.cited_by_count} citations` : null,
+      entity === 'sources' && stats['2yr_mean_citedness'] != null ? `2yr mean citedness ${stats['2yr_mean_citedness']}` : null,
+      entity === 'sources' && stats.h_index != null ? `h-index ${stats.h_index}` : null,
+      entity === 'sources' && stats.i10_index != null ? `i10 ${stats.i10_index}` : null,
+      entity === 'sources' && item.apc_usd != null ? `APC $${item.apc_usd}` : null,
+      entity === 'sources' && item.is_in_doaj ? 'DOAJ' : null,
+      entity === 'sources' && item.is_oa ? 'OA' : null,
       item.orcid || null,
       item.issn_l || null,
     ].filter(Boolean).join(' · ')
     const bits = [`${i + 1}. **${title}**`]
     if (meta) bits.push(meta)
     if (item.id) bits.push(item.id)
+    if (entity === 'sources' && item.homepage_url) bits.push(item.homepage_url)
     return bits.join('\n')
   }).join('\n\n')
 }

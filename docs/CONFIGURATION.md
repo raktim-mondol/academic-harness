@@ -24,16 +24,22 @@ No credential is required to install or boot. Each connector or tool stays disab
 | `JINA_API_KEY` | `jina_read` | Optional; keyless Reader is 20 RPM, search needs a key. |
 | `CORE_API_KEY` | `core_search` | Optional; keyless CORE is capped at ~10 requests/minute. |
 | `ADS_API_TOKEN` | `literature_search` (`sources=ads`), `domain_search` ADS actions | Required for ADS; create a token in your ADS account. A daily quota applies. Read per call, no restart. |
-| `SCOPUS_API_KEY` | `literature_search` (`sources=scopus`), `domain_search` Scopus actions | Required for Scopus; key from <https://dev.elsevier.com>. Access follows the institution's IP/VPN, so a 401/403 means not entitled. Read per call, no restart. |
-| `WOS_API_KEY` | `literature_search` (`sources=wos`), `domain_search` Web of Science actions | Required for Web of Science; key from the Clarivate Developer Portal. Starter has a low daily quota and field limits. Read per call, no restart. |
+| `SCOPUS_API_KEY` | `literature_search` (`sources=scopus`), `domain_search` Scopus actions, `journal_search` CiteScore/SJR/SNIP, `paper_context` ScienceDirect FULL | Required for Scopus; also used as the Elsevier API key. Key from <https://dev.elsevier.com>. Access follows the institution's IP/VPN, so a 401/403 means not entitled. Read per call, no restart. |
+| `ELSEVIER_INSTTOKEN` | `journal_search`, `paper_context` subscriber-gated Elsevier views | Optional `X-ELS-Insttoken` paired with `SCOPUS_API_KEY`. Read per call, no restart. |
+| `WOS_API_KEY` | `literature_search` (`sources=wos`), `domain_search` Web of Science actions, `journal_search` JCR JIF/JCI/quartile | Required for Web of Science; key from the Clarivate Developer Portal. Starter has a low daily quota and field limits. Read per call, no restart. |
+| `WILEY_TDM_TOKEN` | `paper_context` Wiley TDM PDF tier | Optional; requires Wiley TDM entitlement. Read per call, no restart. |
+| `SPRINGER_API_KEY` | `literature_search` (`sources=springer`), `paper_context` Springer JATS tier | Optional; free developer keys have a daily quota. Read per call, no restart. |
+| `IEEE_API_KEY` | `literature_search` (`sources=ieee`) | Optional; free developer keys have a daily quota. Read per call, no restart. |
 | `ELICIT_API_KEY` | `elicit_search` | Elicit Pro+ required. |
 | `FUTUREHOUSE_API_KEY` | `futurehouse_agent` | Edison Scientific API key. |
-| `OPENALEX_API_KEY` | `openalex_search`, `openalex_citations`, `integrity_check`, `funder_policy` | Optional; raises the keyless budget. |
-| `S2_API_KEY` | `s2_search` | Optional; raises Semantic Scholar limits. |
-| `CROSSREF_MAILTO` | `crossref_lookup`, `coscientist_verify` | Puts requests in Crossref's polite pool; falls back to `UNPAYWALL_EMAIL`. |
-| `UNPAYWALL_EMAIL` | `paper_download` | Recommended but not required; enables the Unpaywall lookup. The tool never invents an email. |
+| `OPENALEX_API_KEY` | `openalex_search`, `openalex_citations`, `paper_get`, `journal_search`, `paper_context`, `integrity_check`, `funder_policy` | Optional; raises the keyless budget. |
+| `S2_API_KEY` | `s2_search`, `paper_get`, `paper_context` | Optional; raises Semantic Scholar limits, including paper-scoped snippet search. |
+| `CROSSREF_MAILTO` | `crossref_lookup`, `coscientist_verify`, `journal_search`, `paper_get`, publisher Crossref search | Puts requests in Crossref's polite pool; falls back to `UNPAYWALL_EMAIL`. |
+| `UNPAYWALL_EMAIL` | `paper_download`, `paper_get` OA enrichment, `paper_context` PDF fetch | Recommended but not required; enables the Unpaywall lookup. The tool never invents an email. |
 | `NCBI_API_KEY` | `pubmed_search` with `source: "ncbi"` | Raises E-utilities from 3 to 10 RPS. |
 | `NCBI_EMAIL` | `pubmed_search` with `source: "ncbi"` | Contact email for NCBI. |
+
+Keyed journal metrics and publisher full-text tiers are implemented but intentionally not exercised by the automated or live test suite; they return `key_missing`/skip when unset and warnings when a configured key fails. Test them with your own entitlements.
 
 ### Datasets, policy, and regulatory records
 

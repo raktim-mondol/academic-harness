@@ -26,6 +26,8 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
 | `paper_download` | Academic Harness preset | DOI / arXiv ID / URL → open-access PDF, tried through Unpaywall, OpenAlex, Europe PMC, CORE, and arXiv; auto-ingests into PaperMemory | [Papers](PAPERS.md#download-a-paper) |
+| `paper_get` | Academic Harness preset | Merge one paper across OpenAlex, S2, Crossref, Europe PMC, and arXiv; OA URL and canonical BibTeX with provenance | [Search](SEARCH.md#merged-paper-lookup-and-bibtex) |
+| `paper_context` | Academic Harness preset | Focus-ranked sections/snippets from S2, arXiv HTML, PMC BioC/PubTator3, optional publisher TDM, and OA PDF; no writes | [Search](SEARCH.md#full-text-context) |
 | `paper_fold` | Academic Harness preset | Map-first paper reading through TextFold: section map, then one section at a time; local first-sentence levels by default | [Papers](PAPERS.md#read-at-the-right-level) |
 | `pdf_to_markdown` | Every preset | PDF → Markdown with headings, lists, tables, and reading order; optional OCR for scanned pages | [Papers](PAPERS.md#pdf-to-markdown) |
 | `integrity_check` | Academic Harness preset | Retraction / expression-of-concern / correction status from Crossref and OpenAlex, with notice DOIs | [Search](SEARCH.md#publication-integrity) |
@@ -39,10 +41,12 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `literature_search` | Academic Harness preset | One-shot multi-source router; RRF fusion and cross-provider dedupe. Adds bioRxiv/INSPIRE by domain and ADS when keyed; Scopus/WoS explicit-only | [Search](SEARCH.md#the-literature-router) |
+| `literature_search` | Academic Harness preset | One-shot multi-source router; RRF fusion and cross-provider dedupe. Adds bioRxiv/INSPIRE by domain and ADS when keyed; DOAJ/publisher Crossref deposits keyless; Scopus/WoS/Springer/IEEE explicit and keyed | [Search](SEARCH.md#the-literature-router) |
 | `domain_search` | Academic Harness preset | Source-specific actions: bioRxiv browse, ACL records, INSPIRE citations/references/texkeys, ADS export/metrics, Scopus/WoS cited-by, Wikidata resolution | [Search](SEARCH.md#domain-sources) |
-| `openalex_search` | Academic Harness preset | OpenAlex works discovery with filters, query, and group-by | [Search](SEARCH.md#academic-databases) |
-| `openalex_citations` | Academic Harness preset | Forward and backward citation edges from a DOI, PMID, or OpenAlex ID | [Search](SEARCH.md#academic-databases) |
+| `journal_search` | Academic Harness preset | Journal/venue discovery and metrics across OpenAlex, DOAJ, and Crossref; optional CiteScore/SJR/SNIP and JCR JIF/JCI | [Search](SEARCH.md#journal-and-venue-search) |
+| `openalex_search` | Academic Harness preset | OpenAlex works discovery with filters, query, and group-by; `entity=sources` now surfaces source metrics | [Search](SEARCH.md#academic-databases) |
+| `openalex_citations` | Academic Harness preset | Forward, backward, or both citation edges with an OpenCitations DOI-level fallback | [Search](SEARCH.md#academic-databases) |
+| `database_catalog` | Academic Harness preset | Runtime source catalog with capabilities, key field, rate limit, fronting tool, and configured/not-set state | [Search](SEARCH.md#database-catalog) |
 | `s2_search` | Academic Harness preset | Semantic Scholar relevance, bulk, and snippet search with TLDRs and OA PDFs | [Search](SEARCH.md#academic-databases) |
 | `pubmed_search` | Academic Harness preset | Europe PMC JSON by default; NCBI E-utilities with `source: "ncbi"`; preprint filter | [Search](SEARCH.md#academic-databases) |
 | `arxiv_search` | Academic Harness preset | Fielded arXiv queries, serialized to one request every 3 s | [Search](SEARCH.md#academic-databases) |
@@ -67,7 +71,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `citation` | Academic Harness preset | Format APA/Vancouver/Harvard/IEEE/Chicago/MLA; BibTeX/RIS export; DOI→BibTeX; validation | [Writing](WRITING.md#references-and-citation) |
+| `citation` | Academic Harness preset | Format APA/Vancouver/Harvard/IEEE/Chicago/MLA; BibTeX/RIS export; DOI/arXiv/INSPIRE/title→BibTeX via `identifier`; validation | [Writing](WRITING.md#references-and-citation) |
 | `manuscript_citations` | Academic Harness preset | Manuscript ↔ `.bib` consistency, undefined `\ref`, duplicate labels | [Writing](WRITING.md#references-and-citation) |
 | `reporting_check` | Academic Harness preset | Auditable reporting-guideline check: CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, STARD; verified quotes, stale detection, evidence-only exports | [Writing](WRITING.md#reporting-checklists) |
 | `latex_compile` | Every preset | `.tex` → PDF through `latexmk`, with a `pdflatex`/`xelatex`/`lualatex` fallback | [Writing](WRITING.md#latex) |

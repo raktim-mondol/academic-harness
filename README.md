@@ -4,7 +4,7 @@
 ![DeepSeek Harness 0.2.1–0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1--0.2.x-5b7bd5)
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
-**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review and hypothesis ledgers, 745 scientific skills, and local self-improvement, all inside the DSH web UI.
+**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review and hypothesis ledgers, 747 scientific skills, and local self-improvement, all inside the DSH web UI.
 
 Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset with a research persona and academic tools, and keeps the general-purpose tools available on every preset.
 
@@ -17,7 +17,7 @@ Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset wi
 | **Evidence, not citation-shaped guesses** | PaperMemory stores papers as content-addressed Markdown and anchors claims to exact quote spans. `quote_check` and `trace` verify a quotation before it becomes a citation; an empty `cite` means *do not invent one*. [Read more](docs/PAPERS.md#paper-memory) |
 | **A writing oracle with a gate** | The vendored `ah_*` engine inventories every number, citation, unit, and claim in a LaTeX tree. A turn closes only when it introduced no open blocker or major. [Read more](docs/WRITING.md#academic-harness-engine) |
 | **Auditable research ledgers** | Systematic reviews and hypothesis tournaments live in append-only logs under the workspace, so a resumed session sees the same protocol, screening decisions, and ratings. [Reviews](docs/RESEARCH.md#systematic-reviews) · [Tournaments](docs/RESEARCH.md#hypothesis-tournaments) |
-| **Discovery across the real literature** | OpenAlex, Semantic Scholar, PubMed/Europe PMC, arXiv, Crossref, bioRxiv/medRxiv, INSPIRE, and keyed ADS/Scopus/Web of Science through one `literature_search` entry point, plus `domain_search`, Consensus, Parallel, Firecrawl, Scite, CORE, Elicit, and FutureHouse. [Read more](docs/SEARCH.md) |
+| **Discovery across the real literature** | OpenAlex, Semantic Scholar, PubMed/Europe PMC, arXiv, Crossref, DOAJ, publisher Crossref deposits, bioRxiv/medRxiv, INSPIRE, and keyed ADS/Scopus/Web of Science through one `literature_search` entry point, plus `journal_search`, `paper_get`, `paper_context`, `paper_resolve`, `openalex_citations`, `database_catalog`, `domain_search`, Consensus, Parallel, Firecrawl, Scite, CORE, Elicit, and FutureHouse. [Read more](docs/SEARCH.md) |
 | **A lab notebook that survives context loss** | A JSONL notebook shared across the delegation tree, a schema-validated `scientific_result` card, and deletion-only reply folding at five levels. [Read more](docs/WORKSPACE.md) |
 | **Local-first by design** | Workspace search (zvec-grep), PaperMemory, TextFold, ledgers, and the RSI store stay on disk. No key is required to boot. [Read more](docs/ARCHITECTURE.md#runtime-installs) |
 
@@ -50,17 +50,37 @@ Full instructions, migration from `researchcraft`, troubleshooting, and the "one
 
 | Surface | Highlights | Guide |
 |---|---|---|
-| **Search and discovery** | `literature_search` router, `domain_search` (bioRxiv/medRxiv, INSPIRE, ACL, ADS, Scopus, Web of Science, Wikidata), OpenAlex, Semantic Scholar, PubMed, arXiv, Crossref, Consensus, Parallel, Firecrawl, Scite, Tavily, Exa, Perplexity, Jina, CORE, Elicit, FutureHouse | [Search](docs/SEARCH.md) |
-| **Papers and evidence** | `paper_download`, `paper_fold`, `pdf_to_markdown`, `deep_review` (multi-pass manuscript critique with anchored comments and reference verification, powered by [open-deepreview](https://github.com/raktim-mondol/open-deepreview)), PaperMemory's 14 tools, `reference_library` (the native reference manager: BibTeX, BibLaTeX, RIS, and CSL-JSON in and out; imports Scopus and Web of Science RIS exports), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
-| **Writing and citation** | `ah_*` writing oracle and gate, `citation`, `manuscript_citations`, `reporting_check` (CONSORT/STROBE/PRISMA/ARRIVE/TRIPOD+AI/CARE/STARD), LaTeX, Supervisor-Skills paper lifecycle, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
+| **Search and discovery** | `literature_search` router, `journal_search` (OpenAlex/DOAJ/Crossref metrics plus optional CiteScore/JIF), `paper_get` (merged metadata + BibTeX), `paper_context` (focused sections/snippets), `database_catalog`, `domain_search` (bioRxiv/medRxiv, INSPIRE, ACL, ADS, Scopus, Web of Science, Wikidata), OpenAlex, Semantic Scholar, PubMed, arXiv, Crossref, DOAJ, publisher Crossref deposits, Consensus, Parallel, Firecrawl, Scite, Tavily, Exa, Perplexity, Jina, CORE, Elicit, FutureHouse | [Search](docs/SEARCH.md) |
+| **Papers and evidence** | `paper_get`, `paper_download`, `paper_context`, `paper_fold`, `pdf_to_markdown`, `deep_review` (multi-pass manuscript critique with anchored comments and reference verification, powered by [open-deepreview](https://github.com/raktim-mondol/open-deepreview)), PaperMemory's 14 tools, `reference_library` (the native reference manager: BibTeX, BibLaTeX, RIS, and CSL-JSON in and out; imports Scopus and Web of Science RIS exports), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
+| **Writing and citation** | `ah_*` writing oracle and gate, `citation` (including DOI/arXiv/INSPIRE/title → BibTeX), `manuscript_citations`, `reporting_check` (CONSORT/STROBE/PRISMA/ARRIVE/TRIPOD+AI/CARE/STARD), LaTeX, Supervisor-Skills paper lifecycle, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
 | **Reviews and hypotheses** | `review` PRISMA-style ledger with dual-reviewer screening, risk-of-bias appraisal (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa), κ agreement, and RoB exports; `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors | [Research](docs/RESEARCH.md) |
 | **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
 | **Workspace and notebook** | zvec-grep semantic search, lab notebook, `scientific_result`, `fold_text`, `research_template`, `sci_inspect` | [Workspace](docs/WORKSPACE.md) |
 | **Compute and delegation** | `runpod_run`/`modal_run`/`vastai_run`, `subagent` with optional `subagent_pro`/`subagent_vision` routes, specialist briefs, `agent-browser` | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) |
-| **Skills** | 745 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
+| **Skills** | 747 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
 | **Self-improvement** | Local RSI: capture, diagnose, admit, inject, compare against control, promote or quarantine | [RSI](docs/RSI.md) |
 | **Configuration** | Settings → Academic Harness API keys; every credential is optional at install | [Configuration](docs/CONFIGURATION.md) |
+
+### Search tools
+
+| Tool | What it does |
+|---|---|
+| `literature_search` | One-shot multi-source router with RRF fusion and cross-provider dedupe |
+| `journal_search` | Venue discovery and metrics across OpenAlex, DOAJ, and Crossref; optional CiteScore/SJR/SNIP and JCR JIF/JCI |
+| `paper_get` | Merge one paper across OpenAlex, S2, Crossref, Europe PMC, and arXiv; OA URL and canonical BibTeX |
+| `paper_context` | Focus-ranked sections/snippets from S2, arXiv HTML, PMC BioC/PubTator3, optional publisher TDM, and OA PDF |
+| `paper_resolve` | Convert DOI/PMID/PMCID/arXiv/OpenAlex/S2 and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers |
+| `openalex_search` | OpenAlex works, authors, sources, and topics with filters, facets, and source metrics |
+| `openalex_citations` | Forward, backward, or both citation trails with an OpenCitations fallback |
+| `s2_search` | Semantic Scholar relevance, bulk, and paper-scoped snippet search |
+| `pubmed_search` | Europe PMC by default; NCBI E-utilities on request; preprint filter |
+| `arxiv_search` | Fielded arXiv queries, serialized to one request every 3 seconds |
+| `crossref_lookup` | Canonical DOI metadata; polite pool via `CROSSREF_MAILTO` |
+| `domain_search` | Source-specific bioRxiv/ACL/INSPIRE/ADS/Scopus/WoS/Wikidata actions |
+| `database_catalog` | Source/key/capability catalog; reports key fields only as configured/not set |
+
+Free sources need no key. ADS, Scopus, Web of Science, Springer, IEEE, and publisher TDM tiers use their own keys and are implemented but intentionally not live-tested here. Web and AI-native discovery remains available through `consensus_search`, `parallel_search`/`parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, and `futurehouse_agent`, plus the Parallel, Firecrawl, and Scite MCP connectors. See [Search](docs/SEARCH.md) for routing and [Configuration](docs/CONFIGURATION.md) for the key fields.
 
 The complete tool list, with scope and links, is the **[tool index](docs/TOOLS.md)**. The [architecture guide](docs/ARCHITECTURE.md) explains which tools are available on every preset and which are preset-only.
 
@@ -68,7 +88,7 @@ The complete tool list, with scope and links, is the **[tool index](docs/TOOLS.m
 
 ![Request lifecycle](docs/assets/diagrams/request-lifecycle.svg)
 
-Discovery finds candidate papers, `paper_resolve` collapses their identifiers, and `integrity_check` reports retraction status. A downloaded PDF is stored as content-addressed Markdown in PaperMemory, and a quotation must pass `quote_check` or `trace` before the agent treats it as evidence. The notebook records the work; `scientific_result` records the final finding.
+Discovery finds candidate papers, `paper_resolve` collapses their identifiers, `paper_get` produces one merged metadata/BibTeX record, and `integrity_check` reports retraction status. A downloaded PDF is stored as content-addressed Markdown in PaperMemory, and a quotation must pass `quote_check` or `trace` before the agent treats it as evidence. The notebook records the work; `scientific_result` records the final finding.
 
 ## Documentation
 

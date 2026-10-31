@@ -126,7 +126,7 @@ export function arxivIdFromDoi(doi) {
 }
 
 /** Resolve a DOI to Unpaywall's best open-access location, if any. */
-async function resolveOpenAccess(doi, email, signal) {
+export async function resolveOpenAccess(doi, email, signal) {
   const url = `${UNPAYWALL_URL}/${encodeURIComponent(doi)}?email=${encodeURIComponent(email)}`
   const limiter = getLimiter('unpaywall', { minIntervalMs: 100 })
   const result = await limiter.run(() => fetchJson(url, {

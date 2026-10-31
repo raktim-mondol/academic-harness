@@ -20,9 +20,15 @@ import { runInspireSearch } from './inspire-search.js'
 import { runAdsSearch } from './ads-search.js'
 import { runScopusSearch } from './scopus-search.js'
 import { runWosSearch } from './wos-search.js'
+import { runDoajArticles } from './journal-search.js'
+import { normalizePublisherAliases, PUBLISHER_ALIASES, runPublisherSearch } from './publisher-members.js'
+import { runIeeeSearch, runSpringerSearch } from './publisher-search.js'
 import { libraryLaunch, libraryResolve } from './papermemory-library.js'
 
-const ALLOWED = ['openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints', 'biorxiv', 'inspire', 'ads', 'scopus', 'wos']
+const ALLOWED = [
+  'openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints', 'biorxiv',
+  'inspire', 'ads', 'scopus', 'wos', 'doaj', 'publishers', 'springer', 'ieee',
+]
 const BIOMEDICAL = /\b(clinic|clinical|patient|patients|trial|trials|disease|therapy|therapies|treatment|cancer|tumou?r|gene|genes|genetic|protein|proteins|cell|cells|drug|drugs|medical|medicine|health|epidemi\w*|cohort|rct|surgery|surgical|diagnos\w*|psychiatr\w*|neuron\w*|biolog\w*|immun\w*|infect\w*|virus|viral|vaccine|malaria|diabetes|alzheimer|parkinson|cardio\w*|oncology)\b/i
 const PREPRINT = /\b(arxiv|preprints?|neural|machine learning|deep learning|transformer|transformers|llm|llms|language model|computer vision|algorithm|algorithms|quantum|physics|astrophysic\w*|cosmolog\w*|particle|mathematic\w*|theorem|robot\w*|reinforcement learning|dataset|benchmark|computational)\b/i
 const ASKS_FOR_PREPRINTS = /\b(preprints?|biorxiv|medrxiv)\b/i
@@ -133,7 +139,22 @@ async function runSource(source, { query, perSource, yearMin, yearMax, openAcces
         filter: filters.length ? filters.join(',') : undefined,
       }, { signal })
     }
+    case 'doaj':
+      return runDoajArticles({ query, limit: Math.min(perSource, 50) }, { signal })
+    case 'springer':
+      return runSpringerSearch({ query, limit: Math.min(perSource, 50), year_min: yearMin, year_max: yearMax, open_access_only: openAccessOnly }, { signal })
+    case 'ieee':
+      return runIeeeSearch({ query, limit: Math.min(perSource, 50), year_min: yearMin, year_max: yearMax, open_access_only: openAccessOnly }, { signal })
     default:
+      if (source.startsWith('publisher:')) {
+        return runPublisherSearch({
+          publisher: source.slice('publisher:'.length),
+          query,
+          limit: Math.min(perSource, 50),
+          year_min: yearMin,
+          year_max: yearMax,
+        }, { signal })
+      }
       throw new Error(`unknown source "${source}"`)
   }
 }
@@ -203,9 +224,9 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'literature_search',
     description: [
-      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, Scopus, and Web of Science are also available explicitly.',
+      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, DOAJ, publisher Crossref members, Scopus, Web of Science, Springer, and IEEE are also available explicitly.',
       'Results are deduplicated and rank-fused across sources (reciprocal-rank fusion), so use this when you want one clean discovery list instead of issuing the same query to several tools. Coverage is the top-N relevance slice per source, not exhaustive; use source-specific tools for filters, citation trails, or pagination.',
-      'Optional year range and open_access_only filters. Scopus and Web of Science are never auto-selected and need SCOPUS_API_KEY/WOS_API_KEY; without a key they return key_missing and make no request. Scopus/WoS records are metadata-only. source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
+      'The `publishers` source searches publisher Crossref deposits keylessly; pass `publishers` aliases such as wiley, elsevier, springer, ieee, taylor_francis, sage, oup, cup, acm, acs, aps, iop, rsc, mdpi, frontiers, or plos. The keyed `springer`/`ieee` sources need SPRINGER_API_KEY/IEEE_API_KEY. Scopus and Web of Science are never auto-selected and need SCOPUS_API_KEY/WOS_API_KEY; without a key they return key_missing and make no request. Scopus/WoS records are metadata-only. Source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
     ].join(' '),
     parameters: {
       query: { type: 'string', required: true, description: 'Natural-language discovery query.' },
@@ -214,7 +235,11 @@ export function apply(ctx) {
           { type: 'string' },
           { type: 'array', items: { type: 'string' } },
         ],
-        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints, biorxiv, inspire, ads, scopus, wos. Accepts an array or comma-separated string. Scopus and Web of Science are explicit-only and keyed.',
+        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints, biorxiv, inspire, ads, scopus, wos, doaj, publishers, springer, ieee. Accepts an array or comma-separated string. Scopus/WoS/Springer/IEEE are explicit-only and keyed; publishers is keyless.',
+      },
+      publishers: {
+        oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
+        description: 'Publisher aliases for sources=publishers, e.g. ["plos","mdpi"] or "wiley,elsevier". Uses keyless Crossref member deposits.',
       },
       max_results: { type: 'number', description: 'Total unique results to return, 1-100. Default 20. This is a top-N slice, not exhaustive coverage.' },
       year_min: { type: 'number', description: 'Earliest publication year. Records with unknown years are kept.' },
@@ -235,6 +260,18 @@ export function apply(ctx) {
         sources = chooseSources(query, args.sources, { adsToken: Boolean(adsToken) })
       } catch (error) {
         return { error: error.message }
+      }
+      if (sources.includes('publishers')) {
+        const requested = normalizePublisherAliases(args.publishers)
+        if (requested.unknown.length) {
+          return { error: `unknown publisher(s): ${requested.unknown.join(', ')}; use ${PUBLISHER_ALIASES.join(', ')}` }
+        }
+        if (!requested.aliases.length) {
+          return { error: 'publishers source needs a publishers array (or comma-separated list)' }
+        }
+        sources = sources.flatMap((source) => (
+          source === 'publishers' ? requested.aliases.map((alias) => `publisher:${alias}`) : [source]
+        ))
       }
       const warnings = []
       if (args.open_access_only && sources.includes('crossref')) {

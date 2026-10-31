@@ -28,8 +28,8 @@ The [tool index](TOOLS.md) lists every registered tool, its scope, and the page 
 
 1. The user asks a question in the DSH web UI.
 2. The agent runs on the Academic Harness preset, so the persona, research prompt, and preset-scoped tools are available.
-3. Discovery tools call their providers: native REST tools (`openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `domain_search`, `consensus_search`, `parallel_search`) or MCP connectors (`mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`). `literature_search` also routes bioRxiv/medRxiv, INSPIRE, ADS, Scopus, and Web of Science through their source adapters.
-4. Records are normalized to a common shape; `paper_resolve` collapses DOI / PMID / arXiv / OpenAlex / Semantic Scholar identifiers onto one paper, and `integrity_check` reports retraction or correction status.
+3. Discovery tools call their providers: native REST tools (`journal_search`, `openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `domain_search`, `database_catalog`, `consensus_search`, `parallel_search`) or MCP connectors (`mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`). `literature_search` also routes bioRxiv/medRxiv, INSPIRE, DOAJ, publisher Crossref deposits, ADS, Scopus, and Web of Science through their source adapters.
+4. Records are normalized to a common shape; `paper_resolve` collapses DOI / PMID / PMCID / arXiv / OpenAlex / Semantic Scholar identifiers onto one paper, `paper_get` merges metadata and canonical BibTeX, and `integrity_check` reports retraction or correction status. `paper_context` retrieves focus-ranked sections/snippets when the question needs a specific method, number, or claim.
 5. `paper_download` resolves an open-access PDF; a successful download is ingested into PaperMemory as content-addressed markdown.
 6. Quotes and claims are checked against stored text (`quote_check`, `trace`) before the agent treats them as evidence.
 7. `notebook` records the running work; `scientific_result` records a terminal finding.
@@ -38,8 +38,8 @@ Discovery, orientation, and evidence are deliberately separate:
 
 | Layer | Tool | What it answers | What it does **not** prove |
 |---|---|---|---|
-| Discovery | `literature_search`, `domain_search`, `openalex_search`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, Consensus, Parallel, Firecrawl, Scite | What exists, and where to look | That a paper supports a sentence |
-| Orientation | `paper_fold` | What the paper is about, section by section | A quotation or a number |
+| Discovery | `literature_search`, `journal_search`, `domain_search`, `openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `database_catalog`, Consensus, Parallel, Firecrawl, Scite | What exists, and where to look | That a paper supports a sentence |
+| Orientation | `paper_fold`, `paper_context` | What the paper is about, section by section; focused remote passages | A quotation or a number; `paper_context` output must still be verified |
 | Evidence | PaperMemory `get`, `quote_check`, `trace`, `cite` | What the stored paper actually says | That the paper is correct or current |
 | Status | `integrity_check` | Retracted, expression of concern, corrected, clean, unknown, not found | Claim support |
 

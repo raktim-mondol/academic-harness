@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **746 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **747 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -24,7 +24,7 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining 41 are first-party workflow, tool, notebook, compute, and specialist-brief skills; the total on disk is 745.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 747.
 
 ## Workflow and tool skills
 
@@ -34,6 +34,7 @@ The remaining 41 are first-party workflow, tool, notebook, compute, and speciali
 | `ah-write-unit`, `ah-plan-section`, `ah-fix-findings`, `ah-audit-section`, `ah-revise-from-review` | The writing engine's unit-level workflows; see [Writing](WRITING.md#academic-harness-engine) |
 | `ah-rsi` | Inspecting and steering the local RSI loop; see [RSI](RSI.md) |
 | `academic-harness-notebook` | Lab-notebook discipline for research sessions; see [Lab notebook](WORKSPACE.md#lab-notebook) |
+| `academic-search` | Routing across discovery, journal metrics, merged paper/BibTeX, and focused full-text context; see [Search](SEARCH.md) |
 | `systematic-review-ledger` | Full `review` tool workflow; see [Systematic reviews](RESEARCH.md#systematic-reviews) |
 | `risk-of-bias-appraisal` | `review` risk-of-bias workflow (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa), reconciliation, agreement, and rob exports; see [Risk-of-bias appraisal](RESEARCH.md#risk-of-bias-appraisal) |
 | `co-scientist-tournament` | The tournament loop, subagent briefs, and budget defaults; see [Hypothesis tournaments](RESEARCH.md#hypothesis-tournaments) |

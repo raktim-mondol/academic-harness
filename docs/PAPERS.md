@@ -1,15 +1,30 @@
 # Papers and evidence
 
-The reading loop has four separate jobs:
+The reading loop has five separate jobs:
 
 1. **Discover** a paper and collapse its identifiers — [Search](SEARCH.md).
-2. **Download** an open-access PDF — `paper_download`.
-3. **Orient** yourself in it — `paper_fold` (map first) or `pdf_to_markdown` (full text).
-4. **Prove** what it says — PaperMemory `get`, `quote_check`, `trace`, `cite`.
+2. **Merge** its metadata and canonical BibTeX — `paper_get`.
+3. **Download** an open-access PDF — `paper_download`, or pull focused sections/snippets with `paper_context`.
+4. **Orient** yourself in it — `paper_fold` (map first) or `pdf_to_markdown` (full text).
+5. **Prove** what it says — PaperMemory `get`, `quote_check`, `trace`, `cite`.
 
 `paper_fold` is an orientation layer, not evidence. A `paper_fold` line is not a quote. Numbers, claims, quotations, and citation keys come from PaperMemory.
 
 ![Paper pipeline](assets/diagrams/paper-pipeline.svg)
+
+## Metadata, context, or full text?
+
+These tools answer different questions:
+
+| Need | Tool |
+|---|---|
+| One merged record with IDs, abstract/TLDR, OA URL, and BibTeX | `paper_get` |
+| Focused sections/snippets to verify a method, number, or claim | `paper_context` |
+| A saved, ingested PDF | `paper_download` |
+| Map-first reading of a whole paper already on disk | `paper_fold` |
+| Markdown conversion of a local PDF | `pdf_to_markdown` |
+
+`paper_context` reads remote free tiers (Semantic Scholar snippets, arXiv HTML, PMC BioC/PubTator3), optional keyed publisher TDM, and an OA PDF. It is not a substitute for PaperMemory evidence: a returned snippet is a lead, not a verified quote. It never writes a PDF or ingests content.
 
 ## Download a paper
 

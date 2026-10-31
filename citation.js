@@ -10,8 +10,9 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './paper-download.js'
 import { libraryRecords } from './papermemory-library.js'
-import { fetchJson, fetchText, getLimiter, searchUserAgent } from './search-http.js'
+import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
+import { resolveBibtexForIdentifier } from './bibtex-resolve.js'
 import {
   SUPPORTED_STYLES, formatBibliography, formatCitations, normalizeCsl,
   parseBibtex, parseInput, toBibtex, toRis, validateRecords,
@@ -71,30 +72,14 @@ async function crossrefContact() {
 }
 
 async function fetchDoiBibtex(doi, exec) {
-  const mailto = await crossrefContact()
-  const params = new URLSearchParams()
-  if (mailto) params.set('mailto', mailto)
-  const query = params.toString()
-  const url = `${CROSSREF_WORKS}/${encodeURIComponent(doi)}/transform/application/x-bibtex${query ? `?${query}` : ''}`
-  const limiter = getLimiter('crossref-single', { minIntervalMs: mailto ? 100 : 200 })
-  const result = await limiter.run(() => fetchText(url, {
+  const resolved = await resolveBibtexForIdentifier(doi, {
     signal: exec?.signal,
-    timeoutMs: 20_000,
-    retries: 1,
-    headers: {
-      'User-Agent': searchUserAgent(mailto),
-      Accept: 'application/x-bibtex',
-    },
-  }))
-  if (!result.ok) {
-    if (result.error === 'aborted') throw new Error('request cancelled')
-    throw new Error(`Crossref BibTeX lookup failed for ${doi}: HTTP ${result.status}${result.detail ? ` (${result.detail})` : ''}`)
+    allowPaperGet: false,
+  })
+  if (!resolved.bibtex) {
+    throw new Error(`Could not resolve BibTeX for ${doi}; the DOI may not be registered or may be invalid`)
   }
-  const body = String(result.data || '').trim()
-  if (!body.startsWith('@')) {
-    throw new Error(`Crossref returned no BibTeX for ${doi}; the DOI may not be registered or may be invalid`)
-  }
-  return body
+  return resolved.bibtex
 }
 
 async function fetchCrossrefWork(doi, exec) {
@@ -140,6 +125,11 @@ async function loadRecords(args, exec) {
     const loaded = await libraryRecords(scope, { cwd: workspaceRoot(exec), signal: exec?.signal })
     if (!loaded.ok) throw new Error(`reference library unavailable (${loaded.code}): ${loaded.error}`)
     return normalizeCsl(loaded.records)
+  }
+  if (typeof args.identifier === 'string' && args.identifier.trim()) {
+    const resolved = await resolveBibtexForIdentifier(args.identifier.trim(), { signal: exec?.signal })
+    if (!resolved.bibtex) throw new Error(`could not resolve a BibTeX record for ${args.identifier}`)
+    return parseBibtex(resolved.bibtex)
   }
   const dois = doiList(args.doi)
   if (dois.length) {
@@ -211,6 +201,17 @@ export async function runCitation(args, exec) {
   if (!['format', 'bibtex', 'ris', 'validate'].includes(action)) {
     throw new Error('action must be format, bibtex, ris, or validate')
   }
+  if (action === 'bibtex' && typeof args.identifier === 'string' && args.identifier.trim()
+    && !(Array.isArray(args.records) && args.records.length) && !args.library) {
+    const resolved = await resolveBibtexForIdentifier(args.identifier.trim(), { signal: exec?.signal })
+    if (!resolved.bibtex) throw new Error(`could not resolve a BibTeX record for ${args.identifier}`)
+    const value = { action, count: 1, bibtex: resolved.bibtex, source: resolved.source }
+    if (typeof args.output_path === 'string' && args.output_path.trim()) {
+      writeWorkspaceText(workspaceRoot(exec), args.output_path, `${resolved.bibtex}\n`)
+      value.output_path = args.output_path
+    }
+    return value
+  }
   const records = await loadRecords(args, exec)
   if (!records.length) throw new Error('no citation records found')
 
@@ -260,8 +261,8 @@ export function apply(ctx) {
     name: 'citation',
     description: [
       'Format, export, or validate citations and bibliographies.',
-      '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, or DOIs (Crossref content negotiation). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref.',
-      'Accepts CSL-JSON records, BibTeX, RIS, a workspace path, or `library` (papers from the PaperMemory reference library, under its own keys; to write a project .bib use `papermemory_library` export). No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
+      '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, DOIs, or a single `identifier` (DOI → arXiv → INSPIRE → S2 → synthesized). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref.',
+      'Accepts CSL-JSON records, BibTeX, RIS, a workspace path, `library` (papers from the PaperMemory reference library, under its own keys; to write a project .bib use `papermemory_library` export), or `identifier` for one canonical entry. Use paper_get when you need a merged paper record rather than a citation. No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
     ].join(' '),
     parameters: {
       action: {
@@ -287,9 +288,13 @@ export function apply(ctx) {
           variant: { type: 'string', enum: ['project', 'canonical'] },
         },
       },
+      identifier: {
+        type: 'string',
+        description: 'Resolve one DOI, arXiv ID, INSPIRE/source identifier, or title to canonical BibTeX. For action=bibtex, returns the official entry when a DOI/arXiv/INSPIRE/S2 record exists, otherwise a synthesized entry.',
+      },
       doi: {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
-        description: 'DOI or DOIs to fetch as BibTeX from Crossref before formatting/validating.',
+        description: 'DOI or DOIs to fetch as BibTeX before formatting/validating.',
       },
       text: { type: 'string', description: 'BibTeX, RIS, or CSL-JSON text.' },
       path: { type: 'string', description: 'Workspace-relative file containing BibTeX, RIS, or CSL-JSON.' },

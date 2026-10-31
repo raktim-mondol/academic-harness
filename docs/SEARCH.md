@@ -56,10 +56,38 @@ The keyless-by-default database tools, plus `integrity_check`, cover the open bi
 
 Two further tools work across them:
 
-- `openalex_citations` walks forward (`citations`) and backward (`references`) citation edges. Accepts a DOI, PMID, or OpenAlex ID.
-- `paper_resolve` converts between DOI, PMID, arXiv ID, OpenAlex ID, Semantic Scholar ID, and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers. Use it before citing when results came from more than one database, so the same paper is not cited twice under different IDs.
+- `openalex_citations` walks forward (`citations`), backward (`references`), or `both` citation edges. Accepts a DOI, PMID, PMCID, arXiv ID, or OpenAlex ID. When OpenAlex has no edges and a DOI exists, it falls back to OpenCitations Index v2; those edges carry DOI/OCI/date metadata and explicit placeholder titles, not invented titles.
+- `paper_resolve` converts between DOI, PMID, PMCID, arXiv ID, OpenAlex ID, Semantic Scholar ID, and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers. Use it before citing when results came from more than one database, so the same paper is not cited twice under different IDs.
 
 All of these are native REST tools — no MCP mount and no restart requirement. Shared record normalization and per-provider rate limiting live in `search-normalize.js` and `search-http.js`.
+
+## Journal and venue search
+
+`journal_search` discovers journals and venues and merges them by ISSN/title across OpenAlex `/sources`, DOAJ v4 journals, and Crossref journals. It returns OpenAlex's `2yr_mean_citedness`, h-index, i10-index, works/citation counts, APC, OA/DOAJ status, DOAJ licenses, publisher, ISSNs, homepage, and topics. Use `journal_policy` when the question is self-archiving or OA policy rather than discovery or metrics.
+
+Optional keyed enrichment adds Elsevier Serial Title CiteScore/SJR/SNIP (`SCOPUS_API_KEY`, optional `ELSEVIER_INSTTOKEN`) and WoS JCR JIF/JCI/quartile/percentile (`WOS_API_KEY`). Unset keys are skipped; a configured key that fails adds a warning without failing the whole search. These keyed tiers are implemented but intentionally not part of the automated or live test suite.
+
+## Merged paper lookup and BibTeX
+
+`paper_get` resolves one DOI, arXiv ID, PMID, PMCID, OpenAlex ID, S2 ID, source-specific identifier, or title into a merged record. It fans out across OpenAlex, Semantic Scholar, Crossref, Europe PMC, and arXiv where the identifier allows it, fills an OA URL through Unpaywall/OpenAlex when available, and returns a canonical BibTeX entry. The entry order is DOI content negotiation → arXiv `/bibtex` → INSPIRE → Semantic Scholar `citationStyles.bibtex` → deterministic synthesis, with `bibtex_source` naming the tier. It does not download files or write to PaperMemory.
+
+`citation` remains the formatting/export/validation tool. Its `identifier` input resolves one DOI/arXiv/INSPIRE/title to BibTeX before formatting; use `paper_get` when you need the whole merged record.
+
+Title lookups can be ambiguous: `paper_get` prefers an exact normalized-title match and returns the top-ranked candidate with a warning when no exact match exists.
+
+## Full-text context
+
+`paper_context` returns focused sections and snippets for one paper without downloading it. Its free tiers are Semantic Scholar ~500-word snippets scoped to the paper's S2 ID, arXiv LaTeXML HTML, NCBI PMC BioC JSON, and PubTator3 BioC JSON. Keyed publisher tiers (Wiley TDM PDF, Elsevier ScienceDirect FULL, Springer JATS) sit before the final OA-PDF tier; they are skipped when their key is absent and are intentionally not automated-tested. The last tier fetches the OA PDF through the same SSRF-checked path as `paper_download` and converts it with pdf-inspector; scanned PDFs are reported, not OCR'd by default.
+
+`focus_query` ranks sections/snippets, `max_chars` caps the excerpt, and `include_pdf: false` skips the PDF tier. When nothing can be extracted, the tool returns the abstract/TLDR plus a `no_full_text` warning instead of inventing content. It never writes a PDF or ingests into PaperMemory: use `paper_download` to save and ingest, `pdf_to_markdown` for a local PDF, and `paper_fold` for map-first whole-paper reading.
+
+## Publisher-scoped search
+
+`literature_search` accepts `sources=publishers` plus a `publishers` array. This uses publisher Crossref member deposits keylessly, so it works without a Scopus/WoS/IEEE subscription for Wiley, Elsevier, Springer Nature, IEEE, Taylor & Francis, SAGE, OUP, CUP, ACM, ACS, APS, IOP, RSC, MDPI, Frontiers, and PLOS. The separate `springer` and `ieee` sources use the publishers' native APIs and require `SPRINGER_API_KEY`/`IEEE_API_KEY`. Scopus and Web of Science remain the keyed citation indexes.
+
+## Database catalog
+
+`database_catalog` lists the runtime sources, capabilities, rate limits, key field, and fronting tool. It reports key fields only as configured/not set and never returns key values. Use it to choose a source or explain why a keyed source is unavailable.
 
 ## Domain sources
 
@@ -91,12 +119,12 @@ Keyed sources make no request when their key is unset: they return `key_missing`
 `literature_search` is the router for one-shot discovery:
 
 - **Auto mode** runs OpenAlex + Semantic Scholar, adds PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE for high-energy physics, and bioRxiv/medRxiv when a biomedical query asks for preprints. ADS is added for astronomy only when `ADS_API_TOKEN` is set.
-- **Explicit sources** include Crossref, preprints, bioRxiv, INSPIRE, ADS, Scopus, and Web of Science. Scopus and Web of Science are never auto-selected and return `key_missing` without their key.
+- **Explicit sources** include Crossref, preprints, bioRxiv, INSPIRE, ADS, DOAJ, publisher Crossref deposits (`sources=publishers` with a `publishers` alias array), Scopus, Web of Science, Springer, and IEEE. Scopus/Web of Science/Springer/IEEE are never auto-selected and return `key_missing` without their key; `publishers` is keyless.
 - It deduplicates across providers and fuses their rankings with reciprocal-rank fusion, so a paper found high in two indexes outranks one found once.
 - Coverage is the top-N relevance slice per source, not exhaustive; use the source-specific tools afterward for filters, citation trails, or pagination.
 - Scopus/Web of Science records are metadata-only; abstracts and full text are not stored.
 
-The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` / `domain_search` added by domain, and keeps `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
+The system prompt steers discovery to `openalex_search` + `s2_search`, with `pubmed_search` / `arxiv_search` / `domain_search` added by domain, `journal_search` for venue selection/metrics, `paper_get` for one merged record, `paper_context` for focused evidence, and `consensus_search` / `parallel_search` for their distinct filters and web excerpts.
 
 ## Additional sources
 
@@ -135,6 +163,8 @@ A successful download is ingested into PaperMemory. Ingest failure does not fail
 
 | Works without a key | Needs a key |
 |---|---|
-| OpenAlex (reduced budget), Semantic Scholar (reduced rate), PubMed/Europe PMC, arXiv, Crossref (polite pool email optional), bioRxiv/medRxiv, INSPIRE-HEP, ACL Anthology, Wikidata, `literature_search`'s keyless sources, `domain_search`'s keyless actions, `paper_resolve`, `paper_download` (open-access fallbacks; `UNPAYWALL_EMAIL` recommended), `paper_fold` local levels, PaperMemory, notebook, `fold_text`, `citation`, `review`, `coscientist`, `clinicaltrials`, openFDA (low shared quota), DataCite, CORE (base; full text needs a key), DOAJ, ORCID (public reads; token optional), TextFold local levels | Parallel, Firecrawl, Scite, Consensus, Brave, Tavily, Exa, Perplexity (search), Elicit, FutureHouse, Sherpa Romeo/Juliet, PatentsView, Jina search, Gemini (images/embeddings), **NASA ADS**, **Scopus**, **Web of Science**, Modal, Runpod, Vast.ai |
+| OpenAlex (reduced budget), Semantic Scholar (reduced rate), PubMed/Europe PMC, arXiv, Crossref (polite pool email optional), bioRxiv/medRxiv, INSPIRE-HEP, ACL Anthology, Wikidata, OpenCitations, DOAJ, publisher Crossref deposits, `journal_search`'s free sources, `paper_get`'s free sources, `paper_context`'s free tiers, `database_catalog`, `literature_search`'s keyless sources, `domain_search`'s keyless actions, `paper_resolve`, `paper_download` (open-access fallbacks; `UNPAYWALL_EMAIL` recommended), `paper_fold` local levels, PaperMemory, notebook, `fold_text`, `citation`, `review`, `coscientist`, `clinicaltrials`, openFDA (low shared quota), DataCite, CORE (base; full text needs a key), ORCID (public reads; token optional), TextFold local levels | Parallel, Firecrawl, Scite, Consensus, Brave, Tavily, Exa, Perplexity (search), Elicit, FutureHouse, Sherpa Romeo/Juliet, PatentsView, Jina search, Gemini (images/embeddings), **NASA ADS**, **Scopus**, **Web of Science**, **Springer/JATS**, **IEEE Xplore**, **Wiley TDM**, **Elsevier Serial/ScienceDirect**, Modal, Runpod, Vast.ai |
+
+Keyed journal/full-text enrichments are implemented but intentionally not part of the automated or live test suite: Elsevier Serial Title/ScienceDirect (`SCOPUS_API_KEY`, optional `ELSEVIER_INSTTOKEN`), WoS JCR (`WOS_API_KEY`), Wiley TDM (`WILEY_TDM_TOKEN`), Springer (`SPRINGER_API_KEY`), and IEEE (`IEEE_API_KEY`). Unset keys are skipped; configured-but-failing keys add warnings.
 
 See [Configuration](CONFIGURATION.md) for the exact field names and restart behavior.

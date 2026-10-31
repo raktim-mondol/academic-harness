@@ -389,6 +389,14 @@
   name: academic-harness/arxiv-search
 - id: pubmed-search
   name: academic-harness/pubmed-search
+- id: journal-search
+  name: academic-harness/journal-search
+- id: paper-get
+  name: academic-harness/paper-get
+- id: paper-context
+  name: academic-harness/paper-context
+- id: academic-databases
+  name: academic-harness/academic-databases
 
 # Gated Phase 4 sources: CORE repository full texts (key optional), Elicit
 # paper/trial search (Pro+ key), and FutureHouse Crow/Falcon/Owl agents (async

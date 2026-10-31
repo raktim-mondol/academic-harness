@@ -1,7 +1,11 @@
 flowchart TD
   discover[Discovery<br/>literature_search and databases] --> resolve[paper_resolve<br/>one stable identity]
-  resolve --> integrity[integrity_check<br/>retracted, corrected, clean, unknown]
-  resolve --> download[paper_download<br/>Unpaywall and OA fallbacks]
+  resolve --> get[paper_get<br/>merged metadata + BibTeX]
+  get --> integrity[integrity_check<br/>retracted, corrected, clean, unknown]
+  get --> download[paper_download<br/>Unpaywall and OA fallbacks]
+  get --> context[paper_context<br/>focused sections/snippets]
+
+  context -.->|lead, verify| quote[quote_check and trace<br/>verbatim evidence]
 
   download -->|open-access PDF| ingest[PaperMemory ingest<br/>content-addressed markdown]
   download -->|paywalled| paywall[Report paywalled<br/>list every source tried]
@@ -10,7 +14,7 @@ flowchart TD
   convert -->|scanned| vision[OCR or subagent_vision]
 
   ingest --> fold[paper_fold<br/>section map first]
-  ingest --> quote[quote_check and trace<br/>verbatim evidence]
+  ingest --> quote
   fold --> read[Read one section at a time]
   read --> quote
 
@@ -22,7 +26,7 @@ flowchart TD
   classDef evidence fill:#ecfdf5,stroke:#059669,color:#064e3b
   classDef warn fill:#fff7ed,stroke:#f97316,color:#7c2d12
   classDef optional fill:#f8fafc,stroke:#94a3b8,color:#0f172a
-  class discover,download,convert,fold,read discovery
+  class discover,get,context,download,convert,fold,read discovery
   class ingest,quote,cite evidence
   class paywall,vision warn
   class resolve,integrity,agent optional

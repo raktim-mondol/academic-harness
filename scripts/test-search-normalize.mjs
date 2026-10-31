@@ -15,6 +15,7 @@ import {
   canonicalArxivId,
   canonicalBibcode,
   canonicalDoi,
+  canonicalPmcid,
   canonicalScopusId,
   canonicalWosUid,
   fromAdsDoc,
@@ -55,6 +56,8 @@ assert.match(capText('x'.repeat(30), 10), /\[output truncated\]/)
 
 assert.deepEqual(identifierKind('https://doi.org/10.1000/abc.1'), { kind: 'doi', value: '10.1000/abc.1' })
 assert.deepEqual(identifierKind('PMID: 12345678'), { kind: 'pmid', value: '12345678' })
+assert.deepEqual(identifierKind('PMC11223843'), { kind: 'pmcid', value: 'PMC11223843' })
+assert.equal(canonicalPmcid('pmcid:PMC11223843'), 'PMC11223843')
 assert.deepEqual(identifierKind('2301.12345'), { kind: 'arxiv', value: '2301.12345' })
 assert.deepEqual(identifierKind('W2741809807'), { kind: 'openalex', value: 'W2741809807' })
 assert.equal(identifierKind('a'.repeat(40)).kind, 's2')
@@ -594,5 +597,48 @@ const markdown = renderPapers(merged, { abstractChars: 20 })
 assert.match(markdown, /A Test Paper/)
 assert.match(markdown, /doi: 10\.1000\/abc\.1/)
 assert.match(markdown, /20 citations/)
+
+const journalFirst = fromOpenAlexWork({
+  id: 'https://openalex.org/W777',
+  doi: 'https://doi.org/10.1000/journal-merge',
+  title: 'Journal Merge',
+  publication_year: 2024,
+  authorships: [],
+  primary_location: { source: { display_name: 'Journal One', issn_l: '1234-5678', issn: ['1234-5678'], host_organization_name: 'Publisher One', is_oa: true } },
+})
+journalFirst.bibtex = '@article{journalmerge, title={Journal Merge}}'
+journalFirst.journal.metrics = { h_index: 10 }
+const journalSecond = fromCrossrefWork({
+  DOI: '10.1000/journal-merge',
+  title: ['Journal Merge'],
+  ISSN: ['1234-5678'],
+  publisher: 'Publisher Two',
+  volume: '12',
+  issue: '3',
+  page: '1-9',
+  'references-count': 42,
+})
+const journalMerged = mergePapers([journalFirst, journalSecond])
+assert.equal(journalMerged.length, 1)
+assert.equal(journalMerged[0].journal.name, 'Journal One')
+assert.equal(journalMerged[0].journal.metrics.h_index, 10)
+assert.equal(journalMerged[0].volume, '12')
+assert.equal(journalMerged[0].reference_count, 42)
+assert.equal(journalMerged[0].bibtex, journalFirst.bibtex)
+
+const pmcidSecond = fromSemanticScholarPaper({
+  paperId: 'abc123',
+  externalIds: { DOI: '10.1000/abc.1', PubMedCentral: 'PMC11223843' },
+  title: 'A Test Paper',
+})
+const noPmcid = fromOpenAlexWork({
+  id: 'https://openalex.org/W778',
+  doi: 'https://doi.org/10.1000/abc.1',
+  title: 'A Test Paper',
+  publication_year: 2024,
+  authorships: [],
+})
+const pmcidMerged = mergePapers([noPmcid, pmcidSecond])
+assert.equal(pmcidMerged[0].pmcid, 'PMC11223843')
 
 console.log('Search normalization OK')
