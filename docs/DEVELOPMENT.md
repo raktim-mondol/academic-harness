@@ -29,6 +29,12 @@ The ledger layers add their own suites, all local and fixture-driven:
 every file outside its own cache before and after a run to prove it never writes
 to a source ledger). `npm run test:provenance` runs the last one on its own.
 
+Phase 4 adds `test-submission-pack`, `test-manuscript-diff`, `test-numbers-audit`,
+`test-presentation-build`, `test-authorship`, and `test-journal-match` (the last
+also covers custom CSL loading and URL caching). `npm run test:phase4` runs all
+six without network; the TeX compile path is exercised by hand and is skipped by
+the fixture suite where TeX is not installed.
+
 The full CI matrix also runs the search-provider tests, the PaperMemory test suite, and a real DSH boot; see [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
 
 ### `paper_fold` live integration
@@ -71,7 +77,7 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `presets/academic-harness/` | Preset source |
 | `prompt.js`, `prompt-section.js` | Research system prompt |
 | `client/` | Settings page source; `lib/client.js` is the committed build |
-| `skills/` | 752 bundled skills |
+| `skills/` | 757 bundled skills |
 | `python-helpers/` | Python helpers for `sci_inspect` and `power_analysis` |
 | `vendor/academic-harness/` | Vendored writing engine |
 | `vendor/papermemory/` | Vendored PaperMemory package |

@@ -79,3 +79,26 @@ def read_source(request):
         raise ValueError("path must end in .tex, .md, .txt, or .docx")
     with open(path, "r", encoding="utf-8", errors="replace") as handle:
         return path, handle.read()
+
+
+def main():
+    """CLI for the Node tools: JSON request on stdin, extracted text on stdout."""
+    import json
+    import sys
+
+    try:
+        request = json.load(sys.stdin)
+        path, text = read_source(request)
+        print(json.dumps({
+            "file": path,
+            "text": text,
+            "lines": text.count("\n") + (1 if text else 0),
+            "chars": len(text),
+        }, ensure_ascii=False))
+    except Exception as error:
+        print(json.dumps({"error": str(error)}))
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

@@ -14,7 +14,8 @@ Academic Harness exposes native search tools. Pick by the question, not by the n
 | Question | Tool |
 |---|---|
 | Find papers on a topic | `literature_search` (one clean ranked list), then `openalex_search` / `s2_search` / `pubmed_search` / `arxiv_search` for source-specific filters |
-| Which journal/venue, and how does it rank? | `journal_search` |
+| Which journal/venue, and how does it rank? | `journal_search` (`action: "search"`) |
+| Which venue fits this manuscript? | `journal_search` (`action: "match"`) with title/keywords/constraints; fit is advisory, and venue signals need manual due diligence |
 | Is this venue OA / what may I self-archive? | `journal_policy` |
 | One authoritative record for a known paper | `paper_get` |
 | Convert DOI/PMID/PMCID/arXiv/OpenAlex/S2 identifiers | `paper_resolve` |

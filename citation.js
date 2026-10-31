@@ -5,7 +5,10 @@
  * for DOI input (Crossref content negotiation) and optional DOI checks.
  */
 import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { createHash } from 'node:crypto'
+import { lookup } from 'node:dns/promises'
+import { isIP } from 'node:net'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './paper-download.js'
@@ -15,11 +18,175 @@ import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 import { resolveBibtexForIdentifier } from './bibtex-resolve.js'
 import {
   SUPPORTED_STYLES, formatBibliography, formatCitations, normalizeCsl,
-  parseBibtex, parseInput, toBibtex, toRis, validateRecords,
+  parseBibtex, parseInput, registerCslStyle, toBibtex, toRis, validateRecords,
 } from './citation-format.js'
 
 const CROSSREF_WORKS = 'https://api.crossref.org/works'
 const MAX_INPUT_BYTES = 10 * 1024 * 1024
+const MAX_CSTYLE_BYTES = 1024 * 1024
+
+function privateIpv4(address) {
+  const match = String(address || '').match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!match) return true
+  const octets = match.slice(1).map(Number)
+  if (octets.some((value) => value < 0 || value > 255)) return true
+  const [a, b] = octets
+  return a === 0 || a === 10 || a === 127 || a >= 224
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 198 && (b === 18 || b === 19))
+    || (a === 192 && b === 0 && octets[2] === 0)
+}
+
+function expandIpv6(address) {
+  let value = String(address || '').toLowerCase().split('%')[0]
+  if (value.includes('.')) {
+    const lastColon = value.lastIndexOf(':')
+    const ipv4 = value.slice(lastColon + 1).split('.').map(Number)
+    if (ipv4.length !== 4 || ipv4.some((part) => Number.isNaN(part) || part > 255)) return null
+    value = `${value.slice(0, lastColon + 1)}${((ipv4[0] << 8) | ipv4[1]).toString(16)}:${((ipv4[2] << 8) | ipv4[3]).toString(16)}`
+  }
+  const [head, tail] = value.split('::')
+  const headParts = head ? head.split(':').filter(Boolean) : []
+  const tailParts = tail ? tail.split(':').filter(Boolean) : []
+  const missing = 8 - headParts.length - tailParts.length
+  if (missing < 0) return null
+  return [...headParts, ...Array(missing).fill('0'), ...tailParts].map((part) => Number.parseInt(part, 16))
+}
+
+function privateIpv6(address) {
+  const parts = expandIpv6(address)
+  if (!parts || parts.length !== 8 || parts.some((part) => Number.isNaN(part))) return true
+  if (parts.every((part) => part === 0)) return true
+  if (parts.slice(0, 7).every((part) => part === 0) && parts[7] === 1) return true
+  if ((parts[0] & 0xfe00) === 0xfc00) return true
+  if ((parts[0] & 0xffc0) === 0xfe80) return true
+  if ((parts[0] & 0xff00) === 0xff00) return true
+  const embedded = `${parts[6] >> 8}.${parts[6] & 0xff}.${parts[7] >> 8}.${parts[7] & 0xff}`
+  if (parts.slice(0, 5).every((part) => part === 0) && parts[5] === 0xffff) return privateIpv4(embedded)
+  if (parts[0] === 0x0064 && parts[1] === 0xff9b && parts.slice(2, 6).every((part) => part === 0)) return privateIpv4(embedded)
+  if (parts.slice(0, 6).every((part) => part === 0)) return privateIpv4(embedded)
+  return false
+}
+
+function privateAddress(address) {
+  const kind = isIP(String(address || ''))
+  if (kind === 4) return privateIpv4(address)
+  if (kind === 6) return privateIpv6(address)
+  return true
+}
+
+function privateHostname(hostname) {
+  const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '')
+  if (!host) return true
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return true
+  if (isIP(host)) return privateAddress(host)
+  return false
+}
+
+async function assertPublicStyleUrl(url) {
+  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('style_url must use http or https')
+  if (url.username || url.password) throw new Error('style_url must not contain credentials')
+  if (privateHostname(url.hostname)) throw new Error('style_url must not point at a local or private network host')
+  const host = url.hostname.replace(/^\[|\]$/g, '')
+  let addresses
+  if (isIP(host)) addresses = [{ address: host }]
+  else {
+    try {
+      addresses = await lookup(host, { all: true, verbatim: true })
+    } catch (error) {
+      throw new Error(`style_url host could not be resolved: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  if (!addresses.length || addresses.some((entry) => privateAddress(entry.address))) {
+    throw new Error('style_url resolves to a local or private network address')
+  }
+}
+
+async function fetchStyleUrl(raw) {
+  let url
+  try {
+    url = new URL(String(raw).trim())
+  } catch {
+    throw new Error(`style_url is not a valid URL: ${raw}`)
+  }
+  for (let hop = 0; hop <= 4; hop += 1) {
+    await assertPublicStyleUrl(url)
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(15_000),
+      headers: { 'User-Agent': searchUserAgent() },
+    })
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      if (hop === 4) throw new Error('style_url redirected too many times')
+      const location = response.headers.get('location')
+      if (!location) throw new Error(`style_url redirected (HTTP ${response.status}) without a Location header`)
+      const next = new URL(location, url)
+      if (!['http:', 'https:'].includes(next.protocol)) throw new Error('style_url redirected to a non-http(s) URL')
+      url = next
+      continue
+    }
+    return { response, finalUrl: url }
+  }
+  throw new Error('style_url redirected too many times')
+}
+
+async function loadCustomStyle(cwd, args) {
+  const file = typeof args.style_file === 'string' ? args.style_file.trim() : ''
+  const urlArg = typeof args.style_url === 'string' ? args.style_url.trim() : ''
+  if (file && urlArg) throw new Error('give style_file or style_url, not both')
+  if (!file && !urlArg) return null
+  let xml
+  let source
+  let cached = false
+  let cacheAbs = null
+  let writeCache = false
+  if (file) {
+    xml = readWorkspaceText(cwd, file)
+    source = file
+  } else {
+    let requested
+    try {
+      requested = new URL(String(urlArg).trim())
+    } catch {
+      throw new Error(`style_url is not a valid URL: ${urlArg}`)
+    }
+    if (!['http:', 'https:'].includes(requested.protocol)) throw new Error('style_url must use http or https')
+    if (requested.username || requested.password) throw new Error('style_url must not contain credentials')
+    if (privateHostname(requested.hostname)) throw new Error('style_url must not point at a local or private network host')
+    const cacheRel = join('.dsh', 'styles', `${createHash('sha256').update(requested.href).digest('hex').slice(0, 16)}.csl`)
+    cacheAbs = resolveWorkspacePath(cwd, cacheRel)
+    if (existsSync(cacheAbs)) {
+      xml = readFileSync(cacheAbs, 'utf8')
+      source = requested.href
+      cached = true
+    } else {
+      const { response, finalUrl } = await fetchStyleUrl(urlArg)
+      if (!response.ok) throw new Error(`style_url returned HTTP ${response.status}`)
+      const declared = Number(response.headers.get('content-length'))
+      if (Number.isFinite(declared) && declared > MAX_CSTYLE_BYTES) throw new Error(`style_url is larger than ${MAX_CSTYLE_BYTES / 1024}KB`)
+      xml = await response.text()
+      if (Buffer.byteLength(xml) > MAX_CSTYLE_BYTES) throw new Error(`style_url is larger than ${MAX_CSTYLE_BYTES / 1024}KB`)
+      source = finalUrl.href
+      writeCache = true
+    }
+  }
+  if (Buffer.byteLength(xml) > MAX_CSTYLE_BYTES) throw new Error(`custom CSL style is larger than ${MAX_CSTYLE_BYTES / 1024}KB`)
+  const hash = createHash('sha256').update(xml).digest('hex')
+  const name = `custom-${hash.slice(0, 12)}`
+  const registered = registerCslStyle({ name, xml, label: file ? basename(file) : 'Custom CSL style' })
+  if (writeCache && cacheAbs) writeFileSync(cacheAbs, xml)
+  return {
+    name,
+    label: file ? basename(file) : 'Custom CSL style',
+    source,
+    sha256: `sha256:${hash}`,
+    cached,
+    warnings: registered.warnings || [],
+  }
+}
 
 function workspaceRoot(exec) {
   const cwd = exec.agent?.session?.header?.cwd
@@ -201,6 +368,13 @@ export async function runCitation(args, exec) {
   if (!['format', 'bibtex', 'ris', 'validate'].includes(action)) {
     throw new Error('action must be format, bibtex, ris, or validate')
   }
+  if ((args.style_file || args.style_url) && action !== 'format') {
+    throw new Error('style_file/style_url apply to action=format only')
+  }
+  if (args.style_file || args.style_url) {
+    if (args.style) throw new Error('give style or style_file/style_url, not both')
+  }
+  const customStyle = await loadCustomStyle(workspaceRoot(exec), args)
   if (action === 'bibtex' && typeof args.identifier === 'string' && args.identifier.trim()
     && !(Array.isArray(args.records) && args.records.length) && !args.library) {
     const resolved = await resolveBibtexForIdentifier(args.identifier.trim(), { signal: exec?.signal })
@@ -241,11 +415,12 @@ export async function runCitation(args, exec) {
     return value
   }
 
-  const style = args.style || 'apa'
+  const style = customStyle ? customStyle.name : (args.style || 'apa')
   const locale = args.locale || 'en-US'
   const bibliography = formatBibliography(records, { style, locale })
   const inText = args.include_in_text ? formatCitations(records, { style, locale }) : ''
   const value = { action, style, locale, count: records.length, bibliography, in_text: inText || null }
+  if (customStyle) value.custom_style = customStyle
   if (typeof args.output_path === 'string' && args.output_path.trim()) {
     writeWorkspaceText(workspaceRoot(exec), args.output_path, `${bibliography}\n`)
     value.output_path = args.output_path
@@ -261,7 +436,7 @@ export function apply(ctx) {
     name: 'citation',
     description: [
       'Format, export, or validate citations and bibliographies.',
-      '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, DOIs, or a single `identifier` (DOI → arXiv → INSPIRE → S2 → synthesized). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref.',
+      '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. A custom CSL style can be loaded from a workspace `style_file` or an http(s) `style_url`; it is validated, cached under `.dsh/styles/`, and used for this call. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, DOIs, or a single `identifier` (DOI → arXiv → INSPIRE → S2 → synthesized). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref.',
       'Accepts CSL-JSON records, BibTeX, RIS, a workspace path, `library` (papers from the PaperMemory reference library, under its own keys; to write a project .bib use `papermemory_library` export), or `identifier` for one canonical entry. Use paper_get when you need a merged paper record rather than a citation. No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
     ].join(' '),
     parameters: {
@@ -306,8 +481,10 @@ export function apply(ctx) {
       style: {
         type: 'string',
         enum: Object.keys(SUPPORTED_STYLES),
-        description: 'CSL style for format. Default apa.',
+        description: 'CSL style for format. Default apa. Do not combine with style_file/style_url.',
       },
+      style_file: { type: 'string', description: 'format: workspace-relative CSL style file. Validated and used for this call.' },
+      style_url: { type: 'string', description: 'format: http(s) CSL style URL. Validated, cached under .dsh/styles/, and used for this call; local/private hosts are refused.' },
       locale: { type: 'string', description: 'CSL locale, e.g. en-US. Default en-US.' },
       include_in_text: { type: 'boolean', description: 'Also return in-text citation markers (format action).' },
       check_dois: { type: 'boolean', description: 'Validate DOIs against Crossref (validate action). Adds network calls, one per DOI.' },

@@ -245,9 +245,21 @@ The policy, not your preference, picks the work: ask \`next\`, do that task, rec
 
 ## References and citation
 
-\`citation\` formats, exports, and validates bibliographies locally. Use it for any submitted reference list or \`.bib\`/\`.ris\` file instead of hand-writing entries or citation keys. \`format\` supports APA (default), Vancouver, Harvard, IEEE, Chicago author-date, and MLA; \`bibtex\`/\`ris\` accept CSL-JSON, BibTeX/RIS text, or DOIs (Crossref content negotiation); \`validate\` reports missing fields and duplicate DOIs/keys, and \`check_dois: true\` verifies DOI identity against Crossref — it does not confirm that a paper supports a claim. If a requested style is not in that list, say so rather than approximating it. Papers you cite are kept in the PaperMemory reference library (see below), and \`citation\` can read them with \`library: { cited_only | project | collection | query | all }\`, keeping the library's own keys. To pull a paper into the workspace and store it as citable evidence, use \`paper_download\` (open-access only), which adds it to the library.
+\`citation\` formats, exports, and validates bibliographies locally. Use it for any submitted reference list or \`.bib\`/\`.ris\` file instead of hand-writing entries or citation keys. \`format\` supports APA (default), Vancouver, Harvard, IEEE, Chicago author-date, and MLA, or a custom CSL style loaded from a workspace \`style_file\` or an http(s) \`style_url\` (validated, cached under \`.dsh/styles/\`, and never fetched from a local/private host); \`bibtex\`/\`ris\` accept CSL-JSON, BibTeX/RIS text, or DOIs (Crossref content negotiation); \`validate\` reports missing fields and duplicate DOIs/keys, and \`check_dois: true\` verifies DOI identity against Crossref — it does not confirm that a paper supports a claim. If a requested style is not in that list, say so rather than approximating it. Papers you cite are kept in the PaperMemory reference library (see below), and \`citation\` can read them with \`library: { cited_only | project | collection | query | all }\`, keeping the library's own keys. To pull a paper into the workspace and store it as citable evidence, use \`paper_download\` (open-access only), which adds it to the library.
 
 Before submitting a LaTeX or Pandoc-Markdown manuscript, run \`manuscript_citations\` with the manuscript and its \`.bib\`: it reports keys cited but missing from the bibliography, entries never cited, duplicate bibliography keys, and — for LaTeX — undefined \`\\ref\` targets and duplicate labels. \`citation validate\` only checks the bibliography itself; this checks the manuscript against it. It does not reformat or verify claim support, and it rejects \`.docx\` because Word citation fields are opaque.
+
+## Submission and communication
+
+\`submission_pack\` is the pre-upload checklist and bundle builder: \`plan\` checks limits, figure specs, citations, reporting evidence, numerical candidates, required statements, sections, and reviewers; unknown requirements are \`manual_check\`, never passes. \`build\` assembles the PDF/source, figures, supplement, statements, cover letter, highlights, checklist, and a SHA-256 manifest into a reproducible zip; \`status\` and \`export\` inspect or copy it. It never submits, emails, or logs into a portal, and a call-to-action is not a readiness verdict.
+
+- \`journal_search\` \`action: "match"\` ranks venues from title/keywords/metrics and constraints; fit is advisory, and predatory-venue signals need manual due diligence.
+- \`numbers_audit\` reports numerical-reporting candidates (recomputed p-values, CI/estimate consistency, N, flow counts, percentages, table/text values) and lists what it could not check. It never claims statistical validity.
+- \`manuscript_diff\` produces latexdiff/Markdown diffs, changed blocks, DOCX tracked changes/comments, and a response-letter skeleton; an item is never marked addressed without a real hunk behind it.
+- \`presentation_build\` fills known sections and figures into a poster or slide deck. A successful compile is not a visual pass — render the pages and delegate to \`subagent_vision\`.
+- \`authorship\` records authors, CRediT roles, and ICMJE criteria. It never assigns author order, decides qualification, or invents an affiliation, ORCID, funding source, or conflict.
+
+Load \`submission-package\`, \`manuscript-revision\`, \`numbers-audit\`, \`presentation-build\`, or \`authorship-credit\` for the detailed workflow; use \`journal_search\` \`match\` with the \`academic-search\` skill.
 
 ## Figures
 

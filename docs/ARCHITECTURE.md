@@ -92,6 +92,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Search providers | `literature-search.js`, `openalex-search.js`, `openalex-cite.js`, `semantic-scholar-search.js`, `crossref-lookup.js`, `arxiv-search.js`, `pubmed-search.js`, `consensus-search.js`, `parallel-search.js`, `parallel-extract.js`, `brave-search.js`, `tavily-search.js`, `exa-search.js`, `perplexity-search.js`, `jina-reader.js`, `core-search.js`, `elicit-search.js`, `futurehouse-agent.js`, `search-normalize.js`, `search-http.js` |
 | Papers and memory | `paper-resolve.js`, `paper-download.js`, `paper-fold.js`, `textfold-runtime.js`, `pdf-to-markdown.js`, `papermemory.js`, `paper-mcp.js` |
 | Citation and writing | `citation.js`, `citation-format.js`, `manuscript-citations.js`, `integrity-check.js`, `academic-harness.js`, `academic-harness-hooks.js`, `academic-harness-cli.js`, `vendor/academic-harness/` |
+| Submission and communication | `submission-pack.js`, `submission-store.js`, `manuscript-diff.js`, `numbers-audit.js`, `presentation-build.js`, `authorship.js`, `authorship-store.js`, `python-helpers/stat_audit.py`, `python-helpers/presentation_helper.py` |
 | Reviews and hypotheses | `review.js`, `review-store.js`, `grade-store.js`, `meta-analysis.js`, `meta-analysis-store.js`, `deep-review.js`, `vendor/open-deepreview/`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js`, `ledger-kit.js`, `provenance.js` |
 | Reproducible analysis and data | `analysis-run.js`, `analysis-store.js`, `experiment-log.js`, `experiment-store.js`, `dataset-get.js`, `data-profile.js`, `repro-package.js`, `repro-package-store.js`, `python-helpers/data_profile.py` |
 | Cross-ledger provenance | `provenance-audit.js`, `provenance-store.js` (read-only; joins the ledgers above and the AH claim sidecars) |
@@ -102,7 +103,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (752 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (757 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

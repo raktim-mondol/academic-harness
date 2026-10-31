@@ -47,6 +47,54 @@ for (const [name, style] of Object.entries(VENDORED_STYLES)) {
   if (CSL.styles.has(style.template)) SUPPORTED_STYLES[name] = { template: style.template, label: style.label }
 }
 
+const CUSTOM_STYLES = new Map()
+const MAX_CSL_BYTES = 1024 * 1024
+
+/** Validate one CSL style before registering it. Returns warnings, not a verdict. */
+export function validateCslStyle(xml) {
+  const body = typeof xml === 'string' ? xml : ''
+  if (!body.trim()) throw new Error('CSL style is empty')
+  if (Buffer.byteLength(body) > MAX_CSL_BYTES) throw new Error(`CSL style is larger than ${MAX_CSL_BYTES / 1024}KB`)
+  if (/<!DOCTYPE|<!ENTITY|<script\b/i.test(body)) throw new Error('CSL style contains a DTD, entity declaration, or script; refusing to load it')
+  const root = body.match(/<style\b([^>]*)>/i)
+  if (!root) throw new Error('CSL style has no <style> root element')
+  if (!/xmlns\s*=\s*["']http:\/\/purl\.org\/net\/xbiblio\/csl["']/i.test(root[1])) {
+    throw new Error('CSL style is missing the CSL namespace (http://purl.org/net/xbiblio/csl)')
+  }
+  const version = root[1].match(/version\s*=\s*["']([^"']+)["']/i)?.[1] || null
+  if (!version) throw new Error('CSL style is missing a version attribute (expected 1.0 or 1.0.x)')
+  if (!/^1\.0(?:\.\d+)?$/.test(version)) throw new Error(`unsupported CSL version: ${version}`)
+  if (!/<citation\b[\s\S]*?<\/citation>/i.test(body)) throw new Error('CSL style has no <citation> block')
+  const warnings = []
+  if (!/<bibliography\b[\s\S]*?<\/bibliography>/i.test(body)) {
+    warnings.push('the style has no <bibliography> block; bibliography formatting may fail')
+  }
+  return {
+    ok: true,
+    id: root[1].match(/\bid\s*=\s*["']([^"']+)["']/i)?.[1] || null,
+    version,
+    warnings,
+  }
+}
+
+/** Register a validated CSL style under a deterministic name; no network. */
+export function registerCslStyle({ name, xml, label = null }) {
+  const clean = text(name).toLowerCase()
+  if (!/^custom-[a-z0-9-]+$/.test(clean)) throw new Error(`custom CSL style name must look like custom-<id>: ${name}`)
+  const validation = validateCslStyle(xml)
+  if (CSL.styles.has(clean)) {
+    CUSTOM_STYLES.set(clean, { template: clean, label: label || clean })
+    return { name: clean, ...validation }
+  }
+  try {
+    CSL.styles.add(clean, xml)
+  } catch (error) {
+    throw new Error(`CSL style was not accepted by the formatter: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  CUSTOM_STYLES.set(clean, { template: clean, label: label || clean })
+  return { name: clean, ...validation }
+}
+
 const STYLE_ALIASES = {
   apa7: 'apa',
   harvard: 'harvard1',
@@ -340,6 +388,7 @@ export function assignCitationKeys(records) {
 function resolveStyleName(style) {
   const raw = text(style || 'apa').toLowerCase()
   const canonical = STYLE_ALIASES[raw] || raw
+  if (CUSTOM_STYLES.has(canonical)) return { canonical, ...CUSTOM_STYLES.get(canonical) }
   if (!SUPPORTED_STYLES[canonical]) {
     throw new Error(`unsupported citation style "${style}". Supported: ${Object.keys(SUPPORTED_STYLES).join(', ')}`)
   }
@@ -354,24 +403,32 @@ function citeFor(records) {
 export function formatBibliography(records, { style = 'apa', locale = 'en-US' } = {}) {
   const resolved = resolveStyleName(style)
   if (!Array.isArray(records) || records.length === 0) return ''
-  const output = citeFor(records).format('bibliography', {
-    format: 'text',
-    template: resolved.template,
-    lang: text(locale) || 'en-US',
-  })
-  return String(output || '').trim()
+  try {
+    const output = citeFor(records).format('bibliography', {
+      format: 'text',
+      template: resolved.template,
+      lang: text(locale) || 'en-US',
+    })
+    return String(output || '').trim()
+  } catch (error) {
+    throw new Error(`CSL bibliography formatting failed for style "${style}": ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 /** Format in-text citation markers in a supported CSL style. */
 export function formatCitations(records, { style = 'apa', locale = 'en-US' } = {}) {
   const resolved = resolveStyleName(style)
   if (!Array.isArray(records) || records.length === 0) return ''
-  const output = citeFor(records).format('citation', {
-    format: 'text',
-    template: resolved.template,
-    lang: text(locale) || 'en-US',
-  })
-  return String(output || '').trim()
+  try {
+    const output = citeFor(records).format('citation', {
+      format: 'text',
+      template: resolved.template,
+      lang: text(locale) || 'en-US',
+    })
+    return String(output || '').trim()
+  } catch (error) {
+    throw new Error(`CSL citation formatting failed for style "${style}": ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 export function parseBibtex(value) {

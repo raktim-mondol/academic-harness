@@ -552,6 +552,39 @@
           - id: provenance-audit
             name: academic-harness/provenance-audit
 
+          # Submission planning and bundling (Phase 4A of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+          # plan/build/status/export a journal-ready bundle under .dsh/submission/<slug>/.
+          # Checks limits, figures, citations, reporting evidence, numbers, statements, and
+          # reviewers; unknown requirements stay manual_check. The zip is reproducible from
+          # a SHA-256 manifest. It never submits, emails, or logs into a portal.
+          - id: submission-pack
+            name: academic-harness/submission-pack
+
+          # Revision diffs (Phase 4C): latexdiff or Markdown diff, changed-block extraction,
+          # DOCX tracked changes/comments with Zotero fields preserved, and a response-letter
+          # skeleton that only cites recorded hunks. The source files are never edited.
+          - id: manuscript-diff
+            name: academic-harness/manuscript-diff
+
+          # Numerical-reporting audit (Phase 4E): recomputed p-values where possible, CI and
+          # estimate consistency, total N/subgroup/flow counts, percentages, table/text
+          # candidates, and explicit not_checked items. Candidates only, never a validity
+          # verdict. Extends python-helpers/stat_audit.py.
+          - id: numbers-audit
+            name: academic-harness/numbers-audit
+
+          # Posters and slides (Phase 4D): fill known sections/figures into tikzposter,
+          # beamerposter, baposter, Beamer, or python-pptx templates; compile and preview;
+          # `qa` returns a checklist for subagent_vision and never claims a visual pass.
+          - id: presentation-build
+            name: academic-harness/presentation-build
+
+          # Authorship ledger (Phase 4F): authors, CRediT roles, and ICMJE criteria in an
+          # append-only record under .dsh/authorship/<slug>/; statement and CSV/JSON/Markdown
+          # exports. Order, qualification, affiliations, and conflicts remain human-owned.
+          - id: authorship
+            name: academic-harness/authorship
+
           # Reporting-guideline checker (Phase 3 of docs/REPORTING-AND-APPRAISAL-PLAN.md):
           # list/suggest/start/items/candidates/judge/status/export against versioned
           # CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, and STARD checklists. The

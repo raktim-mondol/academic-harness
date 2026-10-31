@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **752 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **757 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -24,7 +24,7 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 752.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 757.
 
 ## Workflow and tool skills
 
@@ -38,6 +38,11 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `systematic-review-ledger` | Full `review` tool workflow; see [Systematic reviews](RESEARCH.md#systematic-reviews) |
 | `meta-analysis` | Pairwise pooling, heterogeneity, subgroup/meta-regression, publication-bias diagnostics, diagnostic accuracy, and forest/funnel/SROC plots; see [Meta-analysis](RESEARCH.md#meta-analysis) |
 | `reproducible-analysis` | Plan freeze, auditable `analysis_run` executions, `dataset_get` provenance downloads, `data_profile` leakage review, and `repro_package` shipping; see [Reproducible analysis](ANALYSIS.md) |
+| `submission-package` | `submission_pack` planning/building/status/export, journal requirements, drafts, and hashed manifests; see [Writing](WRITING.md#submission-package) |
+| `manuscript-revision` | `manuscript_diff` diffs, changed blocks, DOCX tracked changes/comments, and response letters; see [Writing](WRITING.md#revision-diffs-and-response-letters) |
+| `numbers-audit` | `numbers_audit` numerical-reporting candidates and `not_checked` handling; see [Writing](WRITING.md#numbers-audit) |
+| `presentation-build` | `presentation_build` posters/slides plus the `subagent_vision` QA step; see [Writing](WRITING.md#posters-and-slides) |
+| `authorship-credit` | `authorship` CRediT/ICMJE records, statements, and unresolved disagreements; see [Writing](WRITING.md#authorship-and-credit) |
 | `experiment-tracking` | `experiment_log` sweeps with named-metric best, compare, links, and MLflow-compatible export; see [Reproducible analysis](ANALYSIS.md#experiment_log) |
 | `provenance-audit` | Reading and acting on the read-only cross-ledger index — the seven states, coverage, unsupported, stale, impact, and graph exports; see [Provenance audit](PROVENANCE.md) |
 | `grade-certainty` | GRADE domain judgements, derived suggestion, human overall certainty, evidence profile, and summary-of-findings exports; see [GRADE certainty](RESEARCH.md#grade-certainty) |

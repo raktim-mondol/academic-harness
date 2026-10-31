@@ -173,7 +173,7 @@ for (const marker of ['journal_search', 'paper_get', 'paper_context', 'openalex_
   check(searchRoutingSource.includes(marker), `search-routing.mmd missing ${marker}`)
 }
 const capabilityMapSource = readFileSync(join(root, 'docs/diagrams/capability-map.mmd'), 'utf8')
-for (const marker of ['paper_get', 'paper_context', '752 skills']) {
+for (const marker of ['paper_get', 'paper_context', '757 skills']) {
   check(capabilityMapSource.includes(marker), `capability-map.mmd missing ${marker}`)
 }
 

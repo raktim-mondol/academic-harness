@@ -8,6 +8,7 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { PUBLISHER_MEMBERS } from './publisher-members.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, emptyPaper, normalizeTitle, yearOf } from './search-normalize.js'
 
@@ -369,6 +370,29 @@ function rankJournals(journals, query) {
   })
 }
 
+export function renderJournalMatch(value) {
+  if (value.error) return [{ type: 'text', text: `Error: ${value.error}` }]
+  const lines = [
+    `Journal fit (advisory): ${value.title || value.query} · ${value.journals?.length || 0} venue(s)`,
+    `Query source: ${value.query_source} · constraints: ${[
+      value.constraints?.oa ? 'OA' : null,
+      value.constraints?.max_apc_usd != null ? `APC ≤ ${value.constraints.max_apc_usd} USD` : null,
+      value.constraints?.indexation?.length ? `indexation ${value.constraints.indexation.join('/')}` : null,
+    ].filter(Boolean).join(', ') || 'none'}`,
+  ]
+  if (value.failures?.length) lines.push(`Sources that failed: ${value.failures.map((entry) => `${entry.source} (${entry.error})`).join('; ')}`)
+  for (const journal of value.journals || []) {
+    lines.push('', `**${journal.title}** — ${journal.fit} (advisory)`)
+    lines.push([journal.publisher, journal.issn_l || journal.issns?.[0], journal.is_oa ? 'OA' : journal.is_oa === false ? 'not OA' : 'OA unknown', journal.is_in_doaj ? 'DOAJ' : null, journal.apc_usd != null ? `APC $${journal.apc_usd}` : null].filter(Boolean).join(' · '))
+    if (journal.rationale?.length) lines.push(`Why: ${journal.rationale.join('; ')}`)
+    if (journal.missing?.length) lines.push(`Missing: ${journal.missing.join('; ')}`)
+    if (journal.signal_summary?.length) lines.push(`Due-diligence signals (manual check): ${journal.signal_summary.join(' · ')}`)
+    lines.push(`Sources: ${journal.sources.join(', ')}`)
+  }
+  if (value.notes?.length) lines.push('', ...value.notes.map((note) => `Note: ${note}`))
+  return [{ type: 'text', text: lines.join('\n') }]
+}
+
 export function renderJournals(value) {
   if (value.error) return [{ type: 'text', text: `Error: ${value.error}` }]
   const bits = [
@@ -408,7 +432,234 @@ export function renderJournals(value) {
   return [{ type: 'text', text: bits.join('\n\n') }]
 }
 
+const STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'their', 'using', 'study',
+  'studies', 'analysis', 'results', 'effect', 'effects', 'between', 'among', 'were', 'was',
+  'are', 'has', 'have', 'not', 'but', 'our', 'can', 'may', 'also', 'than', 'more', 'less',
+  'clinical', 'research', 'paper', 'article', 'journal', 'review', 'novel', 'new',
+])
+
+function tokensOf(value) {
+  return [...new Set((String(value || '').toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}-]{2,}/gu) || [])
+    .filter((token) => !STOPWORDS.has(token)))]
+}
+
+function overlap(tokens, textTokens) {
+  const set = new Set(textTokens)
+  return tokens.filter((token) => set.has(token))
+}
+
+function asList(value) {
+  if (value == null || value === '') return []
+  return (Array.isArray(value) ? value : String(value).split(','))
+    .map((entry) => String(entry).trim().toLowerCase()).filter(Boolean)
+}
+
+function venueSignals(journal) {
+  const publisher = String(journal.publisher || journal.host_organization || '')
+  const knownPublisher = publisher
+    ? Object.values(PUBLISHER_MEMBERS).find((member) => publisher.toLowerCase().includes(member.name.toLowerCase()))
+    : null
+  const signals = [
+    {
+      id: 'doaj_listing',
+      status: journal.is_in_doaj === true ? 'listed' : journal.is_in_doaj === false ? 'not_listed' : 'unknown',
+      detail: journal.is_in_doaj === true
+        ? 'Listed in DOAJ at query time; this is a signal, not a quality guarantee.'
+        : journal.is_in_doaj === false
+          ? 'Not listed in DOAJ; many legitimate journals are not indexed there.'
+          : 'DOAJ status was not returned.',
+    },
+    {
+      id: 'publisher_membership',
+      status: knownPublisher ? 'recognized_crossref_member' : publisher ? 'not_in_local_member_list' : 'unknown',
+      detail: knownPublisher
+        ? `Publisher matches the local Crossref member list (${knownPublisher.name}).`
+        : 'No match in the small local Crossref member list; this says nothing by itself.',
+    },
+    {
+      id: 'issn',
+      status: journal.issn_l || journal.issns?.length ? 'present' : 'missing',
+      detail: journal.issn_l ? `ISSN ${journal.issn_l}` : journal.issns?.length ? `ISSN(s) ${journal.issns.join(', ')}` : 'No ISSN was returned.',
+    },
+    {
+      id: 'apc_transparency',
+      status: journal.apc_usd != null ? 'price_returned' : journal.is_oa === true ? 'oa_without_price' : 'unknown',
+      detail: journal.apc_usd != null
+        ? `APC ${journal.apc_usd} USD returned by a source.`
+        : journal.is_oa === true
+          ? 'Marked OA but no APC amount was returned; check the journal site.'
+          : 'APC could not be established from the available sources.',
+    },
+    {
+      id: 'homepage',
+      status: journal.homepage_url ? 'present' : 'missing',
+      detail: journal.homepage_url || 'No homepage URL was returned.',
+    },
+  ]
+  return {
+    manual_check: true,
+    signals,
+    note: 'Signals for human due diligence, not a predatory-venue verdict. Check indexing, editorial board, fees, and publication history directly.',
+  }
+}
+
+export async function runJournalMatch(args, exec) {
+  const constraints = args.constraints && typeof args.constraints === 'object' ? args.constraints : {}
+  const title = String(args.title || '').trim()
+  const abstract = String(args.abstract || '').trim()
+  const keywordList = asList(args.keywords)
+  const articleType = String(args.article_type || constraints.article_type || '').trim()
+  const oaRequired = constraints.oa === true || constraints.open_access === true || args.oa === true
+  const maxApc = constraints.max_apc_usd != null ? Number(constraints.max_apc_usd) : (args.max_apc_usd != null ? Number(args.max_apc_usd) : null)
+  const indexation = asList(constraints.indexation || args.indexation)
+  const deadline = constraints.deadline || args.deadline || null
+  if (!title && !abstract && !keywordList.length) {
+    return { error: 'match needs title, keywords, or abstract' }
+  }
+  const query = keywordList.length ? keywordList.slice(0, 8).join(' ') : (title || abstract.slice(0, 240))
+  const querySource = keywordList.length ? 'keywords' : title ? 'title' : 'abstract'
+  const limit = Math.min(Math.max(Number(args.limit) || 10, 1), 50)
+  const search = await runJournalSearch({
+    ...args,
+    action: 'search',
+    query,
+    issn: undefined,
+    limit: Math.max(limit, 20),
+    open_access_only: false,
+    include_keyed_metrics: args.include_keyed_metrics !== false,
+  }, exec)
+  if (search?.error) return search
+
+  const titleTokens = tokensOf(title)
+  const keywordTokens = tokensOf(keywordList.join(' '))
+  const abstractTokens = tokensOf(abstract).slice(0, 80)
+  const scopeTokens = [...new Set([...keywordTokens, ...titleTokens, ...abstractTokens])]
+  const warnings = [...(search.warnings || [])]
+  const ranked = []
+
+  for (const journal of search.journals || []) {
+    const titleHits = overlap(titleTokens, tokensOf(journal.title))
+    const topicText = (journal.topics || []).join(' ')
+    const topicHits = overlap(scopeTokens, tokensOf(topicText))
+    const matchingTopics = (journal.topics || []).filter((topic) => overlap(scopeTokens, tokensOf(topic)).length)
+    const keywordHits = overlap(keywordTokens, tokensOf(`${journal.title} ${topicText}`))
+    const missingFields = []
+    const constraintNotes = []
+
+    if (oaRequired) {
+      if (journal.is_oa === false && journal.is_in_doaj !== true) continue
+      if (journal.is_oa == null && journal.is_in_doaj == null) {
+        missingFields.push('OA status unknown')
+        constraintNotes.push('OA requirement could not be verified')
+      }
+    }
+    if (maxApc != null && Number.isFinite(maxApc)) {
+      if (journal.apc_usd != null && journal.apc_usd > maxApc) continue
+      if (journal.apc_usd == null) {
+        missingFields.push('APC unknown')
+        constraintNotes.push(`APC could not be checked against ${maxApc} USD`)
+      }
+    }
+    if (indexation.length) {
+      const status = {}
+      for (const source of indexation) {
+        if (source === 'doaj') status.doaj = journal.is_in_doaj === true ? 'yes' : journal.is_in_doaj === false ? 'no' : 'unknown'
+        else if (source === 'scopus') status.scopus = journal.metrics?.citescore != null || journal.metrics?.sjr != null || journal.metrics?.snip != null ? 'yes' : 'unknown'
+        else if (source === 'wos' || source === 'web-of-science') status.wos = journal.metrics?.jif != null || journal.metrics?.jci != null || journal.metrics?.jif_quartile != null ? 'yes' : 'unknown'
+        else status[source] = 'unknown'
+      }
+      const knownNo = Object.entries(status).filter(([, value]) => value === 'no').map(([key]) => key)
+      if (knownNo.length) continue
+      const unknown = Object.entries(status).filter(([, value]) => value === 'unknown').map(([key]) => key)
+      if (unknown.length) {
+        missingFields.push(`indexation unknown: ${unknown.join(', ')}`)
+        constraintNotes.push('indexation could not be verified from the returned metrics')
+      }
+    }
+
+    const metrics = journal.metrics || {}
+    const metricScore =
+      (metrics.two_year_mean_citedness != null ? Math.min(4, Math.log1p(metrics.two_year_mean_citedness)) : 0)
+      + (metrics.h_index != null ? Math.min(3, Math.log1p(metrics.h_index) / 2) : 0)
+    const scopeScore = topicHits.length * 3 + keywordHits.length * 2 + titleHits.length
+    const score = scopeScore + metricScore
+    const fit = !journal.topics?.length && scopeScore === 0
+      ? 'insufficient_scope_evidence'
+      : scopeScore >= 6 && (metrics.two_year_mean_citedness != null || metrics.h_index != null)
+        ? 'strong_scope_evidence'
+        : scopeScore >= 3
+          ? 'moderate_scope_evidence'
+          : 'weak_scope_evidence'
+
+    if (metrics.two_year_mean_citedness == null && metrics.h_index == null && (journal.issn_l || journal.issns?.length)) missingFields.push('no citation metrics')
+    if (journal.apc_usd == null && journal.is_oa === true) missingFields.push('APC not returned')
+    if (journal.is_in_doaj == null) missingFields.push('DOAJ status unknown')
+    if (scopeScore === 0) missingFields.push('no scope evidence in the returned topics')
+
+    const rationale = [
+      matchingTopics.length ? `topic overlap: ${matchingTopics.slice(0, 5).join(', ')}` : null,
+      keywordHits.length ? `keyword overlap in title/topics: ${keywordHits.slice(0, 5).join(', ')}` : null,
+      titleHits.length ? `journal-title overlap: ${titleHits.slice(0, 5).join(', ')}` : null,
+      metrics.two_year_mean_citedness != null ? `2-year mean citedness ${metrics.two_year_mean_citedness}` : null,
+      metrics.h_index != null ? `h-index ${metrics.h_index}` : null,
+      journal.is_oa ? 'marked OA' : journal.is_oa === false ? 'not marked OA' : 'OA status unknown',
+      journal.is_in_doaj ? 'DOAJ-listed' : null,
+      journal.apc_usd != null ? `APC ${journal.apc_usd} USD` : null,
+      articleType ? `article type: ${articleType}` : null,
+      ...constraintNotes,
+    ].filter(Boolean)
+
+    ranked.push({
+      ...journal,
+      fit,
+      fit_is_advisory: true,
+      score: Number(score.toFixed(3)),
+      scope_score: scopeScore,
+      rationale,
+      matching_topics: matchingTopics.slice(0, 8),
+      missing: [...new Set(missingFields)],
+      venue_signals: venueSignals(journal),
+      sources: journal.sources,
+    })
+  }
+
+  ranked.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title))
+  const journals = ranked.slice(0, limit).map((journal) => {
+    const signals = journal.venue_signals
+    return { ...journal, signal_summary: signals.signals.map((signal) => `${signal.id}: ${signal.status}`) }
+  })
+  const notes = [
+    'Journal fit is advisory. It combines local topic/keyword overlap with the metrics a source returned; it cannot guarantee acceptance or suitability.',
+    'Predatory-venue signals are reported for manual due diligence and are not a verdict.',
+    'Use journal_policy for self-archiving and OA policy, and read the journal’s current author guidelines before submission.',
+  ]
+  if (deadline) notes.push(`deadline ${deadline} is recorded but does not affect the ranking`)
+  return {
+    action: 'match',
+    query,
+    query_source: querySource,
+    title: title || null,
+    keywords: keywordList,
+    article_type: articleType || null,
+    constraints: {
+      oa: oaRequired,
+      max_apc_usd: Number.isFinite(maxApc) ? maxApc : null,
+      indexation,
+      deadline: deadline || null,
+    },
+    providers_queried: search.providers_queried,
+    journals,
+    warnings,
+    failures: search.failures || [],
+    notes,
+  }
+}
+
 export async function runJournalSearch(args, exec) {
+  const action = args.action || 'search'
+  if (action === 'match') return runJournalMatch(args, exec)
+  if (action !== 'search') return { error: 'action must be search or match' }
   const query = String(args.query || '').trim()
   const issn = String(args.issn || '').trim()
   if (!query && !issn) return { error: 'give query or issn' }
@@ -514,24 +765,37 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'journal_search',
     description: [
-      'Search journals and venues with open metrics. Free sources: OpenAlex /sources (2-year mean citedness, h-index, i10, APC, DOAJ status), DOAJ v4 (APC/license/OA), and Crossref journals; merged by ISSN and title.',
-      'Optional keyed enrichment adds Elsevier CiteScore/SJR/SNIP (SCOPUS_API_KEY) and WoS JCR JIF/JCI/quartile (WOS_API_KEY); unset keys are skipped.',
-      'Use journal_policy instead when the question is OA/self-archiving policy rather than discovery or metrics.',
+      'Search journals and venues with open metrics, or rank venues for a manuscript. Free sources: OpenAlex /sources (2-year mean citedness, h-index, i10, APC, DOAJ status), DOAJ v4 (APC/license/OA), and Crossref journals; merged by ISSN and title. Optional keyed enrichment adds Elsevier CiteScore/SJR/SNIP (SCOPUS_API_KEY) and WoS JCR JIF/JCI/quartile (WOS_API_KEY); unset keys are skipped.',
+      '`action: "search"` (default) discovers journals by query or ISSN. `action: "match"` takes title, abstract, keywords, article type, and constraints (OA, max APC, indexation, deadline) and returns venues ranked by local scope/keyword overlap plus the returned metrics, with rationale, missing data, and due-diligence signals. Fit is advisory and cannot guarantee acceptance; predatory-venue signals always carry a manual-check flag.',
+      'Use journal_policy instead when the question is OA/self-archiving policy rather than discovery, metrics, or fit.',
     ].join(' '),
     parameters: {
-      query: { type: 'string', description: 'Journal title or topic keywords.' },
-      issn: { type: 'string', description: 'Exact ISSN lookup, e.g. 1476-4687.' },
+      action: { type: 'string', enum: ['search', 'match'], description: 'search (default) or match.' },
+      query: { type: 'string', description: 'search: journal title or topic keywords.' },
+      issn: { type: 'string', description: 'search: exact ISSN lookup, e.g. 1476-4687.' },
+      title: { type: 'string', description: 'match: manuscript title.' },
+      abstract: { type: 'string', description: 'match: abstract used for scope terms (first 80 unique terms).' },
+      keywords: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'match: topic keywords; preferred for the discovery query.' },
+      article_type: { type: 'string', description: 'match: article type, recorded in the rationale.' },
+      constraints: {
+        type: 'object',
+        additionalProperties: true,
+        description: 'match: {oa, max_apc_usd, indexation: [doaj, scopus, wos], deadline}. Unknown constraints are reported as missing, not passed.',
+      },
+      oa: { type: 'boolean', description: 'match: require OA/DOAJ status when known.' },
+      max_apc_usd: { type: 'number', description: 'match: maximum APC in USD when a source returns a price.' },
+      indexation: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'match: desired indexation (doaj, scopus, wos). Unknown is reported, not treated as a pass.' },
       providers: {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
         description: `Sources to query: ${PROVIDERS.join(', ')}. Default all three.`,
       },
-      open_access_only: { type: 'boolean', description: 'Only return journals marked OA or listed in DOAJ.' },
+      open_access_only: { type: 'boolean', description: 'search: only return journals marked OA or listed in DOAJ.' },
       limit: { type: 'number', description: 'Maximum journals to return, 1-50. Default 10.' },
       include_keyed_metrics: { type: 'boolean', description: 'Add CiteScore/SJR/SNIP and JCR metrics when keys are set. Default true; set false to avoid quota use.' },
     },
     output: {
       schema: { type: 'json' },
-      render: (_args, value) => renderJournals(value),
+      render: (_args, value) => (value.action === 'match' ? renderJournalMatch(value) : renderJournals(value)),
     },
     async execute(args, exec) {
       try {
@@ -541,7 +805,7 @@ export function apply(ctx) {
       }
     },
     presentCall(args) {
-      return { card: 'generic', title: `Journal search: ${args.query || args.issn || ''}`, kind: 'search' }
+      return { card: 'generic', title: `Journal search: ${args.title || args.query || args.issn || ''}`, kind: 'search' }
     },
   }))
 }

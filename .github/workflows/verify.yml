@@ -86,6 +86,12 @@ jobs:
           node scripts/test-data-profile.mjs
           node scripts/test-repro-package.mjs
           node scripts/test-provenance-audit.mjs
+          node scripts/test-submission-pack.mjs
+          node scripts/test-manuscript-diff.mjs
+          node scripts/test-numbers-audit.mjs
+          node scripts/test-presentation-build.mjs
+          node scripts/test-authorship.mjs
+          node scripts/test-journal-match.mjs
           node scripts/test-deep-review-tool.mjs
           node scripts/test-agreement.mjs
           node scripts/test-appraisal.mjs

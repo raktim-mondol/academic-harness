@@ -43,7 +43,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 |---|---|---|---|
 | `literature_search` | Academic Harness preset | One-shot multi-source router; RRF fusion and cross-provider dedupe. Adds bioRxiv/INSPIRE by domain and ADS when keyed; DOAJ/publisher Crossref deposits keyless; Scopus/WoS/Springer/IEEE explicit and keyed | [Search](SEARCH.md#the-literature-router) |
 | `domain_search` | Academic Harness preset | Source-specific actions: bioRxiv browse, ACL records, INSPIRE citations/references/texkeys, ADS export/metrics, Scopus/WoS cited-by, Wikidata resolution | [Search](SEARCH.md#domain-sources) |
-| `journal_search` | Academic Harness preset | Journal/venue discovery and metrics across OpenAlex, DOAJ, and Crossref; optional CiteScore/SJR/SNIP and JCR JIF/JCI | [Search](SEARCH.md#journal-and-venue-search) |
+| `journal_search` | Academic Harness preset | Journal/venue discovery and metrics across OpenAlex, DOAJ, and Crossref; `match` ranks venues for a manuscript with advisory fit, constraints, and due-diligence signals; optional CiteScore/SJR/SNIP and JCR JIF/JCI | [Search](SEARCH.md#journal-and-venue-search) |
 | `openalex_search` | Academic Harness preset | OpenAlex works discovery with filters, query, and group-by; `entity=sources` now surfaces source metrics | [Search](SEARCH.md#academic-databases) |
 | `openalex_citations` | Academic Harness preset | Forward, backward, or both citation edges with an OpenCitations DOI-level fallback | [Search](SEARCH.md#academic-databases) |
 | `database_catalog` | Academic Harness preset | Runtime source catalog with capabilities, key field, rate limit, fronting tool, and configured/not-set state | [Search](SEARCH.md#database-catalog) |
@@ -71,9 +71,14 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `citation` | Academic Harness preset | Format APA/Vancouver/Harvard/IEEE/Chicago/MLA; BibTeX/RIS export; DOI/arXiv/INSPIRE/title→BibTeX via `identifier`; validation | [Writing](WRITING.md#references-and-citation) |
+| `citation` | Academic Harness preset | Format APA/Vancouver/Harvard/IEEE/Chicago/MLA or a validated custom CSL `style_file`/`style_url` (cached under `.dsh/styles/`); BibTeX/RIS export; DOI/arXiv/INSPIRE/title→BibTeX via `identifier`; validation | [Writing](WRITING.md#references-and-citation) |
 | `manuscript_citations` | Academic Harness preset | Manuscript ↔ `.bib` consistency, undefined `\ref`, duplicate labels | [Writing](WRITING.md#references-and-citation) |
 | `reporting_check` | Academic Harness preset | Auditable reporting-guideline check: CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, STARD; verified quotes, stale detection, evidence-only exports | [Writing](WRITING.md#reporting-checklists) |
+| `submission_pack` | Academic Harness preset | Journal submission planning and bundling: limits, figure format/DPI/color/size/naming, citation style and manuscript citations, reporting evidence, numbers, statements, reviewers; PDF/source/figures/supplement/cover letter/highlights/checklist and a SHA-256 manifest; reproducible zip; export only, never submit | [Writing](WRITING.md#submission-and-communication) |
+| `manuscript_diff` | Academic Harness preset | latexdiff/Markdown revision diff, changed blocks, DOCX tracked changes/comments with Zotero fields, and a response-letter skeleton that only cites recorded hunks | [Writing](WRITING.md#revision-diffs-and-response-letters) |
+| `numbers_audit` | Academic Harness preset | Numerical-reporting candidates: recomputed p-values, CI/estimate consistency, N/subgroup/flow counts, percentages, table/text matches, impossible values; explicit `not_checked` | [Writing](WRITING.md#numbers-audit) |
+| `presentation_build` | Academic Harness preset | Posters (`tikzposter`, `beamerposter`, `baposter`) and slides (Beamer, optional PowerPoint); compiled PDF/PNG, status, and a visual-QA checklist for `subagent_vision` | [Writing](WRITING.md#posters-and-slides) |
+| `authorship` | Academic Harness preset | Append-only authorship record: authors, CRediT roles, ICMJE criteria, statement and Markdown/CSV/JSON exports; never decides order or qualification | [Writing](WRITING.md#authorship-and-credit) |
 | `latex_compile` | Every preset | `.tex` → PDF through `latexmk`, with a `pdflatex`/`xelatex`/`lualatex` fallback | [Writing](WRITING.md#latex) |
 | `image_generate` | Every preset | Conceptual scientific images through Gemini "nano banana" or an OpenAI-compatible Images API | [Writing](WRITING.md#image-generation) |
 | `mermaid_render` | Every preset | Mermaid text → SVG through Pele, in-process, no browser | [Writing](WRITING.md#mermaid-diagrams) |

@@ -47,15 +47,67 @@ function detectBibTool(src) {
 /** Ordered list of argv arrays to run in the target's directory. */
 function buildCompilePlan({ engine, targetAbs, hasLatexmk, bibTool }) {
   if (hasLatexmk) {
-    return [['latexmk', `-${engine}`, '-interaction=nonstopmode', '-cd', '-file-line-error', '-synctex=1', targetAbs]]
+    // -norc keeps a workspace .latexmkrc from running arbitrary Perl.
+    return [['latexmk', '-norc', `-${engine}`, '-interaction=nonstopmode', '-cd', '-file-line-error', '-synctex=1', targetAbs]]
   }
   const base = basename(targetAbs)
   const stem = base.replace(/\.(tex|latex)$/i, '')
-  const engineCmd = [engine, '-interaction=nonstopmode', '-file-line-error', '-synctex=1', base]
+  const engineCmd = [engine, '-no-shell-escape', '-interaction=nonstopmode', '-file-line-error', '-synctex=1', base]
   const plan = [engineCmd]
   if (bibTool) plan.push([bibTool, stem], engineCmd)
   plan.push(engineCmd)
   return plan
+}
+
+/** Compile one .tex file in place and return the PDF path or the compiler log. */
+export async function compileLatex(cwd, path, engineArg = 'pdflatex') {
+  const target = resolveWorkspacePath(cwd, path)
+  if (!existsSync(target)) return { success: false, error: `file not found: ${path}` }
+
+  const engine = ENGINES.includes(engineArg) ? engineArg : 'pdflatex'
+  const workDir = dirname(target)
+  const stem = basename(target).replace(/\.(tex|latex)$/i, '')
+  const pdfAbs = join(workDir, `${stem}.pdf`)
+  const src = readFileSync(target, 'utf8')
+  const hasLatexmk = await hasCommand('latexmk')
+  const plan = buildCompilePlan({
+    engine,
+    targetAbs: target,
+    hasLatexmk,
+    bibTool: hasLatexmk ? null : detectBibTool(src),
+  })
+
+  let log = ''
+  let lastStatus = 0
+  for (const [cmd, ...cmdArgs] of plan) {
+    try {
+      const { stdout, stderr } = await execFileAsync(cmd, cmdArgs, {
+        cwd: workDir,
+        timeout: COMMAND_TIMEOUT_MS,
+        maxBuffer: 8 * 1024 * 1024,
+        encoding: 'utf8',
+      })
+      log += `${stdout}${stderr}`
+      lastStatus = 0
+    } catch (error) {
+      log += `${error.stdout ?? ''}${error.stderr ?? ''}`
+      if (error.code === 'ENOENT') {
+        return { success: false, error: `LaTeX compiler not found. Install TeX Live or add ${cmd} to PATH.`, log: clampLog(log) }
+      }
+      lastStatus = typeof error.code === 'number' ? error.code : 1
+      // bibtex/biber failures shouldn't kill the run — the engine pass that
+      // follows surfaces the real problem in the log.
+      if (cmd !== 'bibtex' && cmd !== 'biber') break
+    }
+  }
+
+  if (lastStatus === 0 && existsSync(pdfAbs)) {
+    return { success: true, pdf_path: path.replace(/\.(tex|latex)$/i, '.pdf'), log: clampLog(log) }
+  }
+  if (existsSync(pdfAbs) && lastStatus !== 0) {
+    return { success: false, log: clampLog(log), error: 'LaTeX compile failed; an older PDF exists and is not treated as the build output' }
+  }
+  return { success: false, log: clampLog(log), error: lastStatus === 0 ? 'compiler finished but no PDF was written' : 'LaTeX compile failed' }
 }
 
 /** Register the LaTeX-to-PDF compile tool. */
@@ -75,50 +127,7 @@ export function applyLatexCompile(ctx) {
       },
     },
     async execute(args, exec) {
-      const target = resolveWorkspacePath(workspaceRoot(exec), args.path)
-      if (!existsSync(target)) return { success: false, error: `file not found: ${args.path}` }
-
-      const engine = ENGINES.includes(args.engine) ? args.engine : 'pdflatex'
-      const workDir = dirname(target)
-      const stem = basename(target).replace(/\.(tex|latex)$/i, '')
-      const pdfAbs = join(workDir, `${stem}.pdf`)
-      const src = readFileSync(target, 'utf8')
-      const hasLatexmk = await hasCommand('latexmk')
-      const plan = buildCompilePlan({
-        engine,
-        targetAbs: target,
-        hasLatexmk,
-        bibTool: hasLatexmk ? null : detectBibTool(src),
-      })
-
-      let log = ''
-      let lastStatus = 0
-      for (const [cmd, ...cmdArgs] of plan) {
-        try {
-          const { stdout, stderr } = await execFileAsync(cmd, cmdArgs, {
-            cwd: workDir,
-            timeout: COMMAND_TIMEOUT_MS,
-            maxBuffer: 8 * 1024 * 1024,
-            encoding: 'utf8',
-          })
-          log += `${stdout}${stderr}`
-          lastStatus = 0
-        } catch (error) {
-          log += `${error.stdout ?? ''}${error.stderr ?? ''}`
-          if (error.code === 'ENOENT') {
-            return { success: false, error: `LaTeX compiler not found. Install TeX Live or add ${cmd} to PATH.`, log: clampLog(log) }
-          }
-          lastStatus = typeof error.code === 'number' ? error.code : 1
-          // bibtex/biber failures shouldn't kill the run — the engine pass that
-          // follows surfaces the real problem in the log.
-          if (cmd !== 'bibtex' && cmd !== 'biber') break
-        }
-      }
-
-      if (existsSync(pdfAbs)) {
-        return { success: true, pdf_path: args.path.replace(/\.(tex|latex)$/i, '.pdf'), log: clampLog(log) }
-      }
-      return { success: false, log: clampLog(log), error: lastStatus === 0 ? 'compiler finished but no PDF was written' : 'LaTeX compile failed' }
+      return compileLatex(workspaceRoot(exec), args.path, args.engine)
     },
     presentCall(args) {
       return {

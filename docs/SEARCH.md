@@ -67,6 +67,16 @@ All of these are native REST tools — no MCP mount and no restart requirement. 
 
 Optional keyed enrichment adds Elsevier Serial Title CiteScore/SJR/SNIP (`SCOPUS_API_KEY`, optional `ELSEVIER_INSTTOKEN`) and WoS JCR JIF/JCI/quartile/percentile (`WOS_API_KEY`). Unset keys are skipped; a configured key that fails adds a warning without failing the whole search. These keyed tiers are implemented but intentionally not part of the automated or live test suite.
 
+### Venue fit (`action: "match"`)
+
+`journal_search` also ranks venues for a manuscript. Inputs are `title`, `abstract`, `keywords`, `article_type`, and `constraints` (`oa`, `max_apc_usd`, `indexation: [doaj, scopus, wos]`, `deadline`). The tool runs the same OpenAlex/DOAJ/Crossref discovery pipeline, then scores each venue on keyword/topic/title overlap plus the returned citation metrics. Each result carries:
+
+- an advisory `fit` label (`strong_scope_evidence`, `moderate_scope_evidence`, `weak_scope_evidence`, or `insufficient_scope_evidence`) and the rationale behind it;
+- `missing` data (citation metrics, APC, DOAJ status, indexation, scope evidence);
+- `venue_signals` for manual due diligence — DOAJ listing, recognized Crossref publisher, ISSN, APC transparency, homepage — always with `manual_check: true`.
+
+Constraints filter only on known values. Unknown OA/APC/indexation is reported as missing, not silently passed. Fit never guarantees acceptance; DOAJ listing is not a quality verdict; use `journal_policy` for self-archiving terms and read the current author guidelines.
+
 ## Merged paper lookup and BibTeX
 
 `paper_get` resolves one DOI, arXiv ID, PMID, PMCID, OpenAlex ID, S2 ID, source-specific identifier, or title into a merged record. It fans out across OpenAlex, Semantic Scholar, Crossref, Europe PMC, and arXiv where the identifier allows it, fills an OA URL through Unpaywall/OpenAlex when available, and returns a canonical BibTeX entry. The entry order is DOI content negotiation → arXiv `/bibtex` → INSPIRE → Semantic Scholar `citationStyles.bibtex` → deterministic synthesis, with `bibtex_source` naming the tier. It does not download files or write to PaperMemory.

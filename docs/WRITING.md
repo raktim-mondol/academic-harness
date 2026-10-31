@@ -84,6 +84,8 @@ The suite is self-contained in `skills/`, but it refers to the upstream handbook
 
 The IEEE, Chicago author-date, and MLA CSL styles are vendored under `styles/` (CC BY-SA 3.0; see [styles/README.md](../styles/README.md)). Set `CROSSREF_MAILTO` or `UNPAYWALL_EMAIL` for the Crossref polite pool.
 
+For a journal style that is not built in, pass `style_file` (a workspace-relative `.csl`) or `style_url` (http/https) to `format`. The style is validated for the CSL namespace and minimum structure, then registered for that call. URL styles are cached under `.dsh/styles/`; local/private hosts are refused. Do not combine `style` with `style_file`/`style_url`.
+
 Use `citation` for the final bibliography. To pull a paper into the workspace and store citable evidence, use `paper_download` (open-access only) and PaperMemory — a reference in a manager is not verified evidence, so claims still need `papermemory_quote_check` / `papermemory_trace`.
 
 ### Manuscript ↔ bibliography consistency
@@ -128,9 +130,94 @@ If the manuscript is a `.tex` file in an `ah.yaml` project, an evidence location
 
 Exports say **N of M items have verified evidence**, with unassessed and stale counts. They contain the guideline's source link and the paraphrased prompts. They never say "compliant", "ready for submission", or "meets CONSORT". The model proposes and the tool verifies; the author decides. Load the `reporting-guidelines` skill for the item-batch and subagent workflow.
 
+## Submission and communication
+
+The writing side ends with a compiled manuscript. These tools close the submission edge without taking any action on the journal's behalf.
+
+### Submission package
+
+`submission_pack` has four actions:
+
+| Action | What it does |
+|---|---|
+| `plan` | Read the manuscript and journal requirements, then record limits, figure specs, citation consistency, reporting-check evidence, numerical candidates, required statements, required sections, suggested reviewers, and the manuscript PDF. Unknown requirements are `manual_check`, never a pass. |
+| `build` | Copy or compile the PDF and sources, figures, supplementary files, author-supplied statements, cover letter, highlights, graphical abstract, checklist, and a SHA-256 manifest into `.dsh/submission/<slug>/packs/<pack-id>/`; write a zip that is reproducible from the manifest. |
+| `status` | Latest plan and every pack with failed, missing, and manual checks. |
+| `export` | Copy the zip or bundle directory to a workspace path. It does not submit. |
+
+Inputs that matter: `manuscript`, optional `manuscript_pdf`, `bib`, `journal`, `requirements` (`word_limit`, `abstract_limit`, `reference_limit`, `figure_limit`, `table_limit`, `figure_dpi`, `figure_formats`, `figure_naming` regex, `figure_max_width_mm`, `figure_max_height_mm`, `color_mode`, `citation_style`, `citation_style_file`, `citation_style_url`, `required_statements`, `required_sections`, `suggested_reviewers_limit`), `figures`, `supplementary`, `statements`, `suggested_reviewers`, and `reporting`.
+
+- `numbers_audit` candidates enter the plan as a `manual_check`; the pack does not resolve them.
+- Cover letter and highlights are placeholders unless the author supplies them. No claim is generated.
+- Suggested reviewers are only the user's entries, with their source recorded.
+- Raster figures are checked through the local figure helper for format/DPI/color mode; vector figures stay manual.
+- A `pass` means the local check succeeded. The manifest says `ready_to_upload` only when no failed, missing, **or manual** checks remain.
+
+Load the `submission-package` skill before building a real bundle.
+
+### Journal fit
+
+`journal_search` `action: "match"` ranks venues for a manuscript:
+
+- input: `title`, `abstract`, `keywords`, `article_type`, and `constraints` (`oa`, `max_apc_usd`, `indexation`, `deadline`);
+- it queries the existing OpenAlex/DOAJ/Crossref pipeline and combines topic/keyword overlap with returned metrics;
+- each venue carries a rationale, missing data, and advisory fit label;
+- DOAJ listing, publisher membership, ISSN, APC transparency, and homepage are reported as **due-diligence signals** with a manual-check flag.
+
+Fit is advisory and cannot guarantee acceptance. Use `journal_policy` for OA/self-archiving terms and read the current author guidelines.
+
+### Revision diffs and response letters
+
+`manuscript_diff` handles revise-and-resubmit work without editing either source:
+
+- `diff` — `latexdiff` for two `.tex` files (with optional compiled PDF) or a unified diff for `.md`/`.txt`; missing `latexdiff` returns `not_installed` and writes nothing.
+- `changes` — changed blocks with ids (`ch-001`, …), hashes of both versions, and `changes.json` / `changes.md`.
+- `docx` — tracked insertions/deletions, comments, and Zotero/CSL field text from `word/document.xml`; the document is not rewritten.
+- `letter` — with `review: <ah-review-id>`, the Academic Harness engine builds the letter from real unit changes; otherwise pass `items` with `change_ids` that must resolve in `changes.json`. An item marked addressed without a hunk is flagged and returned in `unresolved`.
+
+Load the `manuscript-revision` skill.
+
+### Numbers audit
+
+`numbers_audit` reads `.tex`, `.md`, `.txt`, `.docx`, or `.pdf` and reports candidates:
+
+- p-values recomputed from reported test statistics and df;
+- p-values outside `[0, 1]` or reported as exactly 0;
+- reversed/zero-width confidence intervals, and estimates outside their own interval;
+- non-positive ratio measures;
+- total N inconsistency across sections, subgroup `n` above the total, and flow counts that increase;
+- fraction/percentage mismatches and percentages outside 0–100;
+- label-matched table-versus-text values.
+
+It ignores references, citations, equations, and years in its targeted patterns. Values it cannot recompute or match are listed under `not_checked`. `grim: true` adds the mean-consistency check. It never calls the statistics valid or the authors dishonest. Load the `numbers-audit` skill.
+
+### Posters and slides
+
+`presentation_build` works from explicit `sections` or a manuscript:
+
+- `poster` — `tikzposter` (default), `beamerposter`, or `baposter`; sections and figure files are filled into blocks; compiled PDF plus PNG preview when `pdftoppm` is available.
+- `slides` — Beamer by default, or PowerPoint (`engine: "pptx"`) when `python-pptx` is installed in the helper environment.
+- `status` — builds, artifacts, missing figures, compile failures.
+- `qa` — a visual-QA checklist and rendering command. Render the pages and delegate them to `subagent_vision`; the tool never claims the visual check passed.
+
+Empty sections become explicit placeholders; no result or figure is generated. The design guidance lives in `latex-posters` and `scientific-slides`; load the `presentation-build` routing skill.
+
+### Authorship and credit
+
+`authorship` keeps an append-only record under `.dsh/authorship/<slug>/`:
+
+- `start` creates a write-once record;
+- `add` records an author, affiliation, ORCID, corresponding flag, email, and a user-supplied position (omit it if order is undecided);
+- `credit` records CRediT roles;
+- `icmje` records the four criteria as true, false, or unknown;
+- `statement` writes Markdown plus a JSON sidecar and lists unresolved items;
+- `export` writes Markdown, CSV, or JSON under `exports/`.
+
+It never decides author order or qualification and never invents an affiliation, ORCID, funding source, or conflict. Duplicate positions, duplicate ORCIDs, and changed role/criteria sets are reported as disagreements, not resolved. Load the `authorship-credit` skill.
+
 ## LaTeX
 
-`latex_compile` compiles a `.tex` file to PDF: `latexmk` when it's on `PATH` (handles bibtex/biber automatically), otherwise a `pdflatex`/`xelatex`/`lualatex` fallback with a bibtex/biber pass when the source needs one. Requires a TeX Live (or similar) install.
+`latex_compile` compiles a `.tex` file to PDF: `latexmk` when it's on `PATH` (handles bibtex/biber automatically), otherwise a `pdflatex`/`xelatex`/`lualatex` fallback with a bibtex/biber pass when the source needs one. Requires a TeX Live (or similar) install. Compiles run with `latexmk -norc` and the fallback passes `-no-shell-escape`, so a workspace `.latexmkrc` or shell-escape directive is not executed; a build that needs either must be run by the author outside the tool.
 
 For layout auditing, the agent can render PDF pages to images with `pdftoppm -png -r 150 file.pdf page` (poppler, usually present with TeX Live) and delegate them to `subagent_vision`; `read_image` only accepts PNG/JPEG/WebP/GIF.
 
