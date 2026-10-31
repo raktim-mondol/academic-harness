@@ -227,7 +227,23 @@ ok('package export ah-hooks', pkg.exports['./ah-hooks'] === './academic-harness-
 ok('package export academic-harness alias', pkg.exports['./academic-harness'] === './academic-harness.js')
 ok('package export hooks alias', pkg.exports['./academic-harness-hooks'] === './academic-harness-hooks.js')
 ok('package files include engine JS', pkg.files.includes('academic-harness.js') && pkg.files.includes('academic-harness-hooks.js'))
-ok('prompt mentions Academic Harness', /Academic Harness/.test(readFileSync(join(ROOT, 'prompt.js'), 'utf8')))
+const promptSource = readFileSync(join(ROOT, 'prompt.js'), 'utf8')
+ok('prompt mentions Academic Harness', /Academic Harness/.test(promptSource))
+ok(
+  'prompt asks before a generic paper review',
+  /generic paper review/i.test(promptSource)
+    && /deep review/i.test(promptSource)
+    && /normal session review/i.test(promptSource),
+)
+{
+  const skill = readFileSync(join(ROOT, 'skills', 'deep-review', 'SKILL.md'), 'utf8')
+  ok(
+    'deep-review skill asks before a generic review',
+    /Route a generic review request/.test(skill)
+      && /normal session review/i.test(skill)
+      && /Do not run `estimate` or `review` before the user has chosen/i.test(skill),
+  )
+}
 try {
   const section = await import('../prompt-section.js')
   ok('prompt-section imports', typeof section.apply === 'function' && section.inject?.includes('systemPrompt'))

@@ -35,6 +35,23 @@ reporting-guideline verdict.
 `deep_review` findings are advisory criticism. It does not decide acceptance and
 does not replace the user's judgment.
 
+## Route a generic review request
+
+A generic request — "review this paper", "what do you think of this manuscript",
+"give me feedback" — does not say which kind of review is wanted. Do not silently
+pick one. Ask:
+
+> Do you want a deep review (multi-pass engine; I’ll estimate the cost first and
+> it may take several minutes) or a normal session review (faster, written by
+> this session’s model)?
+
+- **Deep review:** continue with the workflow below — `estimate`, confirm the
+  cost, then `review` and `show`.
+- **Normal review:** delegate to the `peer-reviewer` subagent (or review inline
+  when the request is small). Do not call `deep_review`.
+
+Do not run `estimate` or `review` before the user has chosen the deep review.
+
 ## Workflow
 
 ### 1. Estimate the cost and confirm it

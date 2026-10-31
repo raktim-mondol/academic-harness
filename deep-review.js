@@ -1271,6 +1271,7 @@ export function apply(ctx) {
       'Run a Deep-Review-style multi-pass critique of a manuscript with the vendored Open Deep Review engine: segmented review passes, page/quote-anchored comments, a scholar-peer summary with questions for authors, and reference verification against OpenAlex/Crossref.',
       'Actions: `review` (run the pipeline; slow and token-expensive), `estimate` (offline low/median/high cost estimate; run first), `pdf2md` (inspect a PDF), `verify_citations`, `status` (stored state, stale flag), `show` (read stored summary/comments/questions/checklist/claims/citations/markdown), `list` (stored reviews).',
       'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer.',
+      'When a request is a generic paper review ("review this paper") with no deep/multi-pass qualifier, ask the user to choose `deep_review` or a normal session review before calling this tool; do not choose silently.',
       'This is not the systematic-review ledger (`review`) or a reporting checklist (`reporting_check`); for a referee report written by the session model, delegate to the `peer-reviewer` subagent. Findings are advisory. Load the `deep-review` skill for the workflow.',
     ].join(' '),
     parameters: {

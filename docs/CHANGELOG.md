@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.3
+
+- **Ask before a generic paper review.** When the user says "review this paper", "give me feedback on this manuscript", or similar without naming the kind, the agent now asks whether to use `deep_review` (multi-pass engine, paid `estimate`, minutes) or a normal session review (fast session-model critique/referee report), then acts on the choice. It no longer silently falls back to a normal review, and it does not run `estimate` or `review` before the user chooses. The prompt, `deep_review` tool description, and `deep-review` skill carry the rule; a regression check guards the wording.
+
 ## 0.32.2
 
 - **Documented the repeated DeepSeek model-listing lines.** A normal start mounts the DeepSeek provider once per agent-preset world, so each instance follows the official `/models` listing and prints an informational `[llm-deepseek-api-key] model listing ...` line. `docs/INSTALL.md` now explains the cause, the profile-patch catalog pin that stops the listing requests and the lines, and the discovery tradeoff.
