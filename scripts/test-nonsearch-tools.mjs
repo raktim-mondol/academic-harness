@@ -123,6 +123,20 @@ for (const [id, toolName] of [['analysis-run', 'analysis_run'], ['experiment-log
 for (const skill of ['reproducible-analysis', 'experiment-tracking', 'provenance-audit']) {
   assert.ok(existsSync(join(root, `skills/${skill}/SKILL.md`)), `missing ${skill} skill`)
 }
+for (const [id, toolName] of [
+  ['preregister', 'preregister'], ['causal-dag', 'causal_dag'], ['design', 'design'],
+  ['ethics-protocol', 'ethics_protocol'], ['deidentify', 'deidentify'], ['dmp', 'dmp'],
+  ['grant-budget', 'grant_budget'],
+]) {
+  assert.match(preset, new RegExp(`- id: ${id}\n  name: academic-harness/${id}`), `preset row missing ${id}`)
+  assert.ok(existsSync(join(root, `${id}.js`)), `missing ${id}.js`)
+  assert.ok(read(`${id}.js`).includes(`name: '${toolName}'`), `${id}.js must register ${toolName}`)
+  assert.ok(pkg.exports?.[`./${id}`] === `./${id}.js`, `package.json missing export ${id}`)
+  assert.ok(pkg.files?.includes(`${id}.js`), `package.json files missing ${id}.js`)
+}
+for (const skill of ['preregistering-analysis', 'causal-dag', 'experimental-design', 'research-ethics', 'data-management-plan', 'grant-budget']) {
+  assert.ok(existsSync(join(root, `skills/${skill}/SKILL.md`)), `missing ${skill} skill`)
+}
 assert.ok(existsSync(join(root, 'skills/risk-of-bias-appraisal/SKILL.md')), 'missing risk-of-bias-appraisal skill')
 assert.ok(existsSync(join(root, 'skills/remove-ai-signs/SKILL.md')), 'missing remove-ai-signs skill')
 assert.ok(existsSync(join(root, 'skills/remove-ai-signs/scripts/scan_ai_signs.py')), 'missing remove-ai-signs scanner')
@@ -146,7 +160,7 @@ for (const [id, tool] of [['pdf-references', 'pdf_references'], ['stat-audit', '
   assert.ok(existsSync(join(root, `${id}.js`)), `missing ${id}.js`)
   assert.ok(read(`${id}.js`).includes(`name: '${tool}'`), `${id}.js must register ${tool}`)
 }
-for (const helper of ['stat_audit.py', 'figure_audit.py', 'rob_figure.py', 'prisma_flow.py', 'meta_helper.py', 'data_profile.py']) {
+for (const helper of ['stat_audit.py', 'figure_audit.py', 'rob_figure.py', 'prisma_flow.py', 'meta_helper.py', 'data_profile.py', 'grant_budget.py']) {
   assert.ok(existsSync(join(root, 'python-helpers', helper)), `missing python helper ${helper}`)
 }
 assert.ok(pkg.files?.includes('schemas'), 'package files missing schemas')
@@ -171,6 +185,8 @@ for (const marker of [
   '## GRADE certainty', 'grade_start', 'sof-table', 'grade-profile',
   '## Reproducible analysis', 'analysis_run', 'experiment_log', 'dataset_get', 'data_profile', 'repro_package',
   '## Provenance audit', 'provenance_audit', 'no_link', 'not_checked', 'not_found',
+  '## Study conduct, ethics, and grants', 'preregister', 'causal_dag', 'deidentify',
+  'grant_budget', 'ethics_protocol', 'manual_check',
   'risk-of-bias', 'rob-table', 'appraise', 'reconcile',
   '### Clinical and regulatory evidence', '### Data and journal policy',
   'manuscript_citations', 'funder_policy', '## Writing quality', 'remove-ai-signs',

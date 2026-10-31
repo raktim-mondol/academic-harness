@@ -30,7 +30,8 @@ entity graph, and writes only its own cache under `.dsh/provenance/<audit>/`.
 
 Two sources are reported as `unknown` with their reason rather than silently
 dropped: `scientific_result` cards are returned to the session and not
-persisted, and the `preregister` ledger (Phase 5A) has not shipped.
+persisted, and the `preregister` ledger (Phase 5A) exists but is not indexed by
+`provenance_audit` yet.
 
 ## Node and edge model
 

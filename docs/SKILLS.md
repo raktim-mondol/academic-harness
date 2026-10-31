@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **757 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **762 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -24,7 +24,7 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 757.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 762.
 
 ## Workflow and tool skills
 
@@ -49,6 +49,11 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `risk-of-bias-appraisal` | `review` risk-of-bias workflow (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), reconciliation, agreement, and rob exports; see [Risk-of-bias appraisal](RESEARCH.md#risk-of-bias-appraisal) |
 | `co-scientist-tournament` | The tournament loop, subagent briefs, and budget defaults; see [Hypothesis tournaments](RESEARCH.md#hypothesis-tournaments) |
 | `power-and-sample-size` | Study-planning workflow for `power_analysis`; see [Study planning](RESEARCH.md#study-planning) |
+| `causal-dag` | Drawing assumptions, reading adjustment/front-door sets, instruments, colliders, and E-values; see [Causal DAGs](RESEARCH.md#causal-dags) |
+| `experimental-design` | Randomized allocation, balance diagnostics, and DOE choices; see [Randomization and DOE](RESEARCH.md#randomization-and-doe) |
+| `research-ethics` | Ethics protocol, consent, concept checklist, and local de-identification; see [Ethics protocols and de-identification](RESEARCH.md#ethics-protocols-and-de-identification) |
+| `data-management-plan` | Funder-shaped DMP drafting and checklist review; see [Data-management plans](RESEARCH.md#data-management-plans) |
+| `grant-budget` | Multi-year budget building, checks, and export; see [Grant budgets](RESEARCH.md#grant-budgets) |
 | `reporting-guidelines` | `reporting_check` workflow, evidence rules, and subagent item batches; see [Reporting checklists](WRITING.md#reporting-checklists) |
 | `papermemory` | The PaperMemory workflow; see [Paper memory](PAPERS.md#paper-memory) |
 | `zvec-grep` | Install, index, and routing details for workspace search; see [Workspace search](WORKSPACE.md#workspace-search) |

@@ -643,6 +643,33 @@
 - id: power-analysis
   name: academic-harness/power-analysis
 
+# Study conduct, ethics, and grants (Phase 5 of docs/SCIENTIFIC-EXPANSION-PLAN.md).
+# preregister freezes a hashed study plan before data collection and versions
+# every later edit; causal_dag stores a user-specified DAG and derives
+# d-separation, adjustment sets, instruments, and E-values; design generates
+# seeded randomization schedules and DOE matrices with realized-balance
+# diagnostics; ethics_protocol drafts a protocol/consent and a concept
+# checklist; deidentify scans and redacts PHI/PII locally with a masked report;
+# dmp drafts funder-shaped data-management plans; grant_budget builds a
+# multi-year budget with explicit rates and arithmetic checks. State lives under
+# .dsh/{preregister,causal,design,ethics,deidentify,dmp,budget}/<slug>/.
+# None submits, invents an approval/rate/repository, or issues a compliance or
+# causality verdict.
+- id: preregister
+  name: academic-harness/preregister
+- id: causal-dag
+  name: academic-harness/causal-dag
+- id: design
+  name: academic-harness/design
+- id: ethics-protocol
+  name: academic-harness/ethics-protocol
+- id: deidentify
+  name: academic-harness/deidentify
+- id: dmp
+  name: academic-harness/dmp
+- id: grant-budget
+  name: academic-harness/grant-budget
+
 # Optional Phase 6 tools (identity + peer review). These rows always exist,
 # but apply() registers nothing unless AH_ENABLE_OPTIONAL_TOOLS=1, so the tools
 # are absent from the base tool list and prompt by default. Changing the flag

@@ -114,6 +114,18 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `journal_policy` | Academic Harness preset | DOAJ + Sherpa Romeo OA and self-archiving policy | [Research](RESEARCH.md#datasets-and-policy) |
 | `funder_policy` | Academic Harness preset | OpenAlex funder identity + Sherpa Juliet OA policy | [Research](RESEARCH.md#datasets-and-policy) |
 
+## Study conduct, ethics, and grants
+
+| Tool | Scope | What it does | Details |
+|---|---|---|---|
+| `preregister` | Academic Harness preset | Write-once, hashed pre-registration versions under `.dsh/preregister/<slug>/`: start/import (review, coscientist, analysis plan, causal DAG, JSON), freeze with a data-collection guard, status, hash verification, Markdown/JSON/PDF export. `submit` is disabled; no registry is contacted | [Research](RESEARCH.md#pre-registration) |
+| `causal_dag` | Academic Harness preset | User-specified DAG ledger: versioned create/edit, DOT/Mermaid/edge-list import, d-separation, minimal backdoor/front-door sets, collider/M-bias and adjustment warnings, instruments, testable implications, E-values, and graph exports. No model is fitted | [Research](RESEARCH.md#causal-dags) |
+| `design` | Academic Harness preset | Seeded randomization (simple/block/stratified/cluster/crossover/minimization) with allocation/blinding codes and realized-balance diagnostics; full/fractional factorial, Plackett–Burman, central composite, and Box–Behnken designs with aliasing and run sheets; CSV/JSON/Markdown export | [Research](RESEARCH.md#randomization-and-doe) |
+| `ethics_protocol` | Academic Harness preset | Append-only ethics/IRB protocol and consent drafts under `.dsh/ethics/<slug>/`, with a Helsinki/Common Rule/GDPR/HIPAA concept checklist (`present`/`missing`/`manual_check`/`not_applicable`). Templates and checklist, not legal advice; approvals are never invented | [Research](RESEARCH.md#ethics-protocols-and-de-identification) |
+| `deidentify` | Academic Harness preset | Local PHI/PII scanning and redaction for text/JSON/CSV/TSV under `.dsh/deidentify/<slug>/`: masked reports with offsets and column summaries, separate redacted output, per-type/per-column actions, and residual verification. Regex/heuristics only; no model call, no reversible mapping, no compliance guarantee | [Research](RESEARCH.md#ethics-protocols-and-de-identification) |
+| `dmp` | Academic Harness preset | Funder-shaped data-management plans (NIH DMS, NSF DMP, Horizon Europe, Wellcome, ERC, generic) under `.dsh/dmp/<slug>/`: start/section/check/status and Markdown/JSON export. Paraphrased templates; repository, embargo, costs, and official requirements stay `manual_check` | [Research](RESEARCH.md#data-management-plans) |
+| `grant_budget` | Academic Harness preset | Multi-year budget ledger under `.dsh/budget/<slug>/`: personnel effort/fringe/escalation, equipment, supplies, travel, publication, subawards, cost share, indirect rate/caps, arithmetic checks, justification, and CSV/Markdown/JSON/XLSX export. Rates are user-supplied | [Research](RESEARCH.md#grant-budgets) |
+
 ## Workspace and index
 
 | Tool | Scope | What it does | Details |

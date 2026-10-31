@@ -192,6 +192,71 @@ Rules the tool enforces:
 
 Closed-form results are checked against published reference values (Cohen's tables, G*Power, and the R `pwr` documentation) in `scripts/test-power.mjs`, and simulations are checked against the closed form within Monte-Carlo error. Two approximations are labelled in the output: the Welch degrees of freedom, and Schuirmann's TOST approximation (confirm a final equivalence design with `simulate`). The correlation test uses Fisher's z with the small-sample correction, which can differ from G*Power's exact test by one. The `power-and-sample-size` skill walks through the workflow.
 
+## Pre-registration
+
+`preregister` freezes a study plan before data collection under `.dsh/preregister/<slug>/`; the plan hash and every later version are write-once records. It is a ledger, not a registry submission.
+
+| Action | What it does |
+|---|---|
+| `start` | Record title, question, design, sample size with its basis, hypotheses and directions, outcomes, exclusions, stopping rules, and analysis plan. A frozen plan can be edited only with `new_version: true` and a reason. |
+| `import` | Copy fields from a `review` protocol, a `coscientist` design protocol, an `analysis_run` plan, a `causal_dag`, or a workspace JSON file. A `power_analysis` result is supplied as an object because that tool does not persist a result. Imports are snapshots, not re-derivations. |
+| `freeze` | Validate required fields, hash the full plan, and write `versions/vN.json` plus a summary event. If data collection had started (`data_collected: true`), a reason is required and recorded. |
+| `status` / `verify` | Status shows the latest frozen version, draft changes, sources, and missing fields. Verify re-hashes every version file and reports `verified`, `changed`, or `tampered`. |
+| `export` | Markdown, JSON with OSF/AsPredicted-shaped fields, or PDF when LaTeX is available. Export is a document, not acceptance by a registry. |
+| `submit` | Explicitly disabled: no OSF API is called, even with a token. Export and submit manually. |
+
+The tool never invents a hypothesis, outcome, sampling basis, or analysis choice. Freezing does not make a prediction correct. Use the same slug in `ethics_protocol` and `dmp` to link conduct records.
+
+## Causal DAGs
+
+`causal_dag` stores a user-specified DAG under `.dsh/causal/<slug>/` and derives graph properties. It does not fit a model, estimate a causal effect, or claim that the assumptions are true.
+
+| Action | What it does |
+|---|---|
+| `create` / `edit` | Nodes/edges with optional latent nodes, or DOT/Mermaid/edge-list text. Edits are versioned with a reason; a directed cycle is refused. |
+| `analyze` | Treatment–outcome d-separation, minimal backdoor adjustment sets, front-door sets, collider/M-bias and adjustment warnings, instrument candidates, topological order, and local-Markov testable implications. `given` tests a conditioning set; `adjust_for` flags a proposed set. |
+| `evalues` | VanderWeele E-value for RR/OR/HR, or an approximate standardized-effect conversion. The interval E-value uses the limit closest to the null. |
+| `export` | Mermaid, DOT, edge list, or JSON. |
+
+A minimal adjustment set is minimal by inclusion among the enumerated subsets under **this** graph; it is not automatically the best estimator. Instruments satisfy graph conditions only, not homogeneity/monotonicity assumptions. E-values are sensitivity aids, not evidence of robustness. Estimation belongs in `analysis_run` with an explicit plan.
+
+## Randomization and DOE
+
+`design` stores seeded schedules under `.dsh/design/<slug>/`. A seed is required, stored, and makes the schedule reproducible.
+
+| Action | What it does |
+|---|---|
+| `randomize` | Simple, permuted-block, stratified, cluster, crossover, and minimization allocation; allocation ratios, block size, strata, sequences, washout, per-participant allocation codes, and arm-level blinding codes. |
+| `balance` | Realized arm counts, numeric means/SDs and SMDs against the first arm, categorical shares, and flags at \|SMD\| > 0.1 or a 10% share difference. Only supplied covariates are assessed. |
+| `doe` | Full factorial, fractional factorial with generators and aliasing, Plackett–Burman (8/12/16 runs), central composite, and Box–Behnken designs; coded matrices, defining relation/resolution, and seeded run order. |
+| `export` | CSV, JSON, or Markdown. |
+
+Codes are records, not allocation concealment, and `balance` is realized balance rather than a guarantee. DOE output states its assumed model and aliasing; it does not analyse a response. Write the design into `preregister` before collecting data.
+
+## Ethics protocols and de-identification
+
+`ethics_protocol` keeps an append-only protocol under `.dsh/ethics/<slug>/`; `deidentify` keeps masked scan and redaction records under `.dsh/deidentify/<slug>/`.
+
+- `ethics_protocol` actions: `start`, `section`, `consent`, `check`, `status`, `export`. The checklist covers informed consent, risk/benefit, privacy, retention, sharing, compensation, incidental findings, vulnerable populations, GDPR/HIPAA themes, animal welfare, and institutional requirements. Statuses are `present`, `missing`, `manual_check`, and `not_applicable`. An approval reference is recorded, never verified or invented; institutional requirements always stay manual.
+- `deidentify` actions: `scan`, `redact`, `report`, `verify` (plus `status`). Detection covers emails, phones, SSNs, MRNs, dates, ages over 89, addresses, URLs/IPs/MACs, account numbers, titled/labelled names, and user-supplied `terms`/`names`. Reports are masked and include offsets, line/column, and CSV/TSV column summaries. Custom terms are stored only as HMAC hashes keyed by a workspace-local `.dsh/deidentify/.term-key`, so pass them again to `redact`/`verify`. `redact` writes a separate file, applies per-type or per-column actions (`mask`, `type`, `hash`, `remove`, `drop`, `generalize`), and rescans the output. A scan with more than 1000 candidate matches is refused for redaction rather than producing a partial file. No reversible mapping is written.
+- Detection is regex/heuristic and local: no model call, no network. A zero-match scan does not prove de-identification, and the tool does not certify HIPAA/GDPR compliance. A human must review every report, consent draft, and redacted file.
+
+## Data-management plans
+
+`dmp` drafts a plan under `.dsh/dmp/<slug>/` for `generic`, `nih_dms`, `nsf_dmp`, `horizon_europe`, `wellcome`, or `erc`. `start` records the project and template; `section` appends sections for data types/standards, storage, access, sharing/reuse, preservation, costs, roles, and ethics/legal constraints; `check` reports required sections and manual items; `export` writes Markdown or JSON. Linked `dataset_get`, `repro_package`, and `preregister` ledgers are counted by slug.
+
+Templates are paraphrased concepts, not official funder forms. Repository availability, embargoes, costs, template versions, and institutional requirements are `manual_check`; the tool never invents a repository, embargo, or cost, and it does not submit a DMP.
+
+## Grant budgets
+
+`grant_budget` keeps an append-only input ledger and a stored computation under `.dsh/budget/<slug>/`:
+
+- `start` records personnel (base salary, effort or person-months, required fringe rate, escalation), equipment, supplies, travel, publication, other, subawards, cost share, indirect rate, optional caps, and metadata.
+- `compute` builds the multi-year table (personnel, categories, direct total, indirect base, indirect, total, cost share), per-person detail, flattened line items, a justification, and arithmetic/cap checks. A changed input makes the prior computation stale and `export` refuses it until recomputation.
+- `export` writes CSV, Markdown, JSON, or XLSX (through `python-helpers/grant_budget.py`; CSV/JSON work without it).
+
+Every rate and amount is user-supplied; a missing fringe or indirect rate is an error rather than a guessed zero. The checks cover arithmetic and the caps you supply, not funder allowability, eligibility, salary caps, or cost-share rules. The justification is assembled from your line-item labels and notes, and nothing is submitted.
+
 ## Related
 
 - [Search](SEARCH.md) — discovery and publication status.

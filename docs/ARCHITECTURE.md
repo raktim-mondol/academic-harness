@@ -53,7 +53,7 @@ The first Academic Harness start prepares optional runtimes in the background, s
 | **PaperMemory** | venv `~/.dsh/papermemory`; SQLite store `~/.local/share/papermemory/papermemory.db` | First Academic Harness preset mount, unless `papermemory` is already on `PATH` | **Fail-loud.** A broken memory server and any drift from the expected 14-tool MCP surface are surfaced. | `PAPERMEMORY_CLI`, `PAPERMEMORY_DB`, `PAPERMEMORY_DATA_DIR`, `PAPERMEMORY_SKIP_INSTALL` |
 | **TextFold** | `$DSH_HOME/textfold/venv`; documents in `$DSH_HOME/textfold/data` | First Academic Harness preset start | The first `paper_fold` call waits for install and reports a failure if it cannot complete. | `TEXTFOLD_SKIP_INSTALL`, `TEXTFOLD_PYTHON`, `TEXTFOLD_CLI`, `TEXTFOLD_DATA` |
 | **Writing engine venv** | `vendor/academic-harness/.venv` | First plugin mount, in the background | An early `ah_*` call or interceptor waits for preparation and reports failure. | `ACADEMIC_HARNESS_CLI`, `AH_CMD`, `ACADEMIC_HARNESS_SKIP_INSTALL` |
-| **Python helpers** (for `sci_inspect`, `power_analysis`, and the `rob-figure` export) | `python-helpers/.venv` | You run `cd python-helpers && uv sync` once | The tool reports the missing helper environment; `rob-figure` names matplotlib. | `ACADEMIC_HARNESS_HELPERS_DIR`, `ACADEMIC_HARNESS_PYTHON` |
+| **Python helpers** (for `sci_inspect`, `power_analysis`, the `rob-figure` export, and budget XLSX) | `python-helpers/.venv` | You run `cd python-helpers && uv sync` once | The tool reports the missing helper environment; `rob-figure` names matplotlib, and `grant_budget` can still export CSV/JSON without openpyxl. | `ACADEMIC_HARNESS_HELPERS_DIR`, `ACADEMIC_HARNESS_PYTHON` |
 
 PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and PaperMemory is **fail-loud**. Never read a missing zg tool as missing memory. Paper markdown in the workspace is indexed by zg for *discovery*; evidence for claims, numbers, and quotations always comes from PaperMemory.
 
@@ -69,6 +69,13 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/data/<slug>/` + `data/<slug>/` | `dataset_get` | Download manifest with licenses and checksums; downloaded files under the workspace `data/` tree |
 | `<cwd>/.dsh/repro/<slug>/` + `package/<slug>/` | `repro_package` | Frozen inventory; built package with manifest, environment, Dockerfile, citation metadata, and checksums |
 | `<cwd>/.dsh/provenance/<audit>/` | `provenance_audit` | The **only** thing the audit writes: `index.json` (a rebuilt cache of the joined graph) and `exports/` views. Source ledgers are read, never written |
+| `<cwd>/.dsh/preregister/<slug>/` | `preregister` | Editable draft, write-once hashed versions, and draft/freeze events; exports |
+| `<cwd>/.dsh/causal/<slug>/` | `causal_dag` | Append-only DAG versions, stored analyses, E-value calculations, and graph exports |
+| `<cwd>/.dsh/design/<slug>/` | `design` | Append-only seeded randomization and DOE schedules; exports |
+| `<cwd>/.dsh/ethics/<slug>/` | `ethics_protocol` | Append-only protocol events, consent drafts, and exports |
+| `<cwd>/.dsh/deidentify/<slug>/` | `deidentify` | Masked scan reports, redaction records with residual reports, and exports; the workspace-local `.dsh/deidentify/.term-key` keys custom-term hashes |
+| `<cwd>/.dsh/dmp/<slug>/` | `dmp` | Append-only plan inputs and sections; exports |
+| `<cwd>/.dsh/budget/<slug>/` | `grant_budget` | Append-only budget inputs and stored computations; exports |
 | `<cwd>/.dsh/deep-review/<key>/` | `deep_review` | `review.json`, `review.md`, parsed `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `meta.json`, append-only `runs.jsonl` |
 | `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl` |
 | `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
@@ -96,6 +103,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Reviews and hypotheses | `review.js`, `review-store.js`, `grade-store.js`, `meta-analysis.js`, `meta-analysis-store.js`, `deep-review.js`, `vendor/open-deepreview/`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js`, `ledger-kit.js`, `provenance.js` |
 | Reproducible analysis and data | `analysis-run.js`, `analysis-store.js`, `experiment-log.js`, `experiment-store.js`, `dataset-get.js`, `data-profile.js`, `repro-package.js`, `repro-package-store.js`, `python-helpers/data_profile.py` |
 | Cross-ledger provenance | `provenance-audit.js`, `provenance-store.js` (read-only; joins the ledgers above and the AH claim sidecars) |
+| Study conduct, ethics, and grants | `preregister.js`, `preregister-store.js`, `causal-dag.js`, `causal-dag-store.js`, `causal-graph.js`, `design.js`, `design-store.js`, `ethics-protocol.js`, `ethics-protocol-store.js`, `deidentify.js`, `deidentify-store.js`, `dmp.js`, `dmp-store.js`, `grant-budget.js`, `grant-budget-store.js`, `python-helpers/grant_budget.py` |
 | Clinical, datasets, policy | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js` |
 | Workspace and notebook | `notebook.js`, `notebook-export.js`, `notebook-zip.js`, `zvec-grep.js`, `zvec-index.js`, `zvec-index-engine.js`, `fold-core.js`, `fold-text.js`, `scientific-result.js` |
 | Figures and file formats | `image-generate.js`, `image-gen-client.js`, `mermaid-render.js`, `sci-inspect.js`, `latex-compile.js`, `python-helpers/` |
@@ -103,7 +111,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (757 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (762 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

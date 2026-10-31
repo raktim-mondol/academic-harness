@@ -110,8 +110,8 @@ judgement. A `deep_review` engine verdict, for instance, is recorded as
 
 - The audit reads what the ledgers recorded. A quote verified last month and
   silently re-ingested into PaperMemory is only `stale` if a hash was recorded.
-- `scientific_result` cards are not persisted, and `preregister` has not
-  shipped; both are reported `unknown` with that reason.
+- `scientific_result` cards are not persisted, and the `preregister` ledger
+  (Phase 5A) is not indexed yet; both are reported `unknown` with that reason.
 - Academic Harness unit provenance (who wrote each unit) belongs to
   `ah_provenance`; the audit indexes cited-clause bindings, not authorship.
 - A clean audit is not a correct paper. It says which claims have recorded

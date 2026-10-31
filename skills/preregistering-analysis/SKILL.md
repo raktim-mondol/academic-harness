@@ -15,6 +15,30 @@ Write down the hypotheses, the exact analysis, the directional predictions, and 
 
 This is the pre-registration discipline — the science analog of test-driven development. In TDD you write the test before the code so you know the test tests something. Here you write the prediction before the result so you know the result confirms something.
 
+## In Academic Harness
+
+The native `preregister` tool keeps the record under
+`.dsh/preregister/<slug>/`:
+
+- `start` records the question, design, sample size **and its basis**,
+  hypotheses with directions, outcomes, exclusions, stopping rules, and the
+  analysis plan. `import` can pull a question/hypotheses/outcomes from a
+  `review`, a `coscientist` hypothesis protocol, an `analysis_run` plan, or a
+  `causal_dag`; a stateless `power_analysis` result is supplied as an object.
+  Imported values are snapshots, not re-derivations.
+- `freeze` writes a write-once, hashed version. If data collection had already
+  started, it refuses unless you record a reason. Any later edit needs
+  `new_version: true` and a reason, and every earlier version remains.
+- `verify` re-hashes every version and reports `verified`, `changed`, or
+  `tampered`; `status` shows the draft-versus-frozen differences and missing
+  fields.
+- `export` writes Markdown, JSON (with OSF/AsPredicted-shaped fields), or a PDF.
+  It is a document; no registry is contacted and `submit` is disabled.
+
+Use the same slug in `ethics_protocol` and `dmp` so the conduct records link.
+The tool records what you supplied; it does not invent a hypothesis, outcome,
+sampling basis, or analysis choice.
+
 ## The Iron Law
 
 ```

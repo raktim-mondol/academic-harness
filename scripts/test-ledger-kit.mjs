@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import {
   appendJsonl, csvCell, exportText, hashFile, mdCell, nowIso, readJson, readJsonl,
   requireText, sha256, shortHash, slug, stableStringify, writeOnceJson,
@@ -8,6 +10,7 @@ import {
   PROVENANCE_SCHEMA_VERSION, assertProvenanceLink, contentHash, provenanceKind,
   provenanceLink, shortContentHash,
 } from '../provenance.js'
+import { resolveWorkspacePath } from '../workspace-path.js'
 import { makeWorkspace } from './helpers/test-workspace.mjs'
 
 const workspace = makeWorkspace('ah-ledger-kit-')
@@ -88,6 +91,15 @@ try {
   ]) {
     const parsed = JSON.parse(readFileSync(new URL(`../schemas/${name}`, import.meta.url), 'utf8'))
     assert.ok(parsed && typeof parsed === 'object')
+  }
+
+  // A dangling symlink or a symlinked parent must never be used for a write.
+  if (process.platform !== 'win32') {
+    const outside = join(tmpdir(), `ah-symlink-outside-${process.pid}-${Date.now()}.txt`)
+    symlinkSync(outside, workspace.path('dangling.txt'))
+    assert.throws(() => resolveWorkspacePath(workspace.cwd, 'dangling.txt', { forWrite: true }), /symlink/)
+    symlinkSync(tmpdir(), workspace.path('linkdir'), 'dir')
+    assert.throws(() => resolveWorkspacePath(workspace.cwd, 'linkdir/escape.txt', { forWrite: true }), /escapes|symlink/)
   }
 
   console.log('ledger-kit OK')
