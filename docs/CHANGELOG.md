@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.2
+
+- **Documented the repeated DeepSeek model-listing lines.** A normal start mounts the DeepSeek provider once per agent-preset world, so each instance follows the official `/models` listing and prints an informational `[llm-deepseek-api-key] model listing ...` line. `docs/INSTALL.md` now explains the cause, the profile-patch catalog pin that stops the listing requests and the lines, and the discovery tradeoff.
+
 ## 0.32.1
 
 - **DSH 0.2.1-rc.5 dependency alignment.** The plugin now pins `@deepseek-ai/dsh-tools`, `dsh-settings`, `dsh-tool-subagent`, `dsh-mcp-client`, and `schemastery` to the rc.5 line and requires dsh `>=0.2.1-rc.5 <0.3.0`. With the rc.2 pins, dsh 0.2.1-rc.5 disabled the `tool-subagent`, `subagent-model-selection-settings`, Claude Code hook/subagent, and `subagent_pro`/`subagent_vision` rows at startup as incompatible. The plugin-facing APIs (`defineTool`, `McpClient`, `agentOptions`, settings methods) are unchanged in rc.5.

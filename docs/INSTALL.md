@@ -145,5 +145,33 @@ See [Architecture](ARCHITECTURE.md#runtime-installs) for details and overrides.
 | Local checkout will not install | Use an absolute path; `~` and relative paths are not expanded. |
 | Semantic search tool absent | The zg install or daemon failed (fail-soft). Check the warning and `~/.dsh/zvec-grep`. |
 | PaperMemory is empty or missing | PaperMemory is fail-loud by design; read the startup error rather than assuming an empty store. |
+| Repeated `[llm-deepseek-api-key] model listing` lines | Informational: one line per mounted preset world following the official `/models` listing. Pin the catalog (below) to stop the requests and the lines. |
+
+### Repeated DeepSeek model-listing lines
+
+DSH mounts the DeepSeek provider once per agent-preset world, and each instance follows the official `/models` listing while its catalog equals the built-in list. A normal `academic-harness` start therefore prints one `[llm-deepseek-api-key] model listing ...` line per mounted preset (five presets plus the web app in the default profile). It is informational, not an error.
+
+To stop the listing request and its lines, pin the catalog in the profile patch layer (`$DSH_HOME/profiles/academic-harness/cordis.patch.yml`):
+
+```yaml
+- id: llm-deepseek
+  name: '@deepseek-ai/dsh-llm-deepseek-api-key'
+  config:
+    models:
+      - id: deepseek-flash
+        name: DeepSeek-V4.1-Flash
+        description: Fast text-and-image agent model; pinned catalog.
+        contextWindow: 1048576
+        inputModalities: [text, image]
+        systemPromptUpdate: in-history
+        toolUpdate: addition-only
+      - id: deepseek-v4-pro
+        name: DeepSeek-V4-Pro
+        description: Stronger agentic coding, knowledge, and difficult reasoning; suited to complex or quality-critical tasks at higher cost.
+        contextWindow: 1048576
+        inputModalities: [text]
+```
+
+A `models` list that differs from the built-in catalog replaces it and stops the official listing. The tradeoff is that new DeepSeek models are not discovered automatically; remove the `models` block (or use **Restore defaults** on the Models page) to resume discovery. The `dsh web:` lines are the server URL and the auto-open notice; pass `--no-open` to suppress the second.
 
 For the full list of components and data locations, see [Architecture](ARCHITECTURE.md).
