@@ -230,17 +230,17 @@ ok('package files include engine JS', pkg.files.includes('academic-harness.js') 
 const promptSource = readFileSync(join(ROOT, 'prompt.js'), 'utf8')
 ok('prompt mentions Academic Harness', /Academic Harness/.test(promptSource))
 ok(
-  'prompt asks before a generic paper review',
-  /generic paper review/i.test(promptSource)
-    && /deep review/i.test(promptSource)
+  'prompt asks before any paper review and explains deep review',
+  /paper or manuscript review, critique, referee report, feedback/i.test(promptSource)
+    && /user may not know it exists/i.test(promptSource)
     && /normal session review/i.test(promptSource),
 )
 {
   const skill = readFileSync(join(ROOT, 'skills', 'deep-review', 'SKILL.md'), 'utf8')
   ok(
-    'deep-review skill asks before a generic review',
-    /Route a generic review request/.test(skill)
-      && /normal session review/i.test(skill)
+    'deep-review skill asks before every paper review',
+    /Route every paper-review request/.test(skill)
+      && /do not assume the user knows `deep_review`/i.test(skill)
       && /Do not run `estimate` or `review` before the user has chosen/i.test(skill),
   )
 }

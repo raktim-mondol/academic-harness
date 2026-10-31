@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.4
+
+- **Always offer deep review on paper-review requests.** Any paper or manuscript review, critique, referee report, feedback, assessment, or pre-submission request now asks the user to choose between the deep review engine and a normal session review, and explains the deep option because the user may not know it exists. The question appears every time a paper review is requested unless the user explicitly chose a mode. The routing rule is carried by the prompt, the `deep_review` tool description, and the `deep-review` skill, with a regression guard. Verified live with "Give me feedback on the paper": the agent asked with Normal, Deep review engine, and Referee report options before doing any review.
+
 ## 0.32.3
 
 - **Ask before a generic paper review.** When the user says "review this paper", "give me feedback on this manuscript", or similar without naming the kind, the agent now asks whether to use `deep_review` (multi-pass engine, paid `estimate`, minutes) or a normal session review (fast session-model critique/referee report), then acts on the choice. It no longer silently falls back to a normal review, and it does not run `estimate` or `review` before the user chooses. The prompt, `deep_review` tool description, and `deep-review` skill carry the rule; a regression check guards the wording.

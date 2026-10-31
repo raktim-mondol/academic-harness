@@ -35,15 +35,18 @@ reporting-guideline verdict.
 `deep_review` findings are advisory criticism. It does not decide acceptance and
 does not replace the user's judgment.
 
-## Route a generic review request
+## Route every paper-review request
 
-A generic request — "review this paper", "what do you think of this manuscript",
-"give me feedback" — does not say which kind of review is wanted. Do not silently
-pick one. Ask:
+A paper-review request — "review this paper", "critique my manuscript", "give me
+feedback", "write a referee report", "assess this draft" — does not tell you
+whether the user knows the deep engine exists. Do not silently pick the normal
+path, and do not assume the user knows `deep_review`. Always ask, describing both
+options, unless the user explicitly chose deep or normal in this conversation:
 
-> Do you want a deep review (multi-pass engine; I’ll estimate the cost first and
-> it may take several minutes) or a normal session review (faster, written by
-> this session’s model)?
+> Do you want a deep review (multi-pass engine with page/quote-anchored comments,
+> author questions, and reference checks; I’ll estimate the cost first and it may
+> take several minutes) or a normal session review (faster, written by this
+> session’s model)?
 
 - **Deep review:** continue with the workflow below — `estimate`, confirm the
   cost, then `review` and `show`.
