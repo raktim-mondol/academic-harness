@@ -2,6 +2,10 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.7
+
+- **README links the upstream open-deepreview repository.** The Papers and evidence section now points to [open-deepreview](https://github.com/raktim-mondol/open-deepreview) where `deep_review` is introduced. Docs-only; no behavior change.
+
 ## 0.32.6
 
 - **Live progress for deep review.** Each review now runs as an owned background job, so the session header shows a live stage/percentage while it runs; expanding the job streams the engine log (segmentation, budgeting, per-segment verification, synthesis, citation checks, report) and every model call's route, duration, and token usage. The finished job remains under **Finished** for later inspection, and the tool result includes `job_id`. Cancelling from the job row aborts the engine and returns a cancellation error. The engine log also names the actual session model instead of a placeholder.
