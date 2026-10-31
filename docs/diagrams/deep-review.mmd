@@ -3,14 +3,14 @@ flowchart TD
   est --> ok{Confirm cost<br/>and depth?}
   ok -->|yes| run[review<br/>segmented passes over the whole paper]
   run --> engine[vendor/open-deepreview<br/>Node engine, no Bun]
-  engine -->|loopback OpenAI-compatible bridge| llm[Host LLM service<br/>= the session model]
+  engine -->|loopback bridge<br/>OpenAI-compatible| llm[Host LLM service<br/>= the session model]
   run --> peer[scholar-peer pass<br/>summary · strengths/weaknesses<br/>claim-evidence map · 9-item checklist<br/>questions for the authors]
   run --> refs[reference verification<br/>OpenAlex + Crossref]
   run --> art[Artifacts<br/>.dsh/deep-review/&lt;key&gt;/<br/>review.json · review.md · paper.md<br/>pdf-meta.json · citations.json<br/>estimate.json · meta.json · runs.jsonl]
   art --> show[show<br/>summary · comments · questions<br/>checklist · claims · citations]
   show --> revise[Revise the manuscript]
   revise --> stale[status<br/>content hash changed → stale]
-  stale -.->|estimate again, re-run| est
+  stale -.->|re-run| est
   art -.-> prov[provenance_audit<br/>indexes stored claims by id and hash]
   art -.-> report[notes/ and deepreview_report_vN.md]
 
