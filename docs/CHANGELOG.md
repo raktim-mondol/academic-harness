@@ -2,6 +2,11 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.32.6
+
+- **Live progress for deep review.** Each review now runs as an owned background job, so the session header shows a live stage/percentage while it runs; expanding the job streams the engine log (segmentation, budgeting, per-segment verification, synthesis, citation checks, report) and every model call's route, duration, and token usage. The finished job remains under **Finished** for later inspection, and the tool result includes `job_id`. Cancelling from the job row aborts the engine and returns a cancellation error. The engine log also names the actual session model instead of a placeholder.
+- Tests cover job registration (kind/owner/tool call), engine stderr progress, bridge request/response logs, the result's `job_id`, and the engine's model label. Verified live in the Web UI: a LOW review streamed `3% SEGMENTATION`, `8% ADAPTIVE_BUDGETING`, `45%/80% DEEP_REVIEW`, `82% GLOBAL_SYNTHESIS`, `100% DONE`, with per-call durations and token usage.
+
 ## 0.32.5
 
 - **No separate-cost framing for deep review.** Deep review runs on the session model, so the routing question and default workflow now describe depth and duration only. The prompt, `deep_review` tool description, and `deep-review` skill no longer mention money; `estimate` is optional and used only when the user asks for it. Docs describe it as an optional engine heuristic. Verified live: the question offered normal vs deep review without any cost or billing language.

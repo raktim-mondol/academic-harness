@@ -139,7 +139,7 @@ export function resolveAhLaunch() {
   return findBundled()
 }
 
-export function run(command, args, { cwd, timeoutMs, env, signal, silent, stdin } = {}) {
+export function run(command, args, { cwd, timeoutMs, env, signal, silent, stdin, onStdout, onStderr } = {}) {
   return new Promise((resolvePromise) => {
     const child = spawn(command, args, {
       cwd,
@@ -151,11 +151,13 @@ export function run(command, args, { cwd, timeoutMs, env, signal, silent, stdin 
     child.stdout?.on('data', (buf) => {
       const text = buf.toString()
       out += text
+      onStdout?.(text)
       if (!silent) process.stderr.write(text)
     })
     child.stderr?.on('data', (buf) => {
       const text = buf.toString()
       err += text
+      onStderr?.(text)
       if (!silent) process.stderr.write(text)
     })
     if (stdin != null && child.stdin) {

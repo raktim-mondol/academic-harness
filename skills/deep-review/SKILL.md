@@ -54,6 +54,17 @@ options, unless the user explicitly chose deep or normal in this conversation:
 
 Do not run `review` before the user has chosen the deep review.
 
+## Live progress
+
+Each review runs as a background job owned by the session. While it runs, the
+session header shows the job with a live stage/percentage line; expand it to
+stream the engine log — segmentation, budgeting, per-segment verification,
+synthesis, citation checks, report — plus each model call's route, duration, and
+token usage. The finished job remains under **Finished** for later inspection,
+and the review result includes `job_id`. Collapsing the output stops the live
+stream, not the job; use the row's stop control to cancel, after which the tool
+returns a cancellation error.
+
 ## Workflow
 
 ### 1. Confirm the run

@@ -175,7 +175,7 @@ function sessionRoute(exec) {
   return { provider, model }
 }
 
-function buildEngineEnv(bridge) {
+function buildEngineEnv(bridge, model) {
   const env = {}
   for (const key of ALLOWED_ENV) {
     if (process.env[key] != null) env[key] = process.env[key]
@@ -184,9 +184,17 @@ function buildEngineEnv(bridge) {
   if (bridge) {
     env.DEEPREVIEW_BASE_URL = bridge.baseUrl
     env.DEEPREVIEW_API_KEY = bridge.token
-    env.DEEPREVIEW_MODEL = 'dsh-session-model'
+    env.DEEPREVIEW_MODEL = model || 'dsh-session-model'
   }
   return env
+}
+
+function sessionModelName(exec) {
+  try {
+    return sessionRoute(exec).model
+  } catch {
+    return 'dsh-session-model'
+  }
 }
 
 function contentText(content) {
@@ -228,11 +236,19 @@ function bridgeFailure(reason) {
  * so Deep Review runs on the session model with no separate key or endpoint.
  * Bound to loopback and guarded by a per-run bearer token.
  */
-export async function startLlmBridge(ctx, exec) {
+export async function startLlmBridge(ctx, exec, onEvent) {
   if (!ctx?.llm || typeof ctx.llm.stream !== 'function') {
     throw new Error('deep_review needs the host llm service, which is not available in this session.')
   }
   const token = randomUUID()
+  let calls = 0
+  const notify = (event) => {
+    try {
+      onEvent?.(event)
+    } catch {
+      // progress reporting must never break a model call
+    }
+  }
   const server = createServer(async (req, res) => {
     const send = (status, payload) => {
       res.writeHead(status, { 'content-type': 'application/json' })
@@ -259,8 +275,11 @@ export async function startLlmBridge(ctx, exec) {
       else exec.signal.addEventListener('abort', abort, { once: true })
     }
 
+    const call = ++calls
     try {
       const route = sessionRoute(exec)
+      notify({ type: 'request', call, provider: route.provider, model: route.model })
+      const started = Date.now()
       const { system, messages } = toLlmMessages(body?.messages)
       const maxTokens = [body?.max_completion_tokens, body?.max_tokens]
         .find((value) => Number.isFinite(value))
@@ -282,8 +301,18 @@ export async function startLlmBridge(ctx, exec) {
       }
       const failure = bridgeFailure(reason)
       if (failure) {
-        return send(502, { error: { message: failure.message || failure.code || 'model request failed' } })
+        const message = failure.message || failure.code || 'model request failed'
+        notify({ type: 'error', call, message })
+        return send(502, { error: { message } })
       }
+      const mappedUsage = usage
+        ? {
+            prompt_tokens: usage.inputTokens ?? 0,
+            completion_tokens: usage.outputTokens ?? 0,
+            total_tokens: usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
+          }
+        : undefined
+      notify({ type: 'response', call, durationMs: Date.now() - started, usage: mappedUsage })
       send(200, {
         id: `chatcmpl-${randomUUID()}`,
         object: 'chat.completion',
@@ -294,19 +323,16 @@ export async function startLlmBridge(ctx, exec) {
           message: { role: 'assistant', content: text },
           finish_reason: reason?.kind === 'max-tokens' ? 'length' : 'stop',
         }],
-        ...(usage
-          ? {
-              usage: {
-                prompt_tokens: usage.inputTokens ?? 0,
-                completion_tokens: usage.outputTokens ?? 0,
-                total_tokens: usage.totalTokens ?? (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0),
-              },
-            }
-          : {}),
+        ...(mappedUsage ? { usage: mappedUsage } : {}),
       })
     } catch (error) {
-      if (controller.signal.aborted) return send(499, { error: { message: 'model request aborted' } })
-      send(502, { error: { message: error instanceof Error ? error.message : String(error) } })
+      const message = error instanceof Error ? error.message : String(error)
+      if (controller.signal.aborted) {
+        notify({ type: 'error', call, message: 'model request aborted' })
+        return send(499, { error: { message: 'model request aborted' } })
+      }
+      notify({ type: 'error', call, message })
+      send(502, { error: { message } })
     } finally {
       res.off?.('close', abort)
       exec?.signal?.removeEventListener?.('abort', abort)
@@ -408,7 +434,7 @@ function parseJsonOutput(stdout, action, secret) {
   }
 }
 
-async function runEngine(action, engineArgs, { cwd, timeoutMinutes, signal, env, apiKey }) {
+async function runEngine(action, engineArgs, { cwd, timeoutMinutes, signal, env, apiKey, onStderr }) {
   const launch = resolveEngine()
   const timeoutMs = Math.round(timeoutMinutes * 60_000)
   const result = await run(launch.command, [...launch.args, ...engineArgs], {
@@ -417,6 +443,7 @@ async function runEngine(action, engineArgs, { cwd, timeoutMinutes, signal, env,
     signal,
     silent: true,
     env,
+    onStderr,
   })
   const stderr = redact(result.err, apiKey).trim()
   if (result.code === 124) {
@@ -434,6 +461,132 @@ async function runEngine(action, engineArgs, { cwd, timeoutMinutes, signal, env,
     throw new Error(`deep review engine exited with code ${result.code}${tail ? `: ${tail}` : ''}`)
   }
   return { stdout: redact(result.out, apiKey), stderr }
+}
+
+/** Stream engine stderr and bridge call events into the session's job panel. */
+function makeProgressSink(job) {
+  if (!job) return { onStderr() {}, onEvent() {}, flush() {} }
+  let buffer = ''
+  const emit = (line) => {
+    if (!line) return
+    job.append(`${line}\n`, { channel: 'stderr' })
+    const match = /^\[\s*(\d+)%\]\s*\[([^\]]+)\]\s*(.*)$/.exec(line)
+    if (match) {
+      const detail = clip(match[3], 140)
+      job.updateProgress(`${match[1]}% ${match[2]}${detail ? ` — ${detail}` : ''}`)
+    }
+  }
+  return {
+    onStderr(text) {
+      buffer += text
+      const parts = buffer.split(/\r\n|\r|\n/)
+      buffer = parts.pop() ?? ''
+      for (const line of parts) emit(line)
+    },
+    onEvent(event) {
+      if (!event) return
+      if (event.type === 'request') {
+        job.append(`[bridge] call ${event.call} → ${event.provider}/${event.model}\n`, { channel: 'log' })
+        job.updateProgress(`model call ${event.call} (${event.model})…`)
+      } else if (event.type === 'response') {
+        const usage = event.usage
+          ? ` · ${event.usage.prompt_tokens} in / ${event.usage.completion_tokens} out tokens`
+          : ''
+        job.append(`[bridge] call ${event.call} done in ${event.durationMs} ms${usage}\n`, { channel: 'log' })
+      } else if (event.type === 'error') {
+        job.append(`[bridge] call ${event.call} failed: ${clip(event.message, 300)}\n`, { channel: 'log' })
+      }
+    },
+    flush() {
+      if (buffer) {
+        emit(buffer)
+        buffer = ''
+      }
+    },
+  }
+}
+
+/**
+ * Run long work as an owned background job so the Web UI's jobs panel can
+ * stream progress while the tool call waits. The tool still returns the work's
+ * value at settlement; the job id is added for the user to expand afterwards.
+ */
+async function runAsJob(ctx, exec, { kind, label, timeoutMs }, work) {
+  const jobs = ctx?.jobs
+  if (!jobs) return work(null, exec?.signal)
+  const owner = exec?.agent?.id
+  const controller = new AbortController()
+  const onAbort = () => controller.abort('tool call aborted')
+  if (exec?.signal?.aborted) controller.abort('tool call aborted')
+  else exec?.signal?.addEventListener?.('abort', onAbort, { once: true })
+
+  let resolveResult
+  let rejectResult
+  const resultPromise = new Promise((resolve, reject) => {
+    resolveResult = resolve
+    rejectResult = reject
+  })
+  resultPromise.catch(() => {})
+  let settleOutcome
+  const done = new Promise((resolve) => {
+    settleOutcome = resolve
+  })
+
+  let jobId
+  try {
+    jobId = jobs.start({
+      kind,
+      label,
+      ...(owner ? { owner } : {}),
+      toolCall: { callId: exec.callId, rootCallId: exec.rootCallId },
+      run: (job) => {
+        void (async () => {
+          let outcome
+          try {
+            const value = await work(job, controller.signal)
+            resolveResult(value)
+            outcome = { status: 'completed', detail: 'completed', result: JSON.stringify(value) }
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            rejectResult(error)
+            outcome = { status: controller.signal.aborted ? 'killed' : 'failed', detail: message }
+          } finally {
+            exec?.signal?.removeEventListener?.('abort', onAbort)
+            settleOutcome(outcome)
+          }
+        })()
+        return {
+          done,
+          cancel: (reason) => controller.abort(reason || 'cancelled'),
+        }
+      },
+    })
+  } catch (error) {
+    exec?.signal?.removeEventListener?.('abort', onAbort)
+    throw error
+  }
+
+  try {
+    let view
+    try {
+      view = await jobs.wait(jobId, timeoutMs, owner, exec?.signal)
+    } catch (error) {
+      try { jobs.kill(jobId, owner, 'tool call aborted') } catch { /* already settled */ }
+      throw error
+    }
+    if (view.status === 'running' || view.status === 'stopping') {
+      try { jobs.kill(jobId, owner, 'deep review timed out') } catch { /* already settled */ }
+      try { await jobs.wait(jobId, 10_000, owner) } catch { /* already gone */ }
+      throw new Error(`deep review timed out after ${Math.round(timeoutMs / 60_000)} minutes`)
+    }
+    if (view.status === 'killed') {
+      throw new Error(`deep review cancelled${view.detail ? `: ${view.detail}` : ''}`)
+    }
+    const value = await resultPromise
+    return { ...value, job_id: jobId }
+  } finally {
+    exec?.signal?.removeEventListener?.('abort', onAbort)
+  }
 }
 
 function locationText(location) {
@@ -667,95 +820,106 @@ async function actionReview(args, exec, cwd, input, ctx) {
     citations: args.citations !== false,
     scholar_peer: args.scholar_peer !== false,
   }
-  const bridge = await startLlmBridge(ctx, exec)
-  const env = buildEngineEnv(bridge)
+  const label = `Deep review: ${input.fileName}${topology ? ` (${topology})` : ''}`
+  return runAsJob(ctx, exec, {
+    kind: 'deep-review',
+    label,
+    timeoutMs: timeoutMinutes * 60_000 + 60_000,
+  }, async (job, signal) => {
+    const progress = makeProgressSink(job)
+    const bridge = await startLlmBridge(ctx, exec, progress.onEvent)
+    const env = buildEngineEnv(bridge, sessionModelName(exec))
 
-  let result
-  try {
-    result = await runEngine('review', engineArgs, {
-      cwd,
-      timeoutMinutes,
-      signal: exec?.signal,
-      env,
-      apiKey: bridge.token,
-    })
-  } catch (error) {
-    await bridge.close().catch(() => {})
-    rmSync(tmpPaper, { force: true })
-    await persistArtifacts(cwd, paths, {}, (current) => {
-      const meta = mergeMeta(current, input, params, exec)
-      meta.last_run = runRecord('review', startedAt, {
-        exit_code: 1,
-        state: 'FAILED',
-        error: clip(error instanceof Error ? error.message : String(error), 1200),
-      })
-      return meta
-    })
-    throw error
-  }
-  await bridge.close().catch(() => {})
-
-  let review
-  try {
-    review = parseJsonOutput(result.stdout, 'review', bridge.token)
-  } catch (error) {
-    rmSync(tmpPaper, { force: true })
-    throw error
-  }
-  const summary = summarizeReview(review)
-  const ids = reviewIds(review)
-  let paperMarkdown = null
-  if (input.format === 'pdf') {
+    let result
     try {
-      paperMarkdown = readFileSync(tmpPaper, 'utf8')
-    } catch {
-      // the review is still valid even if the engine skipped the parsed Markdown
+      result = await runEngine('review', engineArgs, {
+        cwd,
+        timeoutMinutes,
+        signal,
+        env,
+        apiKey: bridge.token,
+        onStderr: progress.onStderr,
+      })
+    } catch (error) {
+      progress.flush()
+      await bridge.close().catch(() => {})
+      rmSync(tmpPaper, { force: true })
+      await persistArtifacts(cwd, paths, {}, (current) => {
+        const meta = mergeMeta(current, input, params, exec)
+        meta.last_run = runRecord('review', startedAt, {
+          exit_code: 1,
+          state: 'FAILED',
+          error: clip(error instanceof Error ? error.message : String(error), 1200),
+        })
+        return meta
+      })
+      throw error
     }
-    rmSync(tmpPaper, { force: true })
-  }
+    progress.flush()
+    await bridge.close().catch(() => {})
 
-  const files = { [ARTIFACTS.review_json]: review }
-  if (typeof review?.result?.reviewMarkdown === 'string') {
-    files[ARTIFACTS.review_markdown] = review.result.reviewMarkdown
-  }
-  if (paperMarkdown != null) files[ARTIFACTS.paper_markdown] = paperMarkdown
+    let review
+    try {
+      review = parseJsonOutput(result.stdout, 'review', bridge.token)
+    } catch (error) {
+      rmSync(tmpPaper, { force: true })
+      throw error
+    }
+    const summary = summarizeReview(review)
+    const ids = reviewIds(review)
+    let paperMarkdown = null
+    if (input.format === 'pdf') {
+      try {
+        paperMarkdown = readFileSync(tmpPaper, 'utf8')
+      } catch {
+        // the review is still valid even if the engine skipped the parsed Markdown
+      }
+      rmSync(tmpPaper, { force: true })
+    }
 
-  const meta = await persistArtifacts(cwd, paths, files, (current) => {
-    const next = mergeMeta(current, input, params, exec)
-    next.last_run = runRecord('review', startedAt, {
-      review_id: ids.reviewId,
-      document_id: ids.documentId,
-      state: review?.state || 'SUCCEEDED',
-      error: summary.error,
+    const files = { [ARTIFACTS.review_json]: review }
+    if (typeof review?.result?.reviewMarkdown === 'string') {
+      files[ARTIFACTS.review_markdown] = review.result.reviewMarkdown
+    }
+    if (paperMarkdown != null) files[ARTIFACTS.paper_markdown] = paperMarkdown
+
+    const meta = await persistArtifacts(cwd, paths, files, (current) => {
+      const next = mergeMeta(current, input, params, exec)
+      next.last_run = runRecord('review', startedAt, {
+        review_id: ids.reviewId,
+        document_id: ids.documentId,
+        state: review?.state || 'SUCCEEDED',
+        error: summary.error,
+      })
+      next.summary = summary
+      next.review = {
+        sha1: input.sha1,
+        review_id: ids.reviewId,
+        document_id: ids.documentId,
+        finished_at: next.last_run.finished_at,
+        params: { ...params },
+      }
+      return next
     })
-    next.summary = summary
-    next.review = {
-      sha1: input.sha1,
-      review_id: ids.reviewId,
-      document_id: ids.documentId,
-      finished_at: next.last_run.finished_at,
-      params: { ...params },
-    }
-    return next
-  })
 
-  return {
-    action: 'review',
-    key: input.key,
-    dir: paths.dirRel,
-    ...summary,
-    provider: meta.engine.provider,
-    model: meta.engine.model,
-    topology: params.topology,
-    thinking_level: params.thinking_level,
-    duration_ms: meta.last_run.duration_ms,
-    artifacts: {
-      review: meta.artifacts.review_json?.path ?? null,
-      markdown: meta.artifacts.review_markdown?.path ?? null,
-      paper: meta.artifacts.paper_markdown?.path ?? null,
-    },
-    engine_stderr_tail: result.stderr ? clip(result.stderr.slice(-600), 600) : null,
-  }
+    return {
+      action: 'review',
+      key: input.key,
+      dir: paths.dirRel,
+      ...summary,
+      provider: meta.engine.provider,
+      model: meta.engine.model,
+      topology: params.topology,
+      thinking_level: params.thinking_level,
+      duration_ms: meta.last_run.duration_ms,
+      artifacts: {
+        review: meta.artifacts.review_json?.path ?? null,
+        markdown: meta.artifacts.review_markdown?.path ?? null,
+        paper: meta.artifacts.paper_markdown?.path ?? null,
+      },
+      engine_stderr_tail: result.stderr ? clip(result.stderr.slice(-600), 600) : null,
+    }
+  })
 }
 
 async function actionEstimate(args, exec, cwd, input) {
@@ -893,7 +1057,7 @@ async function actionVerifyCitations(args, exec, cwd, input, ctx) {
   mkdirSync(paths.dir, { recursive: true })
 
   const bridge = await startLlmBridge(ctx, exec)
-  const env = buildEngineEnv(bridge)
+  const env = buildEngineEnv(bridge, sessionModelName(exec))
   let result
   try {
     result = await runEngine('verify-citations', ['verify-citations', input.abs, '--json'], {
@@ -1186,6 +1350,7 @@ function renderReviewSummary(value) {
     lines.push(`- [${String(comment.severity).toLowerCase()}] ${comment.summary}${comment.location ? ` (${comment.location})` : ''}`)
   }
   lines.push(`Questions for authors: ${value.questions ?? 0}; flagged citations: ${value.flagged_citations?.total ?? 0}`)
+  if (value.job_id) lines.push(`Live progress: background job ${value.job_id} — expand it in the session header jobs panel.`)
   lines.push(`Stored under ${value.dir}. Full report: action "show" section "markdown"; findings are advisory.`)
   return text(lines.join('\n'))
 }
@@ -1262,7 +1427,7 @@ function renderDeepReview(value) {
 }
 
 export const name = 'academic-harness-deep-review'
-export const inject = ['tools', 'llm']
+export const inject = ['tools', 'llm', 'jobs']
 
 export function apply(ctx) {
   ctx.tools.register(defineTool({
@@ -1270,7 +1435,7 @@ export function apply(ctx) {
     description: [
       'Run a Deep-Review-style multi-pass critique of a manuscript with the vendored Open Deep Review engine: segmented review passes, page/quote-anchored comments, a scholar-peer summary with questions for authors, and reference verification against OpenAlex/Crossref.',
       'Actions: `review` (run the pipeline; slow and token-heavy), `estimate` (optional engine-run estimate; no model call), `pdf2md` (inspect a PDF), `verify_citations`, `status` (stored state, stale flag), `show` (read stored summary/comments/questions/checklist/claims/citations/markdown), `list` (stored reviews).',
-      'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer.',
+      'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. While a review runs, the engine stage/percentage and model-call events stream to the session\'s background-jobs panel; the result includes a `job_id` so the user can expand the finished log. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer.',
       'Whenever the user asks to review, critique, referee, or give feedback on a paper or manuscript, ask them to choose `deep_review` (multi-pass, takes minutes) or a normal session review before calling this tool — even for a plain "review this paper" — unless they explicitly chose a mode. Describe the deep option in the question; the user may not know it exists.',
       'This is not the systematic-review ledger (`review`) or a reporting checklist (`reporting_check`); for a referee report written by the session model, delegate to the `peer-reviewer` subagent. Findings are advisory. Load the `deep-review` skill for the workflow.',
     ].join(' '),

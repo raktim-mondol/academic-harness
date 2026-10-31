@@ -12,6 +12,7 @@ const args = process.argv.slice(2)
 writeFileSync(process.cwd() + '/.fake-argv.json', JSON.stringify(args))
 writeFileSync(process.cwd() + '/.fake-env.json', JSON.stringify({
   deepreview: process.env.DEEPREVIEW_API_KEY ?? null,
+  model: process.env.DEEPREVIEW_MODEL ?? null,
   openai: process.env.OPENAI_API_KEY ?? null,
   genericSecret: process.env.GITHUB_TOKEN ?? null,
 }))
@@ -87,6 +88,7 @@ const review = {
 if (cmd === 'review') {
   const save = args.indexOf('--save-markdown')
   if (save >= 0) writeFileSync(args[save + 1], '# Parsed paper\n')
+  console.error('[ 42%] [REVIEW] halfway through the fixture')
   const response = await fetch(process.env.DEEPREVIEW_BASE_URL + '/chat/completions', {
     method: 'POST',
     headers: {
@@ -151,6 +153,29 @@ process.exit(3)
 
 const cwd = mkdtempSync(join(tmpdir(), 'ah-deep-review-'))
 const llmCalls = []
+const jobEvents = []
+let jobSpec
+let jobHooks
+const fakeJobs = {
+  start(spec) {
+    jobSpec = spec
+    const job = {
+      append: (text, options) => jobEvents.push({ text, channel: options?.channel }),
+      updateProgress: (line) => jobEvents.push({ progress: line }),
+    }
+    jobHooks = spec.run(job)
+    return 'deep-review-test'
+  },
+  async wait() {
+    const outcome = await jobHooks.done
+    return { status: outcome.status, detail: outcome.detail }
+  },
+  kill(_id, _owner, reason) {
+    jobHooks.cancel(reason)
+    return 'requested'
+  },
+  remove() {},
+}
 const ctx = {
   tools: { register: (registered) => { tool = registered } },
   llm: {
@@ -161,12 +186,16 @@ const ctx = {
       yield { type: 'finish', reason: { kind: 'stop' } }
     },
   },
+  jobs: fakeJobs,
 }
 const exec = {
   agent: {
+    id: 'agent-test',
     options: { provider: 'deepseek-official', model: 'deepseek-flash' },
     session: { header: { cwd } },
   },
+  callId: 'call-test',
+  rootCallId: 'call-test',
 }
 const saved = {
   engine: process.env.DEEPREVIEW_ENGINE,
@@ -228,6 +257,15 @@ try {
   assert.equal(r.quality.actionability_score_pct, 82)
   assert.equal(r.reviewMarkdown, undefined, 'full markdown must not leak into review output')
   assert.equal(r.comments.top[0].body, undefined, 'comment bodies must not leak into review output')
+  assert.equal(r.job_id, 'deep-review-test')
+  assert.equal(jobSpec.kind, 'deep-review')
+  assert.equal(jobSpec.owner, 'agent-test')
+  assert.equal(jobSpec.toolCall.callId, 'call-test')
+  assert.match(jobSpec.label, /paper\.pdf/)
+  assert.ok(jobEvents.some((event) => event.progress?.includes('42%')), 'engine progress reaches the job')
+  assert.ok(jobEvents.some((event) => event.channel === 'stderr' && event.text.includes('42%')), 'engine stderr reaches the job ring')
+  assert.ok(jobEvents.some((event) => event.channel === 'log' && event.text.includes('[bridge] call 1')), 'bridge request reaches the job log')
+  assert.ok(jobEvents.some((event) => event.channel === 'log' && event.text.includes('done in')), 'bridge response reaches the job log')
 
   const argv = JSON.parse(readFileSync(join(cwd, '.fake-argv.json'), 'utf8'))
   assert.equal(argv[0], 'review')
@@ -237,6 +275,7 @@ try {
   assert.ok(argv.includes('--save-markdown'))
   const childEnv = JSON.parse(readFileSync(join(cwd, '.fake-env.json'), 'utf8'))
   assert.match(childEnv.deepreview, /^[0-9a-f-]{36}$/, 'the engine receives a per-run bridge token')
+  assert.equal(childEnv.model, 'deepseek-flash', 'the engine log names the session model')
   assert.ok(!JSON.stringify(argv).includes(childEnv.deepreview), 'the bridge token must never be passed in argv')
   assert.equal(childEnv.openai, null, 'ambient provider keys must not be forwarded')
   assert.equal(childEnv.genericSecret, null, 'unrelated ambient secrets must not be forwarded')
