@@ -2,6 +2,17 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.37.1
+
+- **Remote compute survives transient failures.** Adapted in idea (not code) from `deepseek-ai/dsh-superagent-prototype`: separate "the provider or network could not answer right now" from "your request is wrong", and only retry the first kind.
+- `search-http.js` exports `isTransientNetworkError`, `isTransientStatus`, `isTransientError`, `isAuthStatus`, `withTransientRetry`, and `retryQuietly`. Transient means HTTP 408, 429, or 5xx (501 excluded as permanent), or a connection-level failure found by `code` anywhere in the `cause` chain, because undici wraps the real failure in `TypeError: fetch failed`. The HTTP client's fetch-throw path now retries only these, not every thrown error.
+- `runpod_run` and `vastai_run` SSH readiness polls tolerate transient blips until their deadline; 401/403 and 404 still fail on the first call.
+- `runpod_run`, `vastai_run`, and `modal_run` report `*_transient` (retry the same call), `*_auth` (permanent; fix the credential), or `*_failure`, with the verdict stated in the tool text. `modal_run` also maps gRPC `UNAVAILABLE`/`DEADLINE_EXCEEDED` to transient and `PERMISSION_DENIED`/`UNAUTHENTICATED` to auth. The four hand-rolled teardown loops now share `retryQuietly`; `modal_run` retries idempotent sandbox setup calls but never the user's command.
+- Prompt: one bullet of attention discipline (act on what was asked, stay quiet while working, speak at completion, a blocker, or a decision that is the user's).
+- Docs: `docs/COMPUTE.md` documents the error taxonomy and poll resilience.
+- **Verification.** `npm run test:compute` plus the search suites that share `search-http.js` pass. Live, in the web UI on the `academic-harness` profile: a real `modal_run` succeeded and a non-zero exit came back as a normal result; with `MODAL_SERVER_URL` pointed at a closed port Modal returned `UNAVAILABLE … ECONNREFUSED` and the tool said `TRANSIENT`; with a bad `MODAL_TOKEN_SECRET` it returned `UNAUTHENTICATED` and the tool said `PERMANENT`.
+- **Known limits.** Both live failures occur at Modal's `AuthTokenGet`, before the setup-retry wrapper, so the in-tool retry itself is covered by stubbed tests only. Against the prototype's own transient/permanent vectors the classifier agrees on 8 of 9; a plain `Error('getaddrinfo EAI_AGAIN …')` with no `code` is classed permanent, because this classifier reads `code` and two phrases rather than matching message text. Errors from real Node/undici carry the code and are caught. The Runpod and Vast.ai error paths were exercised only up to "not configured" in the live run.
+
 ## 0.37.0
 
 - **Deep research (`deep_research`).** A self-driving, ledger-backed investigation tool, adapted in design from `jordan-gibbs/hyperresearch` (MIT; see `NOTICE`) and built entirely on this plugin's existing primitives — no vendored code, no second search client, no new runtime. State lives under `.dsh/deep-research/<run_id>/` as append-only JSONL plus write-once `query.md`/`manifest.json`.
