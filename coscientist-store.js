@@ -963,7 +963,7 @@ export async function setStatus({ cwd, slug, id, status, reason, overriddenBy })
  * Budget inputs for the ported policy. Upstream counted tokens from its own LLM
  * client; a tool here cannot see subagent spend, so dispatch rounds are counted
  * against `step_budget` instead. That is an honest substitution, not a token
- * figure — the plan (docs/CO-SCIENTIST-INTEGRATION-PLAN.md §9) records it as a
+ * figure — this is a
  * deliberate deviation.
  */
 function policyStats(state) {

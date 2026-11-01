@@ -90,13 +90,7 @@ See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
 ## Design notes
 
 - [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md)
-- [Co-Scientist integration](CO-SCIENTIST-INTEGRATION-PLAN.md)
-- [Fold integration](FOLD-INTEGRATION-PLAN.md)
-- [Non-search tools](NON-SEARCH-TOOLS-PLAN.md)
-- [PaperMemory v2](PAPERMEMORY-V2-PLAN.md)
 - [RSI](RSI.md)
-- [Search providers](SEARCH-PROVIDERS-PLAN.md)
-- [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md)
 
 ## License
 

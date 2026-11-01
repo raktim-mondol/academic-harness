@@ -266,7 +266,7 @@ for (const modulePath of ['../clinicaltrials.js', '../openfda.js', '../dataset-s
   assert.equal(typeof module.apply, 'function', `${modulePath} must export apply`)
 }
 
-// ── hypothesis tournament (docs/CO-SCIENTIST-INTEGRATION-PLAN.md) ────────────
+// ── hypothesis tournament ────────────
 for (const modulePath of ['./coscientist', './coscientist-rank', './coscientist-verify', './coscientist-embed', './coscientist-store', './coscientist-models', './store-lock']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
 }

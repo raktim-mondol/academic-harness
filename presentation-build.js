@@ -1,6 +1,5 @@
 /**
- * presentation_build: posters and slides from a paper/outline (Phase 4D of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * presentation_build: posters and slides from a paper/outline.
  *
  * The generator fills known sections and figures into a chosen template. It
  * never invents results or figures, and a successful compile is not a visual

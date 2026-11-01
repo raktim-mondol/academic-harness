@@ -119,4 +119,3 @@ Every server-side file is plain ESM JS — no build step. Only the Settings page
 
 - [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) — why the writing oracle is vendored and the open decision about its long-term home.
 - [RSI](RSI.md) — the local self-improvement loop, its store, and its autonomy boundary.
-- [Co-Scientist integration plan](CO-SCIENTIST-INTEGRATION-PLAN.md), [non-search tools plan](NON-SEARCH-TOOLS-PLAN.md), [search providers plan](SEARCH-PROVIDERS-PLAN.md), and [PaperMemory v2 plan](PAPERMEMORY-V2-PLAN.md) — implementation records with more detail than the user guides.

@@ -1,7 +1,6 @@
 /**
  * numbers_audit: extended statistical-reporting consistency checks across a
- * manuscript's text, tables, and flow counts (Phase 4E of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * manuscript's text, tables, and flow counts.
  *
  * The audit reports candidates for human review. It recomputes only what the
  * text makes checkable and marks everything else `not_checked`; it never says a

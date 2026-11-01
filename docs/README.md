@@ -39,14 +39,6 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Changelog](CHANGELOG.md) | Release notes from 0.18.0 onward, plus unreleased changes |
 | [Development](DEVELOPMENT.md) | Build, tests, docs diagrams, bundle patch, repository layout |
 | [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) | Why the writing engine is vendored and the open decision about its home |
-| [Co-Scientist integration](CO-SCIENTIST-INTEGRATION-PLAN.md) | Tournament design and implementation record |
-| [Fold integration](FOLD-INTEGRATION-PLAN.md) | Reply folding and `paper_fold` design |
-| [Non-search tools](NON-SEARCH-TOOLS-PLAN.md) | Citation, review, clinical, dataset, and policy tool plan |
-| [PaperMemory v2](PAPERMEMORY-V2-PLAN.md) | Memory v2 design record |
-| [Reporting and appraisal](REPORTING-AND-APPRAISAL-PLAN.md) | Phase 3 reporting-guideline checker and Phase 4 risk-of-bias/appraisal ledger |
-| [Search providers](SEARCH-PROVIDERS-PLAN.md) | Search provider plan |
-| [Specialist agents](AGENTS-PLAN.md) | Specialist-roster gap analysis (partially implemented; current briefs live in `skills/` and `prompt.js`) |
-| [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md) | Historical workspace-search and memory-boundary design record |
 
 ## Diagrams
 

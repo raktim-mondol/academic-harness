@@ -1,6 +1,5 @@
 /**
- * provenance_audit: the read-only cross-ledger audit (Phase 3 of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * provenance_audit: the read-only cross-ledger audit.
  *
  * It answers the question no single ledger can: which manuscript claims, review
  * inclusions, extractions, appraisals, or hypotheses have no verified support,
