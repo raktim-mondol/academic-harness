@@ -12,6 +12,9 @@
  * result. It never decides what the answer should be, and it never claims a
  * citation is sound when it could not check one: unverified stays `not_checked`
  * and is disclosed in the same breath as a pass.
+ *
+ * Pipeline shape adapted from jordan-gibbs/hyperresearch (MIT); see NOTICE. No
+ * upstream code is vendored.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'

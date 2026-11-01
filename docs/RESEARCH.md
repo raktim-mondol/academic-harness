@@ -151,6 +151,14 @@ escaped so it cannot end its fence and resume as trusted instructions.
 Ledger layout, step ids, gate ids, and error states:
 `skills/deep-research/references/run-ledger.md`.
 
+**Attribution.** The pipeline shape — one step per phase, the canonical query as gospel, tiers
+and gears, patch-never-regenerate with per-hunk caps, the ship gate, independence clustering, and
+untrusted-source fencing — is adapted from [hyperresearch](https://github.com/jordan-gibbs/hyperresearch)
+(MIT), a Claude Code/Codex research harness. No upstream code is vendored: the implementation is
+first-party JavaScript written against this plugin's own retrieval, ledger, and lock helpers, and
+the step set, gate semantics, and verification seams differ from the upstream design. `NOTICE`
+records the same.
+
 ## Hypothesis tournaments
 
 `coscientist` and `coscientist_rank` are preset-only native tools — local state, no key, no database, no new dependency — for a ranked hypothesis shortlist that has to survive past this context window.

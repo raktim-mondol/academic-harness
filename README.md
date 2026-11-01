@@ -135,6 +135,10 @@ Scale is one knob — `effort=low|medium|high` — and it is inferred from the r
 ("quickly" is low, "comprehensive systematic review" is high). A request that points both ways
 returns `needs_input` with a question and creates nothing: no run, no model call. Runs are
 resumable and budget-capped, so a crash continues at the step that died instead of restarting.
+The pipeline shape — step-per-phase, the frozen canonical query, patch-only repair, the ship
+gate, independence clustering, and untrusted-source fencing — is adapted from
+[hyperresearch](https://github.com/jordan-gibbs/hyperresearch) (MIT); no upstream code is
+vendored, and [NOTICE](NOTICE) records the attribution.
 [Read more](docs/RESEARCH.md#deep-research)
 
 ## Documentation
