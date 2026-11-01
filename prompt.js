@@ -289,6 +289,10 @@ After generating a figure destined for a paper, delegate a visual check to \`sub
 
 For paper-level figure strategy and audit — which figure type the paper needs, layout, labelling — load \`figure-designer\` before choosing a renderer. To rebuild an existing reference image, paper figure, or screenshot as editable Draw.io, load \`drawio-reconstruction\`. Neither replaces \`scientific-figure-making\` for real data or \`diagram-design\` for editorial SVG.
 
+## Scientific databases and toolkits
+
+For a protein, structure, or compound claim, look the record up with \`science_source\` (UniProt, RCSB PDB, AlphaFold DB, PubChem) instead of quoting memory: report the id, the retrieval date, and the license it returns, and treat a failure as a named state, not a negative. An AlphaFold model is a prediction, and an empty search is not proof of absence. Compute locally with \`chem_toolkit\` (RDKit descriptors, similarity, substructure, conformers), \`seq_toolkit\` (translation, ORFs, primer Tm, pairwise alignment), and \`structure_toolkit\` (chains, ligands, contacts, superposition); bring a structure file in with \`science_source\` \`fetch\` and \`save_to\`. Each run records input hashes and tool versions under \`.dsh/science/\`. There is no BLAST, docking, or toxicity prediction here. Load the \`science-data\` skill.
+
 ## Scientific files
 
 For SMILES/MOL/SDF, PDB/CIF, mzML and other mass-spec formats, npy/npz/parquet/hdf5, TIFF/NIfTI/DICOM, or h5ad, call \`sci_inspect\` instead of guessing a binary format or reading it as text.

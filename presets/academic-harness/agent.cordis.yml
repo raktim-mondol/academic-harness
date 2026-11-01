@@ -507,6 +507,27 @@
 - id: data-profile
   name: academic-harness/data-profile
 
+# Scientific databases (Phase 6): one multiplexed, read-only, keyless tool over
+# adapters in science-sources/ (UniProt, RCSB PDB, AlphaFold DB, PubChem).
+# Records carry source, id, url, retrieved_at, license, and endpoint; failures
+# are named states. `fetch` saves a source file into the workspace with a hashed
+# entry under <cwd>/.dsh/science/. See science-source.js.
+- id: science-source
+  name: academic-harness/science-source
+
+# Local science toolkits (Phase 6): RDKit chemistry, pure-Python sequences, and
+# gemmi structures. Local only; every run appends input hashes and tool versions
+# to <cwd>/.dsh/science/runs.jsonl. See chem-toolkit.js, seq-toolkit.js,
+# structure-toolkit.js, and science-toolkit-kit.js.
+- id: chem-toolkit
+  name: academic-harness/chem-toolkit
+
+- id: seq-toolkit
+  name: academic-harness/seq-toolkit
+
+- id: structure-toolkit
+  name: academic-harness/structure-toolkit
+
 # Reproducibility packages (Phase 2D): a frozen inventory plus a built
 # package (manifest with SHA-256, environment snapshot, generated Dockerfile,
 # README, CITATION.cff, codemeta.json, RO-Crate, checksums) under a workspace

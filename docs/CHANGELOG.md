@@ -2,6 +2,17 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.38.0
+
+- **Scientific data connectors and local toolkits (Phase 6).** Four preset-only tools, none needing a key: `science_source`, `chem_toolkit`, `seq_toolkit`, and `structure_toolkit`. Guide: [Scientific data and toolkits](SCIENCE-DATA.md); skill: `science-data`. The catalogue is now 763 skills.
+- `science_source` (`science-source.js`, adapters in `science-sources/`) is one multiplexed tool with `catalog`, `search`, `get`, `fetch`, and `resolve`. Adapters: UniProt, RCSB PDB, AlphaFold DB, PubChem. Every record carries `source`, `id`, `url`, `retrieved_at`, `license`, and the endpoint called. Failures are named states (`not_found`, `bad_request`, `rate_limited`, `provider_blocked`, `unavailable`, `not_supported`, `size_limit_exceeded`); an empty search says it is not proof of absence. `resolve` covers UniProt→PDB, UniProt→AlphaFold, and PubChem CID→InChIKey. `fetch` is https-only and limited to the adapter's own hosts, capped at 1 MB by default and 25 MB at most, and `save_to` writes inside the workspace with a hashed line in `.dsh/science/retrievals.jsonl`. RCSB details come from one batched GraphQL call. AlphaFold records are labelled predictions. Adapters are exported as `academic-harness/science-sources/*` for extension.
+- `chem_toolkit` (RDKit): `validate`, `standardize`, `descriptors`, `similarity`, `substructure`, `conformers`. `seq_toolkit` (pure Python, no new dependency): `stats`, `translate`, `orfs`, `primer_tm` (SantaLucia 1998 with sodium correction), `align` (global and local; BLOSUM62 when Biopython is installed, identity scoring otherwise, stated in the result). `structure_toolkit` (gemmi): `chains`, `ligands`, `contacts` (crystal-packing neighbours flagged), `superpose`.
+- Every toolkit run appends its tool, action, input SHA-256 hashes, and tool versions to `.dsh/science/runs.jsonl` (`science-toolkit-kit.js`); inputs are workspace-confined and size-limited, outputs are capped and say so, and absolute paths are not recorded.
+- **Not built.** `astro_toolkit` (optional in the plan) and the optional BLAST action. ChEMBL, NCBI Gene/Ensembl, GEO, and Reactome adapters are deferred; the plan asked for three to five adapters and four shipped.
+- Found by the tests: `conformers` failed when the output directory did not exist; a PubChem unknown CID returns an empty stub with HTTP 200 and is now `not_found`; a text file saved as `.pdb` parsed to a model with no atoms and is now an error.
+- Docs: prompt section `## Scientific databases and toolkits`, `docs/TOOLS.md` rows, `docs/SCIENCE-DATA.md`, preset rows, regenerated `cordis.patch.yml`.
+- Tests: `scripts/test-science-source.mjs` (115 checks, injected fetchers, no network) and `scripts/test-science-toolkits.mjs` (84 checks on synthetic inputs through the real helpers); both are in `verify.yml` and `npm run test:science`.
+
 ## 0.37.1
 
 - **Remote compute survives transient failures.** Adapted in idea (not code) from `deepseek-ai/dsh-superagent-prototype`: separate "the provider or network could not answer right now" from "your request is wrong", and only retry the first kind.

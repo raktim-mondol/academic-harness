@@ -84,6 +84,8 @@ jobs:
           node scripts/test-experiment-log.mjs
           node scripts/test-dataset-get.mjs
           node scripts/test-data-profile.mjs
+          node scripts/test-science-source.mjs
+          node scripts/test-science-toolkits.mjs
           node scripts/test-repro-package.mjs
           node scripts/test-provenance-audit.mjs
           node scripts/test-deep-research-mechanisms.mjs
