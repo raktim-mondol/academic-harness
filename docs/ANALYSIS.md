@@ -1,6 +1,6 @@
 # Reproducible analysis and data
 
-Phase 2 of the [scientific expansion](SCIENTIFIC-EXPANSION-PLAN.md) turns
+Phase 2 of the scientific expansion turns
 reproducibility from a habit into ledgers. Five preset-only tools record the
 analysis that produced a number, the experiments that explored it, the data it
 runs on, and the package a reader needs to rebuild it. All state is local,
@@ -108,4 +108,4 @@ see [Provenance audit](PROVENANCE.md).
 
 ---
 
-*Phase 2 of the [expansion plan](SCIENTIFIC-EXPANSION-PLAN.md).*
+*Phase 2 of the expansion plan.*

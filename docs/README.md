@@ -44,7 +44,6 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Non-search tools](NON-SEARCH-TOOLS-PLAN.md) | Citation, review, clinical, dataset, and policy tool plan |
 | [PaperMemory v2](PAPERMEMORY-V2-PLAN.md) | Memory v2 design record |
 | [Reporting and appraisal](REPORTING-AND-APPRAISAL-PLAN.md) | Phase 3 reporting-guideline checker and Phase 4 risk-of-bias/appraisal ledger |
-| [Scientific expansion](SCIENTIFIC-EXPANSION-PLAN.md) | Phased plan for synthesis, reproducible analysis, provenance, submission, study conduct, science data, and discovery intelligence |
 | [Search providers](SEARCH-PROVIDERS-PLAN.md) | Search provider plan |
 | [Specialist agents](AGENTS-PLAN.md) | Specialist-roster gap analysis (partially implemented; current briefs live in `skills/` and `prompt.js`) |
 | [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md) | Historical workspace-search and memory-boundary design record |

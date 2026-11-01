@@ -1,6 +1,6 @@
 # Discovery and reference checks
 
-Phase 7 of the [scientific expansion plan](SCIENTIFIC-EXPANSION-PLAN.md). Five additions that keep a search alive, map a field, and check references and data links. None needs a key beyond the optional `OPENALEX_API_KEY`, `S2_API_KEY`, and `CROSSREF_MAILTO` that the existing search tools already read. Skills: `research-monitoring`, `citation-network`, `reference-audit`.
+Phase 7 of the scientific expansion plan. Five additions that keep a search alive, map a field, and check references and data links. None needs a key beyond the optional `OPENALEX_API_KEY`, `S2_API_KEY`, and `CROSSREF_MAILTO` that the existing search tools already read. Skills: `research-monitoring`, `citation-network`, `reference-audit`.
 
 Every tool follows the harness rule: the tool reports what a check found, a check that could not run is `unverified` or a named failure state, and nothing here decides whether a paper is good or a claim is supported.
 

@@ -95,7 +95,6 @@ See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
 - [Non-search tools](NON-SEARCH-TOOLS-PLAN.md)
 - [PaperMemory v2](PAPERMEMORY-V2-PLAN.md)
 - [RSI](RSI.md)
-- [Scientific expansion](SCIENTIFIC-EXPANSION-PLAN.md)
 - [Search providers](SEARCH-PROVIDERS-PLAN.md)
 - [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md)
 

@@ -1,6 +1,6 @@
 # Scientific data and toolkits
 
-Phase 6 of the [scientific expansion plan](SCIENTIFIC-EXPANSION-PLAN.md) extends the harness from literature discovery to scientific databases and local molecular computation. Four preset-only tools; none needs a key.
+Phase 6 of the scientific expansion plan extends the harness from literature discovery to scientific databases and local molecular computation. Four preset-only tools; none needs a key.
 
 | Tool | Scope | State |
 |---|---|---|

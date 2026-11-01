@@ -1,6 +1,6 @@
 # Cross-ledger provenance audit
 
-Phase 3 of the [scientific expansion plan](SCIENTIFIC-EXPANSION-PLAN.md). Each
+Phase 3 of the scientific expansion plan. Each
 ledger in the harness keeps excellent local state — `review` knows its evidence,
 `reporting_check` knows its quotes, `analysis_run` knows its input hashes, the
 `ah` engine knows which passage a clause was bound to — but none of them can
