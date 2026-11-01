@@ -6,6 +6,7 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { DEFAULT_MODAL_INSTANCE_ID, MODAL_INSTANCE_IDS, resolveModalInstance } from './modal-instances.js'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './workspace-path.js'
+import { isTransientError, retryQuietly, withTransientRetry } from './search-http.js'
 import { ModalSdkError, ensureModalSdk } from './modal-runtime.js'
 
 const APP_NAME = 'academic-harness'
@@ -13,6 +14,13 @@ const WORKDIR = '/workspace'
 const DEFAULT_TIMEOUT_S = 600
 const MAX_TIMEOUT_S = 3600
 const MAX_OUTPUT_CHARS = 16000
+
+// Modal transport failures surface as gRPC status text, which HTTP/socket
+// classification alone would miss.
+const isModalTransient = (error) => isTransientError(error) || /\b(?:UNAVAILABLE|DEADLINE_EXCEEDED)\b/.test(error?.message ?? String(error))
+const isModalAuth = (error) => /\b(?:PERMISSION_DENIED|UNAUTHENTICATED)\b/.test(error?.message ?? String(error))
+/** Retry idempotent sandbox filesystem setup calls; never the user's command itself (side effects). */
+const retryModalSetup = (fn) => withTransientRetry(fn, { tries: 2, baseDelayMs: 1000, classify: isModalTransient })
 
 function workspaceRoot(exec) {
   const cwd = exec.agent?.session?.header?.cwd
@@ -171,22 +179,21 @@ export function applyModalRun(ctx) {
       const terminate = () => {
         teardownChain = teardownChain.then(async () => {
           if (!sb) return null
-          let lastError = null
-          for (let attempt = 0; attempt < 3; attempt++) {
+          const target = sb
+          const lastError = await retryQuietly(async () => {
             try {
-              await sb.terminate()
-              sb = null
-              return null
+              await target.terminate()
             } catch (error) {
               const msg = error instanceof Error ? error.message : String(error)
+              // Already gone is the desired end state.
               if (/not found|already terminated|does not exist/i.test(msg)) {
                 sb = null
-                return null
+                return
               }
-              lastError = error
-              if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 1500 * (attempt + 1)))
+              throw error
             }
-          }
+            sb = null
+          }, { tries: 3, baseDelayMs: 1500 })
           return lastError
         })
         return teardownChain
@@ -223,7 +230,7 @@ export function applyModalRun(ctx) {
         })
         sandboxId = sb.sandboxId ?? null
         if (exec.signal?.aborted) throw new Error('Aborted after sandbox creation')
-        await sb.filesystem.makeDirectory(WORKDIR, { createParents: true })
+        await retryModalSetup(() => sb.filesystem.makeDirectory(WORKDIR, { createParents: true }))
 
         const stagedIn = []
         const missingIn = []
@@ -231,12 +238,12 @@ export function applyModalRun(ctx) {
           if (!existsSync(local)) { missingIn.push(rel); continue }
           const remote = posix.join(WORKDIR, rel)
           const remoteDir = posix.dirname(remote)
-          if (remoteDir && remoteDir !== WORKDIR) await sb.filesystem.makeDirectory(remoteDir, { createParents: true })
+          if (remoteDir && remoteDir !== WORKDIR) await retryModalSetup(() => sb.filesystem.makeDirectory(remoteDir, { createParents: true }))
           if (statSync(local).isDirectory()) {
             const { tarPath, cleanup } = makeLocalTar(local)
             try {
               const remoteTar = `/tmp/ah-upload-${basename(local)}.tgz`
-              await sb.filesystem.copyFromLocal(tarPath, remoteTar)
+              await retryModalSetup(() => sb.filesystem.copyFromLocal(tarPath, remoteTar))
               const extract = await sb.exec(['sh', '-lc', `tar xzf ${shellQuote(remoteTar)} -C ${shellQuote(remoteDir)} && rm -f ${shellQuote(remoteTar)}`], { timeoutMs: 600_000 })
               const code = await extract.wait()
               if (code !== 0) throw new Error(`remote tar extract failed for ${rel} (exit ${code})`)
@@ -244,7 +251,7 @@ export function applyModalRun(ctx) {
               cleanup()
             }
           } else {
-            await sb.filesystem.copyFromLocal(local, remote)
+            await retryModalSetup(() => sb.filesystem.copyFromLocal(local, remote))
           }
           stagedIn.push(rel)
         }
@@ -276,7 +283,7 @@ export function applyModalRun(ctx) {
               if (packCode !== 0) throw new Error(`remote tar failed (exit ${packCode})`)
               const localTar = `${local}.download.tgz`
               try {
-                await sb.filesystem.copyToLocal(remoteTar, localTar)
+                await retryModalSetup(() => sb.filesystem.copyToLocal(remoteTar, localTar))
                 extractLocalTar(localTar, local)
               } finally {
                 rmSync(localTar, { force: true })
@@ -284,7 +291,7 @@ export function applyModalRun(ctx) {
               }
             } else {
               try {
-                await sb.filesystem.copyToLocal(remote, local)
+                await retryModalSetup(() => sb.filesystem.copyToLocal(remote, local))
               } catch (error) {
                 if (isNotFound(error)) missing = true
                 else throw error
@@ -320,11 +327,28 @@ export function applyModalRun(ctx) {
         outcome = { ...summary, text }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
-        outcome = {
-          error: 'modal_failure',
-          instance: spec.id,
-          sandbox_id: sandboxId,
-          text: `Modal run failed on instance "${spec.id}"${sandboxId ? ` (sandbox ${sandboxId})` : ''}: ${msg}\nIf this is an authentication error, check MODAL_TOKEN_ID / MODAL_TOKEN_SECRET.`,
+        const where = `Modal run on instance "${spec.id}"${sandboxId ? ` (sandbox ${sandboxId})` : ''}`
+        if (isModalAuth(error)) {
+          outcome = {
+            error: 'modal_auth',
+            instance: spec.id,
+            sandbox_id: sandboxId,
+            text: `${where} failed: ${msg}\nPERMANENT: Modal rejected the credentials. Check MODAL_TOKEN_ID / MODAL_TOKEN_SECRET (https://modal.com/settings); retrying the same call will not help.`,
+          }
+        } else if (isModalTransient(error)) {
+          outcome = {
+            error: 'modal_transient',
+            instance: spec.id,
+            sandbox_id: sandboxId,
+            text: `${where} failed: ${msg}\nTRANSIENT: a network or Modal-side failure; retry the same call.`,
+          }
+        } else {
+          outcome = {
+            error: 'modal_failure',
+            instance: spec.id,
+            sandbox_id: sandboxId,
+            text: `${where} failed: ${msg}\nIf this is an authentication error, check MODAL_TOKEN_ID / MODAL_TOKEN_SECRET.`,
+          }
         }
       } finally {
         exec.signal?.removeEventListener('abort', onAbort)

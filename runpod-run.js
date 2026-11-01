@@ -27,6 +27,7 @@ import {
 } from './ssh-client.js'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './workspace-path.js'
+import { isAuthStatus, isTransientError, retryQuietly } from './search-http.js'
 
 const WORKDIR = '/workspace'
 const DEFAULT_TIMEOUT_S = 600
@@ -75,11 +76,16 @@ function isNotFound(error) {
 /** Best-effort sweep for a pod whose create reply was lost mid-request. */
 async function reconcileOrphanPod(key, name) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const pods = await listPods(key)
-    const match = pods.find((pod) => pod.name === name)
-    if (match?.id) {
-      await deletePod(key, match.id)
-      return match.id
+    try {
+      const pods = await listPods(key)
+      const match = pods.find((pod) => pod.name === name)
+      if (match?.id) {
+        await deletePod(key, match.id)
+        return match.id
+      }
+    } catch (error) {
+      // A blip must not abandon a billed orphan; a rejected key will not fix itself by polling.
+      if (!isTransientError(error)) throw error
     }
     await sleep(2000)
   }
@@ -178,24 +184,21 @@ export function applyRunpodRun(ctx) {
         teardownChain = teardownChain.then(async () => {
           let failure = null
           if (podId) {
-            for (let attempt = 0; attempt < TEARDOWN_ATTEMPTS; attempt++) {
+            const target = podId
+            failure = await retryQuietly(async () => {
               try {
-                await deletePod(key, podId)
-                podId = null
-                failure = null
-                break
+                await deletePod(key, target)
               } catch (error) {
                 const msg = error instanceof Error ? error.message : String(error)
                 // Already gone is the desired end state.
-                if (/→ 404\b|not found/i.test(msg)) {
+                if (error.status === 404 || /→ 404\b|not found/i.test(msg)) {
                   podId = null
-                  failure = null
-                  break
+                  return
                 }
-                failure = error
-                if (attempt < TEARDOWN_ATTEMPTS - 1) await sleep(1500 * (attempt + 1))
+                throw error
               }
-            }
+              podId = null
+            }, { tries: TEARDOWN_ATTEMPTS, baseDelayMs: 1500 })
           }
           keys?.cleanup()
           keys = null
@@ -320,13 +323,30 @@ export function applyRunpodRun(ctx) {
         outcome = { ...summary, text }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
-        outcome = {
-          error: 'runpod_failure',
-          instance: spec.id,
-          pod_id: podId,
-          text: `Runpod run failed on instance "${spec.id}"${podId ? ` (pod ${podId})` : ''}: ${msg}\n`
-            + 'If this is an authentication error, check RUNPOD_API_KEY. If the GPU is out of stock, try another instance or cloud_type SECURE.'
-            + (volume ? ` If a volume_name is set, the chosen GPU may simply not be available in that volume's data center — try another instance, or drop volume_name for this run.` : ''),
+        const where = `Runpod run on instance "${spec.id}"${podId ? ` (pod ${podId})` : ''}`
+        if (isAuthStatus(error?.status)) {
+          outcome = {
+            error: 'runpod_auth',
+            instance: spec.id,
+            pod_id: podId,
+            text: `${where} failed: ${msg}\nPERMANENT: Runpod rejected the credentials (HTTP ${error.status}). Check RUNPOD_API_KEY; retrying the same call will not help.`,
+          }
+        } else if (isTransientError(error)) {
+          outcome = {
+            error: 'runpod_transient',
+            instance: spec.id,
+            pod_id: podId,
+            text: `${where} failed: ${msg}\nTRANSIENT: a network or Runpod-side failure; retry the same call.`,
+          }
+        } else {
+          outcome = {
+            error: 'runpod_failure',
+            instance: spec.id,
+            pod_id: podId,
+            text: `${where} failed: ${msg}\n`
+              + 'If this is an authentication error, check RUNPOD_API_KEY. If the GPU is out of stock, try another instance or cloud_type SECURE.'
+              + (volume ? ` If a volume_name is set, the chosen GPU may simply not be available in that volume's data center — try another instance, or drop volume_name for this run.` : ''),
+          }
         }
       } finally {
         signal?.removeEventListener('abort', onAbort)

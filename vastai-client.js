@@ -11,6 +11,7 @@
  * its teardown block.
  */
 import { sleep } from './ssh-client.js'
+import { isTransientError } from './search-http.js'
 
 const API_BASE = process.env.VAST_API_BASE_URL ?? 'https://console.vast.ai/api/v0'
 
@@ -35,7 +36,9 @@ async function request(apiKey, method, relPath, body) {
       ?? data?.error
       ?? text
       ?? res.statusText
-    throw new Error(`Vast.ai API ${method} ${relPath} → ${res.status}: ${msg}`)
+    const error = new Error(`Vast.ai API ${method} ${relPath} → ${res.status}: ${msg}`)
+    error.status = res.status
+    throw error
   }
   return data
 }
@@ -105,14 +108,22 @@ const TERMINAL_BAD_STATES = new Set(['exited', 'unknown', 'offline'])
 /**
  * Poll until the container is running and SSH details exist.
  * `exited`/`unknown`/`offline` never recover on their own — fail fast so the
- * caller can destroy the instance and retry on a different offer.
+ * caller can destroy the instance and retry on a different offer. A transient
+ * network blip or 5xx costs a retry on the next tick, not the whole wait.
  */
 export async function waitForInstanceSsh(apiKey, instanceId, opts) {
   const deadline = Date.now() + opts.timeoutMs
   let last = ''
   while (Date.now() < deadline) {
     if (opts.signal?.aborted) throw new Error('Aborted while waiting for Vast.ai instance')
-    const info = await showInstance(apiKey, instanceId)
+    let info
+    try {
+      info = await showInstance(apiKey, instanceId)
+    } catch (error) {
+      if (!isTransientError(error)) throw error
+      await sleep(opts.pollMs ?? 10_000, opts.signal)
+      continue
+    }
     last = String(info?.actual_status ?? info?.cur_state ?? 'unknown')
     if (TERMINAL_BAD_STATES.has(last)) {
       throw new Error(`Instance ${instanceId} entered unrecoverable state "${last}" (${info?.status_msg || 'no status message'})`)

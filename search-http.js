@@ -11,7 +11,8 @@
 
 const limiters = new Map()
 const warned = new Set()
-const RETRYABLE = new Set([429, 502, 503, 504])
+const TRANSIENT_NETWORK_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE'])
+const TRANSIENT_NETWORK_PHRASES = ['socket hang up', 'fetch failed']
 
 export function getLimiter(name, options = {}) {
   if (!limiters.has(name)) limiters.set(name, new RateLimiter(options))
@@ -77,6 +78,65 @@ export function retryAfterMs(header) {
   const date = Date.parse(header)
   if (Number.isFinite(date)) return Math.max(0, date - Date.now())
   return null
+}
+
+/**
+ * True when a thrown error is a connection-level failure worth retrying:
+ * a DNS/socket code anywhere in the `cause` chain (undici wraps the real
+ * failure in `TypeError: fetch failed`), or one of the known socket phrases.
+ */
+export function isTransientNetworkError(error) {
+  for (let node = error; node && typeof node === 'object'; node = node.cause) {
+    if (typeof node.code === 'string' && TRANSIENT_NETWORK_CODES.has(node.code)) return true
+    const message = typeof node.message === 'string' ? node.message.toLowerCase() : ''
+    if (message && TRANSIENT_NETWORK_PHRASES.some((phrase) => message.includes(phrase))) return true
+    if (node.cause === node) break
+  }
+  return false
+}
+
+/** True for HTTP statuses that mean "the server could not answer right now", not "your request is wrong". 501 is permanent. */
+export function isTransientStatus(status) {
+  return status === 408 || status === 429 || (status >= 500 && status !== 501)
+}
+
+/** True when an error is worth retrying as-is: a transient connection failure, or an HTTP error carrying a transient status on `error.status`. */
+export function isTransientError(error) {
+  return isTransientNetworkError(error) || (Number.isInteger(error?.status) && isTransientStatus(error.status))
+}
+
+/** True for HTTP 401/403 — the caller's credential is wrong and retrying the same call cannot help. */
+export function isAuthStatus(status) {
+  return status === 401 || status === 403
+}
+
+/** Run `fn`, retrying only transient failures with exponential backoff. Permanent errors and aborts rethrow immediately. `classify` can widen "transient" for non-HTTP clients. */
+export async function withTransientRetry(fn, { tries = 3, baseDelayMs = 1000, maxDelayMs = 15_000, signal, classify = isTransientError } = {}) {
+  let attempt = 0
+  for (;;) {
+    try {
+      return await fn()
+    } catch (error) {
+      if (signal?.aborted || attempt >= tries || !classify(error)) throw error
+      await sleep(Math.min(baseDelayMs * 2 ** attempt, maxDelayMs), signal)
+      attempt += 1
+    }
+  }
+}
+
+/** Run `fn` up to `tries` times with linear backoff, never throwing; resolves to null on success or the last error. */
+export async function retryQuietly(fn, { tries = 3, baseDelayMs = 1500 } = {}) {
+  let lastError = null
+  for (let attempt = 0; attempt < tries; attempt++) {
+    try {
+      await fn()
+      return null
+    } catch (error) {
+      lastError = error
+      if (attempt < tries - 1) await sleep(baseDelayMs * (attempt + 1))
+    }
+  }
+  return lastError
 }
 
 const RETRY_DELAYS_MS = [500, 1500]
@@ -158,6 +218,12 @@ async function request(url, options, parse) {
     } catch (error) {
       cleanup()
       if (signal?.aborted) return { ok: false, status: 0, error: 'aborted' }
+      // Retry our own timeout abort and connection-level failures; anything else (a malformed
+      // URL, a programming error) is permanent and must fail fast, not burn the retry budget.
+      const timedOut = error instanceof Error && error.name === 'AbortError'
+      if (!timedOut && !isTransientNetworkError(error)) {
+        return { ok: false, status: 0, error: `network error: ${error.message}`, detail: String(error) }
+      }
       if (attempt >= retries) {
         return { ok: false, status: 0, error: `network error: ${error.message}`, detail: String(error) }
       }
@@ -201,7 +267,7 @@ async function request(url, options, parse) {
       return { ok: true, status: response.status, data, headers: response.headers }
     }
 
-    if (RETRYABLE.has(response.status) && attempt < retries) {
+    if (isTransientStatus(response.status) && attempt < retries) {
       const waitMs = Math.min(retryAfterMs(response.headers.get('retry-after')) ?? backoffMs(attempt), 30_000)
       warnOnce(`retry:${urlLabel}`, `[academic-harness] search provider ${urlLabel} returned HTTP ${response.status}; retrying in ${waitMs}ms`)
       await sleep(waitMs, signal)

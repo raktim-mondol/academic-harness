@@ -10,6 +10,7 @@
  * fresh local key pair instead of a pre-registered account key.
  */
 import { ephemeralName } from './ssh-client.js'
+import { isTransientError } from './search-http.js'
 
 const API_BASE = process.env.RUNPOD_API_BASE_URL ?? process.env.RUNPOD_REST_API_URL ?? 'https://api.runpod.io/v2'
 
@@ -37,7 +38,9 @@ async function request(apiKey, method, relPath, body) {
       ?? text
       ?? res.statusText
     const title = problem.title ? `${problem.title}: ` : ''
-    throw new Error(`Runpod API ${method} ${relPath} → ${res.status}: ${title}${detail}`)
+    const error = new Error(`Runpod API ${method} ${relPath} → ${res.status}: ${title}${detail}`)
+    error.status = res.status
+    throw error
   }
   return data
 }
@@ -114,14 +117,26 @@ export function resolveSshEndpoint(pod) {
 
 const TERMINAL_STATUSES = new Set(['ERROR', 'EXITED', 'TERMINATED'])
 
-/** Poll until the pod is RUNNING and a usable SSH endpoint is resolvable. */
+/**
+ * Poll until the pod is RUNNING and a usable SSH endpoint is resolvable.
+ * A transient network blip or a 5xx from the API costs a retry on the next
+ * tick, not the whole provisioning run; permanent errors (401/404, terminal
+ * pod status) rethrow immediately.
+ */
 export async function waitForPodSsh(apiKey, podId, opts) {
   const deadline = Date.now() + opts.timeoutMs
   const requireDirect = opts.requireDirect !== false
   let lastStatus = ''
   while (Date.now() < deadline) {
     if (opts.signal?.aborted) throw new Error('Aborted while waiting for Runpod pod')
-    const pod = await getPod(apiKey, podId)
+    let pod
+    try {
+      pod = await getPod(apiKey, podId)
+    } catch (error) {
+      if (!isTransientError(error)) throw error
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      continue
+    }
     lastStatus = pod?.status ?? ''
     if (TERMINAL_STATUSES.has(lastStatus)) {
       throw new Error(`Pod ${podId} entered terminal status ${lastStatus}`)

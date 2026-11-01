@@ -65,7 +65,15 @@ On Vast.ai never copy to `/` or `/root` — it breaks SSH key permissions. The t
 
 ## Teardown and failures
 
-Every call tears down its compute in a `finally` block, including aborts and command failures. Deletes are retried; if the final delete still fails, the tool returns `runpod_teardown_failed`, `modal_teardown_failed`, or `vastai_teardown_failed` with the resource id and the console command to remove it (the original run result is preserved alongside the error). If Vast.ai's temporary SSH key cannot be removed after its instance is gone, the call reports `vastai_ssh_key_cleanup_failed`. Modal sandboxes also self-destruct at their timeout.
+Every call tears down its compute in a `finally` block, including aborts and command failures. Deletes are retried with a shared linear backoff; if the final delete still fails, the tool returns `runpod_teardown_failed`, `modal_teardown_failed`, or `vastai_teardown_failed` with the resource id and the console command to remove it (the original run result is preserved alongside the error). If Vast.ai's temporary SSH key cannot be removed after its instance is gone, the call reports `vastai_ssh_key_cleanup_failed`. Modal sandboxes also self-destruct at their timeout.
+
+Failures are classified so the model can tell "retry" from "fix the setup". The shared classifier in `search-http.js` (`isTransientNetworkError` / `isTransientStatus` / `isTransientError`) treats connection-level errors (DNS failures, resets, `fetch failed`, `socket hang up`) and HTTP 408/429/5xx — except 501 — as transient:
+
+- `runpod_transient` / `vastai_transient` / `modal_transient` — a network or provider-side blip; the same call can be retried.
+- `runpod_auth` / `vastai_auth` / `modal_auth` — HTTP 401/403 (for Modal, gRPC `PERMISSION_DENIED`/`UNAUTHENTICATED`) against the API key; retrying cannot help, check `RUNPOD_API_KEY` / `VAST_API_KEY` / `MODAL_TOKEN_ID`.
+- `runpod_failure` / `vastai_failure` / `modal_failure` — everything else (out of stock, timeout, terminal instance state), with the provider-specific advice as before.
+
+Provisioning polls (`waitForPodSsh`, `waitForInstanceSsh`) and orphan sweeps survive transient blips: a failed status read is retried on the next tick within the existing deadline instead of aborting a paid run, while permanent errors (401/404, terminal pod status) still fail fast. Modal filesystem copies and directory creation are retried twice on transient gRPC `UNAVAILABLE`/`DEADLINE_EXCEEDED`; the user's own command is never auto-retried on any provider, because it may have already written files or started training.
 
 Vast.ai placement is marketplace-driven: a host can be unreachable or disappear. The tool polls `actual_status`, fails fast on `exited`/`unknown`/`offline`, and its error suggests retrying or raising `max_price_dph`. Offers are matched on the exact GPU count, and volumes are always mounted at `/workspace`.
 

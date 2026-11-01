@@ -30,6 +30,7 @@ import {
 } from './ssh-client.js'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './workspace-path.js'
+import { isAuthStatus, isTransientError, retryQuietly } from './search-http.js'
 
 const WORKDIR = '/workspace'
 const DEFAULT_TIMEOUT_S = 600
@@ -75,11 +76,16 @@ function userSshKey(keyPath) {
 /** Best-effort sweep for an instance whose create reply was lost mid-request. */
 async function reconcileOrphanInstance(key, label) {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const instances = await listInstances(key)
-    const match = instances.find((instance) => instance.label === label)
-    if (match?.id != null) {
-      await destroyInstance(key, match.id)
-      return match.id
+    try {
+      const instances = await listInstances(key)
+      const match = instances.find((instance) => instance.label === label)
+      if (match?.id != null) {
+        await destroyInstance(key, match.id)
+        return match.id
+      }
+    } catch (error) {
+      // A blip must not abandon a billed orphan; a rejected key will not fix itself by polling.
+      if (!isTransientError(error)) throw error
     }
     await sleep(2000)
   }
@@ -212,42 +218,37 @@ export function applyVastaiRun(ctx) {
           let instanceFailure = null
           let keyFailure = null
           if (lastInstanceId !== null) {
-            for (let attempt = 0; attempt < TEARDOWN_ATTEMPTS; attempt++) {
+            const target = lastInstanceId
+            instanceFailure = await retryQuietly(async () => {
               try {
-                await destroyInstance(key, lastInstanceId)
-                lastInstanceId = null
-                instanceFailure = null
-                break
+                await destroyInstance(key, target)
               } catch (error) {
                 const msg = error instanceof Error ? error.message : String(error)
-                if (/→ 404\b|not found|no such instance/i.test(msg)) {
+                // Already gone is the desired end state.
+                if (error.status === 404 || /→ 404\b|not found|no such instance/i.test(msg)) {
                   lastInstanceId = null
-                  instanceFailure = null
-                  break
+                  return
                 }
-                instanceFailure = error
-                if (attempt < TEARDOWN_ATTEMPTS - 1) await sleep(2000 * (attempt + 1))
+                throw error
               }
-            }
+              lastInstanceId = null
+            }, { tries: TEARDOWN_ATTEMPTS, baseDelayMs: 2000 })
           }
           if (registeredKeyId !== null) {
-            for (let attempt = 0; attempt < KEY_ATTEMPTS; attempt++) {
+            const targetKey = registeredKeyId
+            keyFailure = await retryQuietly(async () => {
               try {
-                await deleteSshKey(key, registeredKeyId)
-                registeredKeyId = null
-                keyFailure = null
-                break
+                await deleteSshKey(key, targetKey)
               } catch (error) {
                 const msg = error instanceof Error ? error.message : String(error)
-                if (/→ 404\b|not found/i.test(msg)) {
+                if (error.status === 404 || /→ 404\b|not found/i.test(msg)) {
                   registeredKeyId = null
-                  keyFailure = null
-                  break
+                  return
                 }
-                keyFailure = error
-                if (attempt < KEY_ATTEMPTS - 1) await sleep(1000 * (attempt + 1))
+                throw error
               }
-            }
+              registeredKeyId = null
+            }, { tries: KEY_ATTEMPTS, baseDelayMs: 1000 })
           }
           ephemeralKey?.cleanup()
           ephemeralKey = null
@@ -386,12 +387,29 @@ export function applyVastaiRun(ctx) {
         outcome = { ...summary, text }
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error)
-        outcome = {
-          error: 'vastai_failure',
-          instance: spec.id,
-          instance_id: lastInstanceId,
-          text: `Vast.ai run failed on instance "${spec.id}"${lastInstanceId !== null ? ` (instance ${lastInstanceId})` : ''}: ${msg}\n`
-            + 'If this is an authentication error, check VAST_API_KEY. If the host was unreachable, retry (the marketplace has variable hosts) or raise max_price_dph.',
+        const where = `Vast.ai run on instance "${spec.id}"${lastInstanceId !== null ? ` (instance ${lastInstanceId})` : ''}`
+        if (isAuthStatus(error?.status)) {
+          outcome = {
+            error: 'vastai_auth',
+            instance: spec.id,
+            instance_id: lastInstanceId,
+            text: `${where} failed: ${msg}\nPERMANENT: Vast.ai rejected the credentials (HTTP ${error.status}). Check VAST_API_KEY; retrying the same call will not help.`,
+          }
+        } else if (isTransientError(error)) {
+          outcome = {
+            error: 'vastai_transient',
+            instance: spec.id,
+            instance_id: lastInstanceId,
+            text: `${where} failed: ${msg}\nTRANSIENT: a network or Vast-side failure; retry the same call (the marketplace has variable hosts).`,
+          }
+        } else {
+          outcome = {
+            error: 'vastai_failure',
+            instance: spec.id,
+            instance_id: lastInstanceId,
+            text: `${where} failed: ${msg}\n`
+              + 'If this is an authentication error, check VAST_API_KEY. If the host was unreachable, retry (the marketplace has variable hosts) or raise max_price_dph.',
+          }
         }
       } finally {
         signal?.removeEventListener('abort', onAbort)
