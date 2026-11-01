@@ -13,7 +13,7 @@ No credential is required to install or boot. Each connector or tool stays disab
 
 | Field | Required for | Notes |
 |---|---|---|
-| `PARALLEL_API_KEY` | Parallel MCP connector, `parallel_search`, `parallel_extract` | Native REST calls take effect on the next call; the MCP connector needs a `dsh` restart. |
+| `PARALLEL_API_KEY` | `parallel_search`, `parallel_extract` | Native REST calls; takes effect on the next call. |
 | `FIRECRAWL_API_KEY` | Firecrawl MCP connector | MCP mount needs a `dsh` restart. |
 | `CONSENSUS_API_KEY` | `consensus_search` | Required; the tool returns a clear error when unset. |
 | `SCITE_API_KEY` | Scite MCP connector | An `mcp`-scoped key from <https://scite.ai/users/me/api>; sent as a bearer token to `https://api.scite.ai/mcp`. |
@@ -108,7 +108,7 @@ The Academic Harness preset mounts once as a **standing composition** for the li
 | `IMAGE_MODEL` | Immediately on dropdown selection, no Save |
 | Tournament numbers | New tournaments; explicit arguments win |
 | `ZVEC_GREP_AUTO_INDEX` | The next Academic Harness session, no restart |
-| MCP connector keys (Parallel, Firecrawl, Scite) | After stopping and restarting `dsh` |
+| MCP connector keys (Firecrawl, Scite) | After stopping and restarting `dsh` |
 | `SUBAGENT_PRO_*`, `SUBAGENT_VISION_*` | After a `dsh` restart |
 | `ZVEC_GREP_EMBEDDING`, `ZVEC_GREP_API_KEY` | New index runs read the current value; a `dsh` restart also hands it to `zg server on` for the search daemon |
 | Modal SDK | No restart: the first `modal_run` call installs it into `$DSH_HOME/modal-sdk` (unless `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1`); a manual profile install still needs a restart |

@@ -1,7 +1,7 @@
 /**
  * Parallel Extract REST API (POST https://api.parallel.ai/v1/extract).
  *
- * Native parity for `mcp__parallel__web_fetch`: give up to 20 URLs and get
+ * Give up to 20 URLs and get
  * LLM-ready excerpts, or full content when requested. Use it after search has
  * produced URLs; it is not a search tool. Requires PARALLEL_API_KEY.
  */
@@ -86,7 +86,7 @@ export function apply(ctx) {
     name: 'parallel_extract',
     description: [
       'Extract LLM-ready excerpts or full page content from up to 20 URLs via the Parallel Extract API.',
-      'Use this after search has produced URLs; it does not discover pages. It is the native counterpart of mcp__parallel__web_fetch and needs PARALLEL_API_KEY.',
+      'Use this after search has produced URLs; it does not discover pages. It needs PARALLEL_API_KEY.',
       'Pass `objective` and/or `search_queries` to focus excerpts on what you need. Set full_content=true only when the excerpt is insufficient — it is much larger. For JavaScript-heavy pages or PDFs, prefer mcp__firecrawl__firecrawl_scrape or pdf_to_markdown after downloading.',
     ].join(' '),
     parameters: {

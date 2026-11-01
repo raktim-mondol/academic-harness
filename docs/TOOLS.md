@@ -61,7 +61,6 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `core_search` | Academic Harness preset | CORE's open-access records; optional full text | [Search](SEARCH.md#additional-sources) |
 | `elicit_search` | Academic Harness preset | Elicit paper/trial search with study and journal filters | [Search](SEARCH.md#additional-sources) |
 | `futurehouse_agent` | Academic Harness preset | FutureHouse Crow/Falcon/Owl agents; async start/status/cancel | [Search](SEARCH.md#additional-sources) |
-| `mcp__parallel__web_search`, `mcp__parallel__web_fetch` | Academic Harness preset | Parallel MCP connector; search is locked to `basic`, fetch reads one URL | [Search](SEARCH.md#mcp-connectors) |
 | `mcp__firecrawl__firecrawl_scrape`, `mcp__firecrawl__firecrawl_search`, `mcp__firecrawl__firecrawl_parse` | Academic Harness preset | Firecrawl MCP connector | [Search](SEARCH.md#mcp-connectors) |
 | `mcp__scite__*` | Academic Harness preset | Scite Smart Citations and evidence datasets | [Search](SEARCH.md#mcp-connectors) |
 | `web_search`, `web_fetch` | DSH built-in | DeepSeek web search and HTTP fetch; fall back to Parallel/Firecrawl when blocked | [Agents](AGENTS.md#browsing-the-web) |

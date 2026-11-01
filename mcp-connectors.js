@@ -1,5 +1,5 @@
 /**
- * Academic search MCP connectors (Parallel, Firecrawl, Scite), mounted
+ * Academic search MCP connectors (Firecrawl, Scite), mounted
  * programmatically instead of as static cordis.yml rows so each server's
  * auth can come from the host entry Config (Settings -> Academic Harness API
  * keys) as well as the matching env var.
@@ -15,13 +15,9 @@
  *
  * Firecrawl now requires a key for its remote MCP calls (keyless calls return
  * an upgrade message), so the connector is mounted only when
- * FIRECRAWL_API_KEY is set. Parallel MCP does not mount keyless either: it is
- * only mounted when PARALLEL_API_KEY is set, and that key is always sent as a
- * Bearer token so it stays off the anonymous rate limit. `mcp__parallel__web_search`
- * is the same search job as native `parallel_search` but locked to `basic`
- * mode — keep it as a fallback if the REST tool is missing or fails.
- * `mcp__parallel__web_fetch` is the extract/read-URL half, not a search tool.
- * Per-call turbo/fast/basic/advanced selection is `parallel-search.js`.
+ * FIRECRAWL_API_KEY is set. Parallel is not mounted here: native
+ * `parallel_search` and `parallel_extract` cover its search and read-URL jobs
+ * with per-call mode selection (see parallel-search.js).
  * Scite requires a key:
  * its hosted MCP server (https://api.scite.ai/mcp) has three access paths
  * (see https://docs.scite.ai/mcp) — the first-party ChatGPT/Claude
@@ -45,20 +41,10 @@ export const name = 'academic-harness-mcp-connectors'
 export const inject = []
 
 export async function apply(ctx) {
-  const [parallelKey, firecrawlKey, sciteKey] = await Promise.all([
-    resolveEnv('PARALLEL_API_KEY'),
+  const [firecrawlKey, sciteKey] = await Promise.all([
     resolveEnv('FIRECRAWL_API_KEY'),
     resolveEnv('SCITE_API_KEY'),
   ])
-
-  if (parallelKey) {
-    ctx.plugin(McpClient, {
-      serverName: 'parallel',
-      transport: 'streamable-http',
-      url: 'https://search.parallel.ai/mcp',
-      headers: { Authorization: `Bearer ${parallelKey}` },
-    })
-  }
 
   if (firecrawlKey) {
     ctx.plugin(McpClient, {

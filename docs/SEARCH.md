@@ -6,11 +6,10 @@ Academic Harness separates **discovery** (what exists), **orientation** (what a 
 
 ## MCP connectors
 
-Three literature/web MCP servers are wired into the `academic-harness` preset and surface as `mcp__parallel__*`, `mcp__firecrawl__*`, and `mcp__scite__*` tools:
+Two literature/web MCP servers are wired into the `academic-harness` preset and surface as `mcp__firecrawl__*` and `mcp__scite__*` tools:
 
 | Connector | Key | Without it |
 |---|---|---|
-| [Parallel](https://parallel.ai) — `mcp__parallel__web_search` (search fallback, always `basic`) and `mcp__parallel__web_fetch` (read a URL) | `PARALLEL_API_KEY` (required) | Connector stays disabled. The key is always sent as a Bearer token so MCP calls are not on the anonymous rate limit. |
 | [Firecrawl](https://firecrawl.dev) — `mcp__firecrawl__firecrawl_scrape`, `mcp__firecrawl__firecrawl_search`, `mcp__firecrawl__firecrawl_parse` | `FIRECRAWL_API_KEY` (required) | Connector stays disabled. Only these three tools are exposed; paper-index tools are not advertised. |
 | [Scite](https://scite.ai) — Smart Citations, retraction/correction checks, evidence datasets (patents, clinical trials, grants, drug safety, …) | `SCITE_API_KEY` (required) | Connector stays disabled. |
 
@@ -20,7 +19,7 @@ MCP connector keys need a `dsh` restart; the native REST tools below do not. See
 
 ## Parallel
 
-`parallel_search` is the **primary** Parallel search tool: a native REST call to `POST /v1/search` (`x-api-key` auth). It requires `PARALLEL_API_KEY` and a **`mode` on every call**. `mcp__parallel__web_search` is the same search job locked to `basic` — the agent is steered to use it only if `parallel_search` is missing or errors. `mcp__parallel__web_fetch` is for reading a specific URL, not for search.
+`parallel_search` is the native Parallel search tool: a REST call to `POST /v1/search` (`x-api-key` auth). It requires `PARALLEL_API_KEY` and a **`mode` on every call**. Reading a specific URL is `parallel_extract`, not search.
 
 Pass `objective`, 1–5 keyword `search_queries`, and `mode`:
 
@@ -31,9 +30,9 @@ Pass `objective`, 1–5 keyword `search_queries`, and `mode`:
 | `basic` | ~1s | Longer excerpts per source; 2–3 high-quality queries. Same mode the MCP search tool always uses. |
 | `advanced` | ~3s | Multi-hop retrieval for literature surveys, deep research, code-review background. |
 
-The system prompt steers the agent to use **both** `consensus_search` and `parallel_search` (`basic` or `advanced`) for peer-reviewed literature, `fast` only for ordinary non-literature lookups, and `mcp__parallel__web_search` only as a fallback when `parallel_search` is unavailable. A Settings-changed `PARALLEL_API_KEY` takes effect on the next `parallel_search` call; the MCP connector still needs a `dsh` restart.
+The system prompt steers the agent to use **both** `consensus_search` and `parallel_search` (`basic` or `advanced`) for peer-reviewed literature, `fast` only for ordinary non-literature lookups. A Settings-changed `PARALLEL_API_KEY` takes effect on the next `parallel_search` call, with no restart.
 
-`parallel_extract` (same key) is the native URL-reading path: 1–20 URLs with focused excerpts, or full content when `full_content` is true. Use it, `mcp__parallel__web_fetch`, or `mcp__firecrawl__firecrawl_scrape` (needs `FIRECRAWL_API_KEY`) after a search has produced URLs.
+`parallel_extract` (same key) is the native URL-reading path: 1–20 URLs with focused excerpts, or full content when `full_content` is true. Use it or `mcp__firecrawl__firecrawl_scrape` (needs `FIRECRAWL_API_KEY`) after a search has produced URLs.
 
 ## Consensus
 
