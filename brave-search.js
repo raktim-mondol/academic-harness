@@ -34,6 +34,39 @@ function render(value) {
   return [{ type: 'text', text: capText(`Brave: ${value.results?.length ?? 0} result(s) for "${value.query}"\n\n${renderPapers(value.results || [], { abstractChars: 400 })}`) }]
 }
 
+/**
+ * Callable search for `runBraveSearch`: returns normalized paper-shaped records, or
+ * `{ error, code: 'key_missing' }` when no key is configured. Extracted so
+ * `deep_research` can sweep the web lane without re-implementing this client.
+ */
+export async function runBraveSearch(args, { signal = null } = {}) {
+        if (!String(args.query || '').trim()) return { error: 'query is required' }
+        if (args.freshness && !FRESHNESS.includes(args.freshness) && !DATE_RANGE.test(args.freshness)) {
+          return { error: 'freshness must be pd, pw, pm, py, or YYYY-MM-DDtoYYYY-MM-DD' }
+        }
+        if (args.safesearch && !SAFESEARCH.includes(args.safesearch)) {
+          return { error: `safesearch must be one of ${SAFESEARCH.join(', ')}` }
+        }
+
+        const apiKey = await resolveEnv('BRAVE_API_KEY')
+        if (!apiKey) return { error: 'BRAVE_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).', code: 'key_missing' }
+
+        const limiter = getLimiter('brave', { minIntervalMs: 100 })
+        const result = await limiter.run(() => fetchJson(`${API}?${buildParams(args)}`, {
+          signal: signal,
+          headers: {
+            'X-Subscription-Token': apiKey,
+            'User-Agent': searchUserAgent(),
+          },
+        }))
+        if (!result.ok) {
+          if (result.error === 'aborted') return { error: 'request cancelled' }
+          return { error: `Brave Search API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
+        }
+        const results = (result.data?.web?.results || []).map(fromBraveResult).filter(Boolean)
+        return { query: String(args.query).trim(), results }
+}
+
 export const name = 'academic-harness-brave-search'
 export const inject = ['tools']
 
@@ -64,31 +97,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      if (!String(args.query || '').trim()) return { error: 'query is required' }
-      if (args.freshness && !FRESHNESS.includes(args.freshness) && !DATE_RANGE.test(args.freshness)) {
-        return { error: 'freshness must be pd, pw, pm, py, or YYYY-MM-DDtoYYYY-MM-DD' }
-      }
-      if (args.safesearch && !SAFESEARCH.includes(args.safesearch)) {
-        return { error: `safesearch must be one of ${SAFESEARCH.join(', ')}` }
-      }
-
-      const apiKey = await resolveEnv('BRAVE_API_KEY')
-      if (!apiKey) return { error: 'BRAVE_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).' }
-
-      const limiter = getLimiter('brave', { minIntervalMs: 100 })
-      const result = await limiter.run(() => fetchJson(`${API}?${buildParams(args)}`, {
-        signal: exec.signal,
-        headers: {
-          'X-Subscription-Token': apiKey,
-          'User-Agent': searchUserAgent(),
-        },
-      }))
-      if (!result.ok) {
-        if (result.error === 'aborted') return { error: 'request cancelled' }
-        return { error: `Brave Search API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
-      }
-      const results = (result.data?.web?.results || []).map(fromBraveResult).filter(Boolean)
-      return { query: String(args.query).trim(), results }
+      return runBraveSearch(args, { signal: exec?.signal })
     },
     presentCall(args) {
       return { card: 'generic', title: `Brave: ${args.query || ''}`, kind: 'search' }

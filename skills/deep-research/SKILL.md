@@ -207,6 +207,83 @@ tables, and reference list intact. Short literature answers can stay in the
 conversation. Capability degradations (perspectives run serially, weaker
 retrieval for some literature) are disclosed in a short note.
 
+## Running it as a tracked run
+
+When `deep_research` is available, use it instead of holding the investigation
+in context. Everything above is still the method; the tool supplies the part
+prose cannot: a frozen query, a resumable step plan, and gates that fail.
+
+```text
+deep_research action=start query="<the request, verbatim>" effort=medium run=true
+```
+
+- **One scale knob: `effort`.** `low` is a bounded answer from titles, abstracts,
+  and metadata in minutes; `medium` is a cited report with loci, four critics, a
+  cite check, and full-text reading; `high` is the widest sweep and deepest
+  critique. Omit it and the level is read from the request — "quickly", "just
+  tell me" reads as low; "comprehensive", "systematic review", "before I commit"
+  reads as high — and the run reports which level it chose and why. `tier` and
+  `gear` are what `effort` sets underneath; use them only when the user asks for
+  something specific, and never ask a user to learn them.
+- **When the tool asks, ask.** `status: needs_input` with an `ask_user` question
+  means the request pointed in two directions at once and nothing has run or
+  spent yet. Put that question to the user and wait. Guessing at an expensive
+  run is not yours to make.
+- **Checks never soften with the level.** Every level cite-checks what it was
+  given and reports what it could not read as `not_checked`. A low-effort answer
+  is shorter, not less honest.
+
+```text
+deep_research action=status run_id=dr-0001
+deep_research action=verify run_id=dr-0001
+```
+
+- **The query is gospel.** It is written once to the run ledger and re-read by
+  every step; if your summary of it drifts, `verify` reports `query_drift`
+  rather than quietly answering a different question.
+- **What the levels run.** `low` is the light path — decompose → sweep → draft →
+  cite check → polish; `medium` and `high` run the whole pipeline including the
+  contradiction graph, loci, depth investigation, four critics, and the patcher.
+  A level changes how much work happens, never how strict the checks are.
+- **Resume, do not restart.** `action=status` shows step state; `action=resume`
+  re-runs the step that died. A step blocked by a CRITICAL gate stays blocked:
+  either clear it with `action=gate status=clear` or restart deliberately with
+  `from_step`. Never run past a block by asking again.
+- **Two retrieval lanes.** The scholarly sweep goes through `literature_search`
+  (OpenAlex, Semantic Scholar, PubMed/Europe PMC, arXiv, Crossref, and the keyed
+  indexes). A web lane then runs the model's own `web_queries` through Parallel,
+  Exa, Tavily, or Brave for guidance documents, trial registers, and reporting.
+  Web records are tagged `lane: web`, `work_type: web_page`, so a press release
+  is never weighed like a trial. Providers with no key are named as skipped, not
+  counted as failures. `web_sources` overrides the order.
+- **Full text goes to the library.** With `fetch_full_text: true`, each readable
+  open-access copy is deposited into PaperMemory and linked from its corpus row,
+  so a quote is verified against stored text and the next session does not
+  re-fetch it. A deposit that fails is recorded, and the run keeps its own copy.
+- **Cap the spend.** `max_llm_calls`, `max_sources`, and `timeout_minutes` block
+  the run when crossed instead of letting it balloon. Check
+  `action=status` for calls and tokens before starting a long gear.
+- **After synthesis, patch only.** `action=patch` with `hunks: [{find, replace}]`,
+  where `find` is copied verbatim and appears once. The store refuses a rewrite
+  of a patched artifact; a finding too big for a hunk is escalated as structural,
+  not applied by hand.
+- **Read the gate before delivering.** `action=verify` returns pass, blocked, or
+  `not_checked` per check. Quote integrity needs fetched text, so pass
+  `fetch_full_text: true` when verbatim quotation matters — without it the gate
+  says `not_checked`, which is not a pass. Independence is counted in voices:
+  three copies of one press release score as one source, so "several sources
+  report" must mean several clusters.
+- `action=export format=markdown` appends the verification record to the report;
+  `csv` exports the corpus with cluster ids so a reviewer can audit the counting.
+
+Ledger layout, step names, gate ids, and every error state:
+`references/run-ledger.md`.
+
+The ledgers this writes (`corpus.jsonl`, `claims.jsonl`, `findings.jsonl`) are
+separate from the `review` screening ledger and from PaperMemory: use `review`
+for a PRISMA funnel, PaperMemory for the library of record, and `deep_research`
+for an investigation that has to produce a defensible report.
+
 ## Boundaries with sibling skills
 
 - Wants a verdict on one idea: `idea-evaluator`.

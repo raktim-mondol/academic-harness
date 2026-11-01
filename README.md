@@ -19,6 +19,7 @@ Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset wi
 | **Auditable research ledgers** | Systematic reviews and hypothesis tournaments live in append-only logs under the workspace, so a resumed session sees the same protocol, screening decisions, and ratings. [Reviews](docs/RESEARCH.md#systematic-reviews) · [Tournaments](docs/RESEARCH.md#hypothesis-tournaments) |
 | **Discovery across the real literature** | OpenAlex, Semantic Scholar, PubMed/Europe PMC, arXiv, Crossref, DOAJ, publisher Crossref deposits, bioRxiv/medRxiv, INSPIRE, and keyed ADS/Scopus/Web of Science through one `literature_search` entry point, plus `journal_search`, `paper_get`, `paper_context`, `paper_resolve`, `openalex_citations`, `database_catalog`, `domain_search`, Consensus, Parallel, Firecrawl, Scite, CORE, Elicit, and FutureHouse. [Read more](docs/SEARCH.md) |
 | **A lab notebook that survives context loss** | A JSONL notebook shared across the delegation tree, a schema-validated `scientific_result` card, and deletion-only reply folding at five levels. [Read more](docs/WORKSPACE.md) |
+| **One question, one bounded investigation** | `deep_research` reads the request, sweeps the literature and a web lane, finds where the sources disagree, drafts, lets four critics attack the draft, and refuses to ship a report that cites a source it cannot support. Five syndicated copies of one release count as one voice. `effort=low|medium|high` is the only knob; a request that contradicts itself gets a question instead of a bill. [Deep research](#deep-research) |
 | **Local-first by design** | Workspace search (zvec-grep), PaperMemory, TextFold, ledgers, and the RSI store stay on disk. No key is required to boot. [Read more](docs/ARCHITECTURE.md#runtime-installs) |
 
 ## Install
@@ -55,6 +56,7 @@ Full instructions, migration from `researchcraft`, troubleshooting, and the "one
 | **Writing and citation** | `ah_*` writing oracle and gate, `citation` (including DOI/arXiv/INSPIRE/title → BibTeX), `manuscript_citations`, `reporting_check` (CONSORT/STROBE/PRISMA/ARRIVE/TRIPOD+AI/CARE/STARD), LaTeX, Supervisor-Skills paper lifecycle, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
 | **Submission and communication** | `submission_pack` journal checklist and hashed bundle (never submits); `journal_search match` advisory venue fit with due-diligence signals; `manuscript_diff` latexdiff/Markdown/DOCX revision artifacts and response-letter skeleton; `numbers_audit` numerical-reporting candidates; `presentation_build` posters and slides with a vision-QA checklist; `authorship` CRediT/ICMJE ledger | [Writing](docs/WRITING.md#submission-and-communication) |
 | **Reviews, synthesis, and hypotheses** | `review` PRISMA-style ledger with dual-reviewer screening, structured extraction, risk-of-bias appraisal (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), GRADE certainty and summary-of-findings tables, κ agreement, PRISMA flow and RoB exports; `meta_analysis` pairwise pooling, heterogeneity, subgroup/meta-regression, publication-bias diagnostics, and forest/funnel/SROC plots; `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors | [Research](docs/RESEARCH.md) |
+| **Deep research** | `deep_research`: a self-driving investigation on an append-only run ledger — frozen query, effort levels (`low`/`medium`/`high`) inferred from the request, scholarly sweep plus a web lane, contradiction graph, loci and depth notes, three drafts, four adversarial critics, capped-hunk repair, cite check against PaperMemory, independence clustering, untrusted-source fencing, and a ship gate that reports `not_checked` honestly | [Research](docs/RESEARCH.md#deep-research) |
 | **Reproducible analysis and data** | `analysis_run` frozen plans with immutable run manifests (argv execution, hashed inputs/outputs, redacted logs, timeouts, run diffs); `experiment_log` sweeps with best-by-named-metric; `dataset_get` DOI downloads with checksums and licenses; `data_profile` leakage and split-overview profiling; `repro_package` reader-facing reproducibility packages with confirm-gated Zenodo drafts | [Reproducible analysis](docs/ANALYSIS.md) |
 | **Provenance audit** | `provenance_audit` read-only cross-ledger index: joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH claim sidecars by stored ids and hashes; coverage, unsupported (`no_link`/`not_checked`/`unverified`/`stale`/`not_found`), stale hashes, impact, and Markdown/CSV/JSON/GraphML/Mermaid exports | [Provenance audit](docs/PROVENANCE.md) |
 | **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
@@ -107,6 +109,33 @@ starts, `review` runs on the session model (no separate key or endpoint), `show`
 review back, and `status` marks it stale after the manuscript changes. Artifacts stay in
 `.dsh/deep-review/<key>/`, and `provenance_audit` indexes the claims stored there.
 [Read more](docs/PAPERS.md#deep-review)
+
+## Deep research
+
+![Deep research](docs/assets/diagrams/deep-research.svg)
+
+`deep_research` runs the investigation a literature question actually asks for, and keeps the
+state a chat cannot. The request is frozen verbatim and re-read by every step, so a long run
+cannot quietly drift onto a different question. It sweeps the literature through the existing
+`literature_search` router and a web lane (Parallel, Exa, Tavily, Brave) for guidance documents,
+registers, and reporting; finds where the sources contradict each other; picks the loci where
+reading deeply would change the answer; drafts from three angles; then has four critics attack the
+draft and repairs it with capped hunks — after synthesis the report cannot be regenerated, only
+patched.
+
+Two things it counts that a plain agent gets wrong. **Voice, not copies:** an independence
+clustering pass groups DOI, exact and near titles, and identical bodies across hosts, so five
+reprints of one press release argue with the weight of one source (distinct DOIs are never
+merged). **Verified, not plausible:** every citation is checked against stored text in
+PaperMemory, a quote nothing read is reported `not_checked` rather than passed, and an
+unacknowledged retraction blocks the ship. Fetched pages arrive inside an
+`<untrusted-source>` fence, so a page that tries to instruct the agent is read as content.
+
+Scale is one knob — `effort=low|medium|high` — and it is inferred from the request when not given
+("quickly" is low, "comprehensive systematic review" is high). A request that points both ways
+returns `needs_input` with a question and creates nothing: no run, no model call. Runs are
+resumable and budget-capped, so a crash continues at the step that died instead of restarting.
+[Read more](docs/RESEARCH.md#deep-research)
 
 ## Documentation
 

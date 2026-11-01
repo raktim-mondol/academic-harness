@@ -264,5 +264,18 @@ routing notes were added to the plugin's `academic-harness`, `ah-write-unit`,
 `seed.js` refreshes those known-stale copies on existing installs.
 See `vendor/supervisor-skills/SOURCE.txt` for the exact file list and changes.
 
+Deep research pipeline design
+
+The `deep_research` tool's pipeline shape — step-per-phase skills, the frozen
+canonical query, tiers and gears, independence clustering, patch-only editing
+with per-hunk caps, the ship gate, and untrusted-source fencing — was adapted
+from `jordan-gibbs/hyperresearch` (MIT License), a Claude Code/Codex research
+harness. No upstream code is vendored: the implementation is first-party
+JavaScript (`deep-research.js`, `deep-research-store.js`,
+`deep-research-steps.js`, `independence-cluster.js`, `untrusted-fence.js`)
+written against this plugin's existing retrieval, ledger, and lock helpers, and
+the step set, gate semantics, tiers, and verification seams differ from the
+upstream design.
+
 ResearchCraft branding and content © ResearchCraft.
 Site: https://researchcraft.dev

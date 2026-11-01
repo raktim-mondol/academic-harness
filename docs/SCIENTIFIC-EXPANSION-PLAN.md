@@ -1,10 +1,10 @@
 # Scientific Harness expansion plan
 
-Status: **Phases 0, 1A–1E, 2A–2D, 3, 4A–4F, and 5 implemented**; Phases 0–3 were verified end-to-end through the DSH Web UI and released as **v0.34.0**; Phase 4 is released as **v0.35.0**; Phase 5 is implemented, verified end-to-end through the DSH Web UI, and released as **v0.36.0**; Phases 6–8 pending · baseline **v0.33.0**.
+Status: **Phases 0, 1A–1E, 2A–2D, 3, 4A–4F, and 5 implemented**; Phases 0–3 were verified end-to-end through the DSH Web UI and released as **v0.34.0**; Phase 4 is released as **v0.35.0**; Phase 5 is implemented, verified end-to-end through the DSH Web UI, and released as **v0.36.0**; Phase 9 pending; **Phase 10 (deep research) implemented, unshipped**; Phases 6–8 pending · baseline **v0.33.0**.
 
-Implementation note: Phase 0 added `ledger-kit.js`, `provenance.js`, `schemas/`, and `scripts/helpers/test-workspace.mjs`. Phase 1A added `review extract`, `extract_status`, field-level extraction reconcile, built-in/inline templates, `row_id` rows, and extraction exports. Phase 1B added `review export format=prisma-flow` with a dependency-free `python-helpers/prisma_flow.py`. Phase 1C added `meta_analysis` with effect-size conversion, fixed/random DL/PM/REML pooling, normal/HK CIs, heterogeneity, subgroup/meta-regression, leave-one-out, Egger/Begg/funnel diagnostics, diagnostic-accuracy pooling, forest/funnel/SROC plots, and `import_review`. Phase 1C deviations: trim-and-fill, network meta-analysis, dose-response, and bivariate/HSROC diagnostic models remain deferred; diagnostic accuracy is univariate logit pooling. Phase 1D added `grade_start`, `grade_judge`, `grade_overall`, and `grade_status` to `review`, plus `grade-profile` and `sof-table` exports; the derived suggestion is never stored. Phase 1E added the AMSTAR 2, PROBAST, QUIPS, SYRCLE, and CASP instrument templates. Phases 2A–2D added `analysis_run`, `experiment_log`, `dataset_get`, `data_profile`, and `repro_package`. Phase 3 added `provenance_audit` (`provenance-audit.js`, `provenance-store.js`); its deviations are recorded in §6. Phase 4A added `submission_pack` (`submission-pack.js`, `submission-store.js`): plan/build/status/export with journal-requirement checks, manuscript citations, reporting evidence, `numbers_audit`, figure metadata, statements, a hashed manifest, and a reproducible zip. Phase 4B added `journal_search` `action=match` and custom CSL loading in `citation` (`style_file`/`style_url`, cached under `.dsh/styles/`). Phase 4C added `manuscript_diff` (latexdiff/Markdown diff, changed blocks, direct OOXML extraction of DOCX tracked changes/comments and Zotero fields, response-letter skeleton). Phase 4D added `presentation_build` (posters, Beamer, optional python-pptx, PDF/PNG, QA checklist). Phase 4E extended `python-helpers/stat_audit.py` with a `numbers` mode and added `numbers_audit`. Phase 4F added `authorship` (`authorship.js`, `authorship-store.js`). Phase 4 deviations: PowerPoint generation uses a small `python-pptx` helper rather than an existing skill script (the slides skills do not ship a deck generator); journal match does not call `journal_policy` per result (policy stays a separate tool); generic response letters are built from recorded change ids, while an `ah_review` id delegates to the engine's own response letter; table/text checks match only unambiguous labels, and GRIMMER remains unimplemented. Phase 5 is implemented: `preregister` (+ store) freezes hashed write-once plans with review/coscientist/analysis/causal-DAG/power imports, a data-collection guard, verification, and Markdown/JSON/PDF export (`submit` disabled); `causal_dag` (+ store, `causal-graph.js`) derives d-separation, minimal backdoor/front-door sets, colliders, instruments, testable implications, and E-values, with DOT/Mermaid/edge-list import/export; `design` (+ store) implements seeded simple/block/stratified/cluster/crossover/minimization randomization, codes, realized balance, and full/fractional factorial, Plackett–Burman, central composite, and Box–Behnken designs; `ethics_protocol` (+ store) drafts protocols/consent with a Helsinki/Common Rule/GDPR/HIPAA concept checklist; `deidentify` (+ store) scans/redacts text/JSON/CSV/TSV locally with masked reports; `dmp` (+ store) drafts six funder-shaped plans; `grant_budget` (+ store, `python-helpers/grant_budget.py`) computes multi-year budgets with arithmetic/cap checks and CSV/Markdown/JSON/XLSX export. Phase 5 deviations: graph, DOE, and de-identification algorithms are dependency-free JavaScript (no networkx, pyDOE3, or Presidio helpers); OSF submission stays disabled; `causal_dag` exports Mermaid/DOT/edge-list/JSON but not GraphML/SVG; PDF export is implemented for `preregister` only (DMP/ethics/budget Markdown/JSON, budget also CSV/XLSX; DOCX/PDF deferred); `provenance_audit` does not index the new preregister ledger yet and still reports it as `unknown`. Phases 6–8 are unchanged.
+Implementation note: Phase 0 added `ledger-kit.js`, `provenance.js`, `schemas/`, and `scripts/helpers/test-workspace.mjs`. Phase 1A added `review extract`, `extract_status`, field-level extraction reconcile, built-in/inline templates, `row_id` rows, and extraction exports. Phase 1B added `review export format=prisma-flow` with a dependency-free `python-helpers/prisma_flow.py`. Phase 1C added `meta_analysis` with effect-size conversion, fixed/random DL/PM/REML pooling, normal/HK CIs, heterogeneity, subgroup/meta-regression, leave-one-out, Egger/Begg/funnel diagnostics, diagnostic-accuracy pooling, forest/funnel/SROC plots, and `import_review`. Phase 1C deviations: trim-and-fill, network meta-analysis, dose-response, and bivariate/HSROC diagnostic models remain deferred; diagnostic accuracy is univariate logit pooling. Phase 1D added `grade_start`, `grade_judge`, `grade_overall`, and `grade_status` to `review`, plus `grade-profile` and `sof-table` exports; the derived suggestion is never stored. Phase 1E added the AMSTAR 2, PROBAST, QUIPS, SYRCLE, and CASP instrument templates. Phases 2A–2D added `analysis_run`, `experiment_log`, `dataset_get`, `data_profile`, and `repro_package`. Phase 3 added `provenance_audit` (`provenance-audit.js`, `provenance-store.js`); its deviations are recorded in §6. Phase 4A added `submission_pack` (`submission-pack.js`, `submission-store.js`): plan/build/status/export with journal-requirement checks, manuscript citations, reporting evidence, `numbers_audit`, figure metadata, statements, a hashed manifest, and a reproducible zip. Phase 4B added `journal_search` `action=match` and custom CSL loading in `citation` (`style_file`/`style_url`, cached under `.dsh/styles/`). Phase 4C added `manuscript_diff` (latexdiff/Markdown diff, changed blocks, direct OOXML extraction of DOCX tracked changes/comments and Zotero fields, response-letter skeleton). Phase 4D added `presentation_build` (posters, Beamer, optional python-pptx, PDF/PNG, QA checklist). Phase 4E extended `python-helpers/stat_audit.py` with a `numbers` mode and added `numbers_audit`. Phase 4F added `authorship` (`authorship.js`, `authorship-store.js`). Phase 4 deviations: PowerPoint generation uses a small `python-pptx` helper rather than an existing skill script (the slides skills do not ship a deck generator); journal match does not call `journal_policy` per result (policy stays a separate tool); generic response letters are built from recorded change ids, while an `ah_review` id delegates to the engine's own response letter; table/text checks match only unambiguous labels, and GRIMMER remains unimplemented. Phase 5 is implemented: `preregister` (+ store) freezes hashed write-once plans with review/coscientist/analysis/causal-DAG/power imports, a data-collection guard, verification, and Markdown/JSON/PDF export (`submit` disabled); `causal_dag` (+ store, `causal-graph.js`) derives d-separation, minimal backdoor/front-door sets, colliders, instruments, testable implications, and E-values, with DOT/Mermaid/edge-list import/export; `design` (+ store) implements seeded simple/block/stratified/cluster/crossover/minimization randomization, codes, realized balance, and full/fractional factorial, Plackett–Burman, central composite, and Box–Behnken designs; `ethics_protocol` (+ store) drafts protocols/consent with a Helsinki/Common Rule/GDPR/HIPAA concept checklist; `deidentify` (+ store) scans/redacts text/JSON/CSV/TSV locally with masked reports; `dmp` (+ store) drafts six funder-shaped plans; `grant_budget` (+ store, `python-helpers/grant_budget.py`) computes multi-year budgets with arithmetic/cap checks and CSV/Markdown/JSON/XLSX export. Phase 5 deviations: graph, DOE, and de-identification algorithms are dependency-free JavaScript (no networkx, pyDOE3, or Presidio helpers); OSF submission stays disabled; `causal_dag` exports Mermaid/DOT/edge-list/JSON but not GraphML/SVG; PDF export is implemented for `preregister` only (DMP/ethics/budget Markdown/JSON, budget also CSV/XLSX; DOCX/PDF deferred); `provenance_audit` does not index the new preregister ledger yet and still reports it as `unknown`. Phases 6–9 are unchanged.
 
-This document is the implementation roadmap for the gaps identified after v0.33.0. It is deliberately written in dependency order so each phase can ship on its own. Phases 0–3 are the core sequence; phases 4–7 are mostly independent after Phase 0 and can be reordered by demand; Phase 8 is continuous hardening.
+This document is the implementation roadmap for the gaps identified after v0.33.0. It is deliberately written in dependency order so each phase can ship on its own. Phases 0–3 are the core sequence; phases 4–7 are mostly independent after Phase 0 and can be reordered by demand; Phase 8 is continuous hardening; Phase 9 depends on nothing and is the recommended next move because it protects every skill and review added by the phases after it.
 
 The plan follows the rules already used by `review`, `reporting_check`, `deep_review`, and the `ah_*` engine:
 
@@ -16,14 +16,15 @@ Nothing in this plan should introduce a secret source of truth, a hidden decisio
 
 ## 1. What this plan adds
 
-The harness already covers discovery, paper memory, citation, LaTeX writing, reporting checklists, risk-of-bias appraisal, hypothesis tournaments, remote compute, and a local RSI loop. It stops at four boundaries:
+The harness already covers discovery, paper memory, citation, LaTeX writing, reporting checklists, risk-of-bias appraisal, hypothesis tournaments, remote compute, and a local RSI loop. It stops at five boundaries:
 
 1. **Synthesis.** A review can screen and appraise, but it cannot extract structured data, pool effects, rate certainty, or draw a PRISMA flow diagram.
 2. **Reproducible analysis.** Skills describe the discipline; no native tool records an analysis run, its environment, its inputs, or its outputs.
 3. **Provenance across ledgers.** PaperMemory, `ah_*`, `review`, `reporting_check`, `deep_review`, `notebook`, and `scientific_result` each keep excellent local state, but there is no cross-ledger audit.
 4. **The submission and conduct edges.** The harness can compile a manuscript; it cannot package a submission, diff a revision, build a poster, freeze a preregistration, or size a grant budget.
+5. **Maintenance.** Every phase above adds capability; none checks that the capability stays sound. The 762 skill bundles, the cross-links between them and `docs/`, and the reviewer tools' output discipline have no mechanical guard, so rot accumulates silently. Phase 9 addresses this, and no other phase does.
 
-The additions are grouped into nine phases:
+The additions are grouped into eleven phases:
 
 | Phase | Theme | Main additions | Depends on |
 |---|---|---|---|
@@ -36,6 +37,8 @@ The additions are grouped into nine phases:
 | 6 | Scientific data connectors | `science_source` adapters, `chem_toolkit`, `seq_toolkit`, `structure_toolkit` | 0 |
 | 7 | Discovery and research intelligence | `literature_watch`, `citation_network`, `trial_registry_search`, `grey_literature_search`, `paper_artifacts`, `paper_recommend`, `citation audit`, clinical/regulatory signals | 0 |
 | 8 | Hardening and adoption | Cross-platform, offline mode, sandboxing, evaluation suite, skill routing, performance, security review | all |
+| 9 | Asset integrity and review discipline | `agent_asset_lint`, RSI evidence ceilings + Task Episodes, finding eligibility gates, `doctor` | — (independent; 9C refines existing reviewers) |
+| 10 | Deep research run pipeline | `deep_research` (self-driving steps, resumable ledger, independence clustering, untrusted-source fencing, ship gate) | — (reuses 0–3 primitives) |
 
 ### Suggested implementation order
 
@@ -49,6 +52,8 @@ If you implement only the highest-value path:
 6. Choose Phase 4A (submission pack) or Phase 5A (preregistration) based on user demand.
 
 Phases 6 and 7 can run in parallel with 4 and 5 once Phase 0 is stable.
+
+Phase 9 sits outside that ordering: it depends on nothing, and 9A + 9D are the two cheapest items in this plan. Ship them **before** Phase 6, so the linter and the doctor cover the connectors and skills those phases add rather than being retrofitted onto them.
 
 ### Phase dependency graph
 
@@ -69,6 +74,8 @@ flowchart LR
   P0 --> P5[Phase 5 conduct / ethics / grants]
   P0 --> P6[Phase 6 science data]
   P0 --> P7[Phase 7 discovery intelligence]
+  P9[Phase 9 asset integrity + review discipline] --> P8
+  P10[Phase 10 deep research pipeline] --> P8
   P3 --> P8[Phase 8 hardening]
   P4 --> P8
   P5 --> P8
@@ -1362,6 +1369,212 @@ This phase is continuous; it starts once the first expansion tool ships.
 
 ---
 
+## 11A. Phase 9 — asset integrity and review discipline
+
+> **Numbering.** This phase is `11A`, not `12`, so that §12–§22 keep their current numbers: §17 is already referenced from §0.1, and renumbering every following section to insert one phase would break it for no gain. Do not "tidy" this to `12`.
+
+**Why this phase exists.** Every other phase adds capability. This one keeps the capability honest. Both gaps below were found by reading [Better Harness](https://github.com/QoderAI/better-harness) (MIT), which reviews the *outer coding-agent workflow* rather than the code an agent writes. Its domain is not ours, but its review discipline is close to domain-free, and it is already mechanically enforced where our equivalent rules are only prose.
+
+1. **762 skill bundles ship with no integrity check.** `scripts/test-academic-harness.mjs:53-105` asserts the count is 762, that frontmatter names are unique, and that ~27 hardcoded marker strings still appear. Nothing checks that a `SKILL.md` link resolves, that a referenced `references/*.md` or `assets/*` was actually shipped, that frontmatter `description` exists and states when to use the skill, or that the same relative-link discipline holds across `docs/*.md`. Every phase from here adds more bundles, so the unchecked surface grows monotonically.
+2. **The reviewer tools have no anti-padding contract.** `deep_review`, `review`, `appraisal`, `integrity_check`, `numbers_audit`, and the `peer-reviewer`, `citation-checker`, `statistician`, and `verifying-results-before-claiming` brief skills all ask a model for critiques. LLM reviewers fail in well-documented ways: they pad to a quota, report an absence as a defect because the evidence for it was never supplied, and assign their own severity. We state the counter-measures in prompt sections; Better Harness enforces them in validators, which is the difference between a rule and a hope.
+
+**Adaptation rule for the whole phase: take the discipline, leave the coding domain.** Each sub-phase ends with what is deliberately *not* imported, and §15 records it as a non-goal so a later contributor does not reintroduce it as "missing functionality".
+
+### 11A.1 Phase 9A — `agent_asset_lint`
+
+**Goal.** Make a broken skill or a dead cross-link a CI failure instead of a silent defect.
+
+This is a **development script, not a registered tool**. Adding it to the preset would be tool sprawl (§16) for something no research session asks for mid-analysis; its consumer is `verify.yml`.
+
+**Checks.** Split by severity so the first run is survivable across 762 legacy bundles:
+
+| Severity | Rule |
+|---|---|
+| `error` (blocks CI) | relative link in a `SKILL.md` or `docs/*.md` resolves to no tracked file; in-page anchor does not exist; a file referenced by a skill is not shipped; frontmatter `name` ≠ the directory name; duplicate `name` across bundles; missing frontmatter entirely |
+| `warn` (reported, non-blocking) | `description` absent, empty, or over budget; no "Use when" trigger clause; a router skill with no "Do not use for" boundary; `SKILL.md` over the byte budget; an orphan file under `references/` or `assets/` that nothing links to |
+
+**Reuse.** Port the Markdown machinery from `better-harness/scripts/agent-lint/index.mjs` (MIT) rather than writing another parser: `parseMarkdownDocument`, `headingAnchor`, inline- and reference-link parsing (`parseInlineLinks`, `parseReferenceLinks`, `parseReferenceDefinition`), fenced-code suppression so a link inside a code sample is not a link (`linkFallsInsideInlineCode`), and workspace-confined destination resolution (`isInsideWorkspace`, `safeDecodeURIComponent`).
+
+**Files and wiring**
+
+- `scripts/agent-asset-lint/index.mjs` — parser plus rules, exports a flat finding list.
+- `scripts/agent-asset-lint/cli.mjs` — `--workspace`, `--format json|text`, `--baseline`, `--fail-on warn|error`.
+- `scripts/agent-asset-lint/baseline.json` — the shrink-only allowlist for pre-existing warnings (see guardrails).
+- `package.json` — `lint:assets`.
+- `.github/workflows/verify.yml` — one step after the existing marker linting in `test-phase7.mjs`.
+- `scripts/test-agent-asset-lint.mjs` — fixture skill tree, added to the CI job.
+
+**Guardrails**
+
+- **Baseline is shrink-only.** The lint passes if a finding count drops, fails if a baselined violation reappears or if the baseline file grows. Without this, the first CI run either blocks on legacy warnings or is switched off within a week.
+- No `--fix`. Rewriting 762 `SKILL.md` files programmatically is a content change disguised as maintenance; each fix is a human edit to prose that routes a model.
+- Do not port `host-support`, the multi-host entrypoint discovery, or the AGENTS.md review profiles: this plugin is DSH-only, and the plan's `## 11.5` skill-routing work is a separate concern.
+- The linter reads only the plugin tree; it never touches a user workspace or `$DSH_HOME`.
+- Every ported file keeps a header naming its upstream path and the MIT license, and `NOTICE` gains an entry. §21 already requires this for adapted skills and checklists; this phase is the first time it applies to vendored **code**, which is why it is called out again.
+
+**Acceptance**
+
+- Delete a `references/x.md` that some `SKILL.md` links to → CI fails naming the linking file and line.
+- Rename a skill directory without editing its frontmatter `name` → `error`.
+- A skill whose only links are `https://` → no finding.
+- A link inside a fenced code block → no finding.
+- Add an entry to `baseline.json` for a violation that has not been fixed → CI fails.
+- `--format json` output round-trips into the test harness.
+
+**Effort.** ~1 week, dominated by whatever the first run finds in the existing catalogue.
+
+### 11A.2 Phase 9B — evidence ceilings and Task Episodes in RSI
+
+**Goal.** Stop RSI from promoting a lesson on weaker evidence than its score implies, and stop turn-level episodes from mistaking retries for repetition.
+
+Two changes to the existing loop (`rsi-core.js`, `rsi-hooks.js`, `rsi-store.js`), no new store.
+
+**1. Review unit: turn → Task Episode.** `rsi-hooks.js:262-401` records a per-turn episode, so a model that retries the same tool three times inside one attempt produces three episodes carrying the same signal — and `diagnoseEpisodes` (`rsi-core.js:700-767`) counts those as independent failures. Adopt Better Harness's unit: **one user goal with one acceptance boundary**. Turns under the same goal boundary collapse into one episode with an `attempts` count; a new goal opens a new episode. Heuristic for a boundary: a user prompt that names a new objective or artifact, not every step.
+
+**2. Confidence ceiling.** Lessons already advance `candidate → trial → active → retired/quarantined` on injected-vs-control success rates (`rsi-core.js:1033-1056`), but the stored `quality` heuristic (`rsi-core.js:623-698`) is not bounded by how well the lesson was evidenced. Map Better Harness's evidence ladder onto the existing lifecycle instead of inventing a second one:
+
+| Evidence tier | Meaning here | Lesson state | `quality` ceiling |
+|---|---|---|---|
+| `missing` / `unobserved` / `not_applicable` | no episode supports it, or it was not observable | `quarantined`, or no lesson at all | 0.59 |
+| `present` | lesson text exists, no episode cited | `candidate` | 0.74 |
+| `wired` | ≥1 Task Episode shows the signal, no control arm | `trial` | 0.84 |
+| `exercised` | ≥2 distinct comparable Task Episodes across ≥2 sessions | `trial`, eligible for `active` | 0.94 |
+| `outcome-supported` | the A/B promotion actually won against control | `active` | 1.00 |
+
+Rules to carry over verbatim in spirit: *"Score each dimension independently and never derive a dimension score from finding counts"*, *"a score never creates or suppresses a finding"*, and recurrence only from *"the same normalized intent and scope across at least two distinct comparable Task Episodes"*. Define *comparable* for research sessions as the same `task_class` **and** the same tool/action boundary, and record `goalConfidence` separately from `procedureConfidence` — being sure what the user wanted is not being sure the procedure was wrong.
+
+**Files and wiring.** `rsi-core.js` (episode grouping, ceiling application), `rsi-store.js` (`lessons.jsonl` gains `evidenceTier`, `episodeIds[]`, `goalConfidence`, `procedureConfidence`), `rsi-hooks.js` (goal-boundary detection), `docs/RSI.md`, `scripts/test-rsi.mjs`.
+
+**Guardrails**
+
+- Append-only: existing `lessons.jsonl` rows are read with defaults (`evidenceTier: "unobserved"`), never rewritten or back-migrated.
+- The ceiling caps reported confidence; it does not silently demote an `active` lesson that a user pinned by hand.
+- **`auto_skills` stays dead.** The config default at `rsi-store.js:35` has no consuming code, and Better Harness's "repeated procedure → propose a skill" impulse must not be implemented here: auto-mutating a curated 762-bundle catalogue is the wrong risk profile for academic content. A lesson may only ever edit its own store.
+
+**Explicitly not imported.** The five coding dimensions (`task-understanding`, `controlled-execution`, `change-validation`, `reliable-delivery`, `learning-capture`) and their sub-checks, the 0–100 scale, and `models/software-fluency.md`. Whether academic-harness wants its own multi-dimensional *research* work-loop rubric is §20 decision 11, not a side effect of this phase.
+
+**Acceptance**
+
+- Three retry turns inside one goal count as **one** episode; `diagnoseEpisodes` emits no remedy for a cluster whose episodes all share one goal boundary.
+- A `candidate` lesson cannot report `quality` above 0.74 even if its heuristic computes higher.
+- A lesson citing one episode is not eligible for `active`.
+- An old `lessons.jsonl` without the new fields still loads.
+
+**Effort.** ~1 week.
+
+### 11A.3 Phase 9C — finding eligibility gates for the reviewer tools
+
+**Goal.** A reviewer emits only findings it inspected, at a severity it is allowed to assign, and keeps what it could not observe visible instead of fabricating it.
+
+This is the single most transferable idea in the source repo, and it is domain-free. Apply it to `deep_review` comments, `review`/`appraisal` output, `integrity_check`, `numbers_audit` candidates, and the `peer-reviewer`, `citation-checker`, `statistician`, and `verifying-results-before-claiming` brief skills.
+
+**Finding contract.** One shape, validated rather than described, adapted from `templates/reporting/harness-findings.input.json` with research vocabulary:
+
+| Field | Meaning |
+|---|---|
+| `id`, `title`, `severity` | `severity ∈ High \| Medium \| Low` only |
+| `reason` | what was inspected, and the exact evidence boundary |
+| `expectedOutput[]` | concrete artefact or edit that would close it |
+| `target` | the **smallest** repairable owner: a file, section, record id, or claim id |
+| `primaryCheck` | exactly one reporting-guideline item, appraisal domain, or claim id — "one problem to one primary check" |
+| `kind` | `evidence-gap \| missing-mechanism \| outcome-gap` |
+| `verifier` | how a human confirms closure |
+
+**Gates.** A shared helper rejects, with a named reason, any candidate that:
+
+- rests on `unobserved` or `not_checked` evidence — that candidate stays in the coverage summary, because *"absence in the supplied facts is not evidence that the practice is absent"*;
+- has no inspected gap, no bounded `target`, or no `verifier`;
+- duplicates another finding on (`target`, `primaryCheck`); merge **only** when target, observed consequence, owner, and repair route all match, and preserve independent consequences that merely share a theme;
+- exists to fill a quota: *"five is a coverage floor… never a target total"*. Counts, similarity, a failed search, or a theoretical risk are leads, not findings;
+- leaks raw manuscript passages, participant identifiers, or private paths — link by id/sidecar the way `provenance_audit` already does.
+
+**Delegation shape.** Parallel read-only specialists return `decision: candidate | defer | reject` and **never** assign final severity or score; the reconciler assigns severity once, freezes it, and only then shapes priority moves. `subagent_pro` difficulty routing in `docs/AGENTS.md` is unchanged, and `peer-reviewer` / `verifying-results-before-claiming` are already read-only brief skills, so this is a contract change rather than a new roster.
+
+**Files and wiring.** `finding-gate.js` (new, shared by the reviewer tools; ids per `ledger-kit.js`), `deep-review.js`, `review.js` + `review-store.js`, `integrity-check.js`, `numbers-audit.js`, the four brief skills under `skills/`, `docs/WRITING.md`, `docs/RESEARCH.md`, `scripts/test-finding-gate.mjs`.
+
+**Explicitly not imported.** `harness render`'s Canvas/HTML pipeline and `templates/style/*`, `harness-inspector`, `intent-correlation-analysis`, `hooks/blast-radius` and its tree-sitter dependency graph (a code-change-risk device with no research analogue), and the five host adapters. Our reporting already owns Markdown/CSV/JSON/GraphML/Mermaid export; adding a second renderer would be a second source of truth.
+
+**Acceptance**
+
+- A fixture where the model returns 8 comments, 3 resting on `not_checked` evidence and 2 duplicates → output carries 3 findings, and the other 5 remain visible by state, not silently dropped.
+- A candidate with no `verifier` is rejected with the reason `missing_verifier`.
+- A specialist agent that sets `severity: High` has its severity ignored by the reconciler.
+- No source ledger is modified; a write-attempt test fails.
+
+**Effort.** 1–1.5 weeks.
+
+### 11A.4 Phase 9D — `doctor` and repository housekeeping
+
+**Goal.** Turn the two most common support requests into a single command.
+
+The README's own most-likely failure is a session left on the Standard or PTC preset producing `tools[name] is not a function` — a one-line diagnosis that today requires a human to know it. `academic-harness-cli.js` gains a `doctor` action.
+
+**Checks** (each `ok | missing | not_supported`, using §13's existing error-state vocabulary; `--json`, non-zero exit on any `missing`):
+
+- DSH version inside the supported range; active profile/preset is `academic-harness`, with the exact remedy if it is not.
+- Skills seeded into `$DSH_HOME/skills` and the count matching the shipped manifest.
+- `cordis.patch.yml` freshness — the same comparison CI already makes.
+- Python helper venv, then each optional helper (`numpy`, `scipy`, `matplotlib`, `rdkit`, `gemmi`, `openpyxl`) reported present/absent, never required.
+- External binaries behind optional routes: `pdflatex`, `latexdiff`, `pdftoppm`, `mermaid`/`mmdc`.
+- Which optional keys from `settings-keys.js` are set versus missing — names only, never values.
+- Workspace ledger roots exist and are writable.
+
+**Guardrails.** Read-only: no install, no repair, no key prompting. Do not probe a network endpoint to decide whether a key works; `not_supported` is the right answer for anything that would require a live call.
+
+**Housekeeping.** Add `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `.editorconfig`, `.nvmrc`, `.gitattributes`. Nothing else is imported: `docs/CHANGELOG.md` already exists and §13 already requires an entry per tool, so Better Harness's `conventional-changelog` machinery would replace a written changelog with a generated one for no benefit.
+
+**Files and wiring.** `academic-harness-cli.js`, `settings-keys.js`, `python-runtime.js`, `latex-compile.js`, `docs/INSTALL.md`, `scripts/test-doctor.mjs`.
+
+**Effort.** 2–3 days.
+
+---
+
+## 11B. Phase 10 — deep research run pipeline
+
+> **Status: implemented and verified — 257 offline checks plus a live DSH Web UI
+> session driven through agent-browser against real retrieval; not yet released.** Delivered as `deep-research.js`,
+> `deep-research-store.js`, `deep-research-steps.js`, `independence-cluster.js`, and
+> `untrusted-fence.js`, with `skills/deep-research` extended rather than a new bundle.
+> Design adapted from [hyperresearch](https://github.com/jordan-gibbs/hyperresearch)
+> (MIT); attribution in `NOTICE`, and no upstream code is vendored.
+>
+> The gap this closes is boundary 5 in §1: the harness had a survey *method* in prose
+> and no state, so a long investigation lost its brief, could not resume, and enforced
+> none of its own gates. Phase 10 adds the ledger and the enforcement and reuses
+> everything else that already exists — `literature_search` for retrieval,
+> `integrity_check` for retraction flags, `paper-download` for open-access text,
+> `ledger-kit`/`store-lock`/`workspace-path` for state. It adds no search client, no
+> runtime, no vault, and no second renderer.
+>
+> Deviations from the adapted design:
+>
+> - The light tier keeps `cite_check`. Upstream routes short queries through a path
+>   that skips citation verification, which contradicts its own "verification never
+>   softens by mode".
+> - 17 step ids rather than 16 numbered steps (1.5 and 14.5 are real steps here).
+> - No per-source reputation score. PaperMemory is the library of record and is now
+>   written to, not bypassed: fetched open-access text is deposited there and quotes
+>   are verified against it, with a run-local cache as fallback. A span nothing
+>   fetched is reported `not_checked`, not `unsupported`.
+> - Model calls go through `ctx.llm.stream` on the session route inside a host job,
+>   not a subprocess with a loopback bridge: `deep_review` needs the bridge only
+>   because its engine is a separate process.
+> - The web lane reuses the plugin's keyed clients (Parallel, Exa, Tavily, Brave);
+>   no new search client was added, and the tools' own `execute` bodies now delegate
+>   to extracted `run*Search` functions.
+- `provenance_audit` does not index this ledger yet and reports it `unknown`,
+>   exactly as it still does for `preregister`.
+> - The live session found seven defects the offline checks could not (host message
+>   shape, an undeclared `run` parameter, a light-tier draft with no evidence, a
+>   fetch path that could never read a PDF, invisible retrieval failures, options
+>   `resume` silently dropped, and a cite check that blamed the report for paywalled
+>   sources). All are fixed and regression-tested; see the Unreleased entry.
+> - Not yet done: Phase 9A's linter does not exist to check the new skill links.
+
+**Effort.** Delivered in one pass; live verification remains.
+
+---
+
 ## 12. Quick-win map
 
 These are low-effort, high-value items. They are already included in the phases above; this table is for scheduling.
@@ -1381,6 +1594,8 @@ These are low-effort, high-value items. They are already included in the phases 
 | openFDA signal detection | 7H | ~1 week |
 | Preregistration export | 5A | 3–5 days |
 | Authorship/CRediT ledger | 4F | 3–5 days |
+| `doctor` action | 9D | 2–3 days |
+| Agent-asset lint in CI | 9A | ~1 week |
 
 ---
 
@@ -1399,6 +1614,7 @@ A tool is not done until all of these are true:
 - [ ] `docs/CONFIGURATION.md` lists any new keys; keys are optional.
 - [ ] `CHANGELOG.md` entry is written.
 - [ ] `package.json` exports/files, preset row, and generated `cordis.patch.yml` are updated.
+- [ ] If the tool emits findings or critiques, each carries `target`, `primaryCheck`, and `verifier` and passes `finding-gate.js` (Phase 9C).
 - [ ] Unit/tool tests and a golden surface test pass; network tests are fixture-based and live tests are opt-in.
 - [ ] No breaking change to existing actions, formats, ledgers, or prompt behavior.
 - [ ] Security review covers path escapes, secrets, URLs, and command execution.
@@ -1421,9 +1637,12 @@ Phases can ship independently. Suggested releases (version numbers are placehold
 | 0.41.0 | Phase 4D + 4E + 4F |
 | 0.42.0 | Phase 5A + 5B + 5C |
 | 0.43.0 | Phase 5D + 5E |
-| 0.44.0 | Phase 6 |
-| 0.45.0 | Phase 7 |
-| 0.46.0 | Phase 8 hardening release |
+| 0.44.0 | Phase 9A + 9D (asset lint + doctor; first, because every later phase adds assets it should already check) |
+| 0.45.0 | Phase 9B + 9C (RSI ceilings + finding gates) |
+| 0.46.0 | Phase 6 |
+| 0.47.0 | Phase 7 |
+| 0.48.0 | Phase 10 (deep research), after live Web UI verification |
+| 0.49.0 | Phase 8 hardening release |
 
 Keep each release small enough to validate live in the DSH web UI, not just in unit tests.
 
@@ -1446,6 +1665,11 @@ These remain out of scope unless explicitly revisited:
 - No claim that `deidentify` makes a dataset HIPAA/GDPR compliant.
 - No network meta-analysis or dose-response in the first meta-analysis release; they are separate, validated sub-phases.
 - No new general web/literature search providers; Phase 7 adds only SR-specific, grey, trial, or regional sources with stable access.
+- No coding-agent work-loop rubric: the five dimensions and their 0–100 ceilings from Better Harness are not mapped onto research work (§11A.2, §20 decision 11).
+- No code-change-risk hooks: `blast-radius`, its tree-sitter dependency graph, `test-mapping`, and `mapping-gate` are not imported; they judge a diff against tests, which this harness's ledgers already cover differently.
+- No second report renderer: no Canvas/HTML pipeline, `templates/style/*`, or `harness-inspector`. Existing Markdown/CSV/JSON/GraphML/Mermaid exports stay the only ones.
+- No multi-host adapters (Claude Code, Codex, Cursor, Qoder, Kimi) and no `conventional-changelog` generation.
+- No auto-generated or auto-edited skills; `auto_skills` (`rsi-store.js:35`) stays unused.
 
 ---
 
@@ -1465,6 +1689,9 @@ These remain out of scope unless explicitly revisited:
 | Cross-platform breakage | Medium | Path helpers; CI matrix; Linux-first documentation; test on macOS/Windows. |
 | User misunderstanding of outputs | High | Explicit caveats, source/date labels, `unknown` states, no guarantees. |
 | Secret leakage in logs/manifests | High | Env allowlist; redaction; no ambient secrets; tests. |
+| Imported rubric mismatch | Medium | Phase 9 transfers discipline, not the coding domain; each sub-phase names what is not imported, §15 repeats it as a non-goal, and every schema keeps research vocabulary. |
+| New linter blocks CI on the legacy catalogue | Medium | `error`/`warn` split plus a shrink-only baseline (§11A.1); no `--fix`; land 9A before Phase 6 adds more assets. |
+| Stricter finding gates suppress real problems | High | Gates reject only unobserved, duplicate, and quota-filling candidates; every rejected candidate stays visible by state and is never deleted. |
 
 ---
 
@@ -1502,6 +1729,14 @@ These remain out of scope unless explicitly revisited:
 | `paper_artifacts` | Yes | Yes | Fake URL checker; live opt-in |
 | `paper_recommend` | Yes | Yes | Fixture records; live opt-in |
 | `citation audit` | Yes | Yes | Fixture references; live DOI opt-in |
+| Agent-asset lint | Yes | No | Fixture skill tree; link/anchor/baseline cases |
+| `doctor` | Yes | Yes | Fixture environment; exit codes; key names only, never values |
+| RSI Task Episodes + ceilings | Yes | No | Retry/episode fixtures; ceiling cannot be exceeded |
+| Finding gates | Yes | No | Padded, duplicated, and unobserved-candidate fixtures |
+| Independence clustering | Yes | No | Syndicate collapse, DOI-conflict veto, near-title corroboration |
+| Untrusted fencing | Yes | No | Fence-tag breakout, caps, stateless forgery detection |
+| `deep_research` ledger | Yes | No | Frozen query, resume, budget caps, patch-only, gate states |
+| `deep_research` pipeline | Yes | Yes | Fake route + injected retrieval; live run is opt-in |
 
 ---
 
@@ -1556,6 +1791,10 @@ Record the decision before starting the phase.
 8. **De-identification scope.** Recommendation: regex/heuristics first, optional Presidio; never claim compliance; local-only.
 9. **Literature watch scheduling.** Recommendation: manual `run`/`digest` in the MVP; optional DSH automation later.
 10. **Cross-platform timing.** Recommendation: keep Linux-first, but run a macOS/Windows pass before Phase 6; do not claim support until the matrix is green.
+11. **Research work-loop rubric.** Recommendation: no. Phase 9B imports only the evidence-tier ceilings and the Task Episode unit. A multi-dimensional rubric for research work would be its own phase with its own justification; two overlapping scoring systems in one harness is worse than none.
+12. **Lint severity across the legacy catalogue.** Recommendation: block CI on structural errors only (broken link, unshipped reference, name mismatch, duplicate name). Everything else warns and is tracked in a shrink-only baseline, so the 762-bundle backlog gets worked down rather than formally waived.
+
+**Phase 9 adds no settings keys and no Python dependencies** — it is JavaScript-only against files already in the tree, which is part of why it is cheap.
 
 ---
 
@@ -1570,6 +1809,7 @@ Record the decision before starting the phase.
 - RO-Crate 1.1 and W3C PROV.
 - FAIR principles.
 - OSF, Zenodo, DataCite, and repository APIs.
+- [Better Harness](https://github.com/QoderAI/better-harness) (MIT) — Phase 9 only: `scripts/agent-lint/` (Markdown/link/anchor model), `models/agent-work-loop.md` (evidence tiers, Task Episode unit, score-independence rules), `templates/reporting/harness-findings.input.json` (finding contract), and `skills/better-harness/references/` (eligibility gates, repeated-work false-positive firewall).
 
 Use paraphrased prompts and link to official sources; do not bundle official checklist wording unless the license clearly permits it. Record any adapted skill or checklist in `NOTICE`.
 

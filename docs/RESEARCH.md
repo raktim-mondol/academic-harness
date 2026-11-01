@@ -91,6 +91,66 @@ A disagreement is a first-class state: `appraisal_status` lists it, `reconcile` 
 
 `rob-figure` renders `rob-traffic-light.svg` and `rob-summary.svg` through `python-helpers/rob_figure.py`, which needs the helper environment (`cd python-helpers && uv sync`). The table and CSV name the reviewers behind each resolved row, the reviewer whose consensus decision resolved a disagreement, and the unverified-quote count; the figure note repeats all three, and AI reviewers keep their `ai:` prefix. The exports contain recorded judgements and completeness counts; they never say "low risk", "high quality", or "compliant". Load the `risk-of-bias-appraisal` skill for the full workflow.
 
+## Deep research
+
+`deep_research` runs the survey-to-report pipeline that `skills/deep-research`
+describes, with the part prose cannot provide: durable state and enforced gates.
+It is a preset tool, so it inherits this harness's retrieval and memory rather
+than duplicating them — `literature_search` for discovery, PaperMemory for the
+library of record, `integrity_check` for retraction flags, `review` for PRISMA
+screening. The run ledger is the new thing, not a new search engine.
+
+```text
+deep_research action=start query="<the request, verbatim>" effort=medium run=true
+deep_research action=status run_id=dr-0001
+deep_research action=verify run_id=dr-0001
+```
+
+Nobody has to learn seven scale parameters to use it. `effort=low|medium|high`
+sets pipeline depth, call and time budgets, full-text reading, and the web lane
+together; omit it and the level is read from the request ("quickly" and "just
+tell me" are low, "comprehensive" and "systematic review" are high) and reported
+back with the phrases that decided it. A request that points both ways gets a
+question instead of a run: `start` returns `needs_input` and spends nothing — no
+run directory, no model call — until the caller answers. Explicit arguments still
+win, and the chosen level is frozen into the manifest so a resume cannot drift.
+
+What it guarantees:
+
+- **The query is gospel.** Written once to `query.md`, hashed into the manifest,
+  and re-checked before every step. A step working from a paraphrase fails with
+  `query_drift` instead of quietly answering a different question.
+- **Verification is tier-independent.** The light path is
+  `decompose → sweep → draft → cite_check → polish`. A short run earns no
+  exemption from the cite check.
+- **Voice is counted, not copied.** `independence-cluster.js` groups records by
+  DOI, exact or near title, and identical body across hosts — with the rule that
+  two different DOIs are never merged, because a DOI names the work. The gate
+  reports records and votes separately, so "several sources report" can be
+  audited into "one release, four hosts".
+- **After synthesis, patch only.** `applyHunks` refuses absent or ambiguous
+  context, an oversized hunk, and a hunk count that would amount to a rewrite;
+  those escalate as structural findings instead of being applied. A patched
+  artifact cannot be overwritten at all — the store refuses it.
+- **A blocker is a human decision.** `blocked` step state halts both `run` and
+  `resume`; only an explicit `from_step` resets it.
+- **A pass never overclaims.** Each gate check is `pass`, `blocked`, or
+  `not_checked`, and the result carries a caveat naming what could not be
+  verified. Quote integrity needs `fetch_full_text: true`, because a span
+  nothing read is unverified, not true.
+
+Fetched bodies are cached content-addressed per run (`bodies/<src-id>.md`) so a
+verbatim quote check is a local string comparison. That cache is disposable run
+state; PaperMemory remains the store of record, and `deep_research` never writes
+to it or to another ledger.
+
+Untrusted text is fenced: every retrieved body entering a prompt is wrapped in
+`<untrusted-source>` with a notice, and a page containing its own closing tag is
+escaped so it cannot end its fence and resume as trusted instructions.
+
+Ledger layout, step ids, gate ids, and error states:
+`skills/deep-research/references/run-ledger.md`.
+
 ## Hypothesis tournaments
 
 `coscientist` and `coscientist_rank` are preset-only native tools — local state, no key, no database, no new dependency — for a ranked hypothesis shortlist that has to survive past this context window.

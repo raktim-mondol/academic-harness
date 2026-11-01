@@ -127,6 +127,7 @@ for (const [id, toolName] of [
   ['preregister', 'preregister'], ['causal-dag', 'causal_dag'], ['design', 'design'],
   ['ethics-protocol', 'ethics_protocol'], ['deidentify', 'deidentify'], ['dmp', 'dmp'],
   ['grant-budget', 'grant_budget'],
+  ['deep-research', 'deep_research'],
 ]) {
   assert.match(preset, new RegExp(`- id: ${id}\n  name: academic-harness/${id}`), `preset row missing ${id}`)
   assert.ok(existsSync(join(root, `${id}.js`)), `missing ${id}.js`)

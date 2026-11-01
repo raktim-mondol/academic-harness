@@ -441,6 +441,57 @@ async function migrateExistingStore(launch, init) {
  * `canonical_project_slug` resolve ah.yaml / manuscript root_path. Kept for
  * read-side callers that still need a directory-derived key.
  */
+const QUOTE_CHECK_TIMEOUT_MS = 30_000
+
+/**
+ * Run `papermemory quote-check <quote> --paper <id> --json`.
+ *
+ * `ok: true, found: false` means the library read the stored text and the span
+ * is not in it — a fabricated quote. `ok: false` means nothing could be read
+ * (no CLI, no such paper, store error), which callers must report as
+ * unverified rather than as a bad quote. Those two outcomes are not the same
+ * claim and must never collapse into one.
+ */
+export async function quoteCheck({ quote, paper, project, cwd, signal } = {}) {
+  const text = String(quote ?? '').trim()
+  if (!text) return { ok: false, code: 'not_recorded', error: 'quote is required' }
+  const launch = resolvePaperMemoryLaunch()
+  if (!launch) return { ok: false, code: 'not_installed', error: 'papermemory CLI not available' }
+  if (launch.readOnly) return { ok: false, code: 'not_supported', error: 'papermemory store is read-only here' }
+
+  const args = ['quote-check', text, '--json']
+  if (paper) args.push('--paper', String(paper))
+  if (project) args.push('--project', String(project))
+  if (cwd) args.push('--cwd', String(cwd))
+
+  let result
+  try {
+    result = await run(launch.command, cliArgs(launch, args), {
+      timeoutMs: QUOTE_CHECK_TIMEOUT_MS,
+      env: papermemoryEnv(),
+      signal,
+      silent: true,
+    })
+  } catch (error) {
+    return { ok: false, code: 'failed', error: error instanceof Error ? error.message : String(error) }
+  }
+  if (result.code !== 0) {
+    const detail = (result.err || result.out || '').trim().replace(/\s+/g, ' ').slice(0, 240)
+    return { ok: false, code: detail ? 'provider_blocked' : 'failed', error: detail || `quote-check exited ${result.code}` }
+  }
+  const parsed = parseJsonOutput(result.out)
+  if (!parsed || typeof parsed !== 'object') {
+    return { ok: false, code: 'not_found', error: 'quote-check returned no JSON' }
+  }
+  return {
+    ok: true,
+    found: Boolean(parsed.found),
+    occurrences: Array.isArray(parsed.occurrences) ? parsed.occurrences.slice(0, 5) : [],
+    reason: parsed.reason ?? null,
+    checked_against: parsed.checked_against ?? null,
+  }
+}
+
 export function projectSlugFromCwd(cwd) {
   if (typeof cwd !== 'string' || cwd.length === 0) return undefined
   const base = cwd.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || ''

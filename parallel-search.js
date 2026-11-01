@@ -36,6 +36,62 @@ function render(value) {
   return [{ type: 'text', text: lines.join('\n\n') }]
 }
 
+/**
+ * Callable search for `runParallelSearch`: an objective plus up to five queries in one
+ * batch call, returning Parallel's raw `results`. Extracted so `deep_research` can sweep
+ * the web lane without re-implementing this client.
+ */
+export async function runParallelSearch(args, { signal = null } = {}) {
+        const key = await resolveEnv('PARALLEL_API_KEY')
+        if (!key) {
+          return {
+            error: 'PARALLEL_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var). mcp__parallel__* is also disabled without this key.',
+            code: 'key_missing',
+          }
+        }
+        const queries = (args.search_queries || []).map((q) => String(q).trim()).filter(Boolean)
+        if (!queries.length) {
+          return { error: 'search_queries must contain at least one non-empty query.' }
+        }
+        const mode = String(args.mode || '').trim()
+        if (!MODES.includes(mode)) {
+          return { error: `mode must be one of ${MODES.join(', ')}.` }
+        }
+        const body = {
+          objective: String(args.objective || '').trim(),
+          search_queries: queries.slice(0, 5),
+          mode,
+        }
+        if (!body.objective) {
+          return { error: 'objective is required.' }
+        }
+        if (args.max_chars_total != null) {
+          const maxChars = Number(args.max_chars_total)
+          if (Number.isFinite(maxChars) && maxChars > 0) body.max_chars_total = maxChars
+        }
+
+        const limiter = getLimiter('parallel', { minIntervalMs: 100 })
+        const result = await limiter.run(() => fetchJson(API_URL, {
+          method: 'POST',
+          retries: 0,
+          signal: signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': key,
+            'User-Agent': searchUserAgent(),
+          },
+          body: JSON.stringify(body),
+        }))
+        if (!result.ok) {
+          const message = result.data?.error?.message ?? result.data?.detail ?? result.data?.message ?? result.detail ?? result.error
+          return { error: `Parallel Search API error ${result.status}`, status: result.status, detail: message }
+        }
+        const data = result.data && typeof result.data === 'object' && !Array.isArray(result.data)
+          ? result.data
+          : {}
+        return { ...data, mode }
+}
+
 export const name = 'academic-harness-parallel-search'
 export const inject = ['tools']
 
@@ -85,53 +141,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      const key = await resolveEnv('PARALLEL_API_KEY')
-      if (!key) {
-        return {
-          error: 'PARALLEL_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var). mcp__parallel__* is also disabled without this key.',
-        }
-      }
-      const queries = (args.search_queries || []).map((q) => String(q).trim()).filter(Boolean)
-      if (!queries.length) {
-        return { error: 'search_queries must contain at least one non-empty query.' }
-      }
-      const mode = String(args.mode || '').trim()
-      if (!MODES.includes(mode)) {
-        return { error: `mode must be one of ${MODES.join(', ')}.` }
-      }
-      const body = {
-        objective: String(args.objective || '').trim(),
-        search_queries: queries.slice(0, 5),
-        mode,
-      }
-      if (!body.objective) {
-        return { error: 'objective is required.' }
-      }
-      if (args.max_chars_total != null) {
-        const maxChars = Number(args.max_chars_total)
-        if (Number.isFinite(maxChars) && maxChars > 0) body.max_chars_total = maxChars
-      }
-
-      const limiter = getLimiter('parallel', { minIntervalMs: 100 })
-      const result = await limiter.run(() => fetchJson(API_URL, {
-        method: 'POST',
-        retries: 0,
-        signal: exec.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': key,
-          'User-Agent': searchUserAgent(),
-        },
-        body: JSON.stringify(body),
-      }))
-      if (!result.ok) {
-        const message = result.data?.error?.message ?? result.data?.detail ?? result.data?.message ?? result.detail ?? result.error
-        return { error: `Parallel Search API error ${result.status}`, status: result.status, detail: message }
-      }
-      const data = result.data && typeof result.data === 'object' && !Array.isArray(result.data)
-        ? result.data
-        : {}
-      return { ...data, mode }
+      return runParallelSearch(args, { signal: exec?.signal })
     },
     presentCall(args) {
       const q = Array.isArray(args.search_queries) ? args.search_queries.filter(Boolean)[0] : ''

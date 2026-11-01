@@ -76,7 +76,8 @@ export function chooseSources(query, requested, { adsToken = false } = {}) {
   return sources
 }
 
-async function runSource(source, { query, perSource, yearMin, yearMax, openAccessOnly, signal }) {
+/** Run one source. Exported for `deep_research`, which sweeps many queries. */
+export async function runSource(source, { query, perSource, yearMin, yearMax, openAccessOnly, signal }) {
   switch (source) {
     case 'openalex': {
       const filters = []

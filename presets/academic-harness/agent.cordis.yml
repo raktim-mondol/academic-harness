@@ -655,6 +655,16 @@
 # .dsh/{preregister,causal,design,ethics,deidentify,dmp,budget}/<slug>/.
 # None submits, invents an approval/rate/repository, or issues a compliance or
 # causality verdict.
+# deep_research runs a bounded, self-driving investigation: it frames the
+# questions, sweeps the literature through the existing router, counts independent
+# voices rather than copies, drafts, attacks the draft with four critics, repairs it
+# with capped hunks only, and refuses to ship a report that cites a source it cannot
+# support. The run ledger under .dsh/deep-research/<run>/ freezes the query verbatim
+# and resumes at the step that died. Anything it could not verify is reported as
+# not_checked rather than passed silently; it never submits anything and never
+# decides what the answer should be.
+- id: deep-research
+  name: academic-harness/deep-research
 - id: preregister
   name: academic-harness/preregister
 - id: causal-dag

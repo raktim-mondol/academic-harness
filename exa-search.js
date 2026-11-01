@@ -61,6 +61,46 @@ function render(value) {
   return [{ type: 'text', text: capText(`${header}\n\n${renderPapers(value.results || [], { abstractChars: 600 })}`) }]
 }
 
+/**
+ * Callable search for `runExaSearch`: returns normalized paper-shaped records, or
+ * `{ error, code: 'key_missing' }` when no key is configured. Extracted so
+ * `deep_research` can sweep the web lane without re-implementing this client.
+ */
+export async function runExaSearch(args, { signal = null } = {}) {
+        let body
+        try {
+          body = buildBody(args)
+        } catch (error) {
+          return { error: error.message }
+        }
+        const apiKey = await resolveEnv('EXA_API_KEY')
+        if (!apiKey) return { error: 'EXA_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).', code: 'key_missing' }
+
+        const limiter = getLimiter('exa', { minIntervalMs: 100 })
+        const result = await limiter.run(() => fetchJson(API, {
+          method: 'POST',
+          retries: 0,
+          signal: signal,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'User-Agent': searchUserAgent(),
+          },
+          body: JSON.stringify(body),
+        }))
+        if (!result.ok) {
+          if (result.error === 'aborted') return { error: 'request cancelled' }
+          return { error: `Exa API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
+        }
+        const data = result.data && typeof result.data === 'object' ? result.data : {}
+        return {
+          query: body.query,
+          request_id: data.requestId || null,
+          cost: data.costDollars ?? null,
+          results: (data.results || []).map(fromExaResult).filter(Boolean),
+        }
+}
+
 export const name = 'academic-harness-exa-search'
 export const inject = ['tools']
 
@@ -98,38 +138,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      let body
-      try {
-        body = buildBody(args)
-      } catch (error) {
-        return { error: error.message }
-      }
-      const apiKey = await resolveEnv('EXA_API_KEY')
-      if (!apiKey) return { error: 'EXA_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).' }
-
-      const limiter = getLimiter('exa', { minIntervalMs: 100 })
-      const result = await limiter.run(() => fetchJson(API, {
-        method: 'POST',
-        retries: 0,
-        signal: exec.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'User-Agent': searchUserAgent(),
-        },
-        body: JSON.stringify(body),
-      }))
-      if (!result.ok) {
-        if (result.error === 'aborted') return { error: 'request cancelled' }
-        return { error: `Exa API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
-      }
-      const data = result.data && typeof result.data === 'object' ? result.data : {}
-      return {
-        query: body.query,
-        request_id: data.requestId || null,
-        cost: data.costDollars ?? null,
-        results: (data.results || []).map(fromExaResult).filter(Boolean),
-      }
+      return runExaSearch(args, { signal: exec?.signal })
     },
     presentCall(args) {
       return { card: 'generic', title: `Exa (${args.type || 'auto'}): ${args.query || ''}`, kind: 'search' }

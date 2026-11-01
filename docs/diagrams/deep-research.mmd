@@ -1,0 +1,34 @@
+%%build: {"maxWidth": 1180}
+flowchart TD
+  ask[Research question<br/>the user's own words] --> eff{effort<br/>low · medium · high}
+  eff -->|named, or read from the request| run[Start the run]
+  eff -->|request contradicts itself| q[needs_input<br/>ask the user<br/>no run created, no model call]
+  q -.->|answer| eff
+
+  run --> s1[1 decompose<br/>atomic items · coverage axes]
+  s1 --> s2[2 width sweep<br/>literature_search router<br/>+ web lane: Parallel · Exa · Tavily · Brave]
+  s2 --> s3[3-9 read deeply<br/>contradictions · loci · depth notes<br/>reconcile · tensions · corpus critic · digest]
+  s3 --> s10[10-11 draft ×3 → synthesize<br/>the report]
+  s10 --> s12[12 four critics<br/>dialectic · depth · width · instruction]
+  s12 --> s14[13-14 gap fetch → patcher<br/>capped hunks only, never a rewrite]
+  s14 --> s145[14.5 cite check<br/>sentence vs source · unknown ids · retractions]
+  s145 --> s16[15-16 polish → readability]
+  s16 --> gate{Ship gate<br/>pass · blocked · not_checked}
+  gate -->|blocked| fix[Clear the blocker<br/>or restart with from_step]
+  fix -.-> s14
+  gate -->|pass| out[Report with its verification record<br/>export markdown · json · csv]
+
+  s2 -.-> ind[Independence clustering<br/>five reprints of one release<br/>count as one voice]
+  s2 -.-> fence[Untrusted-source fencing<br/>fetched text is data,<br/>never instructions]
+  s2 -.-> led[(Run ledger · append-only<br/>.dsh/deep-research/&lt;run&gt;/<br/>query.md frozen + hashed<br/>manifest · corpus · claims · findings<br/>patches · retrieval · accounting)]
+  s145 -.-> pm[(PaperMemory<br/>open-access text deposited,<br/>quotes checked against stored text)]
+  led -.->|crashed run resumes at the step that died| run
+
+  classDef input fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef gate fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef core fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef store fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+  class ask input
+  class eff,q,gate,fix gate
+  class run,s1,s2,s3,s10,s12,s14,s145,s16,out,ind,fence core
+  class led,pm store

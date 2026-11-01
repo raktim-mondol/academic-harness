@@ -63,6 +63,45 @@ function render(value) {
   return [{ type: 'text', text: capText(bits.join('\n\n')) }]
 }
 
+/**
+ * Callable search for `runTavilySearch`: returns normalized paper-shaped records, or
+ * `{ error, code: 'key_missing' }` when no key is configured. Extracted so
+ * `deep_research` can sweep the web lane without re-implementing this client.
+ */
+export async function runTavilySearch(args, { signal = null } = {}) {
+        let body
+        try {
+          body = buildBody(args)
+        } catch (error) {
+          return { error: error.message }
+        }
+        const apiKey = await resolveEnv('TAVILY_API_KEY')
+        if (!apiKey) return { error: 'TAVILY_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).', code: 'key_missing' }
+
+        const limiter = getLimiter('tavily', { minIntervalMs: 100 })
+        const result = await limiter.run(() => fetchJson(API, {
+          method: 'POST',
+          retries: 0,
+          signal: signal,
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+            'User-Agent': searchUserAgent(),
+          },
+          body: JSON.stringify(body),
+        }))
+        if (!result.ok) {
+          if (result.error === 'aborted') return { error: 'request cancelled' }
+          return { error: `Tavily API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
+        }
+        const data = result.data && typeof result.data === 'object' ? result.data : {}
+        return {
+          query: body.query,
+          answer: data.answer || null,
+          results: (data.results || []).map(fromTavilyResult).filter(Boolean),
+        }
+}
+
 export const name = 'academic-harness-tavily-search'
 export const inject = ['tools']
 
@@ -103,37 +142,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args, exec) {
-      let body
-      try {
-        body = buildBody(args)
-      } catch (error) {
-        return { error: error.message }
-      }
-      const apiKey = await resolveEnv('TAVILY_API_KEY')
-      if (!apiKey) return { error: 'TAVILY_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).' }
-
-      const limiter = getLimiter('tavily', { minIntervalMs: 100 })
-      const result = await limiter.run(() => fetchJson(API, {
-        method: 'POST',
-        retries: 0,
-        signal: exec.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-          'User-Agent': searchUserAgent(),
-        },
-        body: JSON.stringify(body),
-      }))
-      if (!result.ok) {
-        if (result.error === 'aborted') return { error: 'request cancelled' }
-        return { error: `Tavily API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
-      }
-      const data = result.data && typeof result.data === 'object' ? result.data : {}
-      return {
-        query: body.query,
-        answer: data.answer || null,
-        results: (data.results || []).map(fromTavilyResult).filter(Boolean),
-      }
+      return runTavilySearch(args, { signal: exec?.signal })
     },
     presentCall(args) {
       return { card: 'generic', title: `Tavily (${args.search_depth || 'basic'}): ${args.query || ''}`, kind: 'search' }
