@@ -12,7 +12,7 @@
 const limiters = new Map()
 const warned = new Set()
 const TRANSIENT_NETWORK_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE'])
-const TRANSIENT_NETWORK_PHRASES = ['socket hang up', 'fetch failed']
+const TRANSIENT_NETWORK_PHRASES = ['socket hang up', 'fetch failed', ...[...TRANSIENT_NETWORK_CODES].map((code) => code.toLowerCase())]
 
 export function getLimiter(name, options = {}) {
   if (!limiters.has(name)) limiters.set(name, new RateLimiter(options))

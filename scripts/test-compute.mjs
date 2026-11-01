@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { isAuthStatus, isTransientError } from '../search-http.js'
 import { applyModalRun } from '../modal-run.js'
 import { DEFAULT_MODAL_INSTANCE_ID, MODAL_INSTANCES, MODAL_INSTANCE_IDS, resolveModalInstance } from '../modal-instances.js'
 import { applyRunpodRun } from '../runpod-run.js'
@@ -304,6 +305,24 @@ await check('runpod client targets the v2 API and parses problem errors', () => 
   assert.match(src, /'https:\/\/api\.runpod\.io\/v2'/, 'v2 base URL is the default')
   assert.ok(!/REST_BASE\s*=\s*process\.env[^\n]*rest\.runpod\.io\/v1/.test(src), 'v1 must not be the default base')
   assert.match(src, /problem|detail|errors/i)
+})
+
+await check('transient classifier agrees with the dsh-superagent-prototype vectors', () => {
+  const err = (message, props = {}) => Object.assign(new Error(message), props)
+  const transient = [
+    err('x', { status: 429 }),
+    err('x', { status: 503 }),
+    err('connect', { code: 'ECONNRESET' }),
+    new TypeError('fetch failed'),
+    err('getaddrinfo EAI_AGAIN api.example.com'),
+  ]
+  const permanent = [err('x', { status: 400 }), err('x', { status: 401 }), err('context too long'), 'LlmError: offline']
+  for (const e of transient) assert.equal(isTransientError(e), true, `should be transient: ${e.message}`)
+  for (const e of permanent) assert.equal(isTransientError(e), false, `should be permanent: ${e.message ?? e}`)
+  // undici hides the real code on `cause`; 501 is a permanent "not implemented"; 401/403 are auth.
+  assert.equal(isTransientError(new TypeError('fetch failed', { cause: err('x', { code: 'ECONNREFUSED' }) })), true)
+  assert.equal(isTransientError(err('x', { status: 501 })), false)
+  assert.ok(isAuthStatus(401) && isAuthStatus(403) && !isAuthStatus(404))
 })
 
 console.log(`\n${checks} compute checks passed`)
