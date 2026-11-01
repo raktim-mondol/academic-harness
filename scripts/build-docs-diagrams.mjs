@@ -22,7 +22,10 @@ for (const name of sources) {
   const source = readFileSync(join(SOURCE_DIR, name), 'utf8')
   const target = join(OUTPUT_DIR, `${basename(name, '.mmd')}.svg`)
   try {
-    const result = render(source, { fontSize: 14, padding: 18, maxWidth: 1100 })
+    // A leading `%%build: {...}%%` comment overrides render options for one diagram.
+    const buildOptions = source.match(/^%%build:\s*(\{.*?\})/)
+    const options = { fontSize: 14, padding: 18, maxWidth: 1100, ...(buildOptions ? JSON.parse(buildOptions[1]) : {}) }
+    const result = render(source, options)
     const svg = flattenColors(result.svg).replace(
       /(<svg\b[^>]*>)/,
       '$1<rect width="100%" height="100%" fill="#ffffff"/>',
