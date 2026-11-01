@@ -2,6 +2,16 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.40.0
+
+Cleanup release. No tool or skill is removed; the tool list gains nine tools (previously opt-in) and loses two MCP aliases of tools that already exist natively.
+
+- **Optional tools are now always on.** `author_lookup`, `openreview`, `pdf_references` (still needs `GROBID_BASE_URL`), `coscientist_verify`, `stat_audit`, `figure_audit`, `repo_audit`, `grant_search`, and `patent_search` register without `AH_ENABLE_OPTIONAL_TOOLS`. The flag and `optional-tools.js` are gone; the tools have a new prompt section and a guide, [Identity, funding, and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) (formerly `OPTIONAL-TOOLS.md`).
+- **Parallel MCP connector removed.** `mcp__parallel__web_search` (locked to `basic`) and `mcp__parallel__web_fetch` duplicated native `parallel_search` and `parallel_extract`, which share `PARALLEL_API_KEY` and support every mode. Firecrawl and Scite connectors are unchanged. A Parallel key now takes effect on the next call with no restart.
+- **ResearchCraft-era compatibility removed.** `scripts/migrate-profile.mjs`, `scripts/test-rename.mjs`, the `dsh-researchcraft` launcher alias, the `RESEARCHCRAFT_*` environment fallbacks, the 0.1.x/pre-0.16 API-key import in `settings-keys.js`, and the notebook-skill rename in `seed.js`. Upgrading from a pre-0.16 profile now needs a fresh install. Attribution in `NOTICE` and `LICENSE` is unchanged.
+- **Stale material removed:** eight finished plan documents under `docs/`, `academic-harness_docs/` (an old mod archive), `.e2e-artifacts/` screenshots, an unrelated run log in `reports/`, and the committed `main.pdf`/`main.bbl` build outputs of `paper/rsi-local/` (now git-ignored; `make` rebuilds them). Comments that pointed at the deleted plans were reworded.
+- **Tests and CI.** `npm test` (`scripts/run-tests.mjs`) runs every `scripts/test-*.mjs`; CI calls it, which adds the twelve suites CI never ran (the seven `test-coscientist-*`, `test-library`, `test-power`, `test-reference-library`, `test-rsi`, `test-zg-excludes`). `test-optional-tools.mjs` became `test-identity-tools.mjs`. CI installs the `dsh` CLI at `0.2.1-rc.5`, matching `package.json`.
+
 ## 0.39.0
 
 - **Discovery and reference checks (Phase 7, partial).** Four preset tools and one `citation` action, none needing a key: `literature_watch`, `paper_recommend`, `citation_network`, `paper_artifacts`, and `citation` `action=audit`. Guide: [Discovery and reference checks](DISCOVERY.md); skills: `research-monitoring`, `citation-network`, `reference-audit`. The catalogue is now 766 skills.
