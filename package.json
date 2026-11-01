@@ -407,6 +407,7 @@
   "scripts": {
     "build": "node build-client.mjs",
     "build:patch": "node scripts/build-cordis-patch.mjs",
+    "test": "node scripts/run-tests.mjs",
     "docs:diagrams": "node scripts/build-docs-diagrams.mjs",
     "test:fold": "node scripts/test-fold.mjs",
     "test:library": "node scripts/test-library.mjs",
