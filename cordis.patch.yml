@@ -125,7 +125,7 @@
             name: '@deepseek-ai/dsh-skill-filesystem'
             config:
               customSkillDirs:
-                - !!js process.env.ACADEMIC_HARNESS_SKILLS_DIR || process.env.RESEARCHCRAFT_SKILLS_DIR || (process.env.HOME + '/scientific-agent-skills/skills')
+                - !!js process.env.ACADEMIC_HARNESS_SKILLS_DIR || (process.env.HOME + '/scientific-agent-skills/skills')
 
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'

@@ -121,9 +121,8 @@ jobs:
           node scripts/test-compute-http.mjs
           node scripts/test-mermaid-render.mjs
 
-      - name: Check rename identity and migration
+      - name: Check preset identity and Paper2Agent
         run: |
-          node scripts/test-rename.mjs
           node scripts/test-academic-harness.mjs
           node scripts/test-paper2agent.mjs
 

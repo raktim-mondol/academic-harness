@@ -72,7 +72,7 @@ Each Supervisor-Skills entry carries a **Routing in Academic Harness** section t
 
 The agent calls the `skill` tool with a skill name when a task matches. Skills are also discoverable through the preset's filesystem skill row, and are seeded on first install.
 
-To use a different catalogue instead, set `ACADEMIC_HARNESS_SKILLS_DIR` (or keep a `~/scientific-agent-skills/skills` checkout). The old `RESEARCHCRAFT_SKILLS_DIR` name is still honored as a fallback. The override applies to the Academic Harness preset, whose `skill-filesystem` row reads it.
+To use a different catalogue instead, set `ACADEMIC_HARNESS_SKILLS_DIR` (or keep a `~/scientific-agent-skills/skills` checkout). The override applies to the Academic Harness preset, whose `skill-filesystem` row reads it.
 
 ## Attribution
 

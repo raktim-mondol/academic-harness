@@ -122,9 +122,9 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 
 | Variable | Effect |
 |---|---|
-| `ACADEMIC_HARNESS_SKILLS_DIR` | Use a different skills catalogue. `RESEARCHCRAFT_SKILLS_DIR` is still honored as a fallback; `~/scientific-agent-skills/skills` is the default checkout path. |
-| `ACADEMIC_HARNESS_HELPERS_DIR` | Use a different `python-helpers` checkout; `RESEARCHCRAFT_HELPERS_DIR` fallback. |
-| `ACADEMIC_HARNESS_PYTHON` | Python interpreter for the helpers; `RESEARCHCRAFT_PYTHON` fallback. |
+| `ACADEMIC_HARNESS_SKILLS_DIR` | Use a different skills catalogue. `~/scientific-agent-skills/skills` is the default checkout path. |
+| `ACADEMIC_HARNESS_HELPERS_DIR` | Use a different `python-helpers` checkout. |
+| `ACADEMIC_HARNESS_PYTHON` | Python interpreter for the helpers. |
 | `ACADEMIC_HARNESS_CLI` / `AH_CMD` | Override the writing-engine CLI. |
 | `ACADEMIC_HARNESS_SKIP_INSTALL=1` | Skip creating the plugin-local engine venv. |
 | `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` | Skip the managed Modal SDK install; use a profile-installed SDK instead. |
@@ -152,8 +152,6 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 | `PDFIUM_LIB_PATH`, `ORT_DYLIB_PATH` | OCR shared-library paths for `pdf_to_markdown`. |
 | `DSH_HOME` | DSH home; defaults to `~/.dsh`. |
 | `OPENFDA_API_KEY`, `SHERPA_ROMERO_API_KEY`, `DATACITE_API_KEY`, `ZENODO_API_KEY`, `FIGSHARE_API_KEY`, `ORCID_TOKEN`, `PATENTSVIEW_API_KEY` | Same fields as Settings; environment wins. |
-
-The old `RESEARCHCRAFT_*` names are honored where code implements a fallback: `RESEARCHCRAFT_SKILLS_DIR`, `RESEARCHCRAFT_HELPERS_DIR`, and `RESEARCHCRAFT_PYTHON`. The old API-key namespace was migrated by the v0.16.0 rename; see [Install](INSTALL.md#renamed-in-v0160).
 
 ## Credential behavior
 

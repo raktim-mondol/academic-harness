@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Shared launcher for dsh-web, dsh-tui, dsh-martty, and academic-harness
-# (the latter also answers to the transition alias dsh-researchcraft).
 #
 # Only one DSH surface should be running: a leftover web server on :3080 or a
 # leftover zvec-grep daemon will collide when you switch launchers (Ctrl+C does
@@ -111,7 +110,7 @@ import pathlib, re, sys
 path = pathlib.Path(sys.argv[1])
 text = path.read_text()
 new, n = re.subn(
-    r"(?m)^agent-presets:\n  default: (?:researchcraft|academic-harness)\n",
+    r"(?m)^agent-presets:\n  default: academic-harness\n",
     "",
     text,
     count=1,
@@ -126,23 +125,13 @@ PY
 stop_leftover_dsh
 stop_zg_daemon
 
-if [ "$cmd" = "academic-harness" ] || [ "$cmd" = "dsh-researchcraft" ]; then
+if [ "$cmd" = "academic-harness" ]; then
   if [ -z "${ACADEMIC_HARNESS_SKILLS_DIR:-}" ]; then
-    export ACADEMIC_HARNESS_SKILLS_DIR="${RESEARCHCRAFT_SKILLS_DIR:-}"
-    if [ -z "${ACADEMIC_HARNESS_SKILLS_DIR:-}" ]; then
-      if [ -d "$HOME/scientific-agent-skills/skills" ]; then
-        export ACADEMIC_HARNESS_SKILLS_DIR="$HOME/scientific-agent-skills/skills"
-      elif [ -d "$HOME/researchcraft/projects/default/sandbox/.pi/skills" ]; then
-        export ACADEMIC_HARNESS_SKILLS_DIR="$HOME/researchcraft/projects/default/sandbox/.pi/skills"
-      fi
+    if [ -d "$HOME/scientific-agent-skills/skills" ]; then
+      export ACADEMIC_HARNESS_SKILLS_DIR="$HOME/scientific-agent-skills/skills"
     fi
   fi
-  if [ "$cmd" = "dsh-researchcraft" ]; then
-    log "dsh-researchcraft is a transition alias; use academic-harness"
-  fi
-  profile=academic-harness
-  [ -d "$DSH_HOME/profiles/academic-harness" ] || profile=researchcraft
-  exec dsh --profile "$profile" "$@"
+  exec dsh --profile academic-harness "$@"
 fi
 
 case "$cmd" in
@@ -159,7 +148,7 @@ case "$cmd" in
   dsh-martty) exec dsh --profile martty "$@" ;;
   *)
     echo "unknown dsh launcher: $cmd" >&2
-    echo "use: dsh-web | dsh-tui | dsh-martty | academic-harness (or dsh-researchcraft alias)" >&2
+    echo "use: dsh-web | dsh-tui | dsh-martty | academic-harness" >&2
     exit 1
     ;;
 esac

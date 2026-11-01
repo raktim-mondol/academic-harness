@@ -255,7 +255,6 @@ const { seed } = await import('../seed.js')
   const patch = readFileSync(join(ROOT, 'cordis.patch.yml'), 'utf8')
   ok('patch declares preset-academic-harness', patch.includes('id: preset-academic-harness') && patch.includes("name: '@deepseek-ai/dsh-agent-preset'"))
   ok('patch sets registry default', /id: agent-preset-registry[\s\S]*default: academic-harness/.test(patch))
-  ok('patch has no legacy preset', !patch.includes('preset-researchcraft-legacy'))
   ok('patch inlines paper-mcp plugins', patch.includes('name: academic-harness/paper-mcp'))
   const fakeHome = mkdtempSync(join(tmpdir(), 'p2a-seed-'))
   const prev = process.env.DSH_HOME

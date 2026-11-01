@@ -83,7 +83,7 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `vendor/papermemory/` | Vendored PaperMemory package |
 | `docs/` | User guides, design notes, and diagram sources |
 | `schemas/` | Example JSON contracts for extraction templates, analysis plans, run manifests, preregistration, and submission manifests |
-| `scripts/` | Tests, profile migration, patch build, docs diagrams |
+| `scripts/` | Tests, patch build, docs diagrams |
 
 See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
 

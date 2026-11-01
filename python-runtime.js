@@ -13,12 +13,11 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 
 export function helpersDir() {
   return process.env.ACADEMIC_HARNESS_HELPERS_DIR
-    || process.env.RESEARCHCRAFT_HELPERS_DIR
     || join(HERE, 'python-helpers')
 }
 
 export function pythonBin() {
-  const override = process.env.ACADEMIC_HARNESS_PYTHON || process.env.RESEARCHCRAFT_PYTHON
+  const override = process.env.ACADEMIC_HARNESS_PYTHON
   if (override) return override
   const dir = helpersDir()
   const venv = process.platform === 'win32'

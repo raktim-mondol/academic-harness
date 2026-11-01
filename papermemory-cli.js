@@ -140,7 +140,6 @@ function findUv() {
 
 function findPython() {
   const override = process.env.ACADEMIC_HARNESS_PYTHON?.trim()
-    || process.env.RESEARCHCRAFT_PYTHON?.trim()
   if (override) return override
   for (const name of PYTHON_BINS) {
     for (const dir of (process.env.PATH || '').split(delimiter)) {
