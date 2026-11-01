@@ -6,7 +6,6 @@ Every tool registered by Academic Harness, with its scope and the page that docu
 |---|---|
 | **Every preset** | Registered by the plugin bundle, so every DSH session has it |
 | **Academic Harness preset** | Mounted only for sessions joined to the Academic Harness preset |
-| **Optional** | Needs `AH_ENABLE_OPTIONAL_TOOLS=1`; absent from the tool list and prompt otherwise |
 | **DSH built-in** | Supplied by DeepSeek Harness, not by this plugin |
 
 The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset relate. For the general-purpose tools, see [Workspace](WORKSPACE.md), [Writing](WRITING.md), and [Compute](COMPUTE.md).
@@ -157,21 +156,21 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `subagent_vision` | Academic Harness preset | Image-reading delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
 | `skill` | DSH built-in | Load a bundled skill by name | [Skills](SKILLS.md) |
 
-## Optional tools
+## Identity, funding, and audit tools
 
-These are registered only with `AH_ENABLE_OPTIONAL_TOOLS=1` and a `dsh` restart.
+Academic Harness preset tools. `pdf_references` is registered only when `GROBID_BASE_URL` is set.
 
 | Tool | What it does | Details |
 |---|---|---|
-| `author_lookup` | ORCID author search/records + ROR institution lookup | [Optional tools](OPTIONAL-TOOLS.md) |
-| `openreview` | OpenReview API v2 submissions, reviews, decisions, venue metadata | [Optional tools](OPTIONAL-TOOLS.md) |
-| `pdf_references` | GROBID bibliography extraction; optional Crossref resolution | [Optional tools](OPTIONAL-TOOLS.md) |
-| `coscientist_verify` | Citation integrity and claim-support ledger for tournaments | [Optional tools](OPTIONAL-TOOLS.md) |
-| `stat_audit` | Recompute p-values and run GRIM checks | [Optional tools](OPTIONAL-TOOLS.md) |
-| `figure_audit` | Figure inventory, DPI flags, near-duplicate groups | [Optional tools](OPTIONAL-TOOLS.md) |
-| `repo_audit` | Static reproducibility checklist for a repository | [Optional tools](OPTIONAL-TOOLS.md) |
-| `grant_search` | NIH RePORTER, NSF Award Search, Grants.gov | [Optional tools](OPTIONAL-TOOLS.md) |
-| `patent_search` | PatentsView prior-art/assignee/inventor lookup | [Optional tools](OPTIONAL-TOOLS.md) |
+| `author_lookup` | ORCID author search/records + ROR institution lookup | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `openreview` | OpenReview API v2 submissions, reviews, decisions, venue metadata | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `pdf_references` | GROBID bibliography extraction; optional Crossref resolution | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `coscientist_verify` | Citation integrity and claim-support ledger for tournaments | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `stat_audit` | Recompute p-values and run GRIM checks | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `figure_audit` | Figure inventory, DPI flags, near-duplicate groups | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `repo_audit` | Static reproducibility checklist for a repository | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `grant_search` | NIH RePORTER, NSF Award Search, Grants.gov | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `patent_search` | PatentsView prior-art/assignee/inventor lookup | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
 
 ## Settings-only surfaces
 

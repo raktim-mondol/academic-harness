@@ -13,13 +13,8 @@ function registered(apply) {
 }
 
 {
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
-  assert.deepEqual(registered(applyGrant), [])
-  assert.deepEqual(registered(applyPatent), [])
-  process.env.AH_ENABLE_OPTIONAL_TOOLS = '1'
   assert.deepEqual(registered(applyGrant), ['grant_search'])
   assert.deepEqual(registered(applyPatent), ['patent_search'])
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
 }
 
 /* ------------------------------------------------------------------- NIH */

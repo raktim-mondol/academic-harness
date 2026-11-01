@@ -21,22 +21,15 @@ function registered(apply) {
 /* ------------------------------------------------------------------ gating */
 
 {
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
   delete process.env.GROBID_BASE_URL
-  assert.deepEqual(registered(applyStat), [])
-  assert.deepEqual(registered(applyFigure), [])
-  assert.deepEqual(registered(applyPdf), [])
-  assert.deepEqual(registered(applyRepo), [])
+  assert.deepEqual(registered(applyPdf), [], 'pdf_references needs GROBID_BASE_URL')
 }
 {
-  process.env.AH_ENABLE_OPTIONAL_TOOLS = '1'
   assert.deepEqual(registered(applyStat), ['stat_audit'])
   assert.deepEqual(registered(applyFigure), ['figure_audit'])
   assert.deepEqual(registered(applyRepo), ['repo_audit'])
-  assert.deepEqual(registered(applyPdf), [], 'pdf_references needs GROBID_BASE_URL too')
   process.env.GROBID_BASE_URL = 'http://127.0.0.1:8070'
   assert.deepEqual(registered(applyPdf), ['pdf_references'])
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
   delete process.env.GROBID_BASE_URL
 }
 

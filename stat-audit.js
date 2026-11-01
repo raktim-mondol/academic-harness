@@ -2,13 +2,10 @@
  * stat_audit: candidate statistical-reporting inconsistencies in a local
  * manuscript (.tex/.md/.txt/.docx). Recomputed p-values and a GRIM check come
  * from python-helpers/stat_audit.py. Advisory only — never misconduct.
- *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { runHelper } from './python-runtime.js'
 
 const MAX_BYTES = 50 * 1024 * 1024
@@ -81,13 +78,12 @@ export const name = 'academic-harness-stat-audit'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'stat_audit',
     description: [
       'Scan a manuscript (.tex/.md/.txt/.docx) or inline text for candidate statistical-reporting inconsistencies: recompute p-values from reported t/F/χ²/z/r statistics and df, flag p = 0 and incompatible statistic/p pairs, and optionally run a GRIM check on reported means with their N.',
       'Findings are candidates for human review — never a misconduct conclusion. The check is pattern-based: it cannot see the underlying data, and GRIMMER (SD consistency) is not implemented.',
-      'Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1. Local only; requires sciPy in the Python helper environment. No network and no file modification.',
+      'Local only; requires sciPy in the Python helper environment. No network and no file modification.',
     ].join(' '),
     parameters: {
       path: { type: 'string', description: 'Workspace-relative manuscript path (.tex, .md, .txt, .docx).' },

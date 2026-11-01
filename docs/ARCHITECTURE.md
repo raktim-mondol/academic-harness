@@ -14,7 +14,7 @@ Academic Harness is one plugin with two planes: a **bundle** that is mounted for
 
 The split matters when something is missing. A general-purpose tool is present in every session. Everything academic is only present on a session whose preset selector reads **Academic Harness**; on Standard/PTC the same call fails with `tools[name] is not a function`. See [Install → Confirm the preset](INSTALL.md#4-confirm-the-preset).
 
-The preset is a **standing composition**: it mounts once as a shared composition for the life of the running `dsh` process. A new chat session on the same process is not a remount. That is why MCP connectors, subagent model ids, the zvec embedding model, and the optional-tools flag need a full `dsh` restart, while per-call REST tools pick up a Settings change immediately. The full restart matrix is in [Configuration](CONFIGURATION.md#when-a-change-takes-effect).
+The preset is a **standing composition**: it mounts once as a shared composition for the life of the running `dsh` process. A new chat session on the same process is not a remount. That is why MCP connectors, subagent model ids, and the zvec embedding model need a full `dsh` restart, while per-call REST tools pick up a Settings change immediately. The full restart matrix is in [Configuration](CONFIGURATION.md#when-a-change-takes-effect).
 
 ## Capability map
 

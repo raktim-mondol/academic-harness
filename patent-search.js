@@ -2,12 +2,10 @@
  * patent_search: PatentsView prior-art/assignee lookup. Requires
  * PATENTSVIEW_API_KEY on every call (a clear error, not a disabled tool).
  *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1. Informational
- * only — no legal-status, validity, or freedom-to-operate conclusions.
+ * Informational only — no legal-status, validity, or freedom-to-operate conclusions.
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const API = 'https://search.patentsview.org/api/v1/patent/'
@@ -141,13 +139,12 @@ export const name = 'academic-harness-patent-search'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'patent_search',
     description: [
       'Search US patents through PatentsView for prior-art context and assignee/inventor lookup: patent id, title, assignees, inventors, grant/priority dates, and optionally the abstract.',
       'Requires PATENTSVIEW_API_KEY on every call (free key); without it the call returns a clear error. Filters: `query` (title/abstract text), `assignee`, `inventor`, and a `date_from`/`date_to` grant-date range.',
-      'Informational only: no legal-status, validity, infringement, or freedom-to-operate conclusion. Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1.',
+      'Informational only: no legal-status, validity, infringement, or freedom-to-operate conclusion.',
     ].join(' '),
     parameters: {
       query: { type: 'string', description: 'Text query over patent title and abstract.' },

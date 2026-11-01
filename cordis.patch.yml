@@ -654,10 +654,7 @@
           - id: coscientist-rank
             name: academic-harness/coscientist-rank
 
-          # Citation integrity and claim support for the tournament. GATED: the row is always present but
-          # `apply()` registers nothing unless AH_ENABLE_OPTIONAL_TOOLS is truthy, so the
-          # tool is absent from the prompt and tool list by default (mount-time decision,
-          # needs a restart). This is the only tournament module that reaches the network
+          # Citation integrity and claim support for the tournament. This is the only tournament module that reaches the network
           # — Crossref for existence, reusing integrity-check for retraction status — and
           # it shares one process-wide Crossref limiter with crossref_lookup. It never
           # calls a model: `claims` records judgements a subagent already made.
@@ -736,19 +733,14 @@
           - id: grant-budget
             name: academic-harness/grant-budget
 
-          # Optional Phase 6 tools (identity + peer review). These rows always exist,
-          # but apply() registers nothing unless AH_ENABLE_OPTIONAL_TOOLS=1, so the tools
-          # are absent from the base tool list and prompt by default. Changing the flag
-          # needs a dsh restart. See author-lookup.js and openreview.js.
+          # Identity and peer review. See author-lookup.js and openreview.js.
           - id: author-lookup
             name: academic-harness/author-lookup
           - id: openreview
             name: academic-harness/openreview
 
-          # Optional Phase 7 local audits. Same gate as above (AH_ENABLE_OPTIONAL_TOOLS=1);
-          # pdf_references additionally requires GROBID_BASE_URL, and none of these are
-          # advertised in the base prompt. See stat-audit.js, figure-audit.js,
-          # pdf-references.js, and repo-audit.js.
+          # Local audits. pdf_references additionally requires GROBID_BASE_URL. See
+          # stat-audit.js, figure-audit.js, pdf-references.js, and repo-audit.js.
           - id: pdf-references
             name: academic-harness/pdf-references
           - id: stat-audit
@@ -758,10 +750,9 @@
           - id: repo-audit
             name: academic-harness/repo-audit
 
-          # Optional Phase 8 funding/patent discovery. Same AH_ENABLE_OPTIONAL_TOOLS gate.
-          # patent_search additionally requires PATENTSVIEW_API_KEY on every call and
-          # returns a clear error without it. Neither is advertised in the base prompt.
-          # See grant-search.js and patent-search.js.
+          # Funding and patent discovery. patent_search additionally requires
+          # PATENTSVIEW_API_KEY on every call and returns a clear error without it. See
+          # grant-search.js and patent-search.js.
           - id: grant-search
             name: academic-harness/grant-search
           - id: patent-search

@@ -2,8 +2,8 @@
  * pdf_references: structured bibliography extraction from a PDF via a
  * user-provided GROBID service (BYO infrastructure, no auto-install).
  *
- * Requires GROBID_BASE_URL and AH_ENABLE_OPTIONAL_TOOLS=1; without either the
- * tool is not registered. Optional `resolve` checks DOI identity in Crossref.
+ * Requires GROBID_BASE_URL; without it the tool is not registered. Optional
+ * `resolve` checks DOI identity in Crossref.
  * It never invents a reference: if GROBID fails, the tool fails.
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
@@ -12,7 +12,6 @@ import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, fetchText, getLimiter, searchUserAgent } from './search-http.js'
 import { normalizeTitle } from './search-normalize.js'
-import { optionalToolsEnabled } from './optional-tools.js'
 
 const MAX_PDF_BYTES = 200 * 1024 * 1024
 const MAX_REFS = 500
@@ -174,12 +173,12 @@ export const name = 'academic-harness-pdf-references'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled() || !grobidBase()) return
+  if (!grobidBase()) return
   ctx.tools.register(defineTool({
     name: 'pdf_references',
     description: [
       'Extract a structured bibliography from a PDF using a GROBID service you run (GROBID_BASE_URL, e.g. http://127.0.0.1:8070). Returns raw strings, titles, authors, years, venues, and DOIs; `resolve: true` checks DOI identity against Crossref.',
-      'Requires AH_ENABLE_OPTIONAL_TOOLS=1 and GROBID_BASE_URL; the tool is not registered without both. If GROBID is down or returns no references, it reports the failure — it never falls back to model-generated references.',
+      'Requires GROBID_BASE_URL; the tool is not registered without it. If GROBID is down or returns no references, it reports the failure — it never falls back to model-generated references.',
       'Advisory extraction only: verify fields before citing. No PDF is uploaded anywhere except your own GROBID instance.',
     ].join(' '),
     parameters: {

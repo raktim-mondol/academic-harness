@@ -2,13 +2,10 @@
  * figure_audit: local figure inventory — dimensions, DPI, format, and
  * pairwise perceptual-hash similarity (duplicate/near-duplicate candidates).
  * Advisory only; it does not detect manipulation.
- *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1.
  */
 import { existsSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { runHelper } from './python-runtime.js'
 
 function workspaceRoot(exec) {
@@ -86,13 +83,12 @@ export const name = 'academic-harness-figure-audit'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'figure_audit',
     description: [
       'Audit figure files locally: dimensions, DPI, color mode, format, low-resolution candidates, images without DPI metadata, and pairwise perceptual-hash near-duplicate groups.',
       'Findings are advisory — duplicate panels and low DPI are candidates for human review, not image-manipulation conclusions. The hash is a local dHash; no network calls and no file modification.',
-      'Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1. Requires Pillow in the Python helper environment.',
+      'Requires Pillow in the Python helper environment.',
     ].join(' '),
     parameters: {
       paths: {

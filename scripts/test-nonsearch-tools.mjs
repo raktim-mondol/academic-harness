@@ -86,10 +86,10 @@ const visionProfile = customRouteProfile({
 assert.deepEqual(visionProfile.models[0].input, ['text', 'image'])
 assert.equal(visionProfile.apiKeyEnv, 'AH_SUBAGENT_VISION_KEY')
 
-for (const modulePath of ['./literature-watch', './literature-watch-store', './paper-artifacts', './paper-recommend', './citation-network', './citation-graph-algos', './citation-audit', './citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './grade-store', './meta-analysis', './meta-analysis-store', './ledger-kit', './provenance', './provenance-audit', './provenance-store', './analysis-run', './analysis-store', './experiment-log', './experiment-store', './dataset-get', './data-profile', './science-source', './science-toolkit-kit', './chem-toolkit', './seq-toolkit', './structure-toolkit', './repro-package', './repro-package-store', './agreement', './appraisal', './papermemory-mcp', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './optional-tools', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
+for (const modulePath of ['./literature-watch', './literature-watch-store', './paper-artifacts', './paper-recommend', './citation-network', './citation-graph-algos', './citation-audit', './citation', './citation-format', './manuscript-citations', './integrity-check', './review', './review-store', './grade-store', './meta-analysis', './meta-analysis-store', './ledger-kit', './provenance', './provenance-audit', './provenance-store', './analysis-run', './analysis-store', './experiment-log', './experiment-store', './dataset-get', './data-profile', './science-source', './science-toolkit-kit', './chem-toolkit', './seq-toolkit', './structure-toolkit', './repro-package', './repro-package-store', './agreement', './appraisal', './papermemory-mcp', './clinicaltrials', './openfda', './dataset-search', './journal-policy', './funder-policy', './author-lookup', './openreview', './pdf-references', './stat-audit', './figure-audit', './repo-audit', './python-runtime', './grant-search', './patent-search', './biorxiv-search', './acl-lookup', './inspire-search', './ads-search', './scopus-search', './wos-search', './wikidata-lookup', './domain-search']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
 }
-for (const file of ['literature-watch.js', 'literature-watch-store.js', 'paper-artifacts.js', 'paper-recommend.js', 'citation-network.js', 'citation-graph-algos.js', 'citation-audit.js', 'citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'grade-store.js', 'meta-analysis.js', 'meta-analysis-store.js', 'ledger-kit.js', 'provenance.js', 'provenance-audit.js', 'provenance-store.js', 'analysis-run.js', 'analysis-store.js', 'experiment-log.js', 'experiment-store.js', 'dataset-get.js', 'data-profile.js', 'science-source.js', 'science-toolkit-kit.js', 'chem-toolkit.js', 'seq-toolkit.js', 'structure-toolkit.js', 'repro-package.js', 'repro-package-store.js', 'agreement.js', 'appraisal.js', 'papermemory-mcp.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'optional-tools.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
+for (const file of ['literature-watch.js', 'literature-watch-store.js', 'paper-artifacts.js', 'paper-recommend.js', 'citation-network.js', 'citation-graph-algos.js', 'citation-audit.js', 'citation.js', 'citation-format.js', 'manuscript-citations.js', 'integrity-check.js', 'review.js', 'review-store.js', 'grade-store.js', 'meta-analysis.js', 'meta-analysis-store.js', 'ledger-kit.js', 'provenance.js', 'provenance-audit.js', 'provenance-store.js', 'analysis-run.js', 'analysis-store.js', 'experiment-log.js', 'experiment-store.js', 'dataset-get.js', 'data-profile.js', 'science-source.js', 'science-toolkit-kit.js', 'chem-toolkit.js', 'seq-toolkit.js', 'structure-toolkit.js', 'repro-package.js', 'repro-package-store.js', 'agreement.js', 'appraisal.js', 'papermemory-mcp.js', 'clinicaltrials.js', 'openfda.js', 'dataset-search.js', 'journal-policy.js', 'funder-policy.js', 'author-lookup.js', 'openreview.js', 'pdf-references.js', 'stat-audit.js', 'figure-audit.js', 'repo-audit.js', 'python-runtime.js', 'grant-search.js', 'patent-search.js', 'biorxiv-search.js', 'acl-lookup.js', 'inspire-search.js', 'ads-search.js', 'scopus-search.js', 'wos-search.js', 'wikidata-lookup.js', 'domain-search.js']) {
   assert.ok(pkg.files?.includes(file), `package files missing ${file}`)
   assert.ok(existsSync(join(root, file)), `missing ${file}`)
 }
@@ -172,10 +172,8 @@ assert.ok(read('client/ApiKeysSection.jsx').includes('PATENTSVIEW_API_KEY'), 'Se
 for (const key of ['DATACITE_API_KEY', 'ZENODO_API_KEY', 'FIGSHARE_API_KEY']) {
   assert.ok(read('client/ApiKeysSection.jsx').includes(key), `Settings UI missing ${key}`)
 }
-assert.ok(!/(^|[^a-z_])author_lookup\b/.test(prompt), 'optional tools must not be advertised in the base prompt')
-assert.ok(!/(^|[^a-z_])openreview\b/.test(prompt), 'optional tools must not be advertised in the base prompt')
-for (const name of ['pdf_references', 'stat_audit', 'figure_audit', 'repo_audit', 'grant_search', 'patent_search']) {
-  assert.ok(!new RegExp(`(^|[^a-z_])${name}\\b`).test(prompt), `${name} must not be advertised in the base prompt`)
+for (const name of ['author_lookup', 'openreview', 'pdf_references', 'stat_audit', 'figure_audit', 'repo_audit', 'grant_search', 'patent_search', 'coscientist_verify']) {
+  assert.ok(new RegExp(`(^|[^a-z_])${name}\\b`).test(prompt), `${name} must be documented in the base prompt`)
 }
 assert.match(prompt, /SRC:PPR/, 'preprint routing must be documented in the prompt')
 assert.ok(!preset.includes('academic-harness/zotero'), 'Zotero preset row must be removed')
@@ -278,13 +276,10 @@ for (const [id, tool] of [['coscientist', 'coscientist'], ['coscientist-rank', '
   assert.match(preset, new RegExp(`- id: ${id}\\n  name: academic-harness/${id}`), `preset row missing ${id}`)
   assert.ok(read(`${id}.js`).includes(`name: '${tool}'`), `${id}.js must register ${tool}`)
 }
-// The ledger and the ranker are preset-only and ungated: they must not
-// early-return like the optional tools. Verification is the opposite — it
-// reaches the network, so it stays behind AH_ENABLE_OPTIONAL_TOOLS.
-for (const file of ['coscientist.js', 'coscientist-rank.js']) {
+// No tournament module sits behind an opt-in flag.
+for (const file of ['coscientist.js', 'coscientist-rank.js', 'coscientist-verify.js']) {
   assert.ok(!read(file).includes('optionalToolsEnabled'), `${file} must ship on by default`)
 }
-assert.match(read('coscientist-verify.js'), /optionalToolsEnabled\(\)/, 'coscientist-verify must stay gated')
 assert.match(preset, /- id: coscientist-verify\n  name: academic-harness\/coscientist-verify/, 'preset row missing coscientist-verify')
 assert.ok(read('coscientist-verify.js').includes("if (value?.error)"), 'a gated tool must still answer in band')
 // The tournament is reachable from the template catalogue.

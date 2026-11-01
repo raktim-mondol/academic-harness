@@ -2,11 +2,8 @@
  * grant_search: funded-project discovery across NIH RePORTER, NSF Award
  * Search, and Grants.gov. Informational only — not grant-writing or legal
  * advice, and not a substitute for a literature review.
- *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1.
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const FUNDERS = ['nih', 'nsf', 'grantsgov']
@@ -245,13 +242,12 @@ export const name = 'academic-harness-grant-search'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'grant_search',
     description: [
       'Discover funded projects and open opportunities: NIH RePORTER (awards), NSF Award Search (awards), and Grants.gov (posted/forecast opportunities).',
       '`search` takes a `funder` and `query`, plus optional `pi`, `org`, and `fiscal_year`; `get` reads one award/opportunity by `award_id`. NIH and NSF return awards with amounts and dates; Grants.gov returns opportunities with open/close dates and award ceilings, not funded awards.',
-      'Informational only: for funding discovery, prior-award context, and acknowledgment checks — not grant-writing advice, and not a literature review. Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1.',
+      'Informational only: for funding discovery, prior-award context, and acknowledgment checks — not grant-writing advice, and not a literature review.',
     ].join(' '),
     parameters: {
       action: { type: 'string', enum: ['search', 'get'], description: 'search (default) or get one award.' },

@@ -1,8 +1,6 @@
-# Optional tools
+# Identity, funding, and audit tools
 
-Several tools ship behind an opt-in flag: `AH_ENABLE_OPTIONAL_TOOLS=1` (**env only, not Settings**).
-
-With the flag unset the tools are not registered at all — they are absent from the tool list and the system prompt. The preset rows always exist, so enabling the flag needs a **`dsh` restart**.
+Narrow, advisory tools on the Academic Harness preset: researcher and institution identity, peer-review records, funding and patent discovery, local audits, and the tournament verifier. Each reports what it found and never turns that into a verdict. Tools with an external requirement (`pdf_references` needs `GROBID_BASE_URL`; `patent_search` needs `PATENTSVIEW_API_KEY`) say so in their own error text.
 
 ## Tools
 
@@ -24,7 +22,7 @@ OpenReview API v2 submission search, a forum's reviews/decision, and venue metad
 
 GROBID bibliography extraction from a workspace PDF.
 
-- Requires `GROBID_BASE_URL` (for example `http://127.0.0.1:8070`) **in addition** to the flag; without a reachable GROBID service the tool reports the failure and never generates references itself.
+- Requires `GROBID_BASE_URL` (for example `http://127.0.0.1:8070`); the tool is not registered without it, and without a reachable GROBID service the tool reports the failure and never generates references itself.
 - `resolve: true` checks each extracted DOI's title against Crossref.
 
 ### `coscientist_verify`
@@ -73,18 +71,9 @@ PatentsView prior-art/assignee/inventor lookup over US patents with grant/priori
 - **Requires `PATENTSVIEW_API_KEY` on every call**; without it the call returns a clear error.
 - No legal-status or freedom-to-operate conclusions.
 
-## Not gated
+## Preprints in `literature_search`
 
-`literature_search` also gains a `preprints` source (Europe PMC `SRC:PPR`) available **without** the flag, and chooses it automatically for biomedical queries that mention preprints.
-
-## Enabling
-
-```sh
-export AH_ENABLE_OPTIONAL_TOOLS=1
-# restart dsh so the preset remounts and registers the tool rows
-```
-
-The flag is read at mount time. Changing it in a running process has no effect until `dsh` restarts. See [Configuration](CONFIGURATION.md#when-a-change-takes-effect).
+`literature_search` also has a `preprints` source (Europe PMC `SRC:PPR`), chosen automatically for biomedical queries that mention preprints.
 
 ## Related
 

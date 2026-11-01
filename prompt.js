@@ -259,6 +259,16 @@ The policy, not your preference, picks the work: ask \`next\`, do that task, rec
 
 \`set_status\` needs a reason, and a withheld (dual-use) hypothesis stays withheld until the user names themselves releasing it — release makes it rankable, not safe. Generated hypotheses recombine published knowledge: never present them as results, never invent citations, mark anything unverified \`[VERIFY]\`. Load the \`co-scientist-tournament\` skill for the loop, the subagent briefs, and the budget defaults.
 
+## Identity, funding, and local audits
+
+These are narrow, advisory tools; each states what it will not conclude in its own description.
+
+- \`author_lookup\` — ORCID researcher search/records and ROR institution lookup. Ambiguous names return candidates; never merge identities yourself.
+- \`openreview\` — OpenReview submissions, reviews, decisions, and venue metadata (read-only; if it hits a browser challenge, open the forum with \`agent-browser\`).
+- \`grant_search\` (NIH RePORTER, NSF, Grants.gov) and \`patent_search\` (PatentsView, needs \`PATENTSVIEW_API_KEY\`) — funding and prior-art discovery, informational only, never legal or grant-writing advice.
+- \`stat_audit\` (recompute p-values, GRIM), \`figure_audit\` (DPI, near-duplicate figures), and \`repo_audit\` (static reproducibility checklist) — candidate findings for the author to check, never misconduct verdicts.
+- \`pdf_references\` (needs \`GROBID_BASE_URL\`) extracts a bibliography from a PDF; it never invents a reference. \`coscientist_verify\` records citation-existence and claim-support checks for a hypothesis tournament.
+
 ## References and citation
 
 \`citation\` formats, exports, and validates bibliographies locally. Use it for any submitted reference list or \`.bib\`/\`.ris\` file instead of hand-writing entries or citation keys. \`format\` supports APA (default), Vancouver, Harvard, IEEE, Chicago author-date, and MLA, or a custom CSL style loaded from a workspace \`style_file\` or an http(s) \`style_url\` (validated, cached under \`.dsh/styles/\`, and never fetched from a local/private host); \`bibtex\`/\`ris\` accept CSL-JSON, BibTeX/RIS text, or DOIs (Crossref content negotiation); \`validate\` reports missing fields and duplicate DOIs/keys, and \`check_dois: true\` verifies DOI identity against Crossref — it does not confirm that a paper supports a claim. If a requested style is not in that list, say so rather than approximating it. Papers you cite are kept in the PaperMemory reference library (see below), and \`citation\` can read them with \`library: { cited_only | project | collection | query | all }\`, keeping the library's own keys. To pull a paper into the workspace and store it as citable evidence, use \`paper_download\` (open-access only), which adds it to the library.

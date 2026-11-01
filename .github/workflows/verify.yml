@@ -110,7 +110,7 @@ jobs:
           node scripts/test-reporting-check.mjs
           node scripts/test-integrity.mjs
           node scripts/test-registries.mjs
-          node scripts/test-optional-tools.mjs
+          node scripts/test-identity-tools.mjs
           node scripts/test-audits.mjs
           node scripts/test-grants.mjs
           node scripts/test-nonsearch-tools.mjs

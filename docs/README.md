@@ -29,7 +29,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
 | [Skills](SKILLS.md) | The 766-skill catalogue, its sources, and workflow skills |
-| [Optional tools](OPTIONAL-TOOLS.md) | The tools behind `AH_ENABLE_OPTIONAL_TOOLS=1` |
+| [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) | Author identity, OpenReview, grants, patents, statistical/figure/repo audits, GROBID references |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 
 ## Reference

@@ -149,7 +149,7 @@ vendored, and [NOTICE](NOTICE) records the attribution.
 | [Architecture](docs/ARCHITECTURE.md) | [Papers and evidence](docs/PAPERS.md) | [Configuration](docs/CONFIGURATION.md) |
 | [Documentation home](docs/README.md) | [Writing](docs/WRITING.md) | [Changelog](docs/CHANGELOG.md) |
 | | [Research](docs/RESEARCH.md) | [Development](docs/DEVELOPMENT.md) |
-| | [Workspace](docs/WORKSPACE.md) | [Optional tools](docs/OPTIONAL-TOOLS.md) |
+| | [Workspace](docs/WORKSPACE.md) | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
 | | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [RSI](docs/RSI.md) | [Engine notes](docs/ACADEMIC-HARNESS-ENGINE.md) |
 
 ## Requirements and scope
