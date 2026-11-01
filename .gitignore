@@ -13,3 +13,7 @@ vendor/academic-harness/installed-version
 
 vendor/papermemory/build/
 vendor/papermemory/*.egg-info/
+
+# Local secrets (never commit)
+.env
+.env.local

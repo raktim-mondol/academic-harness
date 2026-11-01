@@ -2,6 +2,19 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.39.0
+
+- **Discovery and reference checks (Phase 7, partial).** Four preset tools and one `citation` action, none needing a key: `literature_watch`, `paper_recommend`, `citation_network`, `paper_artifacts`, and `citation` `action=audit`. Guide: [Discovery and reference checks](DISCOVERY.md); skills: `research-monitoring`, `citation-network`, `reference-audit`. The catalogue is now 766 skills.
+- `literature_watch` keeps saved searches in append-only ledgers under `.dsh/watch/`, runs them through the `literature_search` sources, and shows only records the watch has not seen. A failed source makes the run `partial` and is named; nothing is scheduled, emailed, or ingested.
+- `paper_recommend` merges Semantic Scholar recommendations and OpenAlex related works, removes the seeds and PaperMemory library duplicates, and states a measured reason for each result.
+- `citation_network` freezes an OpenAlex sample with its source, retrieval time, truncation flag, and a hash that analysis re-checks, then computes degree, PageRank, betweenness, components, coupling, co-citation, Louvain clusters, and shortest paths in dependency-free JavaScript, with GraphML, CSV, and Mermaid export.
+- `paper_artifacts` extracts repository links, accessions, and availability statements and checks links with HEAD requests to public hosts only (redirects re-checked, private addresses refused, capped). Accessions are never reported verified.
+- `citation` `action=audit` adds a batch reference audit: DOI validity, Crossref metadata match, retraction/concern/correction via `integrity_check`, duplicates, missing fields, uncited entries, and style fit, each with a suggested fix. A check that could not run is `unverified`, never clean. `privateHostname` and `privateAddress` in `citation.js` are now exported for reuse.
+- **Not built.** 7C trial registries and `clinicaltrials compliance`, 7D grey and regional literature sources, and 7H the `openfda` signal action; these need registry and API contracts that were not verified. Also deferred: local-library similarity in `paper_recommend`, license lookup in `paper_artifacts`, a notebook entry from digests, SVG export, and OpenCitations/Semantic Scholar sources for `citation_network`. The graph algorithms are pure JavaScript, so the plan's `networkx` helper is not used.
+- Found in live Web UI testing: `digest` and `path` returned `undefined` fields, which the host rejects as "not lossless JSON" (every new tool now normalises its result); a digest reported "no new records" for watches whose runs had failed (it now adds a run-health section); Semantic Scholar 404'd on arXiv-style DOIs (now sent as `ARXIV:` ids); and Zenodo links failed in Node although curl connected, because of Node's 250 ms per-address connect timeout (raised to 2 s for the link checker). Failed-source detail is kept in watch runs.
+- Live verification: driven through the DSH Web UI with Crossref, arXiv, Semantic Scholar, and OpenAlex (with a key, after the keyless daily budget was spent). Watch runs deduplicated (10 new, then 0; 5 new, then 0), the OpenAlex citation graph built 30 nodes and 77 edges with coherent clusters, and every tool returned valid output after the fixes above.
+- Tests: `scripts/test-discovery.mjs` (injected fetchers, no network), in `verify.yml` and `npm run test:discovery`.
+
 ## 0.38.0
 
 - **Scientific data connectors and local toolkits (Phase 6).** Four preset-only tools, none needing a key: `science_source`, `chem_toolkit`, `seq_toolkit`, and `structure_toolkit`. Guide: [Scientific data and toolkits](SCIENCE-DATA.md); skill: `science-data`. The catalogue is now 763 skills.

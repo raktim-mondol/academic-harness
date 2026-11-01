@@ -24,10 +24,11 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Reproducible analysis and data](ANALYSIS.md) | Frozen plans and auditable `analysis_run` executions, `experiment_log` sweeps, `dataset_get` provenance downloads, `data_profile` leakage review, `repro_package` shipping and Zenodo drafts |
 | [Provenance audit](PROVENANCE.md) | The read-only cross-ledger index: how `provenance_audit` joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH records, and what its seven states do and do not mean |
 | [Scientific data and toolkits](SCIENCE-DATA.md) | `science_source` over UniProt, RCSB PDB, AlphaFold DB, and PubChem, and the local `chem_toolkit`, `seq_toolkit`, and `structure_toolkit` |
+| [Discovery and reference checks](DISCOVERY.md) | Saved searches, recommendations, citation networks, data-link extraction, and the bibliography audit |
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 763-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 766-skill catalogue, its sources, and workflow skills |
 | [Optional tools](OPTIONAL-TOOLS.md) | The tools behind `AH_ENABLE_OPTIONAL_TOOLS=1` |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 

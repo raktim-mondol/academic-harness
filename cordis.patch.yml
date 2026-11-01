@@ -550,6 +550,22 @@
           - id: structure-toolkit
             name: academic-harness/structure-toolkit
 
+          # Saved literature searches (Phase 7A): add/list/remove/run/digest/status over the existing search sources, deduplicated against an append-only ledger under <cwd>/.dsh/watch/. Scheduling is manual; nothing is emailed or ingested. See literature-watch.js.
+          - id: literature-watch
+            name: academic-harness/literature-watch
+
+          # Data/code/accession links and availability statements from paper text, with optional link checks to public hosts (Phase 7E). Accessions are never reported verified. See paper-artifacts.js.
+          - id: paper-artifacts
+            name: academic-harness/paper-artifacts
+
+          # Related-paper recommendations from Semantic Scholar and OpenAlex with measured reasons, library duplicates removed (Phase 7F). See paper-recommend.js.
+          - id: paper-recommend
+            name: academic-harness/paper-recommend
+
+          # Citation graphs frozen under <cwd>/.dsh/network/<slug>/ with metrics, Louvain clusters, paths, and GraphML/CSV/Mermaid export (Phase 7B). See citation-network.js.
+          - id: citation-network
+            name: academic-harness/citation-network
+
           # Reproducibility packages (Phase 2D): a frozen inventory plus a built
           # package (manifest with SHA-256, environment snapshot, generated Dockerfile,
           # README, CITATION.cff, codemeta.json, RO-Crate, checksums) under a workspace

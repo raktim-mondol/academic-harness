@@ -16,6 +16,9 @@ import { libraryRecords } from './papermemory-library.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 import { resolveBibtexForIdentifier } from './bibtex-resolve.js'
+import { auditReferences } from './citation-audit.js'
+import { runIntegrityCheck } from './integrity-check.js'
+import { extractMarkdownCitations, extractTexCitations } from './manuscript-citations.js'
 import {
   SUPPORTED_STYLES, formatBibliography, formatCitations, normalizeCsl,
   parseBibtex, parseInput, registerCslStyle, toBibtex, toRis, validateRecords,
@@ -71,14 +74,14 @@ function privateIpv6(address) {
   return false
 }
 
-function privateAddress(address) {
+export function privateAddress(address) {
   const kind = isIP(String(address || ''))
   if (kind === 4) return privateIpv4(address)
   if (kind === 6) return privateIpv6(address)
   return true
 }
 
-function privateHostname(hostname) {
+export function privateHostname(hostname) {
   const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '')
   if (!host) return true
   if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return true
@@ -338,6 +341,17 @@ async function checkDois(records, exec) {
 
 function renderCitation(value) {
   if (value.error) return [{ type: 'text', text: `Error: ${value.error}` }]
+  if (value.action === 'audit') {
+    const lines = [`Reference audit: ${value.count} reference(s) · ${value.counts.problem} problem · ${value.counts.review} review · ${value.counts.unverified} unverified · ${value.counts.no_issues_found} no issues found (${value.network_checked} DOI(s) checked online).`]
+    for (const ref of value.references.filter((r) => r.status === 'problem' || r.status === 'review')) {
+      lines.push(`- ${ref.status.toUpperCase()} ${ref.key}${ref.doi ? ` (${ref.doi})` : ''}`)
+      for (const f of ref.findings.filter((x) => x.severity !== 'info')) lines.push(`    ${f.code}: ${f.detail}${f.suggested_fix ? ` → ${f.suggested_fix}` : ''}`)
+    }
+    const unverified = value.references.filter((r) => r.status === 'unverified')
+    if (unverified.length) lines.push(`- unverified (${unverified.length}): ${unverified.slice(0, 15).map((r) => r.key).join(', ')}${unverified.length > 15 ? ', …' : ''}`)
+    lines.push(...value.caveats.map((c) => `Note: ${c}`))
+    return [{ type: 'text', text: lines.join('\n') }]
+  }
   if (value.action === 'validate') {
     const lines = [
       `Citation validation: ${value.count} record(s), ${value.errors.length} error(s), ${value.warnings.length} warning(s)`,
@@ -363,10 +377,10 @@ function renderCitation(value) {
   return [{ type: 'text', text: body || 'No citation output.' }]
 }
 
-export async function runCitation(args, exec) {
+export async function runCitation(args, exec, deps = {}) {
   const action = args.action || 'format'
-  if (!['format', 'bibtex', 'ris', 'validate'].includes(action)) {
-    throw new Error('action must be format, bibtex, ris, or validate')
+  if (!['format', 'bibtex', 'ris', 'validate', 'audit'].includes(action)) {
+    throw new Error('action must be format, bibtex, ris, validate, or audit')
   }
   if ((args.style_file || args.style_url) && action !== 'format') {
     throw new Error('style_file/style_url apply to action=format only')
@@ -405,6 +419,24 @@ export async function runCitation(args, exec) {
     }
   }
 
+  if (action === 'audit') {
+    let citedKeys = null
+    if (typeof args.manuscript === 'string' && args.manuscript.trim()) {
+      const source = readWorkspaceText(workspaceRoot(exec), args.manuscript)
+      const cited = /\.(md|markdown|qmd|rmd)$/i.test(args.manuscript) ? extractMarkdownCitations(source) : extractTexCitations(source)
+      citedKeys = cited.nociteAll ? null : new Set(cited.keys.keys())
+    }
+    const audit = await auditReferences(records, {
+      fetchCrossref: deps.fetchCrossref || ((doi) => fetchCrossrefWork(doi, exec)),
+      integrity: deps.integrity || ((doi) => runIntegrityCheck({ doi }, exec).catch((error) => ({ error: error.message }))),
+      titleMatches,
+      citedKeys,
+      style: args.style || 'apa',
+      maxAudit: args.max_audit,
+    })
+    return { action, count: records.length, manuscript: args.manuscript || null, ...audit }
+  }
+
   if (action === 'bibtex' || action === 'ris') {
     const textOut = action === 'bibtex' ? toBibtex(records) : toRis(records)
     const value = { action, count: records.length, [action]: textOut }
@@ -436,14 +468,14 @@ export function apply(ctx) {
     name: 'citation',
     description: [
       'Format, export, or validate citations and bibliographies.',
-      '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. A custom CSL style can be loaded from a workspace `style_file` or an http(s) `style_url`; it is validated, cached under `.dsh/styles/`, and used for this call. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, DOIs, or a single `identifier` (DOI → arXiv → INSPIRE → S2 → synthesized). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref.',
+      '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. A custom CSL style can be loaded from a workspace `style_file` or an http(s) `style_url`; it is validated, cached under `.dsh/styles/`, and used for this call. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, DOIs, or a single `identifier` (DOI → arXiv → INSPIRE → S2 → synthesized). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref. `audit` is the batch check for a manuscript or .bib: per-reference DOI validity, Crossref metadata match (title/year/venue/first author), retraction/concern/correction status via integrity_check, duplicates, missing fields, uncited entries (with `manuscript`), and style fit, each with a suggested fix. Audit does not check that a reference supports the claim it is cited for; unknown is reported as unverified, never clean.',
       'Accepts CSL-JSON records, BibTeX, RIS, a workspace path, `library` (papers from the PaperMemory reference library, under its own keys; to write a project .bib use `papermemory_library` export), or `identifier` for one canonical entry. Use paper_get when you need a merged paper record rather than a citation. No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
     ].join(' '),
     parameters: {
       action: {
         type: 'string',
-        enum: ['format', 'bibtex', 'ris', 'validate'],
-        description: 'format (bibliography), bibtex, ris, or validate. Default format.',
+        enum: ['format', 'bibtex', 'ris', 'validate', 'audit'],
+        description: 'format (bibliography), bibtex, ris, validate, or audit (batch reference audit). Default format.',
       },
       records: {
         type: 'array',
@@ -487,6 +519,8 @@ export function apply(ctx) {
       style_url: { type: 'string', description: 'format: http(s) CSL style URL. Validated, cached under .dsh/styles/, and used for this call; local/private hosts are refused.' },
       locale: { type: 'string', description: 'CSL locale, e.g. en-US. Default en-US.' },
       include_in_text: { type: 'boolean', description: 'Also return in-text citation markers (format action).' },
+      manuscript: { type: 'string', description: 'audit: workspace-relative .tex or .md manuscript, used to find uncited bibliography entries.' },
+      max_audit: { type: 'number', description: 'audit: most DOIs to check online, 1-500. Default 100.' },
       check_dois: { type: 'boolean', description: 'Validate DOIs against Crossref (validate action). Adds network calls, one per DOI.' },
       output_path: { type: 'string', description: 'Workspace-relative path to write the output. For format, writes the bibliography only.' },
     },
@@ -496,7 +530,7 @@ export function apply(ctx) {
     },
     async execute(args, exec) {
       try {
-        return await runCitation(args, exec)
+        return JSON.parse(JSON.stringify(await runCitation(args, exec), (_key, v) => (typeof v === 'number' && !Number.isFinite(v) ? null : v)))
       } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) }
       }

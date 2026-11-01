@@ -58,7 +58,7 @@ ok('engine README does not require Pi', !/you use it through \*\*\[Pi\]/.test(re
     const name = readFileSync(join(skillsDir, dir, 'SKILL.md'), 'utf8').match(/^name:\s*(.+)$/m)?.[1]?.trim()
     if (name) names.set(name, (names.get(name) || 0) + 1)
   }
-  ok('skill catalogue has 763 entries', dirs.length === 763, String(dirs.length))
+  ok('skill catalogue has 766 entries', dirs.length === 766, String(dirs.length))
   ok('skill names are unique', names.size === dirs.length, `${names.size} names`)
   for (const name of [
     'deep-research',
