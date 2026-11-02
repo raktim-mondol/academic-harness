@@ -1,6 +1,6 @@
 # Scientific data and toolkits
 
-Phase 6 of the scientific expansion plan extends the harness from literature discovery to scientific databases and local molecular computation. Four preset-only tools; none needs a key.
+This extends the harness from literature discovery to scientific databases and local molecular computation. Four preset-only tools; none needs a key.
 
 | Tool | Scope | State |
 |---|---|---|
@@ -49,7 +49,7 @@ Every record has `source`, `id`, `url`, `title`, `summary`, `fields`, `retrieved
 
 Add a file under `science-sources/` exporting an object with `id`, `name`, `version`, `baseUrl`, `hosts`, `auth`, `rateLimit`, `limiter`, `license`, `capabilities`, `idHelp`, and methods for each capability it lists (`search(params, deps)`, `get(params, deps)`, `resolve(params, deps)`), build records with `makeRecord`, make requests with `call` (both from `science-sources/common.js`), and register it in `science-sources/index.js`. A test enforces that an adapter advertises a capability if and only if it implements it, and every network test injects `deps.fetchJson`, so none touches the network. The adapters are exported as `academic-harness/science-sources/*`.
 
-Not included, by the plan's own rule on unstable APIs and licensing: ChEMBL, NCBI Gene / Ensembl, GEO, and Reactome are deferred. Use `domain_search`, `dataset_search`, or the `database-lookup` skill for those.
+Not included, because of unstable APIs and licensing: ChEMBL, NCBI Gene / Ensembl, GEO, and Reactome are deferred. Use `domain_search`, `dataset_search`, or the `database-lookup` skill for those.
 
 ## `chem_toolkit`
 
@@ -95,7 +95,7 @@ A contact list is proximity, not an interaction type. An RMSD over a short or tr
 
 ## Not implemented
 
-`astro_toolkit` (optional in the plan, needs astropy) and the optional BLAST action are not built. Phase 6 shipped with four adapters (the plan asks for three to five) and three toolkits.
+An `astro_toolkit` (needs astropy) and a BLAST action are not built. The tool ships with four adapters and three toolkits.
 
 ## Setup
 

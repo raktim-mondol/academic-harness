@@ -59,6 +59,9 @@ Full instructions, troubleshooting, and the "one DSH surface at a time" rule are
 | **Deep research** | `deep_research`: a self-driving investigation on an append-only run ledger — frozen query, effort levels (`low`/`medium`/`high`) inferred from the request, scholarly sweep plus a web lane, contradiction graph, loci and depth notes, three drafts, four adversarial critics, capped-hunk repair, cite check against PaperMemory, independence clustering, untrusted-source fencing, and a ship gate that reports `not_checked` honestly | [Research](docs/RESEARCH.md#deep-research) |
 | **Reproducible analysis and data** | `analysis_run` frozen plans with immutable run manifests (argv execution, hashed inputs/outputs, redacted logs, timeouts, run diffs); `experiment_log` sweeps with best-by-named-metric; `dataset_get` DOI downloads with checksums and licenses; `data_profile` leakage and split-overview profiling; `repro_package` reader-facing reproducibility packages with confirm-gated Zenodo drafts | [Reproducible analysis](docs/ANALYSIS.md) |
 | **Provenance audit** | `provenance_audit` read-only cross-ledger index: joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH claim sidecars by stored ids and hashes; coverage, unsupported (`no_link`/`not_checked`/`unverified`/`stale`/`not_found`), stale hashes, impact, and Markdown/CSV/JSON/GraphML/Mermaid exports | [Provenance audit](docs/PROVENANCE.md) |
+| **Scientific data and toolkits** | `science_source` (UniProt, RCSB PDB, AlphaFold DB, PubChem) with provenance on every record; local `chem_toolkit` (RDKit), `seq_toolkit`, and `structure_toolkit` that log hashed inputs | [Scientific data](docs/SCIENCE-DATA.md) |
+| **Discovery and reference checks** | `literature_watch` saved searches with unseen-only digests, `paper_recommend`, `citation_network` (frozen OpenAlex sample, centrality and clusters), `paper_artifacts` link/accession extraction, `citation` batch `audit` | [Discovery](docs/DISCOVERY.md) |
+| **Identity, funding, and audits** | `author_lookup` (ORCID/ROR), `openreview`, `grant_search`, `patent_search`, `stat_audit`, `figure_audit`, `repo_audit`, `pdf_references` (GROBID); advisory, never verdicts | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
 | **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
 | **Study conduct, ethics, and grants** | `preregister` hashed write-once plans; `causal_dag` identification diagnostics and E-values; `design` seeded randomization/DOE; `ethics_protocol` and `deidentify` for ethics and PHI/PII review; `dmp` funder-shaped data-management plans; `grant_budget` multi-year budgets with arithmetic checks. None submits or certifies compliance | [Research](docs/RESEARCH.md#pre-registration) |
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
@@ -149,8 +152,9 @@ vendored, and [NOTICE](NOTICE) records the attribution.
 | [Architecture](docs/ARCHITECTURE.md) | [Papers and evidence](docs/PAPERS.md) | [Configuration](docs/CONFIGURATION.md) |
 | [Documentation home](docs/README.md) | [Writing](docs/WRITING.md) | [Changelog](docs/CHANGELOG.md) |
 | | [Research](docs/RESEARCH.md) | [Development](docs/DEVELOPMENT.md) |
-| | [Workspace](docs/WORKSPACE.md) | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
-| | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [RSI](docs/RSI.md) | [Engine notes](docs/ACADEMIC-HARNESS-ENGINE.md) |
+| | [Workspace](docs/WORKSPACE.md) | [Engine notes](docs/ACADEMIC-HARNESS-ENGINE.md) |
+| | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [RSI](docs/RSI.md) | |
+| | [Analysis](docs/ANALYSIS.md) · [Provenance](docs/PROVENANCE.md) · [Scientific data](docs/SCIENCE-DATA.md) · [Discovery](docs/DISCOVERY.md) · [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) | |
 
 ## Requirements and scope
 

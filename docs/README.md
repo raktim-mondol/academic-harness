@@ -8,7 +8,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 
 | Page | What it answers |
 |---|---|
-| [Install and run](INSTALL.md) | How to install DSH and Academic Harness, confirm the preset, migrate a profile, and troubleshoot |
+| [Install and run](INSTALL.md) | How to install DSH and Academic Harness, confirm the preset, and troubleshoot |
 | [Architecture](ARCHITECTURE.md) | What the bundle vs. preset split means, where state lives, and how a request flows |
 | [Configuration](CONFIGURATION.md) | Every API key, environment variable, and which changes need a restart |
 | [Tool index](TOOLS.md) | Every registered tool, its scope, and the page that documents it |
@@ -36,7 +36,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 
 | Page | What it covers |
 |---|---|
-| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 onward, plus unreleased changes |
+| [Changelog](CHANGELOG.md) | Release notes from 0.18.0 onward |
 | [Development](DEVELOPMENT.md) | Build, tests, docs diagrams, bundle patch, repository layout |
 | [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) | Why the writing engine is vendored and the open decision about its home |
 
@@ -56,6 +56,9 @@ npm run docs:diagrams
 - [Paper pipeline](assets/diagrams/paper-pipeline.svg)
 - [Writing loop](assets/diagrams/writing-loop.svg)
 - [Review ledger](assets/diagrams/review-ledger.svg)
+- [Deep research](assets/diagrams/deep-research.svg)
+- [Deep review](assets/diagrams/deep-review.svg)
+- [Analysis lifecycle](assets/diagrams/analysis-lifecycle.svg)
 - [Hypothesis tournament](assets/diagrams/tournament-loop.svg)
 - [Workspace vs. PaperMemory](assets/diagrams/workspace-memory.svg)
 - [Subagent routing](assets/diagrams/subagent-routing.svg)

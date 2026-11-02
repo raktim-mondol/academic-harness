@@ -1,6 +1,6 @@
 # Reproducible analysis and data
 
-Phase 2 of the scientific expansion turns
+Five preset-only tools turn
 reproducibility from a habit into ledgers. Five preset-only tools record the
 analysis that produced a number, the experiments that explored it, the data it
 runs on, and the package a reader needs to rebuild it. All state is local,
@@ -106,6 +106,3 @@ None of those ledgers can answer "what supports this claim?" on its own.
 `meta_analysis`, and Academic Harness claim sidecars — into one read-only index;
 see [Provenance audit](PROVENANCE.md).
 
----
-
-*Phase 2 of the expansion plan.*

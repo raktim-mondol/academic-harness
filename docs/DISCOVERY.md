@@ -1,6 +1,6 @@
 # Discovery and reference checks
 
-Phase 7 of the scientific expansion plan. Five additions that keep a search alive, map a field, and check references and data links. None needs a key beyond the optional `OPENALEX_API_KEY`, `S2_API_KEY`, and `CROSSREF_MAILTO` that the existing search tools already read. Skills: `research-monitoring`, `citation-network`, `reference-audit`.
+Five additions that keep a search alive, map a field, and check references and data links. None needs a key beyond the optional `OPENALEX_API_KEY`, `S2_API_KEY`, and `CROSSREF_MAILTO` that the existing search tools already read. Skills: `research-monitoring`, `citation-network`, `reference-audit`.
 
 Every tool follows the harness rule: the tool reports what a check found, a check that could not run is `unverified` or a named failure state, and nothing here decides whether a paper is good or a claim is supported.
 
@@ -44,11 +44,11 @@ Extracts repository links (Zenodo, Figshare, OSF, Dryad, Dataverse, GitHub, GitL
 
 A batch reference audit for `records`, `text`, `path`, `library`, or `doi`. Per reference: DOI validity; Crossref metadata match (title, year more than a year apart, venue, first author); retraction, expression of concern, and correction through `integrity_check` (with the notice DOI); duplicate DOIs, keys, and title-year pairs; missing fields; whether it formats in the chosen `style`; and, with `manuscript` (`.tex` or `.md`), bibliography entries the manuscript never cites. Each finding has a severity and a suggested fix. Statuses: `problem`, `review`, `unverified` (no DOI, lookup failed, or past `max_audit`), `no_issues_found`. Unknown is never reported as clean, and the audit does not check that a reference supports the claim it is cited for.
 
-## Not built in Phase 7
+## Not built
 
-- **7C `trial_registry_search`** (WHO ICTRP, EU CTR, ISRCTN, PROSPERO) and the `clinicaltrials compliance` action.
-- **7D grey literature and regional sources** (SciELO, LILACS, J-STAGE, ERIC, thesis repositories, keyed Embase/CINAHL/PsycINFO).
-- **7H** the `openfda` disproportionality `signal` action.
+- **`trial_registry_search`** (WHO ICTRP, EU CTR, ISRCTN, PROSPERO) and the `clinicaltrials compliance` action.
+- **Grey literature and regional sources** (SciELO, LILACS, J-STAGE, ERIC, thesis repositories, keyed Embase/CINAHL/PsycINFO).
+- The `openfda` disproportionality `signal` action.
 - Local-library similarity in `paper_recommend`, license lookup in `paper_artifacts`, a notebook entry from `literature_watch digest`, SVG export and OpenCitations/Semantic Scholar sources in `citation_network`.
 
-These need registry or API contracts that were not verified against live endpoints; the plan keeps them as separate sub-phases.
+These need registry or API contracts that were not verified against live endpoints.
