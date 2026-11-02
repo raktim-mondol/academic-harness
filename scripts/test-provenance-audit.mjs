@@ -334,7 +334,7 @@ const emptyIndex = await buildProvenanceIndex({ cwd: empty.cwd, slug: 'lonely' }
 const ledger = (name) => emptyIndex.sources.find((entry) => entry.ledger === name)
 ok('AH without ah.yaml is unknown with a reason', ledger('ah')?.status === 'unknown' && /ah\.yaml/.test(ledger('ah').reason), JSON.stringify(ledger('ah')))
 ok('notebook without entries is unknown with a reason', ledger('notebook')?.status === 'unknown' && /notebook/.test(ledger('notebook').reason))
-ok('preregister is unknown with a reason', ledger('preregister')?.status === 'unknown' && /Phase 5A/.test(ledger('preregister').reason), JSON.stringify(ledger('preregister')))
+ok('preregister is unknown with a reason', ledger('preregister')?.status === 'unknown' && /not indexed/.test(ledger('preregister').reason), JSON.stringify(ledger('preregister')))
 ok('scientific_result is unknown with a reason', ledger('scientific_result')?.status === 'unknown' && /not persisted/.test(ledger('scientific_result').reason))
 ok('an empty workspace has no claims at all', emptyIndex.counts.claims === 0, JSON.stringify(emptyIndex.counts))
 ok('an empty workspace reports nothing unsupported', unsupportedOf(emptyIndex).unsupported === 0)

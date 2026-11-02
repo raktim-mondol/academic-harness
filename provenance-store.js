@@ -1430,9 +1430,9 @@ export async function buildProvenanceIndex({ cwd, slug = 'default', selection = 
   }
 
   sources.push(sourceEntry('preregister', 'workspace', 'unknown',
-    existsSync(join(resolve(cwd), '.dsh', 'prereg'))
-      ? 'a preregistration directory exists, but this release does not read it'
-      : 'the preregister ledger (Phase 5A) has not shipped, so no preregistration is indexed', { nodes: 0 }))
+    existsSync(join(resolve(cwd), '.dsh', 'preregister'))
+      ? 'a preregistration directory exists, but this audit does not read it yet'
+      : 'preregistrations are not indexed by this audit', { nodes: 0 }))
   sources.push(sourceEntry('scientific_result', 'session', 'unknown',
     'result cards are returned to the session and are not persisted; link a finding through notebook entries or analysis runs', { nodes: 0 }))
 
