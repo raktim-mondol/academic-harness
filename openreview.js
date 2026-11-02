@@ -1,11 +1,9 @@
 /**
  * openreview: public OpenReview API v2 submissions, reviews, and venue data.
  *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1. Read-only;
- * schemas vary by venue, so missing fields stay missing (never inferred).
+ * Read-only; schemas vary by venue, so missing fields stay missing (never inferred).
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const API = 'https://api2.openreview.net'
@@ -166,13 +164,12 @@ export const name = 'academic-harness-openreview'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'openreview',
     description: [
       'Read public OpenReview data: search submissions, fetch a forum\'s reviews and decision, and read venue metadata.',
       '`search` takes a `query` and optional `venue` group id; `reviews` takes `forum_id` and returns rating, confidence, summary, strengths, and weaknesses where the venue publishes them; `venue` takes `venue_id`. Fields absent for a venue are reported absent — never infer a rating or decision.',
-      'Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1. Read-only and free. OpenReview may require an interactive browser challenge (HTTP 403); then open the forum URL with the agent-browser skill.',
+      'Read-only and free. OpenReview may require an interactive browser challenge (HTTP 403); then open the forum URL with the agent-browser skill.',
     ].join(' '),
     parameters: {
       action: { type: 'string', enum: ['search', 'reviews', 'venue'], description: 'search (default), reviews, or venue.' },

@@ -1,6 +1,5 @@
 /**
- * submission_pack: plan, build, inspect, and export a journal-ready bundle
- * (Phase 4A of docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * submission_pack: plan, build, inspect, and export a journal-ready bundle.
  *
  * The tool never submits, emails, logs into a portal, or fabricates a claim.
  * Unknown requirements stay manual_check and drafts stay drafts.

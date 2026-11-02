@@ -1,6 +1,6 @@
 /**
  * grant_budget: a multi-year budget ledger with explicit rates and arithmetic
- * checks (Phase 5E of docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * checks.
  *
  * The tool computes from supplied rates and line items. It never invents a
  * salary, fringe rate, indirect rate, cap, or eligibility rule, and it does not

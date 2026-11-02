@@ -43,7 +43,7 @@ dsh --profile academic-harness
 
 Confirm the preset selector at the top of the message box reads **Academic Harness**. The academic tools are preset-only; a session left on Standard/PTC will fail with `tools[name] is not a function`.
 
-Full instructions, migration from `researchcraft`, troubleshooting, and the "one DSH surface at a time" rule are in **[Install and run](docs/INSTALL.md)**.
+Full instructions, troubleshooting, and the "one DSH surface at a time" rule are in **[Install and run](docs/INSTALL.md)**.
 
 ## What is inside
 
@@ -149,7 +149,7 @@ vendored, and [NOTICE](NOTICE) records the attribution.
 | [Architecture](docs/ARCHITECTURE.md) | [Papers and evidence](docs/PAPERS.md) | [Configuration](docs/CONFIGURATION.md) |
 | [Documentation home](docs/README.md) | [Writing](docs/WRITING.md) | [Changelog](docs/CHANGELOG.md) |
 | | [Research](docs/RESEARCH.md) | [Development](docs/DEVELOPMENT.md) |
-| | [Workspace](docs/WORKSPACE.md) | [Optional tools](docs/OPTIONAL-TOOLS.md) |
+| | [Workspace](docs/WORKSPACE.md) | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
 | | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [RSI](docs/RSI.md) | [Engine notes](docs/ACADEMIC-HARNESS-ENGINE.md) |
 
 ## Requirements and scope
@@ -159,7 +159,6 @@ vendored, and [NOTICE](NOTICE) records the attribution.
 - **A preset check matters.** The research persona, search connectors, PaperMemory, zvec-grep, paper tools, citation/review/tournament tools, and the `subagent_pro`/`subagent_vision` routes are scoped to the Academic Harness preset. Both routes inherit the session model unless you configure a provider/model. Only the general-purpose tools (`notebook`, `fold_text`, `scientific_result`, `sci_inspect`, images, LaTeX, PDF, Mermaid, compute, templates) are on every preset.
 - **Keys are optional.** No credential is needed to install or start; each connector stays disabled until its key is present. Some runtimes install in the background on first use — see [Architecture](docs/ARCHITECTURE.md#runtime-installs).
 - **One DSH surface at a time.** `dsh-web`, `dsh-tui`, `dsh-martty`, and `academic-harness` share `$DSH_HOME`, port `3080`, and the zvec-grep daemon. Stop the previous one before starting another; see [Install](docs/INSTALL.md#one-dsh-surface-at-a-time).
-- **Renamed in v0.16.0** from `dsh-researchcraft` / ResearchCraft. Old env names are still honored; migration is in [Install](docs/INSTALL.md#renamed-in-v0160).
 
 ## Development
 

@@ -1,5 +1,5 @@
 /**
- * Phase 6 fixtures: optional-tool gating, author_lookup, openreview, preprint
+ * Phase 6 fixtures: tool registration, author_lookup, openreview, preprint
  * routing, and the registry API-key headers. No network.
  */
 import assert from 'node:assert/strict'
@@ -10,27 +10,15 @@ import { buildEuropePmcQuery, runPubMedSearch } from '../pubmed-search.js'
 import { chooseSources, parseSources } from '../literature-search.js'
 import { runDatasetSearch } from '../dataset-search.js'
 
-/* ------------------------------------------------------------------ gating */
+/* ------------------------------------------------------------ registration */
 
 {
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
   const registered = []
   const ctx = { tools: { register: (tool) => registered.push(tool.name) } }
   applyAuthor(ctx)
   applyOpenReview(ctx)
   applyCoscVerify(ctx)
-  assert.deepEqual(registered, [], 'optional tools must not register without the flag')
-}
-
-{
-  process.env.AH_ENABLE_OPTIONAL_TOOLS = '1'
-  const registered = []
-  const ctx = { tools: { register: (tool) => registered.push(tool.name) } }
-  applyAuthor(ctx)
-  applyOpenReview(ctx)
-  applyCoscVerify(ctx)
-  assert.deepEqual(registered, ['author_lookup', 'openreview', 'coscientist_verify'])
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
+  assert.deepEqual(registered, ['author_lookup', 'openreview', 'coscientist_verify'], 'registered with no flag')
 }
 
 /* --------------------------------------------------------------- ORCID / ROR */
@@ -292,4 +280,4 @@ function keyDeps(keys, onRequest) {
   assert.equal(headers.Authorization, undefined, 'keyless requests carry no Authorization header')
 }
 
-console.log('optional tools OK')
+console.log('identity tools OK')

@@ -5,7 +5,7 @@
  * constants are carried over from the upstream `co-scientist` implementation so
  * that a tournament run here stays comparable to one run there. Numbers are
  * quoted with their upstream source because changing one silently breaks that
- * comparability — see docs/CO-SCIENTIST-INTEGRATION-PLAN.md §6.
+ * comparability.
  *
  * The plan/prompt files, the LLM calls, and the ledger live elsewhere; nothing
  * in this module knows about the model, the filesystem, or the workspace.

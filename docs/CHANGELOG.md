@@ -2,6 +2,16 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.40.0
+
+Cleanup release. No tool or skill is removed; the tool list gains nine tools (previously opt-in) and loses two MCP aliases of tools that already exist natively.
+
+- **Optional tools are now always on.** `author_lookup`, `openreview`, `pdf_references` (still needs `GROBID_BASE_URL`), `coscientist_verify`, `stat_audit`, `figure_audit`, `repo_audit`, `grant_search`, and `patent_search` register without `AH_ENABLE_OPTIONAL_TOOLS`. The flag and `optional-tools.js` are gone; the tools have a new prompt section and a guide, [Identity, funding, and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) (formerly `OPTIONAL-TOOLS.md`).
+- **Parallel MCP connector removed.** `mcp__parallel__web_search` (locked to `basic`) and `mcp__parallel__web_fetch` duplicated native `parallel_search` and `parallel_extract`, which share `PARALLEL_API_KEY` and support every mode. Firecrawl and Scite connectors are unchanged. A Parallel key now takes effect on the next call with no restart.
+- **ResearchCraft-era compatibility removed.** `scripts/migrate-profile.mjs`, `scripts/test-rename.mjs`, the `dsh-researchcraft` launcher alias, the `RESEARCHCRAFT_*` environment fallbacks, the 0.1.x/pre-0.16 API-key import in `settings-keys.js`, and the notebook-skill rename in `seed.js`. Upgrading from a pre-0.16 profile now needs a fresh install. Attribution in `NOTICE` and `LICENSE` is unchanged.
+- **Stale material removed:** eight finished plan documents under `docs/`, `academic-harness_docs/` (an old mod archive), `.e2e-artifacts/` screenshots, an unrelated run log in `reports/`, and the committed `main.pdf`/`main.bbl` build outputs of `paper/rsi-local/` (now git-ignored; `make` rebuilds them). Comments that pointed at the deleted plans were reworded.
+- **Tests and CI.** `npm test` (`scripts/run-tests.mjs`) runs every `scripts/test-*.mjs`; CI calls it, which adds the twelve suites CI never ran (the seven `test-coscientist-*`, `test-library`, `test-power`, `test-reference-library`, `test-rsi`, `test-zg-excludes`). `test-optional-tools.mjs` became `test-identity-tools.mjs`. CI installs the `dsh` CLI at `0.2.1-rc.5`, matching `package.json`.
+
 ## 0.39.0
 
 - **Discovery and reference checks (Phase 7, partial).** Four preset tools and one `citation` action, none needing a key: `literature_watch`, `paper_recommend`, `citation_network`, `paper_artifacts`, and `citation` `action=audit`. Guide: [Discovery and reference checks](DISCOVERY.md); skills: `research-monitoring`, `citation-network`, `reference-audit`. The catalogue is now 766 skills.
@@ -257,7 +267,7 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## 0.24.0
 
-- The single-file README is now a concise landing page, with the full reference split into modular guides under `docs/`: [Install](INSTALL.md), [Architecture](ARCHITECTURE.md), [Tool index](TOOLS.md), [Configuration](CONFIGURATION.md), [Search](SEARCH.md), [Papers](PAPERS.md), [Writing](WRITING.md), [Research](RESEARCH.md), [Workspace](WORKSPACE.md), [Compute](COMPUTE.md), [Agents](AGENTS.md), [Skills](SKILLS.md), [Optional tools](OPTIONAL-TOOLS.md), [Development](DEVELOPMENT.md), and this [Changelog](CHANGELOG.md). A [docs home](README.md) indexes them.
+- The single-file README is now a concise landing page, with the full reference split into modular guides under `docs/`: [Install](INSTALL.md), [Architecture](ARCHITECTURE.md), [Tool index](TOOLS.md), [Configuration](CONFIGURATION.md), [Search](SEARCH.md), [Papers](PAPERS.md), [Writing](WRITING.md), [Research](RESEARCH.md), [Workspace](WORKSPACE.md), [Compute](COMPUTE.md), [Agents](AGENTS.md), [Skills](SKILLS.md), Optional tools, [Development](DEVELOPMENT.md), and this [Changelog](CHANGELOG.md). A [docs home](README.md) indexes them.
 - 14 diagrams (architecture, capability map, request lifecycle, install flow, search routing, paper pipeline, writing loop, review ledger, tournament loop, workspace-vs-PaperMemory, subagent routing, compute flow, RSI loop, skills map) are authored as Mermaid in `docs/diagrams/` and rendered to flattened SVG with Pele via the new `npm run docs:diagrams`. `flattenColors` is now exported from `mermaid-render.js` for reuse.
 - `sci_inspect` and `pdf_to_markdown` now point at the docs pages instead of the README; four tests read the docs pages rather than the old README headings.
 
@@ -279,7 +289,7 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 - Tournament Phase 4: `coscientist graph` (Mermaid lineage/similarity/support diagram, `export format: mermaid`), `coscientist priors` (cross-session feedback and withholdings, read from sibling ledgers), and opt-in `coscientist embed` (Gemini text embeddings that move the duplicate gate to cosine). `zvec-grep` cannot supply this — `zg query --vector` embeds a search query and never returns a vector — so embeddings go through the Gemini endpoint the plugin already uses for images.
 - Tournament defaults **5 hypotheses / 36 steps**, sized against the termination rules: five is the smallest pool where a review veto plus a dual-use withholding still leaves three ideas competing, and 36 is where an Elo plateau can actually be reached. A fourth stop reason, `no_competitors`, ends a pool that can no longer field a match instead of burning the budget. `coscientist_verify` (optional) adds Crossref citation integrity with the claim-support ledger, `coscientist safety` exposes the dual-use gate, and `scripts/test-coscientist-routing.mjs` checks that a problem-shaped ask still routes to a hypothesis skill.
-- `coscientist` + `coscientist_rank`: a persistent hypothesis tournament (Glicko-2 leaderboard, five-stage review, save-time duplicate gate, scheduling policy with step budget, dual-use withholding, Markdown/JSON export) over append-only logs in `<cwd>/.dsh/coscientist/<slug>/`, plus the `co-scientist-tournament` skill. Algorithms and role prompts ported from [`co-scientist`](https://github.com/raktim-mondol/co-scientist) (MIT); no new dependency. See [docs/CO-SCIENTIST-INTEGRATION-PLAN.md](CO-SCIENTIST-INTEGRATION-PLAN.md).
+- `coscientist` + `coscientist_rank`: a persistent hypothesis tournament (Glicko-2 leaderboard, five-stage review, save-time duplicate gate, scheduling policy with step budget, dual-use withholding, Markdown/JSON export) over append-only logs in `<cwd>/.dsh/coscientist/<slug>/`, plus the `co-scientist-tournament` skill. Algorithms and role prompts ported from [`co-scientist`](https://github.com/raktim-mondol/co-scientist) (MIT); no new dependency. See docs/CO-SCIENTIST-INTEGRATION-PLAN.md.
 - `mermaid_render` — Mermaid text → SVG via [Pele](https://github.com/obsidianmd/pele) (npm dependency, MIT), in-process with no browser or mermaid-cli install; every Mermaid 12.1.0 diagram type. Written files get Pele's `--pele-*` CSS variables flattened to literal colors so Inkscape/rsvg/CairoSVG don't rasterize them blank.
 
 ## 0.21.0
@@ -305,7 +315,7 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## 0.18.0
 
-Academic tooling beyond search (see [docs/NON-SEARCH-TOOLS-PLAN.md](NON-SEARCH-TOOLS-PLAN.md)):
+Academic tooling beyond search (see docs/NON-SEARCH-TOOLS-PLAN.md):
 
 - `citation` — local APA/Vancouver/Harvard/IEEE/Chicago/MLA formatting, BibTeX/RIS export, DOI→BibTeX, and validation.
 - `integrity_check` — retraction / expression-of-concern / correction status from Crossref + OpenAlex (never `clean` on a failed lookup).

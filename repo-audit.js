@@ -2,15 +2,12 @@
  * repo_audit: local/static reproducibility audit of a code repository.
  * No code is executed unless `run_tests: true`. Advisory only — missing
  * metadata is not misconduct, and a passing test run is not full repro.
- *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1.
  */
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { fetchJson, searchUserAgent } from './search-http.js'
 
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.venv', 'venv', 'dist', 'build', '__pycache__', '.mypy_cache', '.pytest_cache', 'target', 'vendor'])
@@ -278,13 +275,12 @@ export const name = 'academic-harness-repo-audit'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'repo_audit',
     description: [
       'Audit a code repository for reproducibility metadata: README, LICENSE, dependency/environment file, tests, CI, entry points, data-availability statement, and release tag. Use `path` for a local repo or `repo_url` (https) to clone a public repository into a temporary directory.',
       'Code is never executed unless `run_tests: true`; then the detected test command runs with a timeout and its exit status is reported. GITHUB_TOKEN (env only) is optional and only raises the GitHub API limit.',
-      'Advisory checklist, not a reproducibility guarantee: a passing test run does not prove the paper can be reproduced. Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1.',
+      'Advisory checklist, not a reproducibility guarantee: a passing test run does not prove the paper can be reproduced.',
     ].join(' '),
     parameters: {
       path: { type: 'string', description: 'Local repository path (workspace-relative or absolute).' },

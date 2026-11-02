@@ -17,3 +17,7 @@ vendor/papermemory/*.egg-info/
 # Local secrets (never commit)
 .env
 .env.local
+
+# LaTeX build outputs
+paper/rsi-local/main.pdf
+paper/rsi-local/main.bbl

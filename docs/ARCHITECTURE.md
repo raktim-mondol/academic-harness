@@ -14,7 +14,7 @@ Academic Harness is one plugin with two planes: a **bundle** that is mounted for
 
 The split matters when something is missing. A general-purpose tool is present in every session. Everything academic is only present on a session whose preset selector reads **Academic Harness**; on Standard/PTC the same call fails with `tools[name] is not a function`. See [Install → Confirm the preset](INSTALL.md#4-confirm-the-preset).
 
-The preset is a **standing composition**: it mounts once as a shared composition for the life of the running `dsh` process. A new chat session on the same process is not a remount. That is why MCP connectors, subagent model ids, the zvec embedding model, and the optional-tools flag need a full `dsh` restart, while per-call REST tools pick up a Settings change immediately. The full restart matrix is in [Configuration](CONFIGURATION.md#when-a-change-takes-effect).
+The preset is a **standing composition**: it mounts once as a shared composition for the life of the running `dsh` process. A new chat session on the same process is not a remount. That is why MCP connectors, subagent model ids, and the zvec embedding model need a full `dsh` restart, while per-call REST tools pick up a Settings change immediately. The full restart matrix is in [Configuration](CONFIGURATION.md#when-a-change-takes-effect).
 
 ## Capability map
 
@@ -28,7 +28,7 @@ The [tool index](TOOLS.md) lists every registered tool, its scope, and the page 
 
 1. The user asks a question in the DSH web UI.
 2. The agent runs on the Academic Harness preset, so the persona, research prompt, and preset-scoped tools are available.
-3. Discovery tools call their providers: native REST tools (`journal_search`, `openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `domain_search`, `database_catalog`, `consensus_search`, `parallel_search`) or MCP connectors (`mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`). `literature_search` also routes bioRxiv/medRxiv, INSPIRE, DOAJ, publisher Crossref deposits, ADS, Scopus, and Web of Science through their source adapters.
+3. Discovery tools call their providers: native REST tools (`journal_search`, `openalex_search`, `openalex_citations`, `s2_search`, `pubmed_search`, `arxiv_search`, `crossref_lookup`, `domain_search`, `database_catalog`, `consensus_search`, `parallel_search`) or MCP connectors (`mcp__firecrawl__*`, `mcp__scite__*`). `literature_search` also routes bioRxiv/medRxiv, INSPIRE, DOAJ, publisher Crossref deposits, ADS, Scopus, and Web of Science through their source adapters.
 4. Records are normalized to a common shape; `paper_resolve` collapses DOI / PMID / PMCID / arXiv / OpenAlex / Semantic Scholar identifiers onto one paper, `paper_get` merges metadata and canonical BibTeX, and `integrity_check` reports retraction or correction status. `paper_context` retrieves focus-ranked sections/snippets when the question needs a specific method, number, or claim.
 5. `paper_download` resolves an open-access PDF; a successful download is ingested into PaperMemory as content-addressed markdown.
 6. Quotes and claims are checked against stored text (`quote_check`, `trace`) before the agent treats them as evidence.
@@ -119,4 +119,3 @@ Every server-side file is plain ESM JS — no build step. Only the Settings page
 
 - [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) — why the writing oracle is vendored and the open decision about its long-term home.
 - [RSI](RSI.md) — the local self-improvement loop, its store, and its autonomy boundary.
-- [Co-Scientist integration plan](CO-SCIENTIST-INTEGRATION-PLAN.md), [non-search tools plan](NON-SEARCH-TOOLS-PLAN.md), [search providers plan](SEARCH-PROVIDERS-PLAN.md), and [PaperMemory v2 plan](PAPERMEMORY-V2-PLAN.md) — implementation records with more detail than the user guides.

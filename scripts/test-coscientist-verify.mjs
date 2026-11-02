@@ -314,21 +314,14 @@ try {
   const row = board.ranked.find((entry) => entry.id === id)
   assert.match(row.citation_check, /2 verified · 1 unverified · 1 fabricated/)
 
-  // ── the tool is absent unless the optional gate is open ────────────────────
+  // ── the tool registers without any flag ────────────────────────────────────
   const registered = []
   const ctx = { tools: { register: (tool) => registered.push(tool) } }
-  const previous = process.env.AH_ENABLE_OPTIONAL_TOOLS
-  delete process.env.AH_ENABLE_OPTIONAL_TOOLS
-  apply(ctx)
-  assert.deepEqual(registered, [], 'a gated tool must register nothing by default')
-  process.env.AH_ENABLE_OPTIONAL_TOOLS = '1'
   apply(ctx)
   assert.equal(registered.length, 1)
   assert.equal(registered[0].name, 'coscientist_verify')
   assert.equal(registered[0].parameters.properties.action.enum.length, 3)
   assert.deepEqual(registered[0].parameters.properties.claims.items.type, 'object')
-  if (previous === undefined) delete process.env.AH_ENABLE_OPTIONAL_TOOLS
-  else process.env.AH_ENABLE_OPTIONAL_TOOLS = previous
 
   console.log('coscientist-verify OK')
 } finally {

@@ -6,7 +6,6 @@ Every tool registered by Academic Harness, with its scope and the page that docu
 |---|---|
 | **Every preset** | Registered by the plugin bundle, so every DSH session has it |
 | **Academic Harness preset** | Mounted only for sessions joined to the Academic Harness preset |
-| **Optional** | Needs `AH_ENABLE_OPTIONAL_TOOLS=1`; absent from the tool list and prompt otherwise |
 | **DSH built-in** | Supplied by DeepSeek Harness, not by this plugin |
 
 The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset relate. For the general-purpose tools, see [Workspace](WORKSPACE.md), [Writing](WRITING.md), and [Compute](COMPUTE.md).
@@ -62,7 +61,6 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `core_search` | Academic Harness preset | CORE's open-access records; optional full text | [Search](SEARCH.md#additional-sources) |
 | `elicit_search` | Academic Harness preset | Elicit paper/trial search with study and journal filters | [Search](SEARCH.md#additional-sources) |
 | `futurehouse_agent` | Academic Harness preset | FutureHouse Crow/Falcon/Owl agents; async start/status/cancel | [Search](SEARCH.md#additional-sources) |
-| `mcp__parallel__web_search`, `mcp__parallel__web_fetch` | Academic Harness preset | Parallel MCP connector; search is locked to `basic`, fetch reads one URL | [Search](SEARCH.md#mcp-connectors) |
 | `mcp__firecrawl__firecrawl_scrape`, `mcp__firecrawl__firecrawl_search`, `mcp__firecrawl__firecrawl_parse` | Academic Harness preset | Firecrawl MCP connector | [Search](SEARCH.md#mcp-connectors) |
 | `mcp__scite__*` | Academic Harness preset | Scite Smart Citations and evidence datasets | [Search](SEARCH.md#mcp-connectors) |
 | `web_search`, `web_fetch` | DSH built-in | DeepSeek web search and HTTP fetch; fall back to Parallel/Firecrawl when blocked | [Agents](AGENTS.md#browsing-the-web) |
@@ -157,21 +155,21 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `subagent_vision` | Academic Harness preset | Image-reading delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |
 | `skill` | DSH built-in | Load a bundled skill by name | [Skills](SKILLS.md) |
 
-## Optional tools
+## Identity, funding, and audit tools
 
-These are registered only with `AH_ENABLE_OPTIONAL_TOOLS=1` and a `dsh` restart.
+Academic Harness preset tools. `pdf_references` is registered only when `GROBID_BASE_URL` is set.
 
 | Tool | What it does | Details |
 |---|---|---|
-| `author_lookup` | ORCID author search/records + ROR institution lookup | [Optional tools](OPTIONAL-TOOLS.md) |
-| `openreview` | OpenReview API v2 submissions, reviews, decisions, venue metadata | [Optional tools](OPTIONAL-TOOLS.md) |
-| `pdf_references` | GROBID bibliography extraction; optional Crossref resolution | [Optional tools](OPTIONAL-TOOLS.md) |
-| `coscientist_verify` | Citation integrity and claim-support ledger for tournaments | [Optional tools](OPTIONAL-TOOLS.md) |
-| `stat_audit` | Recompute p-values and run GRIM checks | [Optional tools](OPTIONAL-TOOLS.md) |
-| `figure_audit` | Figure inventory, DPI flags, near-duplicate groups | [Optional tools](OPTIONAL-TOOLS.md) |
-| `repo_audit` | Static reproducibility checklist for a repository | [Optional tools](OPTIONAL-TOOLS.md) |
-| `grant_search` | NIH RePORTER, NSF Award Search, Grants.gov | [Optional tools](OPTIONAL-TOOLS.md) |
-| `patent_search` | PatentsView prior-art/assignee/inventor lookup | [Optional tools](OPTIONAL-TOOLS.md) |
+| `author_lookup` | ORCID author search/records + ROR institution lookup | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `openreview` | OpenReview API v2 submissions, reviews, decisions, venue metadata | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `pdf_references` | GROBID bibliography extraction; optional Crossref resolution | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `coscientist_verify` | Citation integrity and claim-support ledger for tournaments | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `stat_audit` | Recompute p-values and run GRIM checks | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `figure_audit` | Figure inventory, DPI flags, near-duplicate groups | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `repo_audit` | Static reproducibility checklist for a repository | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `grant_search` | NIH RePORTER, NSF Award Search, Grants.gov | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
+| `patent_search` | PatentsView prior-art/assignee/inventor lookup | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) |
 
 ## Settings-only surfaces
 

@@ -1,7 +1,6 @@
 /**
  * Submission-pack ledger: derive a journal checklist from a manuscript and
- * build a hashed, reproducible bundle (Phase 4A of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * build a hashed, reproducible bundle.
  *
  * Everything here is advisory. An unknown journal requirement is
  * `manual_check`, never a silent pass; a generated cover letter or highlight is

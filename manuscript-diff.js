@@ -1,6 +1,6 @@
 /**
  * manuscript_diff: revision diffs, changed blocks, DOCX tracked changes, and a
- * response-letter skeleton (Phase 4C of docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * response-letter skeleton.
  *
  * The tool only reads the two versions. It never edits either source, never
  * invents a change, and never marks a response item addressed without a

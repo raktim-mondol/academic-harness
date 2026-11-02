@@ -125,7 +125,7 @@
             name: '@deepseek-ai/dsh-skill-filesystem'
             config:
               customSkillDirs:
-                - !!js process.env.ACADEMIC_HARNESS_SKILLS_DIR || process.env.RESEARCHCRAFT_SKILLS_DIR || (process.env.HOME + '/scientific-agent-skills/skills')
+                - !!js process.env.ACADEMIC_HARNESS_SKILLS_DIR || (process.env.HOME + '/scientific-agent-skills/skills')
 
           - id: tool-skill
             name: '@deepseek-ai/dsh-tool-skill'
@@ -330,12 +330,12 @@
 
           # ── literature & academic search MCP connectors ─────────────────────────────
 
-          # One JS module mounts up to three `mcp-client` instances programmatically
+          # One JS module mounts up to two `mcp-client` instances programmatically
           # (rather than static rows) so each server's key can come from the credentials
           # store (Settings -> Academic Harness API keys) as well as its env var — see
           # mcp-connectors.js for the resolution order and per-server detail. Each
           # connector mounts only when its key is set; tools surface as
-          # `mcp__parallel__*`, `mcp__firecrawl__*`, `mcp__scite__*`. No
+          # `mcp__firecrawl__*`, `mcp__scite__*`. No
           # realm needed: like tool-web, it registers only into the shared `tools`
           # registry and provides no service of its own.
           - id: mcp-connectors
@@ -461,11 +461,11 @@
           # runtime under $DSH_HOME/textfold). Local first-sentence levels by default;
           # model-written levels require generate:true and TextFold's own provider.
           # PaperMemory remains the source for quotes and citation keys. See
-          # paper-fold.js and docs/FOLD-INTEGRATION-PLAN.md.
+          # paper-fold.js.
           - id: paper-fold
             name: academic-harness/paper-fold
 
-          # Citation formatting/export/validation (Phase 1 of docs/NON-SEARCH-TOOLS-PLAN.md).
+          # Citation formatting/export/validation.
           # Native, preset-only, local tool: citation-js + CSL styles under styles/.
           # See citation.js and citation-format.js.
           - id: citation
@@ -476,8 +476,7 @@
           - id: manuscript-citations
             name: academic-harness/manuscript-citations
 
-          # Systematic/scoping-review ledger plus risk-of-bias appraisal (Phase 4 of
-          # docs/REPORTING-AND-APPRAISAL-PLAN.md): protocol, records, single or dual
+          # Systematic/scoping-review ledger plus risk-of-bias appraisal: protocol, records, single or dual
           # two-stage screening, evidence, RoB 2/ROBINS-I/QUADAS-2/NOS appraisal,
           # conflicts and reconcile, kappa agreement, PRISMA counts, and
           # rob-table/rob-summary/rob-figure exports. Append-only logs under
@@ -487,7 +486,7 @@
           - id: review
             name: academic-harness/review
 
-          # Pairwise meta-analysis ledger (Phase 1C of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+          # Pairwise meta-analysis ledger:
           # effect-size conversion, fixed/random pooling with DL/PM/REML tau^2, normal or
           # Hartung-Knapp CIs, heterogeneity, subgroup and meta-regression analyses,
           # leave-one-out, Egger/Begg/funnel publication-bias diagnostics, univariate
@@ -498,7 +497,7 @@
           - id: meta-analysis
             name: academic-harness/meta-analysis
 
-          # Reproducible analysis runs (Phase 2A of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+          # Reproducible analysis runs:
           # a frozen analysis plan plus immutable run manifests — argv execution (no
           # shell), environment allowlist with secret redaction, hashed inputs/outputs,
           # hard timeouts, notebook execution, run diffs, and lab-notebook entries.
@@ -574,7 +573,7 @@
           - id: repro-package
             name: academic-harness/repro-package
 
-          # Cross-ledger provenance audit (Phase 3 of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+          # Cross-ledger provenance audit:
           # a strictly READ-ONLY index that joins the ledgers that already exist — review
           # records, screening, evidence, extraction, appraisal and GRADE events,
           # reporting_check verdicts, stored deep reviews, notebook entries, analysis and
@@ -589,7 +588,7 @@
           - id: provenance-audit
             name: academic-harness/provenance-audit
 
-          # Submission planning and bundling (Phase 4A of docs/SCIENTIFIC-EXPANSION-PLAN.md):
+          # Submission planning and bundling:
           # plan/build/status/export a journal-ready bundle under .dsh/submission/<slug>/.
           # Checks limits, figures, citations, reporting evidence, numbers, statements, and
           # reviewers; unknown requirements stay manual_check. The zip is reproducible from
@@ -622,7 +621,7 @@
           - id: authorship
             name: academic-harness/authorship
 
-          # Reporting-guideline checker (Phase 3 of docs/REPORTING-AND-APPRAISAL-PLAN.md):
+          # Reporting-guideline checker:
           # list/suggest/start/items/candidates/judge/status/export against versioned
           # CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, and STARD checklists. The
           # ledger is append-only under <cwd>/.dsh/reporting/<slug>/; every reported quote
@@ -641,8 +640,7 @@
           - id: deep-review
             name: academic-harness/deep-review
 
-          # Co-Scientist hypothesis tournament (docs/CO-SCIENTIST-INTEGRATION-PLAN.md,
-          # Phase 1): generate, review, rank, and evolve candidate hypotheses with state
+          # Co-Scientist hypothesis tournament: generate, review, rank, and evolve candidate hypotheses with state
           # that outlives the context window. Append-only event logs under
           # <cwd>/.dsh/coscientist/<slug>/, shared by the delegation tree the way the
           # review ledger is. `coscientist` owns the ledger and the scheduling policy
@@ -656,11 +654,7 @@
           - id: coscientist-rank
             name: academic-harness/coscientist-rank
 
-          # Citation integrity and claim support for the tournament (Phase 3 of
-          # docs/CO-SCIENTIST-INTEGRATION-PLAN.md). GATED: the row is always present but
-          # `apply()` registers nothing unless AH_ENABLE_OPTIONAL_TOOLS is truthy, so the
-          # tool is absent from the prompt and tool list by default (mount-time decision,
-          # needs a restart). This is the only tournament module that reaches the network
+          # Citation integrity and claim support for the tournament. This is the only tournament module that reaches the network
           # — Crossref for existence, reusing integrity-check for retraction status — and
           # it shares one process-wide Crossref limiter with crossref_lookup. It never
           # calls a model: `claims` records judgements a subagent already made.
@@ -702,7 +696,7 @@
           - id: power-analysis
             name: academic-harness/power-analysis
 
-          # Study conduct, ethics, and grants (Phase 5 of docs/SCIENTIFIC-EXPANSION-PLAN.md).
+          # Study conduct, ethics, and grants.
           # preregister freezes a hashed study plan before data collection and versions
           # every later edit; causal_dag stores a user-specified DAG and derives
           # d-separation, adjustment sets, instruments, and E-values; design generates
@@ -739,19 +733,14 @@
           - id: grant-budget
             name: academic-harness/grant-budget
 
-          # Optional Phase 6 tools (identity + peer review). These rows always exist,
-          # but apply() registers nothing unless AH_ENABLE_OPTIONAL_TOOLS=1, so the tools
-          # are absent from the base tool list and prompt by default. Changing the flag
-          # needs a dsh restart. See author-lookup.js and openreview.js.
+          # Identity and peer review. See author-lookup.js and openreview.js.
           - id: author-lookup
             name: academic-harness/author-lookup
           - id: openreview
             name: academic-harness/openreview
 
-          # Optional Phase 7 local audits. Same gate as above (AH_ENABLE_OPTIONAL_TOOLS=1);
-          # pdf_references additionally requires GROBID_BASE_URL, and none of these are
-          # advertised in the base prompt. See stat-audit.js, figure-audit.js,
-          # pdf-references.js, and repo-audit.js.
+          # Local audits. pdf_references additionally requires GROBID_BASE_URL. See
+          # stat-audit.js, figure-audit.js, pdf-references.js, and repo-audit.js.
           - id: pdf-references
             name: academic-harness/pdf-references
           - id: stat-audit
@@ -761,10 +750,9 @@
           - id: repo-audit
             name: academic-harness/repo-audit
 
-          # Optional Phase 8 funding/patent discovery. Same AH_ENABLE_OPTIONAL_TOOLS gate.
-          # patent_search additionally requires PATENTSVIEW_API_KEY on every call and
-          # returns a clear error without it. Neither is advertised in the base prompt.
-          # See grant-search.js and patent-search.js.
+          # Funding and patent discovery. patent_search additionally requires
+          # PATENTSVIEW_API_KEY on every call and returns a clear error without it. See
+          # grant-search.js and patent-search.js.
           - id: grant-search
             name: academic-harness/grant-search
           - id: patent-search

@@ -19,7 +19,7 @@ const CUSTOM_MODEL = '__custom__'
 
 /** The settings fields this section manages, grouped for display. */
 const KEYS = [
-  { field: 'PARALLEL_API_KEY', label: 'Parallel', group: 'Literature search', hint: 'Required for mcp__parallel__* and parallel_search — sent as a Bearer token so search is not rate-limited. Restart dsh after saving.' },
+  { field: 'PARALLEL_API_KEY', label: 'Parallel', group: 'Literature search', hint: 'Required for parallel_search and parallel_extract — native REST tools, read per call, no restart.' },
   { field: 'FIRECRAWL_API_KEY', label: 'Firecrawl', group: 'Literature search', hint: 'Required to mount Firecrawl (search/scrape/parse); the connector stays disabled without it. Restart dsh after saving.' },
   { field: 'CONSENSUS_API_KEY', label: 'Consensus', group: 'Literature search', hint: 'Required for consensus_search, a native REST tool — read per call, no restart.' },
   { field: 'SCITE_API_KEY', label: 'Scite', group: 'Literature search', hint: 'Required to enable the Scite MCP connector. Restart dsh after saving.' },

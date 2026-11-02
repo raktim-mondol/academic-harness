@@ -140,7 +140,6 @@ function findUv() {
 
 function findPython() {
   const override = process.env.ACADEMIC_HARNESS_PYTHON?.trim()
-    || process.env.RESEARCHCRAFT_PYTHON?.trim()
   if (override) return override
   for (const name of PYTHON_BINS) {
     for (const dir of (process.env.PATH || '').split(delimiter)) {
@@ -433,14 +432,6 @@ async function migrateExistingStore(launch, init) {
   return await init()
 }
 
-/**
- * Slug for auto-ingest / recap when the agent has not named a project.
- * Derived from the workspace directory name.
- *
- * @deprecated for writes: pass `cwd` to PaperMemory ingest and let
- * `canonical_project_slug` resolve ah.yaml / manuscript root_path. Kept for
- * read-side callers that still need a directory-derived key.
- */
 const QUOTE_CHECK_TIMEOUT_MS = 30_000
 
 /**

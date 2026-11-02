@@ -78,39 +78,17 @@ The Academic Harness profile's bundle patch sets `agent-preset-registry` `defaul
 
 Confirm the preset selector at the top of the message box reads **Academic Harness**. If it still says Standard/PTC, the profile patch did not apply.
 
-The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`mcp__parallel__*`, `parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), `paper_fold`, PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation`, `manuscript_citations`, `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy`/`funder_policy` (datasets and venue/funder policy), and the optional `author_lookup`/`openreview` are only present on this preset. A session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`.
+The persona, the longer research system prompt (notebook discipline, specialist roster, connector guidance, …), academic search (`parallel_search`, `mcp__firecrawl__*`, `mcp__scite__*`, `consensus_search`), `paper_fold`, PaperMemory (`mcp__papermemory__*`), workspace semantic search (`mcp__zvec_grep__zvec_grep_search`), `paper_mcp` (Paper2Agent stdio mounts), `citation`, `manuscript_citations`, `review` (systematic-review ledger), `clinicaltrials`/`openfda` (trial and regulatory records), `dataset_search`/`journal_policy`/`funder_policy` (datasets and venue/funder policy), and the optional `author_lookup`/`openreview` are only present on this preset. A session left on Standard/PTC won't have them, and asking it to use e.g. the Parallel connector will fail with `tools[name] is not a function`.
 
 The general-purpose tools below (notebook, fold_text, scientific_result, image_generate, sci_inspect, latex_compile, mermaid_render, pdf_to_markdown, modal_run/runpod_run/vastai_run, research_template) are available on every preset regardless, since they're registered at the plugin/bundle level rather than inside the Academic Harness preset. Native `grep` / `glob` come from the Academic Harness preset's filesystem-search row.
 
 See [Architecture](ARCHITECTURE.md) for the host/bundle/preset split and the full tool index in [Tools](TOOLS.md).
 
-## Renamed in v0.16.0
-
-The repo, npm package, plugin, preset, profile, launcher, and product name were renamed from `dsh-researchcraft` / ResearchCraft to **Academic Harness**.
-
-| Old | New |
-|---|---|
-| repo / package `dsh-researchcraft` | `academic-harness` |
-| profile `researchcraft` | `academic-harness` |
-| launcher `dsh-researchcraft` | `academic-harness` (old command stays as a transition alias) |
-| preset `researchcraft` | `academic-harness` (legacy preset removed) |
-| Settings → ResearchCraft API keys | Settings → Academic Harness API keys |
-| env `RESEARCHCRAFT_*` | `ACADEMIC_HARNESS_*` (old names still honored) |
-
-### Migrate an existing dedicated profile
-
-```sh
-node scripts/migrate-profile.mjs --profile researchcraft --to academic-harness --apply
-dsh plugin --profile academic-harness install
-```
-
-The migration backs up the old profile, moves the dependency/bundle entries, merges the API-key config into the new entry, updates the preset default, and renames the profile directory. Sessions pinned to the removed legacy `researchcraft` preset do not resolve; start a new chat on Academic Harness. `dsh plugin --profile academic-harness update academic-harness` is the new update command.
-
 ## One DSH surface at a time
 
 `dsh-web`, `dsh-tui`, `dsh-martty`, and `academic-harness` share `$DSH_HOME` (including port `3080` and the zvec-grep daemon). Ctrl+C does not always wait for those to exit, so starting another launcher while one is still in the background will fail or pick up the wrong process.
 
-The shared launcher (`scripts/dsh-launch`, installed as those four commands plus the transition alias `dsh-researchcraft`) stops leftover DSH processes and `zg server off` before exec. If you invoke `dsh --profile …` directly, stop the previous one first:
+The shared launcher (`scripts/dsh-launch`, installed as those four commands) stops leftover DSH processes and `zg server off` before exec. If you invoke `dsh --profile …` directly, stop the previous one first:
 
 ```sh
 # leftover web UI

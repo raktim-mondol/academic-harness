@@ -217,7 +217,6 @@ ok('preset mounts hooks', /name: academic-harness\/ah-hooks\b/.test(yml))
 const patch = readFileSync(join(ROOT, 'cordis.patch.yml'), 'utf8')
 ok('patch inlines academic-harness', /name: academic-harness\/ah\b/.test(patch))
 ok('patch inlines hooks', /name: academic-harness\/ah-hooks\b/.test(patch))
-ok('patch has no legacy preset', !patch.includes('preset-researchcraft-legacy') && !patch.includes('id: researchcraft'))
 ok('preset uses workflow-ptc', /name: '@deepseek-ai\/dsh-workflow-ptc'/.test(yml))
 
 const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))

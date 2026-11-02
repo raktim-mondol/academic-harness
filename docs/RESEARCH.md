@@ -329,5 +329,5 @@ Every rate and amount is user-supplied; a missing fringe or indirect rate is an 
 
 - [Search](SEARCH.md) — discovery and publication status.
 - [Writing](WRITING.md) — the writing oracle, citation, and figures.
-- [Optional tools](OPTIONAL-TOOLS.md) — grants, patents, OpenReview, author identity, statistical and figure audits.
+- [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) — grants, patents, OpenReview, author identity, statistical and figure audits.
 - [Configuration](CONFIGURATION.md) — tournament and policy keys.

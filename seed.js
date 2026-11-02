@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -24,19 +24,6 @@ function copyMissing(src, dest) {
     n++
   }
   return n
-}
-
-/** Carry a pre-v0.16.0 seeded notebook skill over to its new directory name. */
-function migrateLegacyNotebookSkill(dest) {
-  const oldDir = join(dest, 'researchcraft-notebook')
-  const newDir = join(dest, 'academic-harness-notebook')
-  if (!existsSync(oldDir) || existsSync(newDir)) return
-  renameSync(oldDir, newDir)
-  const skill = join(newDir, 'SKILL.md')
-  if (!existsSync(skill)) return
-  const text = readFileSync(skill, 'utf8')
-  const next = text.replace(/^name: researchcraft-notebook$/m, 'name: academic-harness-notebook')
-  if (next !== text) writeFileSync(skill, next)
 }
 
 /**
@@ -80,11 +67,10 @@ const RELATED_SKILLS = [
 ]
 
 const STALE_SKILLS = [
-  { dir: 'runpod', stale: (text) => /ResearchCraft API keys/.test(text) || !text.includes('## API version') },
-  { dir: 'modal', stale: (text) => /ResearchCraft API keys/.test(text) || !text.includes('modal-sdk') },
+  { dir: 'runpod', stale: (text) => !text.includes('## API version') },
+  { dir: 'modal', stale: (text) => !text.includes('modal-sdk') },
   { dir: 'vastai', stale: (text) => !text.includes('## Pitfalls that break agent runs') },
   { dir: 'modal-usage', stale: (text) => /^name: modal$/m.test(text) },
-  { dir: 'academic-harness-notebook', stale: (text) => /ResearchCraft/.test(text) },
   { dir: 'papermemory', stale: (text) => !text.includes('its project scopes exports') },
   { dir: 'systematic-review-ledger', stale: (text) => !text.includes('risk-of-bias-appraisal') },
   ...SUPERVISOR_SKILLS.map((dir) => ({ dir, stale: (text) => !text.includes('Routing in Academic Harness') })),
@@ -119,7 +105,6 @@ function refreshStaleSkills(dest) {
 export function seed() {
   const home = dshHome()
   const dest = join(home, 'skills')
-  migrateLegacyNotebookSkill(dest)
   copyMissing(join(here, 'skills'), dest)
   refreshStaleSkills(dest)
   const patched = patchAcademicHarnessProfiles(home)

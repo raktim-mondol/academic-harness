@@ -1,6 +1,5 @@
 /**
- * Read-only cross-ledger provenance index (Phase 3 of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * Read-only cross-ledger provenance index.
  *
  * This module is not a source of truth. Every node and edge is derived from
  * ledgers that already exist, joined by the ids and hashes they already store,

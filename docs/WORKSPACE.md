@@ -126,7 +126,7 @@ Set up the helper venv once (needs [uv](https://docs.astral.sh/uv/)):
 cd python-helpers && uv sync
 ```
 
-The tool finds `python-helpers/.venv` automatically. Override with `ACADEMIC_HARNESS_HELPERS_DIR` (a different helpers checkout) or `ACADEMIC_HARNESS_PYTHON` (a specific interpreter); the old `RESEARCHCRAFT_HELPERS_DIR`/`RESEARCHCRAFT_PYTHON` names are still honored as fallbacks.
+The tool finds `python-helpers/.venv` automatically. Override with `ACADEMIC_HARNESS_HELPERS_DIR` (a different helpers checkout) or `ACADEMIC_HARNESS_PYTHON` (a specific interpreter).
 
 ## Related
 

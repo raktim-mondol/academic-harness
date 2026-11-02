@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
@@ -187,6 +187,6 @@ ok('test script', pkg.scripts?.['test:reply-fold'] === 'node scripts/test-reply-
 ok('React test deps', Boolean(pkg.devDependencies?.react) && Boolean(pkg.devDependencies?.['react-dom']))
 ok('sidebar client inject', pkg.dsh?.client?.inject?.includes('@deepseek-ai/dsh-client-ui-sidebar-right'))
 ok('docs row', read('docs/WORKSPACE.md').includes('Read folded:') && read('docs/WORKSPACE.md').includes('turnTail') && read('docs/WORKSPACE.md').includes('Open in sidebar'))
-ok('CI test', read('.github/workflows/verify.yml').includes('test-reply-fold.mjs'))
+ok('CI runs the suite', read('.github/workflows/verify.yml').includes('run: npm test') && existsSync(join(root, 'scripts/test-reply-fold.mjs')))
 
 console.log(`reply-fold tests OK: ${passed} checks`)

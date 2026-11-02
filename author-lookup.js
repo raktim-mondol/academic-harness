@@ -1,14 +1,12 @@
 /**
  * author_lookup: ORCID researcher search/records and ROR institution lookup.
  *
- * Optional tool: registers only with AH_ENABLE_OPTIONAL_TOOLS=1. ORCID reads
- * are public; ORCID_TOKEN only raises rate limits and unlocks limited fields.
+ * ORCID reads are public; ORCID_TOKEN only raises rate limits and unlocks limited fields.
  * ROR is keyless. Ambiguous names return ranked candidates — identities are
  * never merged automatically.
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { resolveEnv } from './credential-env.js'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const ORCID = 'https://pub.orcid.org/v3.0'
@@ -183,13 +181,12 @@ export const name = 'academic-harness-author-lookup'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'author_lookup',
     description: [
       'Resolve researcher and institution identities: ORCID author search/records (name, works count, employment with ROR iDs) and ROR institution search/records (name, aliases, country, website).',
       '`author` takes a free-text `query` or an `orcid`; `institution` takes `query` or `ror_id`. Ambiguous names return ranked candidates — never merge identities or assume a candidate is the person you mean.',
-      'Optional tool: present only when AH_ENABLE_OPTIONAL_TOOLS=1. ORCID reads are public (ORCID_TOKEN only raises limits); ROR is keyless.',
+      'ORCID reads are public (ORCID_TOKEN only raises limits); ROR is keyless.',
     ].join(' '),
     parameters: {
       action: { type: 'string', enum: ['author', 'institution'], description: 'author (default) or institution.' },

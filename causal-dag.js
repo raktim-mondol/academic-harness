@@ -1,6 +1,6 @@
 /**
  * causal_dag: explicit causal assumptions and graph-derived identification
- * diagnostics (Phase 5B of docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * diagnostics.
  *
  * The DAG is user-specified. The tool computes what the graph implies —
  * d-separation, adjustment sets, instruments, testable independencies — and

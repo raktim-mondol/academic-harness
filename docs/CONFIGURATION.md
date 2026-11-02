@@ -13,7 +13,7 @@ No credential is required to install or boot. Each connector or tool stays disab
 
 | Field | Required for | Notes |
 |---|---|---|
-| `PARALLEL_API_KEY` | Parallel MCP connector, `parallel_search`, `parallel_extract` | Native REST calls take effect on the next call; the MCP connector needs a `dsh` restart. |
+| `PARALLEL_API_KEY` | `parallel_search`, `parallel_extract` | Native REST calls; takes effect on the next call. |
 | `FIRECRAWL_API_KEY` | Firecrawl MCP connector | MCP mount needs a `dsh` restart. |
 | `CONSENSUS_API_KEY` | `consensus_search` | Required; the tool returns a clear error when unset. |
 | `SCITE_API_KEY` | Scite MCP connector | An `mcp`-scoped key from <https://scite.ai/users/me/api>; sent as a bearer token to `https://api.scite.ai/mcp`. |
@@ -108,10 +108,9 @@ The Academic Harness preset mounts once as a **standing composition** for the li
 | `IMAGE_MODEL` | Immediately on dropdown selection, no Save |
 | Tournament numbers | New tournaments; explicit arguments win |
 | `ZVEC_GREP_AUTO_INDEX` | The next Academic Harness session, no restart |
-| MCP connector keys (Parallel, Firecrawl, Scite) | After stopping and restarting `dsh` |
+| MCP connector keys (Firecrawl, Scite) | After stopping and restarting `dsh` |
 | `SUBAGENT_PRO_*`, `SUBAGENT_VISION_*` | After a `dsh` restart |
 | `ZVEC_GREP_EMBEDDING`, `ZVEC_GREP_API_KEY` | New index runs read the current value; a `dsh` restart also hands it to `zg server on` for the search daemon |
-| `AH_ENABLE_OPTIONAL_TOOLS` | After a `dsh` restart; the preset rows exist either way |
 | Modal SDK | No restart: the first `modal_run` call installs it into `$DSH_HOME/modal-sdk` (unless `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1`); a manual profile install still needs a restart |
 | `PAPERMEMORY_CLI`, `TEXTFOLD_*`, `ACADEMIC_HARNESS_CLI` | After a `dsh` restart (the MCP/runtime mount is standing) |
 | `paper_mcp` server registrations | Tools appear as `mcp__<serverName>__*`; if a mount does not appear, restart `dsh` |
@@ -122,9 +121,9 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 
 | Variable | Effect |
 |---|---|
-| `ACADEMIC_HARNESS_SKILLS_DIR` | Use a different skills catalogue. `RESEARCHCRAFT_SKILLS_DIR` is still honored as a fallback; `~/scientific-agent-skills/skills` is the default checkout path. |
-| `ACADEMIC_HARNESS_HELPERS_DIR` | Use a different `python-helpers` checkout; `RESEARCHCRAFT_HELPERS_DIR` fallback. |
-| `ACADEMIC_HARNESS_PYTHON` | Python interpreter for the helpers; `RESEARCHCRAFT_PYTHON` fallback. |
+| `ACADEMIC_HARNESS_SKILLS_DIR` | Use a different skills catalogue. `~/scientific-agent-skills/skills` is the default checkout path. |
+| `ACADEMIC_HARNESS_HELPERS_DIR` | Use a different `python-helpers` checkout. |
+| `ACADEMIC_HARNESS_PYTHON` | Python interpreter for the helpers. |
 | `ACADEMIC_HARNESS_CLI` / `AH_CMD` | Override the writing-engine CLI. |
 | `ACADEMIC_HARNESS_SKIP_INSTALL=1` | Skip creating the plugin-local engine venv. |
 | `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` | Skip the managed Modal SDK install; use a profile-installed SDK instead. |
@@ -144,16 +143,13 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 | `XDG_DATA_HOME` | Base for the default PaperMemory store when neither `PAPERMEMORY_DB` nor `PAPERMEMORY_DATA_DIR` is set. |
 | `PAPERMEMORY_PROJECT` | Override the project for auto-ingest (slugified). |
 | `PAPERMEMORY_SKIP_INSTALL=1` | Skip installing the bundled PaperMemory venv. |
-| `AH_ENABLE_OPTIONAL_TOOLS=1` | Register the optional tools; needs a `dsh` restart. |
 | `AH_RSI`, `AH_RSI_STORE`, `AH_RSI_*` | Control the local RSI loop; see [RSI](RSI.md#configuration). |
 | `IMAGE_PROVIDER`, `IMAGE_BASE_URL`, `IMAGE_API_KEY` | Use an OpenAI-compatible Images API instead of Gemini. |
-| `GROBID_BASE_URL` | Required for `pdf_references` (optional tools). |
+| `GROBID_BASE_URL` | Required for `pdf_references`; the tool is not registered without it. |
 | `GITHUB_TOKEN` | Optional API metadata for `repo_audit` (env only). |
 | `PDFIUM_LIB_PATH`, `ORT_DYLIB_PATH` | OCR shared-library paths for `pdf_to_markdown`. |
 | `DSH_HOME` | DSH home; defaults to `~/.dsh`. |
 | `OPENFDA_API_KEY`, `SHERPA_ROMERO_API_KEY`, `DATACITE_API_KEY`, `ZENODO_API_KEY`, `FIGSHARE_API_KEY`, `ORCID_TOKEN`, `PATENTSVIEW_API_KEY` | Same fields as Settings; environment wins. |
-
-The old `RESEARCHCRAFT_*` names are honored where code implements a fallback: `RESEARCHCRAFT_SKILLS_DIR`, `RESEARCHCRAFT_HELPERS_DIR`, and `RESEARCHCRAFT_PYTHON`. The old API-key namespace was migrated by the v0.16.0 rename; see [Install](INSTALL.md#renamed-in-v0160).
 
 ## Credential behavior
 
@@ -163,4 +159,4 @@ The old `RESEARCHCRAFT_*` names are honored where code implements a fallback: `R
 - Settings values live in the profile's `cordis.patch.yml` (the `academic-harness` Loader row); there is no separate keychain integration.
 - Keys entered in Settings reach per-call tools without a restart; MCP connectors and model-id mounts do not. Check the matrix above before concluding a key "doesn't work".
 
-See [Search](SEARCH.md), [Papers](PAPERS.md), [Compute](COMPUTE.md), and [Optional tools](OPTIONAL-TOOLS.md) for what each key unlocks.
+See [Search](SEARCH.md), [Papers](PAPERS.md), [Compute](COMPUTE.md), and [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) for what each key unlocks.

@@ -101,7 +101,7 @@ project (MIT License, © 2025 Raktim Mondol) — itself an implementation of the
 Gottweis et al. *Nature* (2026) paper cited above. No file from that repository
 was copied: its TypeScript was rewritten as this plugin's own ES modules, and
 its Bun / `bun:sqlite` / `sqlite-vec` / ONNX-embedding / MCP-OAuth / ink-TUI
-stack was deliberately left behind (docs/CO-SCIENTIST-INTEGRATION-PLAN.md §4).
+stack was deliberately left behind.
 What is carried over is the deterministic core — the Glicko-2 update and
 review-score seeding, the citation-integrity penalty, both-order judge
 debiasing, the scheduling weight tables and termination rules, matchup

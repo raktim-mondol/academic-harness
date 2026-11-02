@@ -13,27 +13,15 @@ npm run build # after any client/ change — rebuilds lib/client.js
 
 ## Tests
 
-The tool tests are plain Node scripts and need no network (the Python-helper cases skip themselves when SciPy/Pillow are unavailable):
+The tool tests are plain Node scripts under `scripts/test-*.mjs` and need no network (the Python-helper cases skip themselves when SciPy/Pillow are unavailable). `npm test` globs and runs all of them; CI calls the same command, so a new test file is picked up automatically:
 
 ```sh
-for t in ledger-kit citation-format review-store review-tool review-extract prisma-flow meta-analysis grade agreement appraisal reporting-check integrity registries \
-         optional-tools audits grants manuscript-tools nonsearch-tools mermaid-render fold reply-fold paper-fold compute library power reference-library; do
-  node scripts/test-$t.mjs
-done
-node scripts/test-compute-http.mjs
+npm test                      # every scripts/test-*.mjs
+npm test -- deep-research     # only files whose name contains the fragment
+node scripts/test-grade.mjs   # a single file
 ```
 
-The ledger layers add their own suites, all local and fixture-driven:
-`test-analysis-run`, `test-experiment-log`, `test-dataset-get`, `test-data-profile`,
-`test-repro-package`, and `test-provenance-audit` (the cross-ledger audit hashes
-every file outside its own cache before and after a run to prove it never writes
-to a source ledger). `npm run test:provenance` runs the last one on its own.
-
-Phase 4 adds `test-submission-pack`, `test-manuscript-diff`, `test-numbers-audit`,
-`test-presentation-build`, `test-authorship`, and `test-journal-match` (the last
-also covers custom CSL loading and URL caching). `npm run test:phase4` runs all
-six without network; the TeX compile path is exercised by hand and is skipped by
-the fixture suite where TeX is not installed.
+Some suites have a per-area alias in `package.json` (for example `npm run test:provenance`). The provenance audit suite hashes every file outside its own cache before and after a run to prove it never writes to a source ledger. The TeX compile path is exercised by hand and is skipped by the fixture suite where TeX is not installed.
 
 The full CI matrix also runs the search-provider tests, the PaperMemory test suite, and a real DSH boot; see [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
 
@@ -83,20 +71,14 @@ CI runs `node scripts/build-cordis-patch.mjs --check` and fails if the generated
 | `vendor/papermemory/` | Vendored PaperMemory package |
 | `docs/` | User guides, design notes, and diagram sources |
 | `schemas/` | Example JSON contracts for extraction templates, analysis plans, run manifests, preregistration, and submission manifests |
-| `scripts/` | Tests, profile migration, patch build, docs diagrams |
+| `scripts/` | Tests, patch build, docs diagrams |
 
 See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
 
 ## Design notes
 
 - [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md)
-- [Co-Scientist integration](CO-SCIENTIST-INTEGRATION-PLAN.md)
-- [Fold integration](FOLD-INTEGRATION-PLAN.md)
-- [Non-search tools](NON-SEARCH-TOOLS-PLAN.md)
-- [PaperMemory v2](PAPERMEMORY-V2-PLAN.md)
 - [RSI](RSI.md)
-- [Search providers](SEARCH-PROVIDERS-PLAN.md)
-- [zvec-grep/PaperMemory alignment](ZG-PAPERMEMORY-ALIGNMENT-PLAN.md)
 
 ## License
 

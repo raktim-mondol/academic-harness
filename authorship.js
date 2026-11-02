@@ -1,6 +1,5 @@
 /**
- * authorship: a CRediT/ICMJE contribution ledger (Phase 4F of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * authorship: a CRediT/ICMJE contribution ledger.
  *
  * It records who decided what. Author order, qualification, and the truth of
  * an affiliation or ORCID remain human decisions; the tool reports what is

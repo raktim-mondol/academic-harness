@@ -49,6 +49,6 @@ metadata:
 
 ## Related
 
-- `stat_audit` (optional tool) for a narrower p/GRIM pass.
+- `stat_audit` for a narrower p/GRIM pass.
 - `reporting_check` for guideline evidence.
 - `numbers_audit` is included in `submission_pack` planning.

@@ -1,6 +1,6 @@
 /**
  * coscientist_verify: citation integrity and claim support for the hypothesis
- * tournament. Optional tool — mounted only when AH_ENABLE_OPTIONAL_TOOLS is set.
+ * tournament.
  *
  * This is the one part of the tournament that reaches the network, and it stays
  * inside the registry boundary: Crossref for existence, and `integrity_check`
@@ -15,7 +15,6 @@
  * fabrication; a DOI that is not registered is.
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
-import { optionalToolsEnabled } from './optional-tools.js'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi } from './search-normalize.js'
@@ -347,11 +346,10 @@ export const name = 'academic-harness-coscientist-verify'
 export const inject = ['tools']
 
 export function apply(ctx) {
-  if (!optionalToolsEnabled()) return
   ctx.tools.register(defineTool({
     name: 'coscientist_verify',
     description: [
-      'Citation integrity and claim support for the Co-Scientist hypothesis tournament (optional tool; set AH_ENABLE_OPTIONAL_TOOLS=1 and restart). Actions: `citations` (check that every work a hypothesis cites actually exists, via Crossref, and record the result so the rating penalty applies), `claims` (record the supports/contradicts/unaddressed judgements a subagent reached about each load-bearing claim), `status` (whether this hypothesis has been checked, and what the ledger holds).',
+      'Citation integrity and claim support for the Co-Scientist hypothesis tournament. Actions: `citations` (check that every work a hypothesis cites actually exists, via Crossref, and record the result so the rating penalty applies), `claims` (record the supports/contradicts/unaddressed judgements a subagent reached about each load-bearing claim), `status` (whether this hypothesis has been checked, and what the ledger holds).',
       'Classifications: `verified` — a DOI that resolves, or a title Crossref matches at 0.7 token overlap; `fabricated` — a DOI the caller asserted that Crossref does not list, and nothing else; `unverified` — everything inconclusive, including a title nobody matched and any registry error. A registry that could not be queried is never reported as verified.',
       'Counts drive a soft penalty (up to −150 rating, +100 RD at a 100% weighted fabrication rate), never a veto. This tool does not judge whether a paper supports a claim — that is a subagent reading real sources; `claims` only records those judgements so the ledger, not the transcript, holds them.',
     ].join(' '),

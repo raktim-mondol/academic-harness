@@ -61,71 +61,10 @@ jobs:
       - name: Check the MCP tool surface and plugin guidance
         run: PM_CLI="$(command -v papermemory)" node scripts/test-phase7.mjs
 
-      - name: Run search provider tests
-        run: |
-          node scripts/test-search-normalize.mjs
-          node scripts/test-search-ratelimit.mjs
-          node scripts/test-search-execute.mjs
-          node scripts/test-domain-sources.mjs
-          node scripts/test-academic-search-parity.mjs
-
-      - name: Run non-search tool tests
-        run: |
-          node scripts/test-citation-format.mjs
-          node scripts/test-manuscript-tools.mjs
-          node scripts/test-ledger-kit.mjs
-          node scripts/test-review-store.mjs
-          node scripts/test-review-tool.mjs
-          node scripts/test-review-extract.mjs
-          node scripts/test-prisma-flow.mjs
-          node scripts/test-meta-analysis.mjs
-          node scripts/test-grade.mjs
-          node scripts/test-analysis-run.mjs
-          node scripts/test-experiment-log.mjs
-          node scripts/test-dataset-get.mjs
-          node scripts/test-data-profile.mjs
-          node scripts/test-science-source.mjs
-          node scripts/test-science-toolkits.mjs
-          node scripts/test-discovery.mjs
-          node scripts/test-repro-package.mjs
-          node scripts/test-provenance-audit.mjs
-          node scripts/test-deep-research-mechanisms.mjs
-          node scripts/test-deep-research-effort.mjs
-          node scripts/test-deep-research-store.mjs
-          node scripts/test-deep-research.mjs
-          node scripts/test-submission-pack.mjs
-          node scripts/test-manuscript-diff.mjs
-          node scripts/test-numbers-audit.mjs
-          node scripts/test-presentation-build.mjs
-          node scripts/test-authorship.mjs
-          node scripts/test-journal-match.mjs
-          node scripts/test-preregister.mjs
-          node scripts/test-causal-dag.mjs
-          node scripts/test-design.mjs
-          node scripts/test-ethics-deidentify.mjs
-          node scripts/test-dmp-budget.mjs
-          node scripts/test-deep-review-tool.mjs
-          node scripts/test-agreement.mjs
-          node scripts/test-appraisal.mjs
-          node scripts/test-reporting-check.mjs
-          node scripts/test-integrity.mjs
-          node scripts/test-registries.mjs
-          node scripts/test-optional-tools.mjs
-          node scripts/test-audits.mjs
-          node scripts/test-grants.mjs
-          node scripts/test-nonsearch-tools.mjs
-          node scripts/test-fold.mjs
-          node scripts/test-reply-fold.mjs
-          node scripts/test-paper-fold.mjs
-          node scripts/test-compute.mjs
-          node scripts/test-compute-http.mjs
-          node scripts/test-mermaid-render.mjs
-
-      - name: Check rename identity and migration
-        run: |
-          node scripts/test-rename.mjs
-          node scripts/test-academic-harness.mjs
-          node scripts/test-paper2agent.mjs
+      # Runs every scripts/test-*.mjs (see scripts/run-tests.mjs), so a new test
+      # file is picked up without editing this workflow.
+      - name: Run the test suite
+        run: npm test
 
       - name: Rebuild the client bundle and check it's committed
         run: |
@@ -135,11 +74,11 @@ jobs:
             exit 1
           fi
 
-      # Pin the CLI to the same 0.2.1-rc.2 line as package.json dsh-* deps.
-      # The 0.1.5-rc.2 pin plus a web-app override sent npm into a peer-
+      # Pin the CLI to the same 0.2.1-rc.5 line as package.json dsh-* deps.
+      # An unpinned CLI plus a web-app override once sent npm into a peer-
       # resolution loop that OOM'd the runner (~1h, exit 134).
       - name: Install the dsh CLI
-        run: npm install -g @deepseek-ai/dsh@0.2.1-rc.2
+        run: npm install -g @deepseek-ai/dsh@0.2.1-rc.5
 
       - name: Compose a throwaway profile that installs this plugin
         run: |

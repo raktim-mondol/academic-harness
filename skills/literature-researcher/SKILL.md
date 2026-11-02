@@ -23,14 +23,12 @@ paper index; `parallel_search` is the Parallel search tool and must use
 `mode: "basic"` (focused lookup, longer excerpts) or `mode: "advanced"`
 (multi-hop survey / deep research). Do not use `turbo` or `fast` for
 literature. Issue both in the same search round with complementary
-queries. Do not call `mcp__parallel__web_search` when `parallel_search`
-works — it is the same search job locked to `basic` mode; use it only if
-`parallel_search` is missing or failed. Pass `objective` plus 2-3 keyword
+queries. Pass `objective` plus 2-3 keyword
 `search_queries` of 3-6 words each. Do not invent a mode the tools do not
 support. Do not start a literature search on built-in `web_search`. Do not
 use built-in `web_fetch` (no fetch provider; it fails with
 `WEB_PROVIDER_UNAVAILABLE`). To read a paper or trial page URL, call
-`mcp__firecrawl__firecrawl_scrape` or `mcp__parallel__web_fetch`.
+`mcp__firecrawl__firecrawl_scrape` or `parallel_extract`.
 
 For any paper you have as a downloaded PDF, call `pdf_to_markdown` to read it
 rather than treating it as raw bytes. When surveying several papers, pass

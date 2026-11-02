@@ -106,8 +106,7 @@ and termination rules are in `references/tournament.md`.
      genuinely different claim.
    - `reflection` → pick one `pending_review` hypothesis, run the five stage
      briefs in order, `review` after each. Verify its citations with
-     `coscientist_verify citations` when that optional tool is enabled
-     (`AH_ENABLE_OPTIONAL_TOOLS=1`); otherwise do it by hand with
+     `coscientist_verify citations`, or by hand with
      `paper_resolve` / `crossref_lookup`, plus `integrity_check` for retraction.
      Anything you could not resolve is unverified — never counted as verified.
    - `ranking` → `coscientist_rank propose`, then **two judge subagents, one at

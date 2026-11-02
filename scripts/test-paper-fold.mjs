@@ -334,7 +334,7 @@ try {
   ok('memory skill', read('skills/papermemory/SKILL.md').includes('paper_fold'))
   ok('docs section', read('docs/PAPERS.md').includes('## Read at the right level') && read('docs/PAPERS.md').includes('TEXTFOLD_SKIP_INSTALL'))
   ok('NOTICE runtime', read('NOTICE').includes('paper_fold') && read('NOTICE').includes('textfold==0.10.31'))
-  ok('CI fake test', read('.github/workflows/verify.yml').includes('test-paper-fold.mjs'))
+  ok('CI runs the suite', read('.github/workflows/verify.yml').includes('run: npm test') && existsSync(join(root, 'scripts/test-paper-fold.mjs')))
   ok('CI live test', read('.github/workflows/verify.yml').includes('test-paper-fold-live.mjs'))
   ok('runtime pin', read('textfold-runtime.js').includes("TEXTFOLD_VERSION = '0.10.31'"))
   ok('tool registration', read('paper-fold.js').includes("name: 'paper_fold'"))

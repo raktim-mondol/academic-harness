@@ -236,6 +236,6 @@ ok('prompt shape section', read('prompt-section.js').includes("name: 'academic-h
 }
 ok('docs section', read('docs/WORKSPACE.md').includes('## Reply folding') && read('docs/WORKSPACE.md').includes('fold_text'))
 ok('NOTICE attribution', read('NOTICE').includes('plugins/textfold/hooks/fold.ts') && read('NOTICE').includes('Apache License 2.0'))
-ok('CI test', read('.github/workflows/verify.yml').includes('test-fold.mjs'))
+ok('CI runs the suite', read('.github/workflows/verify.yml').includes('run: npm test') && existsSync(join(root, 'scripts/test-fold.mjs')))
 
 console.log(`fold tests OK: ${passed} checks`)

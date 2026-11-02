@@ -1,7 +1,6 @@
 /**
  * design: seeded randomization schedules, realized-balance diagnostics, and
- * design-of-experiments matrices (Phase 5C of
- * docs/SCIENTIFIC-EXPANSION-PLAN.md).
+ * design-of-experiments matrices.
  *
  * A schedule is deterministic given its stored seed. Balance is reported as
  * realized, never guaranteed. DOE output states the assumed model and aliasing;
