@@ -26,12 +26,31 @@ const RUNNER = join(VENDOR_DIR, 'runner.mjs')
 const REGISTER = join(VENDOR_DIR, 'register.mjs')
 const VENDOR_COMMIT = 'c48e29450134d7a41559a73112962377f9602bce'
 
-const ACTIONS = ['review', 'estimate', 'pdf2md', 'verify_citations', 'status', 'show', 'list']
-const SECTIONS = ['summary', 'comments', 'questions', 'checklist', 'claims', 'citations', 'markdown']
+const ACTIONS = ['review', 'estimate', 'pdf2md', 'verify_citations', 'status', 'show', 'compare', 'list']
+const SECTIONS = ['summary', 'comments', 'questions', 'checklist', 'claims', 'citations', 'markdown', 'rounds']
 const TOPOLOGIES = ['LOW', 'MID', 'HIGH', 'EXTRA_HIGH']
 const THINKING_LEVELS = ['LOW', 'MEDIUM', 'HIGH']
 const SEVERITIES = ['CRITICAL', 'MAJOR', 'MINOR', 'SUGGESTION', 'SEVERITY_UNSPECIFIED']
 const SEVERITY_RANK = { CRITICAL: 0, MAJOR: 1, MINOR: 2, SUGGESTION: 3, SEVERITY_UNSPECIFIED: 4 }
+/**
+ * Rounds are meta.schemaVersion 2. Version 1 stored one review per manuscript
+ * and let the next run overwrite it, which made a revision's effect unmeasurable.
+ */
+const META_SCHEMA_VERSION = 2
+const ROUNDS_DIR = 'rounds'
+const ROUND_COMMENT_CAP = 200
+const ROUND_CLAIM_CAP = 200
+const ROUND_QUESTION_CAP = 60
+const COMPARE_LIST_CAP = 25
+const COMPARE_CLIP = 220
+const CLEAN_CITATION_VERDICTS = ['OK', 'SKIPPED', 'VERIFIED_BY_SEARCH']
+const CLAIM_STATUS_RANK = { UNSUPPORTED: 0, OVERCLAIMED: 1, PARTIALLY_SUPPORTED: 2, SUPPORTED: 3 }
+/**
+ * Wording-similarity floor for pairing a reworded finding across rounds. The
+ * engine re-issues comment ids per run, so exact wording alone splits a
+ * rephrased criticism into one closed and one opened finding.
+ */
+const FUZZY_MIN_JACCARD = 0.6
 const ALLOWED_ENV = [
   'PATH', 'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'TMPDIR', 'TMP', 'TEMP',
   'LANG', 'LC_ALL', 'LC_CTYPE', 'TZ', 'NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS',
@@ -82,6 +101,7 @@ function storePaths(cwd, key) {
     dirRel: relative(cwd, dir),
     meta: join(dir, 'meta.json'),
     runs: join(dir, 'runs.jsonl'),
+    roundsDir: join(dir, ROUNDS_DIR),
     reviewJson: join(dir, ARTIFACTS.review_json),
     reviewMarkdown: join(dir, ARTIFACTS.review_markdown),
     paperMarkdown: join(dir, ARTIFACTS.paper_markdown),
@@ -465,8 +485,9 @@ async function runEngine(action, engineArgs, { cwd, timeoutMinutes, signal, env,
 
 /** Stream engine stderr and bridge call events into the session's job panel. */
 function makeProgressSink(job) {
-  if (!job) return { onStderr() {}, onEvent() {}, flush() {} }
+  if (!job) return { onStderr() {}, onEvent() {}, flush() {}, usage: () => null }
   let buffer = ''
+  const tally = { calls: 0, prompt_tokens: 0, completion_tokens: 0 }
   const emit = (line) => {
     if (!line) return
     job.append(`${line}\n`, { channel: 'stderr' })
@@ -492,10 +513,16 @@ function makeProgressSink(job) {
         const usage = event.usage
           ? ` · ${event.usage.prompt_tokens} in / ${event.usage.completion_tokens} out tokens`
           : ''
+        tally.calls += 1
+        tally.prompt_tokens += Number(event.usage?.prompt_tokens) || 0
+        tally.completion_tokens += Number(event.usage?.completion_tokens) || 0
         job.append(`[bridge] call ${event.call} done in ${event.durationMs} ms${usage}\n`, { channel: 'log' })
       } else if (event.type === 'error') {
         job.append(`[bridge] call ${event.call} failed: ${clip(event.message, 300)}\n`, { channel: 'log' })
       }
+    },
+    usage() {
+      return tally.calls ? { ...tally } : null
     },
     flush() {
       if (buffer) {
@@ -675,6 +702,390 @@ function summarizeReview(review = {}) {
   }
 }
 
+/**
+ * Findings move between rounds without stable identities — the engine assigns
+ * comment ids per run — so `compare` matches on id, then normalized summary,
+ * then the quoted span, and reports which rule matched.
+ */
+export function normalizeText(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 240)
+}
+
+function commentMatchKeys(comment) {
+  const keys = []
+  const id = String(comment?.commentId ?? '').trim()
+  if (id) keys.push(`id:${id}`)
+  const summary = normalizeText(comment?.summary)
+  if (summary) keys.push(`summary:${summary}`)
+  const quote = normalizeText(quoteText(comment?.location))
+  if (quote) keys.push(`quote:${quote}`)
+  return keys
+}
+
+function listValue(list) {
+  return Array.isArray(list) ? list : []
+}
+
+function reviewDigest(review, bits = {}) {
+  const result = review?.result && typeof review.result === 'object' ? review.result : {}
+  const allComments = listValue(result.anchoredComments)
+  const allQuestions = listValue(result.questionsForAuthors)
+  const checklist = listValue(result.reproducibilityChecklist).map((item) => ({
+    key: item?.key ?? null,
+    label: item?.label ?? null,
+    status: item?.status ?? null,
+  }))
+  const claims = listValue(result.claimEvidenceMap).slice(0, ROUND_CLAIM_CAP).map((claim) => ({
+    claim_id: claim?.claimId ?? null,
+    claim: clip(claim?.claim || '', 400),
+    status: claim?.status ?? null,
+    evidence_type: claim?.evidenceType ?? null,
+    keys: [`claim:${normalizeText(claim?.claim)}`].filter((key) => key !== 'claim:'),
+  }))
+  return {
+    run_id: bits.run_id ?? null,
+    started_at: bits.started_at ?? null,
+    finished_at: bits.finished_at ?? null,
+    duration_ms: bits.duration_ms ?? null,
+    state: bits.state ?? null,
+    input_sha1: bits.input_sha1 ?? null,
+    input_path: bits.input_path ?? null,
+    params: bits.params ?? null,
+    model: bits.model ?? null,
+    usage: bits.usage ?? null,
+    contribution_type: result.contributionType ?? null,
+    markdown: bits.markdown ?? null,
+    counts: {
+      comments: allComments.length,
+      by_severity: countBy(allComments, (comment) => comment?.severity),
+      questions: allQuestions.length,
+      checklist_by_status: countBy(checklist, (item) => item?.status),
+      claims_by_status: countBy(claims, (claim) => claim?.status),
+      flagged_citations: allComments.filter((comment) => comment?.citationReport).length,
+    },
+    comments: allComments.slice(0, ROUND_COMMENT_CAP).map((comment) => ({
+      comment_id: comment?.commentId ?? null,
+      severity: comment?.severity ?? 'SEVERITY_UNSPECIFIED',
+      summary: clip(comment?.summary || '', 500),
+      location: locationText(comment?.location),
+      quote: clip(quoteText(comment?.location) || '', 200),
+      keys: commentMatchKeys(comment),
+      citation_ref: comment?.citationReport?.refNum ?? null,
+      citation_verdict: comment?.citationReport?.finalVerdict ?? null,
+    })),
+    checklist,
+    claims,
+    questions: allQuestions.slice(0, ROUND_QUESTION_CAP).map((question) => ({
+      number: question?.questionNumber ?? null,
+      question: clip(question?.question || '', COMPARE_CLIP),
+      keys: [`question:${normalizeText(question?.question)}`].filter((key) => key !== 'question:'),
+    })),
+  }
+}
+
+function roundIndexEntry(detail, extra = {}) {
+  return {
+    round: extra.round ?? null,
+    run_id: detail.run_id,
+    started_at: detail.started_at,
+    finished_at: detail.finished_at,
+    duration_ms: detail.duration_ms,
+    state: detail.state,
+    input_sha1: detail.input_sha1,
+    input_path: detail.input_path,
+    params: detail.params,
+    model: detail.model,
+    usage: detail.usage,
+    contribution_type: detail.contribution_type,
+    counts: detail.counts,
+    artifacts: extra.artifacts ?? {},
+  }
+}
+
+function roundRel(paths, runId, extension) {
+  return `${paths.dirRel}/${ROUNDS_DIR}/${runId}${extension}`
+}
+
+/**
+ * A store written before rounds existed holds exactly one review in
+ * `review.json`. Digest it as round 1 so the next review adds a round instead
+ * of destroying the only record the workspace has.
+ */
+function priorRoundDigest(paths, meta) {
+  if (!meta?.review || !existsSync(paths.reviewJson)) return null
+  const review = readJsonFile(paths.reviewJson)
+  if (!review) return null
+  const stamp = `${meta.review?.finished_at ?? meta.last_run?.finished_at ?? ''}|${meta.input?.sha1 ?? ''}`
+  return reviewDigest(review, {
+    run_id: meta.last_run?.run_id || `legacy-${sha1(stamp).slice(0, 12)}`,
+    started_at: meta.last_run?.started_at ?? null,
+    finished_at: meta.review?.finished_at ?? meta.last_run?.finished_at ?? null,
+    duration_ms: meta.last_run?.duration_ms ?? null,
+    state: meta.last_run?.state ?? 'SUCCEEDED',
+    input_sha1: meta.input?.sha1 ?? null,
+    input_path: meta.input?.path ?? null,
+    params: meta.review?.params ?? meta.params ?? null,
+  })
+}
+
+function materializePriorRound(paths, meta) {
+  const detail = priorRoundDigest(paths, meta)
+  if (!detail) return null
+  const files = { [`${ROUNDS_DIR}/${detail.run_id}.json`]: detail }
+  const artifacts = { json: roundRel(paths, detail.run_id, '.json') }
+  if (existsSync(paths.reviewMarkdown)) {
+    try {
+      const markdown = readFileSync(paths.reviewMarkdown, 'utf8')
+      files[`${ROUNDS_DIR}/${detail.run_id}.md`] = markdown
+      detail.markdown = roundRel(paths, detail.run_id, '.md')
+      artifacts.markdown = detail.markdown
+    } catch {
+      // the digest is what compare needs; a report copy is a convenience
+    }
+  }
+  return { entry: roundIndexEntry(detail, { round: 1, artifacts }), files }
+}
+
+function storedRounds(paths, meta) {
+  if (Array.isArray(meta?.rounds) && meta.rounds.length) {
+    return meta.rounds.filter(Boolean).map((entry, index) => ({ ...entry, round: entry.round ?? index + 1 }))
+  }
+  const detail = priorRoundDigest(paths, meta)
+  return detail ? [roundIndexEntry(detail, { round: 1 })] : []
+}
+
+function roundDetail(paths, meta, entry) {
+  if (!entry?.run_id) return null
+  const file = join(paths.roundsDir, `${entry.run_id}.json`)
+  if (existsSync(file)) return readJsonFile(file)
+  const prior = priorRoundDigest(paths, meta)
+  return prior && prior.run_id === entry.run_id ? prior : null
+}
+
+function tokenSet(text) {
+  return new Set(String(text || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .filter(Boolean))
+}
+
+function jaccardTokens(a, b) {
+  if (!a.size || !b.size) return 0
+  let shared = 0
+  for (const token of b) if (a.has(token)) shared += 1
+  const union = a.size + b.size - shared
+  return union ? shared / union : 0
+}
+
+/** The wording an item was found by, taken from its non-id match keys. */
+function fuzzyText(item) {
+  return (item?.keys || [])
+    .filter((key) => /^(summary|claim|question):/.test(key))
+    .map((key) => key.slice(key.indexOf(':') + 1))
+    .join(' ')
+}
+
+/**
+ * Greedy layered match: exact keys first (id, wording, quoted span, and the
+ * claim/question equivalents), then a wording-similarity pass over what is
+ * left. Each side is used once, and every pair records which rule made it.
+ * Exported so the calibration harness measures the same thing `compare` does.
+ */
+export function matchPool(fromItems, toItems) {
+  const remaining = fromItems.map((item) => ({ item, keys: item?.keys || [] }))
+  const pairs = []
+  let opened = []
+  // The exact tiers start at zero so a reader can see that, e.g., id matching
+  // never fired rather than wondering whether it was skipped.
+  const byRule = { id: 0, summary: 0, quote: 0 }
+  for (const target of toItems) {
+    const keys = target?.keys || []
+    let hit = null
+    let rule = null
+    for (const prefix of ['id:', 'summary:', 'quote:', 'claim:', 'question:']) {
+      const want = keys.filter((key) => key.startsWith(prefix))
+      if (!want.length) continue
+      const index = remaining.findIndex((slot) => slot.keys.some((key) => want.includes(key)))
+      if (index >= 0) {
+        hit = index
+        rule = prefix.slice(0, -1)
+        break
+      }
+    }
+    if (hit == null) {
+      opened.push(target)
+      continue
+    }
+    byRule[rule] = (byRule[rule] ?? 0) + 1
+    pairs.push({ from: remaining[hit].item, to: target, matched_by: rule })
+    remaining.splice(hit, 1)
+  }
+
+  if (opened.length && remaining.length) {
+    const candidates = opened
+    const scored = []
+    for (const [ti, target] of candidates.entries()) {
+      const tokens = tokenSet(fuzzyText(target))
+      if (!tokens.size) continue
+      for (const [ri, slot] of remaining.entries()) {
+        const score = jaccardTokens(tokens, tokenSet(fuzzyText(slot.item)))
+        if (score >= FUZZY_MIN_JACCARD) scored.push({ ti, ri, score })
+      }
+    }
+    scored.sort((a, b) => b.score - a.score || a.ti - b.ti || a.ri - b.ri)
+    const usedTarget = new Set()
+    const usedSource = new Set()
+    for (const match of scored) {
+      if (usedTarget.has(match.ti) || usedSource.has(match.ri)) continue
+      usedTarget.add(match.ti)
+      usedSource.add(match.ri)
+      byRule.similar = (byRule.similar ?? 0) + 1
+      pairs.push({
+        from: remaining[match.ri].item,
+        to: candidates[match.ti],
+        matched_by: 'similar',
+        score: Number(match.score.toFixed(2)),
+      })
+    }
+    opened = candidates.filter((_item, index) => !usedTarget.has(index))
+    return { pairs, opened, closed: remaining.filter((_slot, index) => !usedSource.has(index)).map((slot) => slot.item), byRule }
+  }
+
+  return { pairs, opened, closed: remaining.map((slot) => slot.item), byRule }
+}
+
+function compareDigests(from, to) {
+  const brief = (item) => ({
+    severity: item.severity ?? null,
+    summary: clip(item.summary || '', COMPARE_CLIP),
+    location: item.location || null,
+  })
+  const commentMatch = matchPool(from?.comments || [], to?.comments || [])
+  const persisting = commentMatch.pairs.map((pair) => ({
+    ...brief(pair.to),
+    from_severity: pair.from.severity ?? null,
+    matched_by: pair.matched_by,
+    score: pair.score ?? null,
+    changed: (pair.from.severity ?? null) !== (pair.to.severity ?? null),
+  }))
+  const severityMoved = persisting.filter((item) => item.changed)
+
+  const claimMatch = matchPool(from?.claims || [], to?.claims || [])
+  const claimRank = (status) => CLAIM_STATUS_RANK[status] ?? -1
+  const claimsMoved = claimMatch.pairs
+    .filter((pair) => claimRank(pair.to.status) !== claimRank(pair.from.status))
+    .map((pair) => ({
+      claim: clip(pair.to.claim || '', COMPARE_CLIP),
+      from_status: pair.from.status ?? null,
+      to_status: pair.to.status ?? null,
+      improved: claimRank(pair.to.status) > claimRank(pair.from.status),
+    }))
+
+  const questionMatch = matchPool(from?.questions || [], to?.questions || [])
+
+  const citationsById = (digest) => {
+    const map = new Map()
+    for (const comment of digest?.comments || []) {
+      if (comment?.citation_verdict == null) continue
+      map.set(String(comment.citation_ref ?? comment.citation_verdict), {
+        ref: comment.citation_ref ?? null,
+        verdict: comment.citation_verdict,
+        reference: comment.summary || '',
+      })
+    }
+    return map
+  }
+  const fromCitations = citationsById(from)
+  const toCitations = citationsById(to)
+  const citationDelta = { fixed: [], still_flagged: [], newly_flagged: [] }
+  for (const [id, entry] of fromCitations) {
+    const next = toCitations.get(id)
+    if (next && CLEAN_CITATION_VERDICTS.includes(next.verdict)) continue
+    if (!next || CLEAN_CITATION_VERDICTS.includes(next.verdict)) {
+      citationDelta.fixed.push({ ref_num: entry.ref ?? id, from_verdict: entry.verdict, to_verdict: next?.verdict ?? 'removed' })
+      continue
+    }
+    citationDelta.still_flagged.push({ ref_num: entry.ref ?? id, verdict: next.verdict })
+  }
+  for (const [id, entry] of toCitations) {
+    if (fromCitations.has(id) || CLEAN_CITATION_VERDICTS.includes(entry.verdict)) continue
+    citationDelta.newly_flagged.push({ ref_num: entry.ref ?? id, verdict: entry.verdict })
+  }
+
+  const checklistBy = (digest) => new Map((digest?.checklist || []).map((item) => [String(item.key), item]))
+  const fromChecklist = checklistBy(from)
+  const toChecklist = checklistBy(to)
+  const checklistDelta = [...new Set([...fromChecklist.keys(), ...toChecklist.keys()])].map((key) => {
+    const before = fromChecklist.get(key)
+    const after = toChecklist.get(key)
+    return {
+      key,
+      label: after?.label ?? before?.label ?? null,
+      from_status: before?.status ?? null,
+      to_status: after?.status ?? null,
+      changed: (before?.status ?? null) !== (after?.status ?? null),
+    }
+  })
+
+  return {
+    comments: {
+      total_from: from?.comments?.length ?? 0,
+      total_to: to?.comments?.length ?? 0,
+      closed_total: commentMatch.closed.length,
+      opened_total: commentMatch.opened.length,
+      persisting_total: commentMatch.pairs.length,
+      severity_changed: severityMoved.length,
+      matched_by: commentMatch.byRule,
+      closed: commentMatch.closed.slice(0, COMPARE_LIST_CAP).map(brief),
+      opened: commentMatch.opened.slice(0, COMPARE_LIST_CAP).map(brief),
+      moved: persisting.filter((item) => item.changed).slice(0, COMPARE_LIST_CAP),
+    },
+    claims: {
+      by_status_from: from?.counts?.claims_by_status ?? {},
+      by_status_to: to?.counts?.claims_by_status ?? {},
+      resolved_total: claimMatch.closed.length,
+      raised_total: claimMatch.opened.length,
+      changed: claimsMoved.slice(0, COMPARE_LIST_CAP),
+    },
+    questions: {
+      total_from: from?.questions?.length ?? 0,
+      total_to: to?.questions?.length ?? 0,
+      dropped_total: questionMatch.closed.length,
+      added_total: questionMatch.opened.length,
+      dropped: questionMatch.closed.slice(0, COMPARE_LIST_CAP).map((item) => item.question),
+      added: questionMatch.opened.slice(0, COMPARE_LIST_CAP).map((item) => item.question),
+    },
+    checklist: {
+      changed_total: checklistDelta.filter((item) => item.changed).length,
+      transitions: checklistDelta.filter((item) => item.changed).slice(0, 12),
+      statuses_from: from?.counts?.checklist_by_status ?? {},
+      statuses_to: to?.counts?.checklist_by_status ?? {},
+    },
+    citations: {
+      flagged_from: from?.counts?.flagged_citations ?? 0,
+      flagged_to: to?.counts?.flagged_citations ?? 0,
+      fixed_total: citationDelta.fixed.length,
+      still_flagged_total: citationDelta.still_flagged.length,
+      newly_flagged_total: citationDelta.newly_flagged.length,
+      fixed: citationDelta.fixed.slice(0, 12),
+      still_flagged: citationDelta.still_flagged.slice(0, 12),
+      newly_flagged: citationDelta.newly_flagged.slice(0, 12),
+    },
+    usage: {
+      from: from?.usage ?? null,
+      to: to?.usage ?? null,
+      duration_ms_from: from?.duration_ms ?? null,
+      duration_ms_to: to?.duration_ms ?? null,
+    },
+  }
+}
+
 function engineInfo(exec) {
   let route = null
   try {
@@ -693,7 +1104,7 @@ function engineInfo(exec) {
 
 function baseMeta(input, params, exec) {
   return {
-    schemaVersion: 1,
+    schemaVersion: META_SCHEMA_VERSION,
     key: input.key,
     input: {
       path: input.rel,
@@ -707,11 +1118,15 @@ function baseMeta(input, params, exec) {
     last_run: null,
     summary: null,
     artifacts: {},
+    rounds: [],
+    latest_round: null,
   }
 }
 
 function mergeMeta(previous, input, params, exec) {
-  const meta = previous && previous.schemaVersion === 1 ? previous : baseMeta(input, params, exec)
+  const stored = previous && (previous.schemaVersion === 1 || previous.schemaVersion === 2)
+  const meta = stored ? previous : baseMeta(input, params, exec)
+  meta.schemaVersion = META_SCHEMA_VERSION
   meta.key = input.key
   meta.input = {
     path: input.rel,
@@ -722,11 +1137,13 @@ function mergeMeta(previous, input, params, exec) {
   }
   meta.engine = engineInfo(exec)
   meta.params = params
+  if (!Array.isArray(meta.rounds)) meta.rounds = []
   return meta
 }
 
 async function persistArtifacts(cwd, paths, files, buildMeta) {
   mkdirSync(paths.dir, { recursive: true })
+  mkdirSync(paths.roundsDir, { recursive: true })
   let meta
   await withLock(paths.dir, async () => {
     for (const [name, content] of Object.entries(files)) {
@@ -877,36 +1294,66 @@ async function actionReview(args, exec, cwd, input, ctx) {
       rmSync(tmpPaper, { force: true })
     }
 
+    const run = runRecord('review', startedAt, {
+      review_id: ids.reviewId,
+      document_id: ids.documentId,
+      state: review?.state || 'SUCCEEDED',
+      error: summary.error,
+    })
+    const markdownText = typeof review?.result?.reviewMarkdown === 'string' ? review.result.reviewMarkdown : null
     const files = { [ARTIFACTS.review_json]: review }
-    if (typeof review?.result?.reviewMarkdown === 'string') {
-      files[ARTIFACTS.review_markdown] = review.result.reviewMarkdown
-    }
+    if (markdownText != null) files[ARTIFACTS.review_markdown] = markdownText
     if (paperMarkdown != null) files[ARTIFACTS.paper_markdown] = paperMarkdown
 
-    const meta = await persistArtifacts(cwd, paths, files, (current) => {
+    const detail = reviewDigest(review, {
+      run_id: run.run_id,
+      started_at: startedAt,
+      finished_at: run.finished_at,
+      duration_ms: run.duration_ms,
+      state: run.state,
+      input_sha1: input.sha1,
+      input_path: input.rel,
+      params,
+      model: sessionModelName(exec) || null,
+      usage: progress.usage(),
+    })
+    files[`${ROUNDS_DIR}/${run.run_id}.json`] = detail
+    if (markdownText != null) files[`${ROUNDS_DIR}/${run.run_id}.md`] = markdownText
+
+    // Read before the write: a store from before rounds holds one review, and
+    // this run is about to overwrite it.
+    const prior = materializePriorRound(paths, readMeta(paths.dir))
+
+    const meta = await persistArtifacts(cwd, paths, { ...prior?.files, ...files }, (current) => {
       const next = mergeMeta(current, input, params, exec)
-      next.last_run = runRecord('review', startedAt, {
-        review_id: ids.reviewId,
-        document_id: ids.documentId,
-        state: review?.state || 'SUCCEEDED',
-        error: summary.error,
-      })
+      next.last_run = run
       next.summary = summary
       next.review = {
         sha1: input.sha1,
         review_id: ids.reviewId,
         document_id: ids.documentId,
-        finished_at: next.last_run.finished_at,
+        finished_at: run.finished_at,
         params: { ...params },
       }
+      const seeded = next.rounds.length ? next.rounds.filter(Boolean) : (prior ? [prior.entry] : [])
+      const round = seeded.reduce((max, entry) => Math.max(max, Number(entry.round) || 0), 0) + 1
+      const artifacts = { json: roundRel(paths, run.run_id, '.json') }
+      if (markdownText != null) artifacts.markdown = roundRel(paths, run.run_id, '.md')
+      next.rounds = [...seeded, roundIndexEntry(detail, { round, artifacts })]
+      next.latest_round = round
       return next
     })
 
+    const entry = meta.rounds[meta.rounds.length - 1]
     return {
       action: 'review',
       key: input.key,
       dir: paths.dirRel,
       ...summary,
+      round: entry?.round ?? null,
+      rounds: meta.rounds.length,
+      seeded_prior_round: prior ? prior.entry.round : null,
+      usage: detail.usage,
       provider: meta.engine.provider,
       model: meta.engine.model,
       topology: params.topology,
@@ -916,6 +1363,7 @@ async function actionReview(args, exec, cwd, input, ctx) {
         review: meta.artifacts.review_json?.path ?? null,
         markdown: meta.artifacts.review_markdown?.path ?? null,
         paper: meta.artifacts.paper_markdown?.path ?? null,
+        round: entry?.artifacts ?? null,
       },
       engine_stderr_tail: result.stderr ? clip(result.stderr.slice(-600), 600) : null,
     }
@@ -1093,6 +1541,38 @@ async function actionVerifyCitations(args, exec, cwd, input, ctx) {
   }
 }
 
+function roundTotals(entries) {
+  const totals = { duration_ms: 0, model_calls: 0, prompt_tokens: 0, completion_tokens: 0 }
+  for (const entry of entries) {
+    totals.duration_ms += Number(entry.duration_ms) || 0
+    totals.model_calls += Number(entry.usage?.calls) || 0
+    totals.prompt_tokens += Number(entry.usage?.prompt_tokens) || 0
+    totals.completion_tokens += Number(entry.usage?.completion_tokens) || 0
+  }
+  return totals
+}
+
+function roundViews(paths, meta, currentSha1) {
+  return storedRounds(paths, meta).map((entry) => ({
+    round: entry.round,
+    run_id: entry.run_id,
+    finished_at: entry.finished_at,
+    duration_ms: entry.duration_ms,
+    state: entry.state,
+    comments: entry.counts?.comments ?? null,
+    by_severity: entry.counts?.by_severity ?? {},
+    questions: entry.counts?.questions ?? null,
+    claims_by_status: entry.counts?.claims_by_status ?? {},
+    flagged_citations: entry.counts?.flagged_citations ?? null,
+    topology: entry.params?.topology ?? null,
+    thinking_level: entry.params?.thinking_level ?? null,
+    model: entry.model ?? null,
+    usage: entry.usage ?? null,
+    reviewed_this_input: (entry.input_sha1 ?? null) === (currentSha1 ?? null),
+    artifacts: entry.artifacts ?? {},
+  }))
+}
+
 function actionStatus(args, cwd, input) {
   const paths = storePaths(cwd, input.key)
   const meta = readMeta(paths.dir)
@@ -1100,6 +1580,7 @@ function actionStatus(args, cwd, input) {
     throw new Error(`no stored deep review for ${input.rel}; run action "review" first`)
   }
   const artifacts = artifactIndex(paths.dir, cwd)
+  const rounds = roundViews(paths, meta, input.sha1)
   return {
     action: 'status',
     key: input.key,
@@ -1108,7 +1589,66 @@ function actionStatus(args, cwd, input) {
     input: meta.input,
     last_run: meta.last_run,
     summary: meta.summary,
+    rounds: {
+      total: rounds.length,
+      latest_round: meta.latest_round ?? (rounds.length || null),
+      totals: roundTotals(meta.rounds || rounds),
+      recent: rounds.slice(-5),
+    },
     artifacts,
+  }
+}
+
+function pickRound(entries, selector, fallback) {
+  if (selector == null || String(selector).trim() === '') return fallback
+  const asNumber = Number(String(selector).trim())
+  if (Number.isInteger(asNumber) && asNumber > 0) {
+    const hit = entries.find((entry) => entry.round === asNumber)
+    if (hit) return hit
+  }
+  const wanted = String(selector).trim()
+  const byRun = entries.find((entry) => entry.run_id === wanted)
+  if (byRun) return byRun
+  throw new Error(`no stored round "${wanted}" (rounds 1–${entries.length} exist; pass a round number or run_id)`)
+}
+
+function actionCompare(args, cwd, input) {
+  const paths = storePaths(cwd, input.key)
+  const meta = readMeta(paths.dir)
+  if (!meta) throw new Error(`no stored deep review for ${input.rel}; run action "review" first`)
+  const entries = storedRounds(paths, meta)
+  if (!entries.length) throw new Error(`no stored review rounds for ${input.rel}; run action "review" first`)
+  if (entries.length < 2) {
+    throw new Error(`only 1 review round stored for ${input.rel}; revise the manuscript and run "review" again, then "compare" to see which findings moved`)
+  }
+  const to = pickRound(entries, args.to, entries[entries.length - 1])
+  const from = pickRound(entries, args.from, entries[Math.max(0, entries.indexOf(to) - 1)])
+  if (!from) throw new Error('no earlier round to compare against; "from" must differ from "to"')
+  if (from.run_id === to.run_id) throw new Error('"from" and "to" name the same round')
+  const fromDetail = roundDetail(paths, meta, from)
+  const toDetail = roundDetail(paths, meta, to)
+  if (!fromDetail || !toDetail) {
+    throw new Error(`round digest missing for ${from.run_id === to.run_id ? from.run_id : `${from.run_id}/${to.run_id}`}; the ${ROUNDS_DIR}/ files were edited or deleted out of band`)
+  }
+  const ref = (entry) => ({
+    round: entry.round,
+    run_id: entry.run_id,
+    finished_at: entry.finished_at,
+    input_sha1: entry.input_sha1,
+    reviewed_this_input: (entry.input_sha1 ?? null) === (input.sha1 ?? null),
+    topology: entry.params?.topology ?? null,
+    thinking_level: entry.params?.thinking_level ?? null,
+  })
+  return {
+    action: 'compare',
+    key: input.key,
+    dir: paths.dirRel,
+    stale: reviewStale(meta, input),
+    from: ref(from),
+    to: ref(to),
+    input_changed: (from.input_sha1 ?? '') !== (to.input_sha1 ?? ''),
+    ...compareDigests(fromDetail, toDetail),
+    note: `Advisory: the engine re-issues comment ids per run, so findings are paired by wording, then wording similarity (≥${FUZZY_MIN_JACCARD} token overlap), then the quoted span — the "Matched by" line says which rule made each pair. A closed finding is a lead, not proof the criticism was resolved, and if the manuscript bytes did not change the movement is reviewer variance.`,
   }
 }
 
@@ -1276,6 +1816,16 @@ function actionShow(args, cwd, input) {
   if (section === 'markdown') {
     return { ...base, ...showMarkdown(cwd, paths, args) }
   }
+  if (section === 'rounds') {
+    const rounds = roundViews(paths, meta, input.sha1)
+    return {
+      ...base,
+      total: rounds.length,
+      latest_round: meta?.latest_round ?? (rounds.length || null),
+      totals: roundTotals(meta?.rounds && meta.rounds.length ? meta.rounds : rounds),
+      rounds,
+    }
+  }
   if (!review) {
     throw new Error(`no stored deep review for ${input.rel}; run action "review" first`)
   }
@@ -1329,6 +1879,7 @@ async function runDeepReview(args = {}, exec = {}, ctx = null) {
   if (action === 'pdf2md') return actionPdf2md(args, exec, cwd, input)
   if (action === 'verify_citations') return actionVerifyCitations(args, exec, cwd, input, ctx)
   if (action === 'status') return actionStatus(args, cwd, input)
+  if (action === 'compare') return actionCompare(args, cwd, input)
   return actionShow(args, cwd, input)
 }
 
@@ -1341,6 +1892,8 @@ function renderReviewSummary(value) {
   const state = value.state || 'SUCCEEDED'
   const duration = Number.isFinite(value.duration_ms) ? ` (${value.duration_ms} ms)` : ''
   lines.push(`Deep review ${state.toLowerCase()} for ${value.dir}${duration}.`)
+  if (value.round) lines.push(`Round ${value.round} of ${value.rounds ?? value.round}; earlier rounds stay under ${value.dir}/rounds/.`)
+  if (value.usage) lines.push(`Model calls this round: ${value.usage.calls} (${value.usage.prompt_tokens} in / ${value.usage.completion_tokens} out tokens).`)
   if (value.stale === true) lines.push('Note: the manuscript changed since this run (stale).')
   if (value.contribution_type) lines.push(`Contribution type: ${value.contribution_type}`)
   const bySeverity = value.comments?.by_severity || {}
@@ -1384,11 +1937,51 @@ function renderDeepReview(value) {
   }
   if (value.action === 'status') {
     const last = value.last_run || {}
+    const rounds = value.rounds || {}
+    const totals = rounds.totals || {}
     return text([
       `Stored deep review for ${value.input?.path} (${value.stale ? 'stale: manuscript changed' : 'current'}).`,
       `Last run: ${last.action || '?'} · ${last.state || '?'} · ${last.finished_at || '?'}${last.error ? ` · ${clip(last.error, 300)}` : ''}`,
       `Comments: ${value.summary?.comments?.total ?? '—'}; questions: ${value.summary?.questions ?? '—'}. Dir ${value.dir}.`,
+      `Rounds: ${rounds.total ?? 0} (latest ${rounds.latest_round ?? '—'})`
+        + `${totals.model_calls ? ` · ${totals.model_calls} model call(s), ${totals.prompt_tokens} in / ${totals.completion_tokens} out tokens` : ''}`
+        + `${(rounds.total ?? 0) > 1 ? '; use action "compare" to see which findings moved' : '; a second review enables action "compare"'}.`,
+      ...(rounds.recent || []).slice(-3).map((round) => `- round ${round.round}: ${round.comments ?? 0} comment(s), ${round.finished_at || '?'}${round.reviewed_this_input ? '' : ' (older manuscript)'}`),
     ].join('\n'))
+  }
+  if (value.action === 'compare') {
+    const lines = [
+      `Round ${value.from?.round} (${value.from?.finished_at || '?'}) → round ${value.to?.round} (${value.to?.finished_at || '?'})${value.input_changed ? ' — the manuscript changed between rounds' : ' — same manuscript hash, so this is reviewer variance, not revision'}.`,
+    ]
+    const comments = value.comments || {}
+    lines.push(`Comments: ${comments.total_from} → ${comments.total_to}. Closed ${comments.closed_total}, still open ${comments.persisting_total}, new ${comments.opened_total}, severity moved ${comments.severity_changed}.`)
+    const rules = Object.entries(comments.matched_by || {}).map(([key, count]) => `${key} ${count}`).join(', ')
+    if (rules) lines.push(`Matched by: ${rules} — the engine re-issues comment ids per run, so "similar" pairs a reworded finding at ≥${FUZZY_MIN_JACCARD} token overlap.`)
+    for (const item of comments.closed.slice(0, 10)) lines.push(`- closed [${String(item.severity).toLowerCase()}] ${item.summary}`)
+    for (const item of comments.opened.slice(0, 10)) lines.push(`- new [${String(item.severity).toLowerCase()}] ${item.summary}`)
+    for (const item of comments.moved.slice(0, 10)) {
+      const how = item.matched_by === 'similar' ? ` (reworded, overlap ${item.score ?? '?'})` : ''
+      lines.push(`- moved [${String(item.from_severity).toLowerCase()} → ${String(item.severity).toLowerCase()}] ${item.summary}${how}`)
+    }
+    const claims = value.claims || {}
+    if (claims.changed?.length || claims.raised_total || claims.resolved_total) {
+      lines.push(`Claims: ${claims.changed.filter((item) => item.improved).length} better supported, ${claims.changed.filter((item) => !item.improved).length} weaker; ${Object.entries(claims.by_status_to || {}).map(([key, count]) => `${key} ${count}`).join(', ')}.`)
+      for (const item of claims.changed.slice(0, 8)) lines.push(`- ${item.improved ? '↑' : '↓'} ${item.from_status} → ${item.to_status}: ${item.claim}`)
+    }
+    const checklist = value.checklist || {}
+    if (checklist.changed_total) {
+      lines.push(`Checklist: ${checklist.changed_total} item(s) changed status.`)
+      for (const item of checklist.transitions.slice(0, 8)) lines.push(`- ${item.label || item.key}: ${item.from_status ?? '—'} → ${item.to_status ?? '—'}`)
+    }
+    const citations = value.citations || {}
+    if (citations.fixed_total || citations.newly_flagged_total || citations.still_flagged_total) {
+      lines.push(`Citations: ${citations.fixed_total} now clean, ${citations.still_flagged_total} still flagged, ${citations.newly_flagged_total} newly flagged.`)
+    }
+    const questions = value.questions || {}
+    if (questions.total_from !== questions.total_to) lines.push(`Questions for authors: ${questions.total_from} → ${questions.total_to}.`)
+    if (value.usage?.to) lines.push(`This round cost ${value.usage.to.calls} model call(s), ${value.usage.to.prompt_tokens} in / ${value.usage.to.completion_tokens} out tokens.`)
+    lines.push(value.note)
+    return text(lines.join('\n'))
   }
   if (value.action === 'show') {
     if (value.section === 'summary') {
@@ -1414,6 +2007,11 @@ function renderDeepReview(value) {
     if (value.section === 'citations') {
       return text((value.citations || []).map((item) => `- [${item.ref_num}] ${item.verdict}: ${clip(item.reference, 200)}`).join('\n') || 'No flagged citations stored.')
     }
+    if (value.section === 'rounds') {
+      if (!value.total) return text(`No stored review rounds for this manuscript yet.`)
+      const lines = (value.rounds || []).map((round) => `- round ${round.round}: ${round.comments ?? 0} comment(s), ${round.questions ?? 0} question(s), ${round.flagged_citations ?? 0} flagged citation(s) · ${round.finished_at || '?'} · ${round.topology || 'default'}${round.reviewed_this_input ? '' : ' · older manuscript'}`)
+      return text([`${value.total} round(s), latest ${value.latest_round}.`, ...lines, value.total > 1 ? 'Use action "compare" for what moved.' : 'Run "review" again after revising to build the ladder.'].join('\n'))
+    }
     return text(value.markdown || '(empty review Markdown)')
   }
   if (value.action === 'list') {
@@ -1434,16 +2032,17 @@ export function apply(ctx) {
     name: 'deep_review',
     description: [
       'Run a Deep-Review-style multi-pass critique of a manuscript with the vendored Open Deep Review engine: segmented review passes, page/quote-anchored comments, a scholar-peer summary with questions for authors, and reference verification against OpenAlex/Crossref.',
-      'Actions: `review` (run the pipeline; slow and token-heavy), `estimate` (optional engine-run estimate; no model call), `pdf2md` (inspect a PDF), `verify_citations`, `status` (stored state, stale flag), `show` (read stored summary/comments/questions/checklist/claims/citations/markdown), `list` (stored reviews).',
-      'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. While a review runs, the engine stage/percentage and model-call events stream to the session\'s background-jobs panel; the result includes a `job_id` so the user can expand the finished log. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer.',
+      'Actions: `review` (run the pipeline; slow and token-heavy), `estimate` (optional engine-run estimate; no model call), `pdf2md` (inspect a PDF), `verify_citations`, `status` (stored state, stale flag, round ladder), `show` (read stored summary/comments/questions/checklist/claims/citations/markdown/rounds), `compare` (diff two review rounds), `list` (stored reviews).',
+      'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. Every `review` is kept as a numbered round with its report under `rounds/`, so reviewing again after a revision does not erase the earlier round — use `compare` to see which comments closed, reopened, or changed severity, and which claims, checklist items, or citations moved. After a revision, review and then compare instead of eyeballing the two reports. While a review runs, the engine stage/percentage and model-call events stream to the session\'s background-jobs panel; the result includes a `job_id` so the user can expand the finished log. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer.',
       'Whenever the user asks to review, critique, referee, or give feedback on a paper or manuscript, ask them to choose `deep_review` (multi-pass, takes minutes) or a normal session review before calling this tool — even for a plain "review this paper" — unless they explicitly chose a mode. Describe the deep option in the question; the user may not know it exists.',
+      'After finishing a paper, manuscript, or technical document, offer the same choice: deliver the draft, then ask whether the user wants a deep review of it. Offer only — never run `review` on a just-written document without the user agreeing.',
       'This is not the systematic-review ledger (`review`) or a reporting checklist (`reporting_check`); for a referee report written by the session model, delegate to the `peer-reviewer` subagent. Findings are advisory. Load the `deep-review` skill for the workflow.',
     ].join(' '),
     parameters: {
       action: {
         type: 'string',
         enum: ACTIONS,
-        description: 'review, estimate, pdf2md, verify_citations, status, show, or list. Default status.',
+        description: 'review, estimate, pdf2md, verify_citations, status, show, compare, or list. Default status.',
       },
       path: { type: 'string', description: 'Workspace-relative manuscript path (PDF, TeX, Markdown, or text). Required for every action except list.' },
       topology: {
@@ -1466,7 +2065,15 @@ export function apply(ctx) {
       section: {
         type: 'string',
         enum: SECTIONS,
-        description: 'show: summary (default), comments, questions, checklist, claims, citations, or markdown.',
+        description: 'show: summary (default), comments, questions, checklist, claims, citations, markdown, or rounds (the stored review ladder with per-round counts).',
+      },
+      from: {
+        type: 'string',
+        description: 'compare: the earlier round — a round number or run_id. Default: the round before "to".',
+      },
+      to: {
+        type: 'string',
+        description: 'compare: the later round — a round number or run_id. Default: the latest round.',
       },
       severity: {
         type: 'string',

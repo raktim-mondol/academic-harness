@@ -253,6 +253,16 @@ ok(
     'deep-review skill omits separate-cost framing',
     !/cost|paid|dollar/i.test(skill),
   )
+  ok(
+    'prompt offers deep review after finishing a paper or technical document',
+    /finish writing a paper, manuscript, or technical document/i.test(promptSource)
+      && /offer only, never run it unless the user agrees/i.test(promptSource),
+  )
+  ok(
+    'deep-review skill offers review after writing, never runs it unprompted',
+    /Writing ends the same way/i.test(skill)
+      && /never start one unprompted/i.test(skill),
+  )
 }
 try {
   const section = await import('../prompt-section.js')

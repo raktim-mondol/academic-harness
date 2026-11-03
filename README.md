@@ -109,8 +109,11 @@ and every segment is reviewed with the whole manuscript in context; comments are
 or a quotation, and a scholar-peer pass adds strengths and weaknesses, a claim-evidence map, a
 nine-item reproducibility checklist and questions for the authors. `estimate` prices a run before it
 starts, `review` runs on the session model (no separate key or endpoint), `show` reads a stored
-review back, and `status` marks it stale after the manuscript changes. Artifacts stay in
-`.dsh/deep-review/<key>/`, and `provenance_audit` indexes the claims stored there.
+review back, and `status` marks it stale after the manuscript changes. Every pass is kept as a
+numbered round, so reviewing again after a revision does not erase the first, and `compare` diffs
+two rounds — findings closed, opened, or moved in severity, plus claim, checklist, and citation
+transitions. Artifacts stay in `.dsh/deep-review/<key>/`, and `provenance_audit` indexes the claims
+stored there.
 [Read more](docs/PAPERS.md#deep-review)
 
 ## Deep research

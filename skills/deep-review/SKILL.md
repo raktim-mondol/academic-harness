@@ -1,10 +1,10 @@
 ---
 name: deep-review
-description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, with artifacts stored under `.dsh/deep-review/`. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, or a second opinion beyond the session model.
+description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, kept as numbered rounds that `compare` can diff. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, a second opinion beyond the session model, or whether a revision closed the findings from an earlier review.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
-  version: "1.0"
+  version: "1.1"
   skill-author: Academic Harness
 ---
 
@@ -15,8 +15,8 @@ metadata:
 > every artifact under `.dsh/deep-review/<key>/`, and returns compact summaries.
 > `review` and `verify_citations` run on the session model through the host LLM
 > service — the same provider and model as the chat, with no separate key or
-> endpoint. `pdf2md`, `status`, `show`, and `list` make no model call; `estimate`
-> is optional.
+> endpoint. `pdf2md`, `status`, `show`, `compare`, and `list` make no model call;
+> `estimate` is optional.
 
 Use this skill for a full-manuscript critique produced by an external multi-pass
 engine. It is not a fast proofread, not a systematic-review ledger, and not a
@@ -53,6 +53,12 @@ options, unless the user explicitly chose deep or normal in this conversation:
   when the request is small). Do not call `deep_review`.
 
 Do not run `review` before the user has chosen the deep review.
+
+Writing ends the same way: when a paper, manuscript, or technical document you
+just wrote is finished, deliver the draft and then offer this choice — describe
+what `deep_review` adds (multi-pass, page/quote-anchored comments, reference
+checks; several minutes) and wait for the user's answer.
+The user must accept before any review runs — never start one unprompted.
 
 ## Live progress
 
@@ -143,24 +149,62 @@ to `citation-checker`, and reporting items to `reporting_check`. After substanti
 edits, `status` reports the stored review as stale; re-run only if the user wants
 a fresh review, and confirm the run again.
 
+### 6. Measure the revision with the round ladder
+
+Every `review` is kept as a numbered round, so a revision is checkable instead of
+remembered. After the user approves a second run:
+
+```text
+deep_review action=review path=paper/main.pdf          # round 2, round 1 stays on disk
+deep_review action=compare path=paper/main.pdf          # latest vs previous
+deep_review action=compare path=paper/main.pdf from=1 to=2
+deep_review action=show path=paper/main.pdf section=rounds
+```
+
+`compare` reports closed, opened, and persisting findings with severity moves,
+plus claim, checklist, and citation transitions. Read it with two cautions, and
+state both to the user:
+
+- Findings are paired by wording, then wording similarity (token overlap ≥ 0.6),
+  then the quoted span. Comment ids are tried first but the engine re-issues them
+  per run, so ids rarely match. `compare` prints a `Matched by` line naming the
+  rule that paired each finding — read it before calling anything closed. A
+  reworded criticism can still slip past pairing, so a closed finding is a lead,
+  not proof the science improved.
+- If `compare` says the manuscript bytes did not change, every difference between
+  the rounds is reviewer variance. Measure that before crediting a revision with
+  closing anything, and never average over it silently.
+
+`compare` never accepts or rejects the paper, and the round ladder is not a
+score to climb. Where the user wants the tool itself checked,
+`node scripts/deep-review-calibration.mjs --report` summarizes stored rounds and
+their agreement with real OpenReview decisions, reporting `not_checked` when the
+sample is too small.
+
 ## State and artifacts
 
 ```
 .dsh/deep-review/<key>/
-  review.json       full engine result (comments, claims, checklist, questions, audit)
-  review.md         rendered report
+  review.json       full engine result for the latest round
+  review.md         rendered report for the latest round
+  rounds/*.json     per-round finding digest (matching keys, counts, claims, checklist)
+  rounds/*.md       per-round rendered report
   paper.md          parsed PDF Markdown (pdf2md or review of a PDF)
   pdf-meta.json     page count, PDF type, OCR flags (pdf2md)
   citations.json    standalone verify-citations report
   estimate.json     last optional engine estimate
-  meta.json         input hash, engine/model, params, last run, summary, artifact sizes
+  meta.json         input hash, engine/model, params, last run, summary, round index
   runs.jsonl        append-only run history
 ```
 
 `<key>` is derived from the workspace-relative path, so the same manuscript keeps
 one directory across edits; `meta.json` stores the content hash used to flag
-staleness. Re-runs overwrite the latest artifacts and append a run record. Use
-`action=list` to see stored reviews and `action=status` for the current one.
+staleness, `rounds[]`, and `latest_round`. Re-runs replace `review.json` and
+`review.md` with the newest pass but keep every earlier round under `rounds/`. A
+store written before rounds (schema v1) reads as one round; the next `review`
+materializes that pass into `rounds/` first, so upgrading a workspace never loses
+its only review. Use `action=list` to see stored reviews and `action=status` for
+the current one, including the round ladder and its cumulative model calls.
 
 ## Failure modes
 

@@ -38,6 +38,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 |---|---|
 | [Changelog](CHANGELOG.md) | Release notes from 0.18.0 onward |
 | [Development](DEVELOPMENT.md) | Build, tests, docs diagrams, bundle patch, repository layout |
+| [ScientistTwo roadmap](SCIENTISTTWO-ROADMAP.md) | Which paper mechanisms are being folded into the tools, phase by phase, and what is deliberately not ported |
 | [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md) | Why the writing engine is vendored and the open decision about its home |
 
 ## Diagrams

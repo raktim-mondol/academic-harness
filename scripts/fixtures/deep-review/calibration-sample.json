@@ -1,0 +1,12 @@
+{
+  "_readme": [
+    "Sample manifest for scripts/deep-review-calibration.mjs.",
+    "Regenerate with: node scripts/deep-review-calibration.mjs --collect --query \"<term>\" --venue ICLR.cc/2025/Conference --limit 12",
+    "After collecting, download each PDF into a workspace, run deep_review on it in a DSH session, then fill manuscript_sha1 (sha1 of the reviewed bytes) or manuscript_file so --report can join a stored review to its real decision.",
+    "Committed empty on purpose: rows carry third-party titles and identifiers, so the fixture is a shape, not data."
+  ],
+  "collected_at": null,
+  "venue": null,
+  "query": null,
+  "rows": []
+}

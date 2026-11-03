@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import {
-  appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync,
+  appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply, startLlmBridge } from '../deep-review.js'
 
 const FAKE_ENGINE = String.raw`
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 const args = process.argv.slice(2)
 writeFileSync(process.cwd() + '/.fake-argv.json', JSON.stringify(args))
 writeFileSync(process.cwd() + '/.fake-env.json', JSON.stringify({
@@ -85,6 +86,72 @@ const review = {
   },
 }
 
+// Round two of the same manuscript: comment ids are deliberately re-issued, and
+// one criticism keeps its wording while dropping in severity, so the round
+// ladder must match it by text rather than by id.
+const review2 = {
+  name: 'documents/doc1234567890ab/reviews/rev-0002',
+  state: 'SUCCEEDED',
+  createTime: new Date().toISOString(),
+  runConfig: { model: 'fake-model', baseUrl: 'https://example.invalid/v1', topology: 'MID' },
+  result: {
+    reviewMarkdown: '# Second review\n\n' + 'B'.repeat(900),
+    anchoredComments: [
+      {
+        commentId: 'x1',
+        severity: 'CRITICAL',
+        summary: 'Unsupported causal claim',
+        bodyMarkdown: 'Still no intervention identified.',
+        suggestedEdit: 'Soften to an association.',
+        location: { pdf: { pageNumber: 3, quoteSelector: { exact: 'X causes Y' } } },
+      },
+      {
+        commentId: 'x2',
+        severity: 'MINOR',
+        summary: 'Missing baseline',
+        bodyMarkdown: 'A weak baseline was added in the appendix.',
+        location: { text: { firstLine: 20, lastLine: 21, quotedLinePreview: 'baseline missing' } },
+      },
+      {
+        commentId: 'x3',
+        severity: 'MAJOR',
+        summary: 'No uncertainty quantification',
+        bodyMarkdown: 'The headline table reports no intervals.',
+        location: { text: { firstLine: 30, lastLine: 31, quotedLinePreview: 'Table 3' } },
+      },
+      {
+        // Same MINOR finding as round one, reworded: exact wording fails, so the
+        // similarity tier must pair it instead of reporting one closed and one new.
+        commentId: 'x4',
+        severity: 'MINOR',
+        summary: 'Typo in section 2 remains',
+        bodyMarkdown: 'The typo is still there.',
+        location: { text: { firstLine: 4, lastLine: 4, quotedLinePreview: 'Section 2' } },
+      },
+    ],
+    contributionType: 'EMPIRICAL_ML',
+    claimEvidenceMap: [
+      { claimId: 'k1', claim: 'The method improves accuracy', page: 5, evidenceLocation: 'Table 2', evidenceType: 'EXPERIMENT', status: 'SUPPORTED', gapAnalysis: 'Interval still missing.' },
+      { claimId: 'k2', claim: 'Attention weights are humanly aligned', page: 7, evidenceLocation: 'none', evidenceType: 'NONE', status: 'UNSUPPORTED', gapAnalysis: 'No evidence.' },
+    ],
+    reproducibilityChecklist: [
+      { key: 'claims_match_evidence', label: 'Claims match evidence', status: 'YES', evidenceAndSuggestion: 'Now stated as an association.' },
+      { key: 'code_and_data_availability', label: 'Code available', status: 'NO', evidenceAndSuggestion: 'No link.' },
+    ],
+    questionsForAuthors: [
+      { questionNumber: 1, question: 'What is the baseline?', linkedIssueSummary: 'Missing baseline', howResponseChangesEvaluation: 'Would clarify the gains.' },
+      { questionNumber: 2, question: 'How were the intervals estimated?', linkedIssueSummary: 'No uncertainty quantification', howResponseChangesEvaluation: 'Would support the headline claim.' },
+    ],
+    reviewQualityAudit: {
+      actionabilityScorePct: 88,
+      depthScoreNormalized: 0.75,
+      factualAccuracyScore: 0.9,
+      lazyHeuristicsRemoved: [],
+      principlesPassed: { fidelity: true, clarity: true, fairness: true, proportionality: true, constructiveness: true },
+    },
+  },
+}
+
 if (cmd === 'review') {
   const save = args.indexOf('--save-markdown')
   if (save >= 0) writeFileSync(args[save + 1], '# Parsed paper\n')
@@ -110,7 +177,7 @@ if (cmd === 'review') {
     console.error('bridge failed: ' + JSON.stringify(payload))
     process.exit(4)
   }
-  out(review)
+  out(existsSync(process.cwd() + '/.phase2') ? review2 : review)
 } else if (cmd === 'estimate-cost') {
   out({
     lowCost: { currencyCode: 'USD', units: '1', nanos: 0 },
@@ -183,6 +250,7 @@ const ctx = {
       llmCalls.push(options)
       yield { type: 'block-start', index: 0, blockType: 'text' }
       yield { type: 'text-delta', index: 0, text: '{"ok":true}' }
+      yield { type: 'usage', usage: { inputTokens: 120, outputTokens: 40, totalTokens: 160 } }
       yield { type: 'finish', reason: { kind: 'stop' } }
     },
   },
@@ -437,6 +505,131 @@ try {
   assert.ok(listed.total >= 3)
   assert.ok(listed.reviews.some((entry) => entry.file_name === 'paper.pdf'))
   assert.ok(listed.reviews.every((entry) => typeof entry.stored === 'string'))
+
+  // 15. rounds: a second review adds a round instead of erasing the first
+  writeFileSync(join(cwd, 'ladder.md'), '# Ladder\n\nFirst manuscript.\n')
+  const l1 = await call({ action: 'review', path: 'ladder.md' })
+  assert.equal(l1.round, 1)
+  assert.equal(l1.rounds, 1)
+  assert.equal(l1.seeded_prior_round, null)
+  assert.equal(l1.usage.calls, 1, 'a round records the bridge token tally')
+  assert.equal(l1.usage.prompt_tokens, 120)
+  const ldir = storeDir(l1)
+  assert.ok(existsSync(join(cwd, l1.artifacts.round.json)), 'round one keeps its digest')
+  const legacyReview = JSON.parse(readFileSync(join(cwd, l1.artifacts.review), 'utf8'))
+  const ladderMeta = () => JSON.parse(readFileSync(join(ldir, 'meta.json'), 'utf8'))
+  assert.equal(ladderMeta().schemaVersion, 2)
+  const runId1 = ladderMeta().rounds[0].run_id
+
+  writeFileSync(join(cwd, '.phase2'), 'second fixture')
+  const l2 = await call({ action: 'review', path: 'ladder.md' })
+  assert.equal(l2.round, 2)
+  assert.equal(l2.rounds, 2)
+  assert.ok(existsSync(join(cwd, l2.artifacts.round.markdown)), 'round two keeps its own report')
+  assert.equal(ladderMeta().rounds.length, 2)
+  assert.equal(readFileSync(join(cwd, l2.artifacts.review), 'utf8').includes('rev-0002'), true)
+
+  const cmp = await call({ action: 'compare', path: 'ladder.md' })
+  assert.equal(cmp.action, 'compare')
+  assert.equal(cmp.from.round, 1)
+  assert.equal(cmp.to.round, 2)
+  assert.equal(cmp.input_changed, false, 'same bytes: this ladder is reviewer variance, not a revision')
+  assert.equal(cmp.comments.total_from, 4)
+  assert.equal(cmp.comments.total_to, 4)
+  assert.equal(cmp.comments.closed_total, 1, 'only the citation finding actually disappeared')
+  assert.equal(cmp.comments.opened_total, 1)
+  assert.equal(cmp.comments.persisting_total, 3)
+  assert.equal(cmp.comments.severity_changed, 1)
+  assert.equal(cmp.comments.matched_by.summary, 2, 're-issued comment ids must not read as closed plus opened')
+  assert.equal(cmp.comments.matched_by.similar, 1, 'a reworded finding pairs by wording similarity, not as closed plus new')
+  assert.equal(cmp.comments.matched_by.id, 0)
+  assert.ok(!cmp.comments.closed.some((item) => /typo/i.test(item.summary)), 'the reworded typo must not read as closed')
+  assert.ok(cmp.comments.opened.every((item) => /uncertainty/.test(item.summary)))
+  assert.ok(cmp.comments.moved.some((item) => item.from_severity === 'MAJOR' && item.severity === 'MINOR'))
+  const rendered = tool.output.render({}, cmp)
+  assert.match(rendered[0].text, /Matched by: id 0, summary 2, quote 0, similar 1/, 'the render names which rule paired findings')
+  assert.match(rendered[0].text, /re-issues comment ids per run/, 'the note names the engine behaviour that makes ids useless')
+  assert.equal(cmp.citations.fixed_total, 1)
+  assert.equal(cmp.citations.still_flagged_total, 0)
+  assert.equal(cmp.checklist.changed_total, 1)
+  assert.ok(cmp.checklist.transitions.some((item) => item.key === 'claims_match_evidence' && item.from_status === 'PARTIAL' && item.to_status === 'YES'))
+  assert.equal(cmp.claims.raised_total, 1)
+  assert.equal(cmp.claims.resolved_total, 0)
+  assert.equal(cmp.questions.total_from, 1)
+  assert.equal(cmp.questions.total_to, 2)
+  assert.equal(cmp.questions.added_total, 1)
+  assert.match(cmp.note, /advisory/i)
+
+  const explicit = await call({ action: 'compare', path: 'ladder.md', from: '1', to: '2' })
+  assert.equal(explicit.from.run_id, runId1)
+  const twice = await call({ action: 'compare', path: 'ladder.md', from: '2', to: '2' })
+  assert.match(twice.error, /same round/)
+  const unknown = await call({ action: 'compare', path: 'ladder.md', from: '9' })
+  assert.match(unknown.error, /no stored round/)
+
+  s = await call({ action: 'show', path: 'ladder.md', section: 'rounds' })
+  assert.equal(s.total, 2)
+  assert.equal(s.latest_round, 2)
+  assert.equal(s.rounds[0].comments, 4)
+  assert.equal(s.rounds[0].model, 'deepseek-flash', 'each round records the reviewer model that produced it')
+  assert.equal(s.rounds[1].reviewed_this_input, true)
+  s = await call({ action: 'status', path: 'ladder.md' })
+  assert.equal(s.rounds.total, 2)
+  assert.equal(s.rounds.totals.model_calls, 2)
+  assert.equal(s.rounds.totals.prompt_tokens, 240)
+
+  // 16. a store written before rounds is read as round 1, then kept on upgrade
+  writeFileSync(join(cwd, 'legacy.md'), '# Legacy\n\nOld store.\n')
+  const legacyDir = join(cwd, '.dsh', 'deep-review', createHash('sha1').update('legacy.md').digest('hex').slice(0, 16))
+  mkdirSync(legacyDir, { recursive: true })
+  writeFileSync(join(legacyDir, 'review.json'), JSON.stringify(legacyReview))
+  writeFileSync(join(legacyDir, 'review.md'), '# Legacy review\n')
+  writeFileSync(join(legacyDir, 'meta.json'), JSON.stringify({
+    schemaVersion: 1,
+    key: legacyDir.split('/').pop(),
+    input: {
+      path: 'legacy.md',
+      file_name: 'legacy.md',
+      size_bytes: statSync(join(cwd, 'legacy.md')).size,
+      sha1: createHash('sha1').update(readFileSync(join(cwd, 'legacy.md'))).digest('hex'),
+      format: 'md',
+    },
+    engine: { provider: 'deepseek-official', model: 'deepseek-flash', route: 'session-model' },
+    params: {},
+    last_run: {
+      action: 'review', run_id: 'legacy-run-1', started_at: '2026-01-01T00:00:00.000Z',
+      finished_at: '2026-01-01T00:04:00.000Z', duration_ms: 240000, exit_code: 0, state: 'SUCCEEDED',
+      review_id: 'rev-0001', document_id: 'doc1234567890ab', error: null,
+    },
+    summary: null,
+    artifacts: {},
+    review: {
+      sha1: createHash('sha1').update(readFileSync(join(cwd, 'legacy.md'))).digest('hex'),
+      review_id: 'rev-0001', document_id: 'doc1234567890ab',
+      finished_at: '2026-01-01T00:04:00.000Z', params: { topology: null, thinking_level: null },
+    },
+  }))
+
+  const single = await call({ action: 'compare', path: 'legacy.md' })
+  assert.match(single.error, /only 1 review round stored/)
+  s = await call({ action: 'status', path: 'legacy.md' })
+  assert.equal(s.rounds.total, 1, 'a v1 store reads as one round without being rewritten')
+  assert.equal(JSON.parse(readFileSync(join(legacyDir, 'meta.json'), 'utf8')).schemaVersion, 1, 'reading must not migrate the store')
+
+  appendFileSync(join(cwd, 'legacy.md'), '\nrevised\n')
+  const upgraded = await call({ action: 'review', path: 'legacy.md' })
+  assert.equal(upgraded.round, 2)
+  assert.equal(upgraded.seeded_prior_round, 1, 'the overwritten v1 review survives as round 1')
+  const upgradedMeta = JSON.parse(readFileSync(join(legacyDir, 'meta.json'), 'utf8'))
+  assert.equal(upgradedMeta.schemaVersion, 2)
+  assert.equal(upgradedMeta.rounds[0].run_id, 'legacy-run-1')
+  assert.ok(existsSync(join(legacyDir, 'rounds', 'legacy-run-1.json')))
+  assert.ok(existsSync(join(legacyDir, 'rounds', 'legacy-run-1.md')))
+  const cmpLegacy = await call({ action: 'compare', path: 'legacy.md' })
+  assert.equal(cmpLegacy.input_changed, true, 'the revision changed the manuscript bytes')
+  assert.equal(cmpLegacy.comments.closed_total, 1)
+  assert.equal(cmpLegacy.comments.matched_by.similar, 1)
+  rmSync(join(cwd, '.phase2'), { force: true })
 
   console.log('test-deep-review-tool: ok')
 } finally {

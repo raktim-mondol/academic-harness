@@ -79,6 +79,15 @@ See [Architecture](ARCHITECTURE.md#component-map) for the source-file map.
 
 - [Academic Harness engine](ACADEMIC-HARNESS-ENGINE.md)
 - [RSI](RSI.md)
+- [ScientistTwo → Academic Harness roadmap](SCIENTISTTWO-ROADMAP.md)
+
+### Vendored engines: wrapper or fork
+
+`vendor/open-deepreview` is pinned by commit (`VENDOR_COMMIT` in `deep-review.js`), so where a new behaviour lives decides how much maintenance it costs.
+
+- **Wrapper by default.** State the plugin needs to keep — review rounds, round digests, `compare`, staleness, token tallies — lives in `deep-review.js` and its store, not in the engine. New review *criteria* (attribution, evaluator drift, coverage, unmeasured trade-offs) are planned the same way: a wrapper-side pass writing its own artifact, so re-pinning upstream cannot silently fork it.
+- **Fork deliberately.** A change that belongs in the engine's prompts or heuristics means editing `vendor/open-deepreview`, re-pinning `VENDOR_COMMIT`, and updating `vendor/open-deepreview/SOURCE.txt` plus [NOTICE](../NOTICE). The CI boot test imports every module in the tree, so a stale pin or a broken vendor edit fails there rather than at first use.
+- **One definition per concept.** Where two surfaces measure the same thing, they share code rather than reimplementing it: `matchPool` is exported from `deep-review.js` and used by `scripts/deep-review-calibration.mjs`, so the harness's finding-overlap number and `compare`'s persisting count cannot drift apart.
 
 ## License
 

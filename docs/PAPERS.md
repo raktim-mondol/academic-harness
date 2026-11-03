@@ -113,17 +113,32 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 | `review` | Run the pipeline and store the result. Slow and token-expensive; asks the model once per segment and pass |
 | `pdf2md` | Parse a PDF and store its Markdown plus page and OCR metadata |
 | `verify_citations` | Check bibliography entries without running a full review |
-| `status` | Stored state for a manuscript, including whether it is stale |
-| `show` | Read back `summary`, `comments`, `questions`, `checklist`, `claims`, `citations`, or `markdown` |
+| `status` | Stored state for a manuscript, including whether it is stale and the round ladder |
+| `show` | Read back `summary`, `comments`, `questions`, `checklist`, `claims`, `citations`, `markdown`, or `rounds` |
+| `compare` | Diff two stored review rounds: which findings closed, reopened, changed severity, and which claims, checklist items, or citations moved |
 | `list` | Stored deep reviews under `.dsh/deep-review/` |
 
 `review` returns a compact summary (severity counts, top comments, question and flagged-citation counts, quality-audit scores) and never the full report. Use `show` for details; `show comments` pages with `limit`/`offset` and only includes comment bodies with `include_body: true`. `show citations` covers only references the engine flagged — clean references are omitted upstream, so "no flagged references" is the accurate phrasing.
 
 While a review runs, it appears as a session background job: the header shows the latest stage/percentage, and expanding the job streams the engine log and each model call's route, duration, and token usage. The finished job stays under **Finished** for later inspection; the tool result includes `job_id`.
 
-Topology controls the review depth: `LOW` (1 pass), `MID` (2, default), `HIGH` (3), `EXTRA_HIGH` (4). `thinking_level` controls the model's reasoning budget. Both add model work and time, and a long paper is re-sent once per segment and pass, so confirm the scope with the user before running `HIGH` or `EXTRA_HIGH`.
+### Review rounds
 
-Artifacts live under `<cwd>/.dsh/deep-review/<key>/`: `review.json`, `review.md`, `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `meta.json`, and append-only `runs.jsonl`. The key is derived from the workspace-relative path, so a manuscript keeps one directory across edits; `status` compares hashes and reports staleness. The engine runs under Node (no Bun) and calls the host's LLM service through a loopback OpenAI-compatible bridge. `review` and `verify_citations` therefore run on the **session model** — the same provider and model as the chat — with no separate API key or endpoint; switching the session model switches the reviewer. `estimate`, `pdf2md`, `status`, `show`, and `list` make no model call.
+Every `review` is kept as a numbered round: the digest of its findings goes to `rounds/<run_id>.json` and its report to `rounds/<run_id>.md`, while `review.json` and `review.md` keep holding the latest pass. Reviewing again after a revision therefore does not erase the earlier round, which is what makes the revision measurable rather than remembered.
+
+The loop is `review` → revise → `review` → `compare`. `compare` pairs findings across rounds by wording, then by wording similarity (a token-overlap floor of 0.6), then by the quoted span. Comment ids are tried first, but the current engine re-issues them on every run, so id matching rarely fires. The result prints a `Matched by` line naming which rule paired the findings — that is how you tell a genuine closure from a reworded one. It reports closed, opened, and persisting findings with their severity moves, claim-evidence status changes, reproducibility-checklist transitions, and citation verdicts that became clean or newly flagged.
+
+Two honest limits, both printed with the result. A reworded criticism can still slip past pairing, so a closed finding is a lead, not proof the science improved. And when `compare` says `input_changed: false`, the two rounds reviewed identical bytes: everything that moved between them is reviewer variance, which is the floor any "closed" claim has to clear before it means anything. Measured live at `LOW` topology on an unchanged manuscript, one pass closed 9 findings and opened 6 new ones, and the critical count itself moved. `deep_review` reports readings and never accepts or rejects a paper.
+
+Topology controls the review depth: `LOW` (1 pass), `MID` (2, default), `HIGH` (3), `EXTRA_HIGH` (4). `thinking_level` controls the model's reasoning budget. Both add model work and time, and a long paper is re-sent once per segment and pass, so confirm the scope with the user before running `HIGH` or `EXTRA_HIGH`. Each round records its own model-call and token tally, and `status` sums them across the ladder so the cost of a review-revise-review loop is visible instead of assumed.
+
+The deep engine is offered, never assumed: for any review request the agent asks whether the user wants `deep_review` or a normal session review, and after finishing a paper or technical document it delivers the draft and offers `deep_review` as a next step — running it only when the user agrees.
+
+Artifacts live under `<cwd>/.dsh/deep-review/<key>/`: `review.json`, `review.md`, `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `meta.json`, `rounds/<run_id>.json`, `rounds/<run_id>.md`, and append-only `runs.jsonl`. The key is derived from the workspace-relative path, so a manuscript keeps one directory across edits; `status` compares hashes and reports staleness. A store written before rounds (schema v1) is read as a single round without being rewritten, and the next `review` materializes that first pass into `rounds/` before adding the second. The engine runs under Node (no Bun) and calls the host's LLM service through a loopback OpenAI-compatible bridge. `review` and `verify_citations` therefore run on the **session model** — the same provider and model as the chat — with no separate API key or endpoint; switching the session model switches the reviewer. `estimate`, `pdf2md`, `status`, `show`, `compare`, and `list` make no model call.
+
+### Calibration
+
+`scripts/deep-review-calibration.mjs` measures the reviewer instead of trusting it. `--collect` builds a sample manifest from OpenReview (real ratings and decisions, no model call); `--report` reads the stored rounds in a workspace and reports reviewer variance — finding overlap between two rounds of an unchanged manuscript — and agreement between severity counts and accepted versus rejected decisions. Both say `not_checked` below their sample floor rather than producing a number that the data does not support. It is not named `test-*.mjs` on purpose: `npm test` globs that prefix, and the collector needs the network.
 
 ## Paper memory
 
