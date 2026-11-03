@@ -30,6 +30,8 @@ export function applyImageGenerate(ctx) {
       'Settings -> Academic Harness API keys, the IMAGE_MODEL env var, or the model arg here (highest priority).',
       'Set IMAGE_PROVIDER=openai plus IMAGE_BASE_URL/IMAGE_API_KEY to use an OpenAI-compatible Images API instead.',
       'Do not use this for quantitative data plots or charts — write Python (matplotlib/etc.) for those.',
+      'If this tool fails (missing key, provider error, no image), fall back to mermaid_render: write the figure as',
+      'Mermaid and render it to SVG rather than leaving the request unfulfilled.',
     ].join(' '),
     parameters: {
       prompt: {
@@ -56,7 +58,7 @@ export function applyImageGenerate(ctx) {
     output: {
       schema: { type: 'json' },
       render(_args, value) {
-        if (!value.ok) return [{ type: 'text', text: value.error ?? 'image generation failed' }]
+        if (!value.ok) return [{ type: 'text', text: (value.error ?? 'image generation failed') + ' — fall back to mermaid_render: write the figure as Mermaid and render it to SVG.' }]
         return [{ type: 'text', text: `wrote conceptual figure ${value.path} (${value.provider}/${value.model})` }]
       },
     },
@@ -74,7 +76,7 @@ export function applyImageGenerate(ctx) {
           ok: false,
           error: 'image_generate is not configured. Set GEMINI_API_KEY (Settings -> Academic Harness API keys, or the '
             + 'env var) for the default nano-banana path, or IMAGE_MODEL + IMAGE_BASE_URL + IMAGE_API_KEY for an '
-            + 'OpenAI-compatible Images API.',
+            + 'OpenAI-compatible Images API. Until a key is set, use mermaid_render for the figure.',
         }
       }
       const cfg = getImageGenConfig({ model, provider: args.provider, ...keyOverrides })
