@@ -4,7 +4,9 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
-Phase 3 of [ScientistTwo → Academic Harness](SCIENTISTTWO-ROADMAP.md): the advisory score with evaluator provenance.
+## 0.43.0
+
+Phases 3–6 of [ScientistTwo → Academic Harness](SCIENTISTTWO-ROADMAP.md): the advisory review score with evaluator provenance, the staged experiment contract, the ablation ledger, and limitation, trace, selection, and grounded-novelty records on the hypothesis tournament.
 
 - **New `score` action on `deep_review`.** One bounded model call reads a stored review round and returns advisory `soundness`, `originality`, `clarity`, and `significance` readings on a declared numeric scale, each citing one to four stored comment ids. A dimension with no numeric reading or no valid comment id is `not_checked`, never guessed. The overall reading is the model's score or the mean of the scored dimensions (source recorded), with confidence and limitations. The scale and rubric source (`caller`, `setting`, or `default`) are recorded; no acceptance decision, venue outcome, or gate is produced.
 - **No model route is not a pass.** A session without the host LLM service, a failed call, or a non-JSON reply still completes and stores `score.json` with `state: not_checked` and the reason. `show section=score` and `status` read it back; `score.json` (`schemaVersion` 1) and `meta.score` are new artifacts on the existing v2 store, with the same v1 materialization as `validity`.
