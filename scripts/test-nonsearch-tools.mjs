@@ -12,6 +12,7 @@ import {
   routingOutcomeEntry,
   topLevelPresetAgent,
 } from '../subagent-models.js'
+import { fillPrompt } from '../workflows.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (path) => readFileSync(join(root, path), 'utf8')
@@ -291,6 +292,21 @@ assert.ok(tournament.suggestedSkills.includes('co-scientist-tournament'), 'the t
 assert.deepEqual(tournament.placeholders.map((p) => p.key), ['goal', 'max_hypotheses'])
 assert.match(tournament.prompt, /BOTH presentation orders/)
 assert.match(tournament.prompt, /never invent a reference|Never invent a reference/)
+// The Phase 7 rebuttal ledger is reachable from the template catalogue too.
+const rebuttalPlan = templates.find((w) => w.id === 'rebuttal-plan')
+assert.ok(rebuttalPlan, 'workflows.json must carry the rebuttal-plan template')
+assert.equal(rebuttalPlan.category, 'paper')
+assert.equal(rebuttalPlan.requiresFiles, false, 'all three import surfaces are workspace state or a supplied array, never an uploaded document — and the tool refuses to fetch')
+assert.ok(rebuttalPlan.suggestedSkills.includes('rebuttal-experiments'), 'the template must route to the ledger skill')
+assert.deepEqual(rebuttalPlan.placeholders.map((p) => p.key), ['slug', 'source'])
+assert.ok(rebuttalPlan.placeholders.every((p) => p.required), 'slug and source are required')
+assert.match(rebuttalPlan.prompt, /\{slug\}/, 'fillPrompt substitutes single-brace {key} tokens only')
+assert.match(rebuttalPlan.prompt, /\{source\}/)
+assert.ok(!/\{\{/.test(rebuttalPlan.prompt), 'double-brace tokens would pass through fillPrompt literally')
+const rebuttalFilled = fillPrompt(rebuttalPlan.prompt, { slug: 'iclr-r1', source: 'deep_review round 2' })
+assert.ok(!rebuttalFilled.includes('{slug}') && !rebuttalFilled.includes('{source}'), 'every placeholder key must fill')
+assert.match(rebuttalFilled, /iclr-r1/)
+assert.ok(existsSync(join(root, 'skills', 'rebuttal-experiments', 'SKILL.md')), 'the ledger skill must ship next to the tool')
 // The lock is shared, not forked into a second implementation.
 assert.match(read('review-store.js'), /from '.\/store-lock\.js'/, 'review-store must use the shared lock')
 assert.match(read('coscientist-store.js'), /from '.\/store-lock\.js'/, 'coscientist-store must use the shared lock')

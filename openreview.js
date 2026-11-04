@@ -42,9 +42,19 @@ export function normalizeReview(note) {
   const content = note?.content || {}
   const invitations = note?.invitations || []
   const invitation = invitations.find((entry) => /review/i.test(entry)) || invitations[0] || null
+  const rawSignatures = note?.signatures
+  const signatureList = Array.isArray(rawSignatures)
+    ? rawSignatures
+    : (rawSignatures && typeof rawSignatures === 'object' && Array.isArray(rawSignatures.value) ? rawSignatures.value : [])
   return {
     id: note?.id || null,
     invitation,
+    // Additive passthroughs the rebuttal ledger needs: reviewer identity,
+    // the questions field, and the forum binding (note.id stands in for a
+    // single-note forum). Absent stays absent — [] / null, never inferred.
+    signatures: signatureList.map((entry) => String(entry ?? '').trim()).filter(Boolean),
+    questions: value(content, 'questions'),
+    forum: note?.forum || note?.id || null,
     rating: value(content, 'rating') ?? value(content, 'recommendation'),
     confidence: value(content, 'confidence'),
     summary: value(content, 'summary'),

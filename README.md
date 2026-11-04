@@ -4,7 +4,7 @@
 ![DeepSeek Harness 0.2.1–0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1--0.2.x-5b7bd5)
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
-**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 767 scientific skills, and local self-improvement, all inside the DSH web UI.
+**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 768 scientific skills, and local self-improvement, all inside the DSH web UI.
 
 Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset with a research persona and academic tools, and keeps the general-purpose tools available on every preset.
 
@@ -67,7 +67,7 @@ Full instructions, troubleshooting, and the "one DSH surface at a time" rule are
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
 | **Workspace and notebook** | zvec-grep semantic search, lab notebook, `scientific_result`, `fold_text`, `research_template`, `sci_inspect` | [Workspace](docs/WORKSPACE.md) |
 | **Compute and delegation** | `runpod_run`/`modal_run`/`vastai_run`, `subagent` with optional `subagent_pro`/`subagent_vision` routes, specialist briefs, `agent-browser` | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) |
-| **Skills** | 767 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
+| **Skills** | 768 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
 | **Self-improvement** | Local RSI: capture, diagnose, admit, inject, compare against control, promote or quarantine | [RSI](docs/RSI.md) |
 | **Configuration** | Settings → Academic Harness API keys; every credential is optional at install | [Configuration](docs/CONFIGURATION.md) |
 

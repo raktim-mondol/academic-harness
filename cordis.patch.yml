@@ -616,6 +616,22 @@
           - id: manuscript-diff
             name: academic-harness/manuscript-diff
 
+          # Reviewer-response coverage ledger (Phase 7): actions import, plan, link,
+          # respond, decline, coverage, draft, export, status. Import a stored
+          # deep_review round, ah_review items, or supplied openreview reviews; plan
+          # supplementary task stubs capped by REBUTTAL_MAX_TASKS (the paper's Rebuttal
+          # Planner instantiates N_t — this tool never does); link stubs to existing
+          # experiment_log/analysis_run runs pinned by SHA-256 digest; record
+          # author-written responses and declines the author already made; read
+          # answered/answered_asserted/declined/unaddressed coverage and which points a
+          # newer deep_review round closed (identical bytes ⇒ variance_only, never
+          # closed); draft a letter from recorded hunks only; export markdown/json/csv.
+          # It never fetches, never executes, never edits a manuscript, and never writes
+          # reviewer prose. State lives under <cwd>/.dsh/rebuttal/<slug>/. The coverage
+          # reading is advisory; only ah_check blocks. See rebuttal.js and rebuttal-store.js.
+          - id: rebuttal
+            name: academic-harness/rebuttal
+
           # Numerical-reporting audit (Phase 4E): recomputed p-values where possible, CI and
           # estimate consistency, total N/subgroup/flow counts, percentages, table/text
           # candidates, and explicit not_checked items. Candidates only, never a validity

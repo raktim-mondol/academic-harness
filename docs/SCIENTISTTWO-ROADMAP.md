@@ -1,6 +1,6 @@
 # ScientistTwo → Academic Harness: implementation roadmap
 
-Status: **Phases 0–6 implemented; Phases 7–10 are plan.** See §3 for what shipped and what is still proposed.
+Status: **Phases 0–7 implemented; Phases 8–10 are plan.** See §3 for what shipped and what is still proposed.
 Source paper: *ScientistTwo: Pioneering the Human Knowledge Frontier with Autonomous AI* (Google Cloud AI Research — J. Nam, J. Yoon, et al.), LaTeX bundle reviewed locally.
 Shaping decision: the plugin stays **advisory**. ScientistTwo's contribution we keep is its *control structure* — critic verdicts, per-stage round budgets, attribution-before-acceptance, staged compute, and post-hoc integrity audits. Its autonomy we do not keep.
 
@@ -201,7 +201,7 @@ Extend the tournament; do not add a competing ideation ledger (it already scores
 
 **Exit:** a limitation cannot exist without a checkable quote, cannot be silently rewritten, cannot pass by exhaustion, and its coverage is a ledger join; selection and novelty both carry their evidence. ✅
 
-### Phase 7 — New tool `rebuttal` · M–L · depends on 1 and 4/5
+### Phase 7 — New tool `rebuttal` · M–L · depends on 1 and 4/5 · ✅ implemented
 
 Advisory coverage ledger with no execution of its own.
 
@@ -214,6 +214,18 @@ Advisory coverage ledger with no execution of its own.
 - Closing the loop: a fresh `deep_review` round + `compare` shows which points actually closed.
 
 **Tests/docs:** `scripts/test-rebuttal-tool.mjs`; `docs/WRITING.md`; TOOLS row; CHANGELOG.
+
+**Shipped as `rebuttal.js` + `rebuttal-store.js`** under `.dsh/rebuttal/<slug>/` — a write-once `rebuttal.json` round definition plus append-only `points.jsonl`, `tasks.jsonl`, `links.jsonl`, `answers.jsonl`, `declines.jsonl`, and `imports.jsonl`, with `exports/`. The shipped action list is nine: `import, plan, link, respond, decline, coverage, draft, export, status` — `respond` and `decline` joined the planned seven so author answers and author declines are ledger events, not prose side-notes. The `ablation` idiom holds throughout: the tool file parses and renders, the store file validates and persists; every mutating call takes the shared lock and re-derives counters, dedupe, and the cap *inside* it; foreign-ledger reads happen before the lock; reads are lock-free re-derivations.
+
+- **Deliberate divergence, kept in the docs verbatim.** Coverage, not outcome, is what this ledger reports. The paper's Rebuttal Planner instantiates `N_t` supplementary experiments and integrates their results into the manuscript with no performance gate at all. This tool never computes `N_t`, never instantiates an experiment, and caps planned stubs with `REBUTTAL_MAX_TASKS` (default 20) in Settings instead. A supplementary result that fails to help is still recorded and still reportable: an `experiment_log` verdict of `bad`/`engineer`, a `spec_drift` state, and a non-zero `analysis_run` exit appear beside the point they were run for, and they never reduce coverage. Nothing here gates a turn — only `ah_check` blocks.
+- `import` reads the three planned sources and keeps provenance with every point: reviewer identity (`round_model` for deep_review, `review_not_person` for engine items, openreview `signature`/`note_id`/`invitation`) and `evaluator_kind` with `declared`/`inferred`/`not_applicable` provenance. Match keys are per kind exactly as the engine builds its own — wording-based `question:`/`claim:` keys, no positional `id:` tier that would invert the closed/still-present reading — and a re-import dedupes by source + native id, reporting in-place payload changes as drift instead of rewriting history. No fetch, ever: `forum_id` is refused and the openreview data must be the reviews array this session already has (the `openreview` tool now passes `signatures`, `questions`, and `forum` through additively for this).
+- `plan` is the capped stub (dataset, one baseline arm — the Phase 4 `reproduced`/`reported` distinction, never mixed — metric with direction, replicates from a supplied `power_analysis` result stored verbatim or a declared basis, expected evidence type), validated against the named experiment's benchmark spec with readings recorded as notes, not refusals.
+- `link` pins a SHA-256 digest of the whole linked run; `coverage` re-reads it as `verified`/`drifted`/`unreadable`. `respond` cites link ids and `manuscript_diff` change ids pinned to their version pair; `decline` verifies against the engine's live `declined` status when an `ah_item` names one (the author ran `ah_author action=decline` first) and is stored labelled unverified otherwise — the tool never declines anything itself.
+- `coverage` reports the five states `answered`, `answered_asserted`, `declined_verified`, `declined_recorded`, `unaddressed` — and unresolved is not unanswered: an answer whose citations no longer resolve stays `answered_asserted`, never silently back to `unaddressed`. Given a newer `deep_review` round (Phase 1), it pairs the imported points with the engine's own matcher and reports `closed` / `still_present` / `variance_only`, with the identical-bytes caveat: a closed finding is a lead, not proof.
+- `draft` renders the markdown/latex letter skeleton citing only recorded hunks and linked artifacts and returns both planned handoffs: the `manuscript_diff` `items` array (`addressed` only where a hunk resolves and matches its pinned version pair) and the `ah_review_respond` entries. Inside an `ah.yaml` project the engine remains authoritative for item status and the letter; the ledger's coverage is its own reading beside it, and divergences surface as warnings, never silent reconciliation. `export` writes `report.md`/`rebuttal.json`/`coverage.csv`.
+- Tests: `scripts/test-rebuttal-store.mjs` and `scripts/test-rebuttal-tool.mjs`. Docs and surface: [Writing](WRITING.md#reviewer-response-ledger), TOOLS row, CONFIGURATION (`REBUTTAL_MAX_TASKS`), ARCHITECTURE (state row + component map), CHANGELOG, the `rebuttal-experiments` skill, the `rebuttal-plan` workflow row, and `prompt.js` guidance.
+
+**Exit:** every reviewer point has a stored state with cited, digest-pinned evidence behind it or a labelled absence; the loop closes against a fresh round; and no reading here accepts, gates, or hides anything. ✅
 
 ### Phase 8 — Re-execution, compliance, and alignment · L · depends on 4
 
@@ -258,14 +270,14 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 | 4 Staged experiment contract | — | yes; unblocks 5/7/8 | M–L |
 | 5 `ablation` | 4 | no | L |
 | 6 Limitations + novelty + traces | PaperMemory anchors | ✅ shipped (`limitation`, `trace`, `select`, grounded novelty) | M |
-| 7 `rebuttal` | 1, 4, 5 | no | M–L |
+| 7 `rebuttal` | 1, 4, 5 | ✅ shipped (`import`, `plan`, `link`, `respond`, `decline`, `coverage`, `draft`, `export`, `status`) | M–L |
 | 8 Re-execution / compliance / align | 4, 5 | partial | L |
 | 9 Loop roll-up | 4–8 | last, maybe never as a store | S–M |
 | 10 Skills/docs/tests | per phase | continuous | S |
 
 Recommended cut: **0 → 1 → 4 → 2 → 5 → 3 → 6 → 7 → 8 → decide 9.**
 Phases 1 and 4 are the two structural holes — review history and a staged, verdicted, reference-named experiment record — and everything else composes on them.
-Phase 2 was taken before 4, so what has actually shipped is 0 → 1 → 2 → 3 → 4 → 5 → 6; 4 unblocked 5 and still unblocks 7/8.
+Phase 2 was taken before 4, so what has actually shipped is 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7; 4 unblocked 5 and 7 and still unblocks 8.
 
 ---
 

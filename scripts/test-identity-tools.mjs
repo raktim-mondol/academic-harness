@@ -154,12 +154,14 @@ const reviewNote = {
   id: 'n1',
   forum: 'f1',
   invitations: ['ICLR.cc/2025/Conference/Submission1/-/Official_Review'],
+  signatures: ['ICLR.cc/2025/Conference/Submission1/Reviewer_Ab12'],
   content: {
     rating: { value: 6 },
     confidence: { value: 4 },
     summary: { value: 'Good' },
     strengths: { value: 'Clear' },
     weaknesses: { value: 'Thin evaluation' },
+    questions: { value: 'Add per-seed variance?' },
   },
 }
 const normalizedReview = normalizeReview(reviewNote)
@@ -167,6 +169,18 @@ assert.equal(normalizedReview.rating, 6)
 assert.equal(normalizedReview.confidence, 4)
 assert.equal(normalizedReview.weaknesses, 'Thin evaluation')
 assert.match(normalizedReview.url, /forum\?id=f1&noteId=n1$/)
+// Additive passthroughs the rebuttal ledger needs: identity, questions, forum.
+assert.deepEqual(normalizedReview.signatures, ['ICLR.cc/2025/Conference/Submission1/Reviewer_Ab12'])
+assert.equal(normalizedReview.questions, 'Add per-seed variance?')
+assert.equal(normalizedReview.forum, 'f1')
+// absent stays absent — never inferred
+const bareReview = normalizeReview({ id: 'n9', content: {}, invitations: [] })
+assert.deepEqual(bareReview.signatures, [])
+assert.equal(bareReview.questions, null)
+assert.equal(bareReview.forum, 'n9', 'a lone note id stands in for its own forum')
+// a wrapped {value: [...]} signatures list is tolerated like every other content field
+const wrappedReview = normalizeReview({ id: 'n8', forum: 'f8', invitations: ['X/-/Official_Review'], signatures: { value: ['X/Reviewer_Cd34 ', ''] }, content: {} })
+assert.deepEqual(wrappedReview.signatures, ['X/Reviewer_Cd34'])
 
 {
   let requested
@@ -202,6 +216,10 @@ assert.match(normalizedReview.url, /forum\?id=f1&noteId=n1$/)
   assert.equal(data.decision, 'Accept (Poster)')
   assert.equal(data.reviews.length, 1)
   assert.equal(data.submission.title, 'A Diffusion Study')
+  // the reviews action surfaces the new passthroughs for the rebuttal ledger
+  assert.equal(data.reviews[0].forum, 'f1')
+  assert.equal(data.reviews[0].questions, 'Add per-seed variance?')
+  assert.deepEqual(data.reviews[0].signatures, ['ICLR.cc/2025/Conference/Submission1/Reviewer_Ab12'])
 }
 
 {

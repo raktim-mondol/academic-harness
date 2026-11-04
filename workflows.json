@@ -116,6 +116,31 @@
     "requiresFiles": true
   },
   {
+    "id": "rebuttal-plan",
+    "name": "Plan a Rebuttal Ledger",
+    "description": "Coverage ledger over reviewer points: import, plan capped supplementary stubs, link existing runs, record answers and declines, read coverage",
+    "category": "paper",
+    "icon": "ListChecks",
+    "prompt": "Keep the reviewer-response coverage ledger for rebuttal {slug} from source {source} (deep_review, ah_review, or openreview). Load the rebuttal-experiments skill first. (1) `rebuttal action=import` with that source; for openreview, run the openreview tool yourself and pass its reviews array — rebuttal never fetches. (2) For each point that needs new evidence, `plan` one supplementary task stub (dataset, one baseline arm reproduced or reported, metric, a replicate count from a supplied power_analysis result or a declared basis, expected evidence type); stubs are capped by REBUTTAL_MAX_TASKS. (3) `link` each stub to an existing `experiment_log` run or a hashed `analysis_run` — never run or create anything here. (4) `respond` with the author's own words citing link ids and recorded `manuscript_diff` change ids, or `decline` a point the author already declined (an ah_review decline must go through ah_author action=decline first). (5) Read `coverage` — answered, answered_asserted, declined_verified, declined_recorded, unaddressed — and which points a fresh `deep_review` round closed. (6) `draft` the response-letter skeleton, hand its items to `manuscript_diff action=letter`, and in an `ah.yaml` project route engine items to `ah_review_respond`; the engine stays authoritative for item status and the letter. Never invent results, prose, or numbers: every metric reads live from a linked run, and a failed supplementary result stays recorded beside the point it was run for without reducing coverage. Nothing here gates a turn — only `ah_check` blocks. Close the loop with `export` and report `status`.",
+    "suggestedSkills": [
+      "rebuttal-experiments",
+      "rebuttal-guidance"
+    ],
+    "placeholders": [
+      {
+        "key": "slug",
+        "label": "Rebuttal slug",
+        "required": true
+      },
+      {
+        "key": "source",
+        "label": "Import source (deep_review, ah_review, or openreview)",
+        "required": true
+      }
+    ],
+    "requiresFiles": false
+  },
+  {
     "id": "format-journal",
     "name": "Format for Journal",
     "description": "Reformat manuscript to match a target journal's submission guidelines",

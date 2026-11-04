@@ -101,6 +101,14 @@ Optional preferences for `deep_review`. They are read per call; an explicit tool
 | `DEEP_REVIEW_MAX_ROUNDS` | unset (no limit) | Refuse a new `review` once that many rounds are stored for one manuscript. Raise it or review a different path to continue. |
 | `DEEP_REVIEW_COST_CEILING_USD` | unset (no ceiling) | Before a review, check the engine's median cost estimate and refuse if it exceeds this amount. This is a user preference, not an autonomy gate. |
 
+### Reviewer response ledger
+
+Optional preference for `rebuttal`. It is read per call and applies to the next call with no restart.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `REBUTTAL_MAX_TASKS` | `20` | Cap on supplementary task stubs one rebuttal slug may plan (integer 1–200). A non-integer or out-of-range value falls back to 20 and the call says so in a warning. No tool argument overrides it — an override would defeat the cap that replaces the paper's `N_t`, which this ledger never instantiates. |
+
 ### Workspace index
 
 | Field | Default | Meaning |
