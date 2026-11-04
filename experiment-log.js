@@ -7,13 +7,14 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
-  EXPERIMENT_DIRECTIONS, EXPERIMENT_EXPORT_FORMATS, LINK_TARGET_KINDS,
-  bestExperimentRun, compareExperiments, experimentStatus, exportExperiment,
-  linkExperimentRun, listExperimentLinks, listExperimentRuns, logExperimentRun,
-  readExperiment, startExperiment,
+  EXPERIMENT_BASELINE_REFS, EXPERIMENT_DIRECTIONS, EXPERIMENT_EXPORT_FORMATS,
+  EXPERIMENT_ROLES, EXPERIMENT_STAGES, EXPERIMENT_VERDICTS, LINK_TARGET_KINDS,
+  bestExperimentRun, compareExperiments, dominanceExperiment, experimentStatus, exportExperiment,
+  linkExperimentRun, listExperimentLinks, listExperimentRuns, listExperimentVerdicts, logExperimentRun,
+  readExperiment, startExperiment, verdictExperiment,
 } from './experiment-store.js'
 
-const ACTIONS = ['start', 'log', 'compare', 'best', 'link', 'status', 'list', 'show', 'export']
+const ACTIONS = ['start', 'log', 'compare', 'best', 'verdict', 'link', 'status', 'list', 'show', 'export']
 
 function text(value) {
   return String(value ?? '').trim()
@@ -32,9 +33,12 @@ function workspaceRoot(exec) {
 }
 
 function renderRunLine(run) {
-  const metrics = Object.entries(run.metrics).map(([key, value]) => `${key}=${value}`).join(', ')
-  const params = Object.entries(run.params).map(([key, value]) => `${key}=${value}`).join(', ')
-  return `- ${run.run_id} · ${run.ts}${run.seed != null ? ` · seed ${run.seed}` : ''}${params ? ` · ${params}` : ''}${metrics ? ` · ${metrics}` : ''}${run.artifacts.length ? ` · ${run.artifacts.length} artifact(s)` : ''}`
+  const metrics = Object.entries(run.metrics || {}).map(([key, value]) => `${key}=${value}`).join(', ')
+  const params = Object.entries(run.params || {}).map(([key, value]) => `${key}=${value}`).join(', ')
+  const staged = run.role ? ` · ${run.role}${run.baseline_ref ? `/${run.baseline_ref}` : ''}${run.stage ? `/${run.stage}` : ''}` : ''
+  const drift = run.spec_drift?.state === 'drift' ? ' · SPEC DRIFT' : ''
+  const verdict = run.verdict?.verdict ? ` · verdict ${run.verdict.verdict}` : ''
+  return `- ${run.run_id} · ${run.ts}${run.seed != null ? ` · seed ${run.seed}` : ''}${params ? ` · ${params}` : ''}${metrics ? ` · ${metrics}` : ''}${staged}${drift}${verdict}${run.artifacts?.length ? ` · ${run.artifacts.length} artifact(s)` : ''}`
 }
 
 function renderValue(value) {
@@ -43,13 +47,24 @@ function renderValue(value) {
     case 'start': {
       const e = value.experiment
       const metrics = e.metrics.length ? `\nMetrics: ${e.metrics.map((m) => `${m.name}${m.direction ? ` (${m.direction})` : ''}`).join(', ')}` : ''
-      return [{ type: 'text', text: `Experiment "${e.slug}" ${value.resumed ? 'resumed' : 'started'}: ${e.question}${metrics}` }]
+      const benchmark = e.benchmark
+        ? `\nBenchmark: datasets ${e.benchmark.datasets.join(', ')}; splits ${e.benchmark.splits.join(', ')}; baseline arm ${e.benchmark.baseline_arm}; ${e.benchmark.task_rules.length} task rule(s)`
+        : ''
+      const protocol = e.protocol ? `\nProtocol: ${e.protocol.eval_script} + metric parameters` : ''
+      return [{ type: 'text', text: `Experiment "${e.slug}" ${value.resumed ? 'resumed' : 'started'}: ${e.question}${metrics}${benchmark}${protocol}` }]
     }
     case 'log': {
       const undeclared = value.undeclared_metrics.length
         ? `\nUndeclared metrics (recorded, not defined at start): ${value.undeclared_metrics.join(', ')}`
         : ''
-      return [{ type: 'text', text: `Logged ${value.run.run_id} (${Object.keys(value.run.metrics).length} metric(s), ${value.run.artifacts.length} artifact(s)).${undeclared}` }]
+      const run = value.run
+      const staged = run.role ? ` · ${run.role}${run.baseline_ref ? `/${run.baseline_ref}` : ''}${run.stage ? `/${run.stage}` : ''}` : ''
+      const drift = run.spec_drift?.state === 'drift'
+        ? `\nSpec drift against baseline ${run.spec_drift.baseline_run_id}: ${run.spec_drift.changed.join(', ') || 'protocol digest changed'}`
+        : run.spec_drift?.state === 'match'
+          ? `\nProtocol digest matches baseline ${run.spec_drift.baseline_run_id}.`
+          : ''
+      return [{ type: 'text', text: `Logged ${run.run_id} (${Object.keys(run.metrics).length} metric(s), ${run.artifacts.length} artifact(s))${staged}.${drift}${undeclared}` }]
     }
     case 'compare': {
       const lines = [`Experiment "${value.comparison.experiment.slug}" — ${value.comparison.runs.length} run(s).`]
@@ -63,30 +78,58 @@ function renderValue(value) {
       return [{ type: 'text', text: lines.join('\n') }]
     }
     case 'best': {
-      const lines = [
-        `Best by ${value.best.metric} (${value.best.direction}): ${value.best.run.run_id} = ${value.best.run.metrics[value.best.metric]}`,
-        renderRunLine(value.best.run),
-      ]
-      if (value.best.tied_runs.length > 1) lines.push(`Tied runs: ${value.best.tied_runs.join(', ')}`)
+      const lines = []
+      if (value.best) {
+        lines.push(
+          `Best by ${value.best.metric} (${value.best.direction}): ${value.best.run.run_id} = ${value.best.run.metrics[value.best.metric]}`,
+          renderRunLine(value.best.run),
+        )
+        if (value.best.tied_runs.length > 1) lines.push(`Tied runs: ${value.best.tied_runs.join(', ')}`)
+      }
+      if (value.dominance) {
+        if (lines.length) lines.push('')
+        lines.push(`Pareto front over ${value.dominance.metrics.map((metric) => `${metric.name} (${metric.direction})`).join(', ')}:`)
+        if (!value.dominance.front.length) lines.push('- none (no complete run)')
+        for (const entry of value.dominance.front) {
+          lines.push(`- ${entry.run_id}: ${Object.entries(entry.metrics).map(([key, val]) => `${key}=${val}`).join(', ')}${entry.dominated_run_ids.length ? ` · dominates ${entry.dominated_run_ids.join(', ')}` : ''}`)
+        }
+        if (value.dominance.dominated.length) lines.push(`Dominated: ${value.dominance.dominated.join(', ')}`)
+        if (value.dominance.incomplete.length) {
+          lines.push(`Incomplete (missing metrics, not ranked): ${value.dominance.incomplete.map((entry) => `${entry.run_id} (${entry.missing.join(', ')})`).join('; ')}`)
+        }
+        lines.push(value.dominance.note)
+      }
       return [{ type: 'text', text: lines.join('\n') }]
+    }
+    case 'verdict': {
+      const verdict = value.verdict
+      return [{ type: 'text', text: `Verdict ${verdict.verdict_id} on ${verdict.run_id}: ${verdict.verdict}${verdict.forced ? ` (requested ${verdict.requested_verdict}, forced)` : ''} — ${verdict.reason}` }]
     }
     case 'link':
       return [{ type: 'text', text: `Linked ${value.link.run_id} → ${value.link.target.kind}:${value.link.target.id}.` }]
     case 'status': {
       const s = value.status
-      return [{ type: 'text', text: [
+      const lines = [
         `Experiment "${s.slug}" at ${s.dir}`,
         `Question: ${s.question}`,
-        `Runs: ${s.runs}${s.last_run ? ` (last ${s.last_run})` : ''} · links: ${s.links}`,
+        `Runs: ${s.runs}${s.last_run ? ` (last ${s.last_run})` : ''} · links: ${s.links} · verdicts: ${s.verdicts ?? 0}`,
         s.metrics.length ? `Metrics: ${s.metrics.map((m) => `${m.name}${m.direction ? ` (${m.direction})` : ''}`).join(', ')}` : 'Metrics: none declared.',
-      ].join('\n') }]
+      ]
+      if (s.benchmark) lines.push(`Benchmark: datasets ${s.benchmark.datasets.join(', ')}; splits ${s.benchmark.splits.join(', ')}; baseline arm ${s.benchmark.baseline_arm}.`)
+      if (s.protocol) lines.push(`Protocol: ${s.protocol.eval_script} + metric parameters.`)
+      if (s.baseline_runs?.length) lines.push(`Baselines: ${s.baseline_runs.map((entry) => `${entry.run_id} (${entry.baseline_ref || '?'})`).join(', ')}.`)
+      if (s.spec_drift_runs?.length) lines.push(`Spec drift: ${s.spec_drift_runs.map((entry) => `${entry.run_id} (${entry.changed.join(', ') || 'digest'})`).join(', ')}.`)
+      if (s.latest_verdict) lines.push(`Latest verdict: ${s.latest_verdict.run_id} ${s.latest_verdict.verdict}${s.latest_verdict.forced ? ' (forced)' : ''}.`)
+      return [{ type: 'text', text: lines.join('\n') }]
     }
     case 'list':
       return [{ type: 'text', text: value.runs.length ? value.runs.map(renderRunLine).join('\n') : 'No runs logged yet.' }]
     case 'show': {
       const lines = [renderRunLine(value.run).slice(2), `params: ${JSON.stringify(value.run.params)}`, `environment: ${JSON.stringify(value.run.environment)}`]
+      if (value.run.protocol_digest) lines.push(`protocol: ${value.run.protocol_digest}${value.run.spec_drift?.state ? ` (${value.run.spec_drift.state}${value.run.spec_drift.changed?.length ? `: ${value.run.spec_drift.changed.join(', ')}` : ''})` : ''}`)
       if (value.run.artifacts.length) lines.push('artifacts:', ...value.run.artifacts.map((entry) => `- ${entry.path} (${entry.sha256.slice(0, 18)}…)`))
       if (value.links.length) lines.push('links:', ...value.links.map((link) => `- ${link.target.kind}:${link.target.id}${link.note ? ` — ${link.note}` : ''}`))
+      if (value.verdicts?.length) lines.push('verdicts:', ...value.verdicts.map((verdict) => `- ${verdict.verdict}${verdict.forced ? ` (requested ${verdict.requested_verdict}, forced)` : ''} — ${verdict.reason}`))
       return [{ type: 'text', text: lines.join('\n') }]
     }
     case 'export':
@@ -103,7 +146,17 @@ export async function runExperimentAction(args, exec) {
   const slug = requireString(args.slug, 'slug')
 
   if (action === 'start') {
-    const { experiment, resumed } = await startExperiment({ cwd, slug, experiment: { ...args.experiment, question: args.question ?? args.experiment?.question, resume: args.resume ?? args.experiment?.resume } })
+    const { experiment, resumed } = await startExperiment({
+      cwd,
+      slug,
+      experiment: {
+        ...args.experiment,
+        question: args.question ?? args.experiment?.question,
+        benchmark: args.benchmark ?? args.experiment?.benchmark,
+        protocol: args.protocol ?? args.experiment?.protocol,
+        resume: args.resume ?? args.experiment?.resume,
+      },
+    })
     return { action, experiment, resumed }
   }
 
@@ -117,6 +170,11 @@ export async function runExperimentAction(args, exec) {
       parent: args.parent,
       notes: args.notes,
       environment: args.environment,
+      role: args.role,
+      baselineRef: args.baseline_ref,
+      stage: args.stage,
+      sampling: args.sampling,
+      protocol: args.protocol,
     })
     return { action, run, undeclared_metrics }
   }
@@ -126,7 +184,22 @@ export async function runExperimentAction(args, exec) {
   }
 
   if (action === 'best') {
-    return { action, best: bestExperimentRun(cwd, slug, { metric: requireString(args.metric, 'metric'), direction: args.direction }) }
+    const best = args.metric ? bestExperimentRun(cwd, slug, { metric: requireString(args.metric, 'metric'), direction: args.direction }) : null
+    const dominance = args.dominance ? dominanceExperiment(cwd, slug) : null
+    if (!best && !dominance) throw new Error('best requires a named metric or dominance: true')
+    return { action, best, dominance }
+  }
+
+  if (action === 'verdict') {
+    const { verdict } = await verdictExperiment({
+      cwd, slug,
+      runId: requireString(args.run_id, 'run_id'),
+      verdict: args.verdict,
+      reason: args.reason,
+      engineeringRound: args.engineering_round,
+      budget: args.budget,
+    })
+    return { action, verdict }
   }
 
   if (action === 'link') {
@@ -153,7 +226,12 @@ export async function runExperimentAction(args, exec) {
     const runId = requireString(args.run_id, 'run_id')
     const run = listExperimentRuns(cwd, slug).find((entry) => entry.run_id === runId)
     if (!run) throw new Error(`run "${runId}" not found`)
-    return { action, run, links: listExperimentLinks(cwd, slug).filter((link) => link.run_id === runId) }
+    return {
+      action,
+      run,
+      links: listExperimentLinks(cwd, slug).filter((link) => link.run_id === runId),
+      verdicts: listExperimentVerdicts(cwd, slug).filter((verdict) => verdict.run_id === runId),
+    }
   }
 
   if (action === 'export') {
@@ -171,14 +249,20 @@ export function apply(ctx) {
     name: 'experiment_log',
     description: [
       'Keep an experiment registry under `.dsh/experiments/<slug>/` for sweeps, simulations, pilots, and model comparisons that are not a single pre-registered analysis (use `analysis_run` for that).',
-      'Actions: `start` (question, named metrics with higher/lower directions, notes; write-once unless `resume: true`), `log` (append a run: params, metrics, hashed workspace artifacts, seed, parent, environment; a rerun is a new run — nothing is deduplicated), `compare` (all runs, best per named metric, optional grouping by a param `field`), `best` (by an explicit `metric` and `direction` — there is no implicit best model), `link` (run → notebook/scientific_result/analysis_run/experiment_run/paper/review id), `status`, `list`, `show`, `export` (csv, json, markdown, or MLflow-compatible json).',
-      'Missing metrics stay blank, never zero. Artifact paths are workspace-confined and hashed. The tool records logged values and makes no scientific claim about them. Load the `experiment-tracking` skill for the workflow.',
+      'Actions: `start` (question, named metrics with higher/lower directions, an optional benchmark spec — datasets, splits, baseline_arm, task_rules — and an optional protocol: eval_script + metric_params; write-once unless `resume: true`), `log` (append a run: params, metrics, hashed workspace artifacts, seed, parent, environment; staged runs add role baseline|variant, baseline_ref reproduced|reported, stage subset|slice|full, a sampling rule, and a protocol whose SHA-256 is checked against the matching baseline as spec_drift; a rerun is a new run — nothing is deduplicated), `compare` (all runs, best per named metric, optional grouping by a param `field`), `best` (by an explicit `metric` and `direction`, and/or `dominance: true` for the multi-metric Pareto front), `verdict` (advisory human decision good|engineer|bad with reason, engineering_round, and budget; a budget-exhausted engineer is recorded force-bad), `link` (run → notebook/scientific_result/analysis_run/experiment_run/paper/review id), `status`, `list`, `show`, `export` (csv, json, markdown, or MLflow-compatible json).',
+      'Missing metrics stay blank, never zero. Artifact paths are workspace-confined and hashed. A baseline_run with a protocol_digest is the reference for later staged runs; a variant must name a matching baseline_ref, and a changed eval script or metric parameters is reported as spec_drift, not silently accepted. The tool records logged values and human verdicts and makes no scientific claim about them. Load the `experiment-tracking` skill for the workflow.',
     ].join(' '),
     parameters: {
-      action: { type: 'string', enum: ACTIONS, description: 'start, log, compare, best, link, status, list, show, or export. Default status.' },
+      action: { type: 'string', enum: ACTIONS, description: 'start, log, compare, best, verdict, link, status, list, show, or export. Default status.' },
       slug: { type: 'string', description: 'Experiment slug (stable short name).' },
-      experiment: { type: 'object', additionalProperties: true, description: 'Start object: {question, name, metrics:[{name,direction}], notes, resume}.' },
+      experiment: { type: 'object', additionalProperties: true, description: 'Start object: {question, name, metrics:[{name,direction}], benchmark, protocol, notes, resume}.' },
       question: { type: 'string', description: 'Experiment question (start; alternative to experiment.question).' },
+      benchmark: { type: 'object', additionalProperties: true, description: 'Start benchmark spec: {datasets:[...], splits:[...], baseline_arm, task_rules:[...]}. Required for staged runs.' },
+      protocol: { type: 'object', additionalProperties: true, description: 'Start/log protocol: {eval_script: workspace-relative path, metric_params: object}. The baseline captures its SHA-256 digest; later runs are checked.' },
+      role: { type: 'string', enum: EXPERIMENT_ROLES, description: 'log: baseline or variant. Required with baseline_ref/stage/sampling.' },
+      baseline_ref: { type: 'string', enum: EXPERIMENT_BASELINE_REFS, description: 'log: reproduced or reported — which reference this run compares against. Variants must match a baseline with the same ref.' },
+      stage: { type: 'string', enum: EXPERIMENT_STAGES, description: 'log: subset, slice, or full. Subset/slice need a sampling rule.' },
+      sampling: { oneOf: [{ type: 'string' }, { type: 'object', additionalProperties: true }], description: 'log: sampling rule, e.g. {rule, size, seed, stratification} or a rule string. Required for subset/slice.' },
       params: { type: 'object', additionalProperties: true, description: 'Parameters for a logged run (log).' },
       metrics: { type: 'object', additionalProperties: true, description: 'Numeric metric values for a logged run (log); omit what is missing.' },
       artifacts: { type: 'array', items: { type: 'string' }, description: 'Workspace-relative artifact files to hash and attach (log).' },
@@ -187,9 +271,14 @@ export function apply(ctx) {
       notes: { type: 'string', description: 'Free-text notes (start/log/link).' },
       environment: { type: 'object', additionalProperties: true, description: 'Extra environment fields (log); node/os/git are captured automatically.' },
       field: { type: 'string', description: 'Param name to group compare output by (compare).' },
-      metric: { type: 'string', description: 'Metric name for best (best).' },
+      metric: { type: 'string', description: 'Metric name for best (best); omit when using dominance: true.' },
       direction: { type: 'string', enum: EXPERIMENT_DIRECTIONS, description: 'higher or lower (best; defaults to the declared direction).' },
-      run_id: { type: 'string', description: 'Run id (link/show).' },
+      dominance: { type: 'boolean', description: 'best: return the multi-metric Pareto front over declared metrics and directions.' },
+      verdict: { type: 'string', enum: EXPERIMENT_VERDICTS, description: 'verdict: good, engineer, or bad (advisory human decision).' },
+      reason: { type: 'string', description: 'verdict: the required reason for the decision.' },
+      engineering_round: { type: 'integer', description: 'verdict: the engineering round requested (required for engineer).' },
+      budget: { oneOf: [{ type: 'number' }, { type: 'object', additionalProperties: true }], description: 'verdict: engineering budget, e.g. {max_rounds, used, exhausted}. A budget-exhausted engineer is recorded force-bad.' },
+      run_id: { type: 'string', description: 'Run id (link/show/verdict).' },
       target_kind: { type: 'string', enum: LINK_TARGET_KINDS, description: 'Link target kind (link).' },
       target_id: { type: 'string', description: 'Link target id (link).' },
       resume: { type: 'boolean', description: 'Continue an existing experiment instead of failing (start).' },

@@ -65,7 +65,7 @@ try {
   result = await run({ action: 'best', slug: 'sweep', metric: 'f1', direction: 'higher' })
   assert.equal(result.best.run.run_id, 'x0003')
   result = await run({ action: 'best', slug: 'sweep' })
-  assert.match(result.error, /metric is required/)
+  assert.match(result.error, /named metric or dominance/)
   result = await run({ action: 'best', slug: 'sweep', metric: 'nonexistent', direction: 'higher' })
   assert.match(result.error, /no run records metric/)
 
@@ -101,7 +101,7 @@ try {
   assert.match(result.error, /already exists/)
   result = await run({ action: 'export', slug: 'sweep', format: 'csv', overwrite: false })
   const csv = readFileSync(join(cwd, result.path), 'utf8')
-  assert.match(csv.split('\n')[0], /run_id,ts,seed,parent,lr,epochs,accuracy,loss,f1,artifacts,notes/)
+  assert.match(csv.split('\n')[0], /run_id,ts,seed,parent,role,baseline_ref,stage,protocol_digest,spec_drift,lr,epochs,accuracy,loss,f1,verdict,artifacts,notes/)
   assert.match(csv, /x0001,.*out\/run1\.json/)
   result = await run({ action: 'export', slug: 'sweep', format: 'json' })
   const json = JSON.parse(readFileSync(join(cwd, result.path), 'utf8'))
@@ -116,8 +116,187 @@ try {
     /must be one of/,
   )
 
+  // Phase 4: benchmark spec, staged runs, protocol digest, verdicts, dominance.
+  const benchMetrics = [
+    { name: 'accuracy', direction: 'higher' },
+    { name: 'latency', direction: 'lower' },
+  ]
+  const validBench = {
+    datasets: ['D1', 'D2'],
+    splits: ['val', 'test'],
+    baseline_arm: 'baseline',
+    task_rules: ['no test leakage', 'fixed split'],
+  }
+  workspace.write('eval.py', 'print("v1")\n')
+  result = await run({
+    action: 'start', slug: 'bad-bench', question: 'Bad benchmark?',
+    experiment: { metrics: benchMetrics, benchmark: { datasets: ['D1'], splits: ['test'], baseline_arm: 'baseline' } },
+  })
+  assert.match(result.error, /benchmark\.task_rules is required/)
+  result = await run({
+    action: 'start', slug: 'bad-bench2', question: 'No direction?',
+    experiment: { metrics: [{ name: 'accuracy' }], benchmark: validBench },
+  })
+  assert.match(result.error, /need a direction/)
+  result = await run({
+    action: 'start', slug: 'bad-bench3', question: 'No eval?',
+    experiment: { metrics: benchMetrics, benchmark: validBench, protocol: { eval_script: 'missing.py', metric_params: {} } },
+  })
+  assert.match(result.error, /protocol\.eval_script not found/)
+
+  result = await run({
+    action: 'start', slug: 'bench', question: 'Does the mechanism beat the reference across stages?',
+    experiment: {
+      metrics: benchMetrics,
+      benchmark: validBench,
+      protocol: { eval_script: 'eval.py', metric_params: { threshold: 0.5 } },
+    },
+  })
+  assert.equal(result.experiment.benchmark.baseline_arm, 'baseline')
+  assert.equal(result.experiment.protocol.eval_script, 'eval.py')
+  assert.equal(result.experiment.metrics[0].direction, 'higher')
+
+  result = await run({
+    action: 'log', slug: 'bench', role: 'baseline', baseline_ref: 'reproduced', stage: 'subset',
+    sampling: { seed: 7, size: 32, stratification: 'by dataset' },
+    params: { lr: 0.1 }, metrics: { accuracy: 0.8, latency: 100 },
+  })
+  assert.equal(result.run.run_id, 'x0001')
+  assert.equal(result.run.role, 'baseline')
+  assert.equal(result.run.stage, 'subset')
+  assert.equal(result.run.sampling.size, 32)
+  assert.match(result.run.protocol_digest, /^sha256:[0-9a-f]{64}$/)
+  assert.equal(result.run.spec_drift.state, 'baseline')
+
+  result = await run({
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full',
+    params: { lr: 0.05 }, metrics: { accuracy: 0.85, latency: 90 },
+  })
+  assert.equal(result.run.run_id, 'x0002')
+  assert.equal(result.run.baseline_run_id, 'x0001')
+  assert.equal(result.run.spec_drift.state, 'match')
+
+  result = await run({
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full',
+    protocol: { eval_script: 'eval.py', metric_params: { threshold: 0.6 } },
+    params: { lr: 0.05 }, metrics: { accuracy: 0.82, latency: 80 },
+  })
+  assert.equal(result.run.run_id, 'x0003')
+  assert.equal(result.run.spec_drift.state, 'drift')
+  assert.deepEqual(result.run.spec_drift.changed, ['metric_params'])
+
+  workspace.write('eval.py', 'print("v2")\n')
+  result = await run({
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full',
+    params: { lr: 0.02 }, metrics: { accuracy: 0.88, latency: 95 },
+  })
+  assert.equal(result.run.run_id, 'x0004')
+  assert.equal(result.run.spec_drift.state, 'drift')
+  assert.deepEqual(result.run.spec_drift.changed, ['eval_script'])
+
+  result = await run({ action: 'log', slug: 'bench', metrics: { accuracy: 0.9 } })
+  assert.equal(result.run.run_id, 'x0005')
+
+  result = await run({
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reported', stage: 'full',
+    metrics: { accuracy: 0.8, latency: 90 },
+  })
+  assert.match(result.error, /no baseline run with baseline_ref "reported"/)
+  result = await run({
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced',
+    metrics: { accuracy: 0.8, latency: 90 },
+  })
+  assert.match(result.error, /needs stage/)
+  result = await run({
+    action: 'log', slug: 'bench', role: 'variant', stage: 'full',
+    metrics: { accuracy: 0.8, latency: 90 },
+  })
+  assert.match(result.error, /needs baseline_ref/)
+  result = await run({
+    action: 'log', slug: 'bench', role: 'baseline', baseline_ref: 'reproduced', stage: 'subset',
+    metrics: { accuracy: 0.8, latency: 90 },
+  })
+  assert.match(result.error, /needs a sampling rule/)
+  await run({ action: 'start', slug: 'plain', question: 'No benchmark?', experiment: { metrics: benchMetrics } })
+  result = await run({
+    action: 'log', slug: 'plain', role: 'baseline', baseline_ref: 'reproduced', stage: 'full',
+    metrics: { accuracy: 0.8, latency: 90 },
+  })
+  assert.match(result.error, /no benchmark spec/)
+  await run({
+    action: 'start', slug: 'noproto', question: 'No protocol?',
+    experiment: { metrics: benchMetrics, benchmark: validBench },
+  })
+  result = await run({
+    action: 'log', slug: 'noproto', role: 'baseline', baseline_ref: 'reproduced', stage: 'full',
+    metrics: { accuracy: 0.8, latency: 90 },
+  })
+  assert.match(result.error, /needs a protocol/)
+
+  result = await run({ action: 'verdict', slug: 'bench', run_id: 'x0002', verdict: 'good', reason: 'clear gain' })
+  assert.equal(result.verdict.verdict, 'good')
+  assert.equal(result.verdict.forced, false)
+  result = await run({
+    action: 'verdict', slug: 'bench', run_id: 'x0003', verdict: 'engineer',
+    reason: 'try a wider slice', engineering_round: 2, budget: { max_rounds: 2, used: 2 },
+  })
+  assert.equal(result.verdict.requested_verdict, 'engineer')
+  assert.equal(result.verdict.verdict, 'bad')
+  assert.equal(result.verdict.forced, true)
+  assert.match(result.verdict.reason, /forced bad: engineering budget exhausted/)
+  result = await run({
+    action: 'verdict', slug: 'bench', run_id: 'x0002', verdict: 'engineer',
+    reason: 'one more round', engineering_round: 2, budget: { max_rounds: 3, used: 1 },
+  })
+  assert.equal(result.verdict.verdict, 'engineer')
+  assert.equal(result.verdict.forced, false)
+  result = await run({ action: 'verdict', slug: 'bench', run_id: 'x0002', verdict: 'engineer', reason: 'no round' })
+  assert.match(result.error, /engineering_round is required/)
+  result = await run({ action: 'verdict', slug: 'bench', run_id: 'x9999', verdict: 'good', reason: 'missing' })
+  assert.match(result.error, /not found/)
+
+  result = await run({ action: 'status', slug: 'bench' })
+  assert.equal(result.status.benchmark.baseline_arm, 'baseline')
+  assert.equal(result.status.baseline_runs[0].run_id, 'x0001')
+  assert.deepEqual(result.status.spec_drift_runs.map((entry) => entry.run_id), ['x0003', 'x0004'])
+  assert.equal(result.status.verdicts, 3)
+  result = await run({ action: 'show', slug: 'bench', run_id: 'x0002' })
+  assert.equal(result.verdicts.length, 2)
+  assert.equal(result.verdicts.at(-1).verdict, 'engineer')
+  result = await run({ action: 'compare', slug: 'bench' })
+  assert.equal(result.comparison.runs.length, 5)
+  assert.equal(result.comparison.runs.find((entry) => entry.run_id === 'x0002').spec_drift.state, 'match')
+  assert.equal(result.comparison.runs.find((entry) => entry.run_id === 'x0003').spec_drift.state, 'drift')
+  assert.equal(result.comparison.runs.find((entry) => entry.run_id === 'x0002').verdict.verdict, 'engineer')
+
+  result = await run({ action: 'best', slug: 'bench', dominance: true })
+  assert.equal(result.best, null)
+  assert.equal(result.dominance.front.length, 3)
+  assert.deepEqual(result.dominance.front.map((entry) => entry.run_id).sort(), ['x0002', 'x0003', 'x0004'])
+  assert.deepEqual(result.dominance.dominated, ['x0001'])
+  assert.deepEqual(result.dominance.incomplete, [{ run_id: 'x0005', missing: ['latency'] }])
+  result = await run({ action: 'best', slug: 'bench', metric: 'accuracy', dominance: true })
+  assert.equal(result.best.run.run_id, 'x0005', 'single-metric best still considers an incomplete run')
+  assert.equal(result.dominance.front.length, 3)
+  result = await run({ action: 'best', slug: 'bench', metric: 'accuracy' })
+  assert.equal(result.best.run.run_id, 'x0005')
+  assert.equal(result.dominance, null)
+
+  result = await run({ action: 'export', slug: 'bench', format: 'markdown' })
+  const benchReport = readFileSync(join(cwd, result.path), 'utf8')
+  assert.match(benchReport, /## Staged contract/)
+  assert.match(benchReport, /## Verdicts/)
+  assert.match(benchReport, /spec_drift|drift/)
+  result = await run({ action: 'export', slug: 'bench', format: 'csv' })
+  const benchCsv = readFileSync(join(cwd, result.path), 'utf8')
+  assert.match(benchCsv.split('\n')[0], /role,baseline_ref,stage,protocol_digest,spec_drift/)
+  result = await run({ action: 'export', slug: 'bench', format: 'json' })
+  const benchJson = JSON.parse(readFileSync(join(cwd, result.path), 'utf8'))
+  assert.equal(benchJson.verdicts.length, 3)
+  assert.equal(benchJson.runs.length, 5)
+
   // Direct runner throws.
-  await assert.rejects(() => runExperimentAction({ action: 'best', slug: 'sweep' }, exec), /metric is required/)
+  await assert.rejects(() => runExperimentAction({ action: 'best', slug: 'sweep' }, exec), /named metric or dominance/)
 
   console.log('experiment_log OK')
 } finally {

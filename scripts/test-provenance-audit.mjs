@@ -181,6 +181,27 @@ await startExperiment({
 await logExperimentRun({ cwd, slug: 'sweep', params: { lr: 0.1 }, metrics: { loss: 0.5 }, artifacts: ['results.csv'], seed: 7 })
 await linkExperimentRun({ cwd, slug: 'sweep', runId: 'x0001', targetKind: 'paper', targetId: '10.1000/ghost' })
 await linkExperimentRun({ cwd, slug: 'sweep', runId: 'x0001', targetKind: 'notebook', targetId: 'n2' })
+// A staged experiment with a deliberate protocol drift: this is the
+// experiment ledger's structured spec_drift signal.
+ws.write('eval.py', 'print("v1")\n')
+await startExperiment({
+  cwd, slug: 'drift',
+  experiment: {
+    question: 'Does the variant survive the staged contract?',
+    metrics: [{ name: 'loss', direction: 'lower' }],
+    benchmark: { datasets: ['D1'], splits: ['test'], baseline_arm: 'baseline', task_rules: ['fixed split'] },
+    protocol: { eval_script: 'eval.py', metric_params: { threshold: 0.5 } },
+  },
+})
+await logExperimentRun({
+  cwd, slug: 'drift', role: 'baseline', baselineRef: 'reproduced', stage: 'subset',
+  sampling: { size: 16, seed: 1 }, params: { lr: 0.1 }, metrics: { loss: 0.5 },
+})
+await logExperimentRun({
+  cwd, slug: 'drift', role: 'variant', baselineRef: 'reproduced', stage: 'full',
+  protocol: { eval_script: 'eval.py', metric_params: { threshold: 0.6 } },
+  params: { lr: 0.1 }, metrics: { loss: 0.45 },
+})
 
 /* ------------------------------------------------------------------ dataset */
 
@@ -277,12 +298,13 @@ ok('all ledgers the workspace holds are readable', index.sources.filter((entry) 
   JSON.stringify(index.sources.map((entry) => `${entry.ledger}:${entry.status}`)))
 ok('no unexpected warnings', index.warnings.length === 0, JSON.stringify(index.warnings))
 
-/* ------------------------------------------------------- the five states */
+/* ------------------------------------------------------- the six unsupported states */
 
 const coverage = coverageOf(index)
-for (const state of ['no_link', 'not_checked', 'unverified', 'not_found']) {
+for (const state of ['no_link', 'not_checked', 'unverified', 'not_found', 'spec_drift']) {
   ok(`state "${state}" is present`, coverage.totals.by_state[state] > 0, JSON.stringify(coverage.totals.by_state))
 }
+ok('an experiment protocol drift is spec_drift', stateOf(index, 'claim:experiment/drift/spec-drift-x0002') === 'spec_drift', stateOf(index, 'claim:experiment/drift/spec-drift-x0002'))
 ok('a quote with no PaperMemory paper is no_link', stateOf(index, 'claim:review/bcg/e0001') === 'no_link', stateOf(index, 'claim:review/bcg/e0001'))
 ok('an included record with no evidence is no_link', stateOf(index, 'claim:review/bcg/include~r0003') === 'no_link', stateOf(index, 'claim:review/bcg/include~r0003'))
 ok('an unbound AH clause is no_link', stateOf(index, 'claim:ah/project/U_INTRO_1~clm_unbound') === 'no_link', stateOf(index, 'claim:ah/project/U_INTRO_1~clm_unbound'))
@@ -306,7 +328,7 @@ ok('a not-reported checklist item is an unsupported claim', stateOf(index, 'clai
 
 const unsupported = unsupportedOf(index)
 ok('unsupported lists only claims', unsupported.items.every((item) => item.role === 'claim'))
-ok('unsupported separates all five states', Object.keys(unsupported.by_state).length === 5, JSON.stringify(unsupported.by_state))
+ok('unsupported separates all six states', Object.keys(unsupported.by_state).length === 6, JSON.stringify(unsupported.by_state))
 ok('supported claims are excluded from unsupported', !unsupported.items.some((item) => item.state === 'supported'))
 
 /* --------------------------------------------------------------- stale ripple */
@@ -509,7 +531,7 @@ const finalDrift = [...lastSnapshot].filter(([key, value]) => {
   return before.get(key) !== value
 })
 ok('the audit never wrote to a source ledger', finalDrift.length === 0, finalDrift.map(([key]) => key).join(', '))
-ok('every documented state is reachable', AUDIT_STATES.length === 7 && new Set(AUDIT_STATES).size === 7)
+ok('every documented state is reachable', AUDIT_STATES.length === 8 && new Set(AUDIT_STATES).size === 8)
 
 console.log(failures.length ? `\n${failures.length} failure(s):\n  ${failures.join('\n  ')}` : '\nall provenance audit checks passed')
 process.exit(failures.length ? 1 : 0)

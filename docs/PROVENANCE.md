@@ -55,7 +55,7 @@ Each node also carries a **role**, and the role decides what the tool reports:
 `unsupported` walks only claims. Containers and support nodes appear in
 `coverage` and `impact`, so nothing is double-counted as a defect.
 
-## The seven states
+## The eight states
 
 | State | Recorded meaning | Never means |
 |---|---|---|
@@ -65,6 +65,7 @@ Each node also carries a **role**, and the role decides what the tool reports:
 | `unverified` | A verification was attempted and did not confirm it | "the check failed to run" |
 | `stale` | The source behind the evidence changed | "the claim was retracted" |
 | `not_found` | A recorded link's far end does not exist | "unsupported" |
+| `spec_drift` | An experiment run's evaluation protocol changed against its baseline | "the result is false" |
 | `unknown` | The audit could not read that ledger at all | "unsupported" |
 
 The rules that produce them are deliberately boring:
@@ -96,7 +97,7 @@ The rules that produce them are deliberately boring:
 |---|---|
 | `index` | Builds or refreshes the index for the workspace and writes the cache. Optional `review`, `reporting`, `meta`, `analysis`, `experiment`, `dataset`, `deep_review` slugs narrow it, `manuscript` adds a workspace file as a source, `include_ah: false` skips the AH sidecars, `verify_quotes: true` re-checks quotes through PaperMemory. |
 | `coverage` | Totals and per-ledger state counts, plus each source's status (`present`, `unknown`, `skipped`, `not_queried`, `queried`) with its reason. |
-| `unsupported` | Claims lacking verified support, split into `no_link`, `not_checked`, `unverified`, `stale`, `not_found`; optional `state` filter and `limit`. |
+| `unsupported` | Claims lacking verified support, split into `no_link`, `not_checked`, `unverified`, `stale`, `not_found`, `spec_drift`; optional `state` filter and `limit`. |
 | `stale` | Evidence whose source changed, with recorded and current hashes, location, and the state it held before. |
 | `unverified` | Evidence with a verification attempt that did not confirm it — including appraisals, extractions, and dataset files whose checksum failed. |
 | `impact` | The transitive dependents of a `paper:`, `quote:`, `record:`, `run:`, `result:`, or workspace path — what would need revisiting if it changed. |

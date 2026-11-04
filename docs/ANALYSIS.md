@@ -35,14 +35,51 @@ host's existing permission model; it is not a privilege boundary.
 ## `experiment_log`
 
 A run registry for sweeps, simulations, pilots, and model comparisons under
-`<cwd>/.dsh/experiments/<slug>/`. `start` freezes the question and named
-metrics with `higher`/`lower` directions; `log` appends params, metrics,
-hashed workspace artifacts, seed, parent, and captured environment — a rerun
-is a new run, nothing is deduplicated, and missing metrics stay blank rather
-than zero. `compare` tables all runs (optionally grouped by a param), `best`
-selects by a **named metric and direction** (ties are listed), `link` connects
-a run to a notebook entry, analysis run, paper, or review, and `export` writes
-CSV/JSON/Markdown or an MLflow-compatible JSON.
+`<cwd>/.dsh/experiments/<slug>/`: `experiment.json` (write-once definition),
+`runs.jsonl`, `links.jsonl`, `verdicts.jsonl`, and `exports/`. There is no
+parallel store.
+
+`start` freezes the question and named metrics with `higher`/`lower`
+directions. For a staged comparison it also declares a **benchmark spec** —
+`datasets`, `splits`, `baseline_arm`, and `task_rules` — and may declare a
+**protocol** (`eval_script` plus `metric_params`). `log` appends params,
+metrics, hashed workspace artifacts, seed, parent, and captured environment; a
+rerun is a new run, nothing is deduplicated, and missing metrics stay blank
+rather than zero.
+
+**Staged runs.** `log` accepts `role: baseline|variant`,
+`baseline_ref: reproduced|reported`, `stage: subset|slice|full`, and a
+`sampling` rule (a rule string or `{rule, size, seed, stratification}`).
+Subset and slice stages require a sampling rule; the rule is ours to declare,
+not a claim that the slice is representative.
+
+The first `baseline` run captures a **`protocol_digest`**: SHA-256 of the
+evaluated script hash plus the canonical metric parameters. Every later
+`variant` must name a baseline with the same `baseline_ref`; its protocol is
+hashed the same way and compared. A changed eval script or metric parameters
+is recorded as **`spec_drift`** with the expected/actual digests and the
+changed components, not silently accepted. A variant with no matching
+baseline reference is refused.
+
+**Selection.** `best` still selects by a named metric and direction (ties are
+listed). With `dominance: true` it also returns the **Pareto front** over all
+declared metrics: a run dominates only when it is at least as good on every
+declared metric and strictly better on one. Runs missing a declared metric are
+listed as incomplete and not ranked. This is the plugin's specification of the
+paper's undefined "preferred" relation, not a scientific claim.
+
+**Verdicts.** `verdict` records an advisory human decision on a run:
+`good`, `engineer`, or `bad`, with a required reason, an optional
+`engineering_round`, and a `budget` (`{max_rounds, used, exhausted}`). Engineer
+is not a terminal state: a budget-exhausted engineer is recorded as
+**force-`bad`**, preserving both the requested verdict and the forced final
+one. Verdicts are append-only; the latest per run is shown in `compare`,
+`show`, `status`, and the exports.
+
+`link` connects a run to a notebook entry, analysis run, paper, or review, and
+`export` writes CSV/JSON/Markdown or an MLflow-compatible JSON, including the
+staged fields and verdicts. The tool records logged values and human
+decisions; none of it is a scientific claim.
 
 ## `dataset_get`
 

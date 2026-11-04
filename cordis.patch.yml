@@ -506,10 +506,14 @@
           - id: analysis-run
             name: academic-harness/analysis-run
 
-          # Experiment registry (Phase 2B): sweeps, simulations, pilots, and model
-          # comparisons as append-only runs with params, metrics, hashed artifacts,
-          # seeds, and links; best is always by a named metric and direction. State
-          # lives under <cwd>/.dsh/experiments/<slug>/. See experiment-log.js and
+          # Experiment registry (Phase 2B / Phase 4): sweeps, simulations, pilots, and
+          # model comparisons as append-only runs with params, metrics, hashed artifacts,
+          # seeds, and links. A staged contract adds a benchmark spec, baseline/variant
+          # roles with reproduced|reported references, subset|slice|full stages, a
+          # sampling rule, and a protocol digest that reports spec_drift; verdicts are
+          # advisory good|engineer|bad (force-bad when the engineering budget is
+          # exhausted), and best is by a named metric or the multi-metric Pareto front.
+          # State lives under <cwd>/.dsh/experiments/<slug>/. See experiment-log.js and
           # experiment-store.js.
           - id: experiment-log
             name: academic-harness/experiment-log

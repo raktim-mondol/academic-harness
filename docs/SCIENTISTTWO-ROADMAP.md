@@ -1,6 +1,6 @@
 # ScientistTwo → Academic Harness: implementation roadmap
 
-Status: **Phases 0–3 implemented; Phases 4–10 are plan.** See §3 for what shipped and what is still proposed.
+Status: **Phases 0–4 implemented; Phases 5–10 are plan.** See §3 for what shipped and what is still proposed.
 Source paper: *ScientistTwo: Pioneering the Human Knowledge Frontier with Autonomous AI* (Google Cloud AI Research — J. Nam, J. Yoon, et al.), LaTeX bundle reviewed locally.
 Shaping decision: the plugin stays **advisory**. ScientistTwo's contribution we keep is its *control structure* — critic verdicts, per-stage round budgets, attribution-before-acceptance, staged compute, and post-hoc integrity audits. Its autonomy we do not keep.
 
@@ -128,7 +128,7 @@ Both sections print `not_checked` below their sample floor (3 same-manuscript pa
 
 **Exit:** Phase 0 harness reports correlation against real decisions; docs state advisory posture in the tool's own description text. ✅ — the report path and metrics are implemented and tested; it prints `not_checked` until a workspace has at least six scored reviews joined to a decided sample with both classes.
 
-### Phase 4 — Staged experimentation contract · M–L · unblocks 5, 7, 8
+### Phase 4 — Staged experimentation contract · M–L · ✅ implemented
 
 All of this lands on `experiment_log` + `experiment-store.js` — no parallel store.
 
@@ -140,6 +140,17 @@ All of this lands on `experiment_log` + `experiment-store.js` — no parallel st
 - `best`: add multi-metric Pareto **`dominance`** beside the existing single-metric best; the paper's own gate says "preferred", never defines it for a multi-metric grid, so dominance relations are ours to specify.
 
 **Tests:** extend `scripts/test-experiment-log.mjs`; register `spec_drift` in `provenance_audit` unsupported states. **Docs:** `docs/ANALYSIS.md#experiment_log`, TOOLS row, CHANGELOG.
+
+**Shipped, all on `experiment_log`/`experiment-store.js` — no parallel store:**
+
+- `start` accepts and validates a `benchmark` object (`datasets`, `splits`, `baseline_arm`, `task_rules`) and an optional `protocol` (`eval_script` + `metric_params`); metrics in a benchmark must carry directions. The spec is stored in the write-once `experiment.json`.
+- `log` accepts `role`, `baseline_ref`, `stage`, and `sampling`; subset/slice require a sampling rule. The first matching baseline captures `protocol_digest` — SHA-256 of the eval-script hash plus canonical metric parameters — and every variant must match a baseline with the same `baseline_ref`. A changed script or parameter set is stored as `spec_drift` with expected/actual digests and changed components; a variant with no matching baseline is refused. The run record carries the role, stage, sampling, protocol, baseline id, and drift.
+- `verdict` appends to `verdicts.jsonl`: `good`, `engineer`, or `bad`, a required reason, `engineering_round`, and a budget. A budget-exhausted `engineer` is recorded force-`bad`, preserving the request and the forced outcome. `compare`, `show`, `status`, and the exports surface the latest verdict.
+- `best dominance: true` computes the Pareto front over declared metrics and directions; runs missing a declared metric are incomplete and not ranked, ties remain on the front, and a single-metric `best` still lists ties.
+- `spec_drift` is a first-class `provenance_audit` unsupported state (the six unsupported states are now `no_link`, `not_checked`, `unverified`, `stale`, `not_found`, `spec_drift`), indexed from drifted experiment runs.
+- Tests cover benchmark/protocol validation, baseline/variant matching, both drift components, sampling requirements, verdict exhaustion, Pareto dominance, exports, and the provenance state; docs are in [Analysis](ANALYSIS.md#experiment_log), TOOLS, and the CHANGELOG.
+
+**Exit:** a staged run cannot silently compare against a different reference or a changed evaluator; the contract, drift, verdict, and Pareto front are stored and visible. ✅
 
 ### Phase 5 — New tool `ablation` · L
 

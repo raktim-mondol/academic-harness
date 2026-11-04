@@ -32,12 +32,12 @@ import { readJsonl as readReviewJsonl, readProtocol as readReviewProtocol } from
 import { latestVerdicts, readCheck as readReportingCheck, readVerdicts } from './reporting-store.js'
 import { readGradeEvents } from './grade-store.js'
 
-export const AUDIT_STATES = ['supported', 'no_link', 'not_checked', 'unverified', 'stale', 'not_found', 'unknown']
-export const UNSUPPORTED_STATES = ['no_link', 'not_checked', 'unverified', 'stale', 'not_found']
+export const AUDIT_STATES = ['supported', 'no_link', 'not_checked', 'unverified', 'stale', 'not_found', 'spec_drift', 'unknown']
+export const UNSUPPORTED_STATES = ['no_link', 'not_checked', 'unverified', 'stale', 'not_found', 'spec_drift']
 export const PROVENANCE_ACTIONS = ['index', 'coverage', 'unsupported', 'stale', 'unverified', 'impact', 'export']
 export const PROVENANCE_EXPORT_FORMATS = ['markdown', 'csv', 'json', 'graphml', 'mermaid']
 
-const STATE_RANK = { supported: 0, not_checked: 1, no_link: 2, unverified: 3, not_found: 4, stale: 5, unknown: 6 }
+const STATE_RANK = { supported: 0, not_checked: 1, no_link: 2, unverified: 3, not_found: 4, stale: 5, spec_drift: 6, unknown: 7 }
 const CLIP = 220
 const MAX_NODES = 20_000
 const MAX_DEPTH = 4
@@ -851,6 +851,22 @@ function readExperimentLedger(cwd, slug, graph) {
     })
     graph.edge({ from: questionId, to: id, relation: 'explored_by', ledger: 'experiment' })
     graph.edge({ from: id, to: containerId, relation: 'in_experiment', ledger: 'experiment' })
+    if (run.spec_drift?.state === 'drift') {
+      const driftId = nodeId('claim', 'experiment', slug, `spec-drift-${run.run_id}`)
+      const changed = Array.isArray(run.spec_drift.changed) && run.spec_drift.changed.length
+        ? run.spec_drift.changed.join(', ')
+        : 'protocol digest'
+      graph.node({
+        id: driftId, kind: 'claim', ledger: 'experiment', slug, type: 'spec_drift', role: 'claim',
+        label: `${run.run_id}: evaluation protocol drift`,
+        state: 'spec_drift',
+        reason: `protocol changed against baseline ${run.spec_drift.baseline_run_id ?? '(unknown)'}: ${changed}`,
+        ts: run.ts ?? null,
+        detail: { expected_digest: run.spec_drift.expected_digest ?? null, actual_digest: run.spec_drift.actual_digest ?? null, changed: run.spec_drift.changed ?? [] },
+      })
+      graph.edge({ from: driftId, to: id, relation: 'observed_in', ledger: 'experiment' })
+      graph.edge({ from: driftId, to: containerId, relation: 'drifted_in', ledger: 'experiment' })
+    }
     for (const artifact of run.artifacts || []) {
       if (!artifact?.path) continue
       addFileNode(graph, cwd, 'experiment', slug, artifact.path, artifact.sha256 || null, 'produced_artifact', id, { role: 'support' })
