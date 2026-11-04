@@ -1,10 +1,10 @@
 ---
 name: deep-review
-description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, kept as numbered rounds that `compare` can diff. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, a second opinion beyond the session model, or whether a revision closed the findings from an earlier review.
+description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, kept as numbered rounds that `compare` can diff, plus four advisory evaluation-validity readings over the manuscript's own text and grids. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, a second opinion beyond the session model, whether a revision closed the findings from an earlier review, or whether a reported gain survives removing its mechanism, changing the evaluator, and reading the results grid against a baseline.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
-  version: "1.1"
+  version: "1.2"
   skill-author: Academic Harness
 ---
 
@@ -15,8 +15,9 @@ metadata:
 > every artifact under `.dsh/deep-review/<key>/`, and returns compact summaries.
 > `review` and `verify_citations` run on the session model through the host LLM
 > service — the same provider and model as the chat, with no separate key or
-> endpoint. `pdf2md`, `status`, `show`, `compare`, and `list` make no model call;
-> `estimate` is optional.
+> endpoint. `validity` uses that same route for at most one critic call, and
+> `critic: false` makes none. `pdf2md`, `status`, `show`, `compare`, and `list`
+> make no model call; `estimate` is optional.
 
 Use this skill for a full-manuscript critique produced by an external multi-pass
 engine. It is not a fast proofread, not a systematic-review ledger, and not a
@@ -181,6 +182,48 @@ score to climb. Where the user wants the tool itself checked,
 their agreement with real OpenReview decisions, reporting `not_checked` when the
 sample is too small.
 
+### 7. Check the validity of what the paper claims
+
+`validity` asks the four questions the engine's critique leaves open — whether a
+claimed gain survives removing its mechanism (`attribution`), whether a stated
+before-and-after value change sits in the evaluation harness rather than the model
+(`evaluator_drift`), how wide the results grid actually is (`benchmark_coverage`),
+and whether a quality or feasibility counter-metric stands beside a speed, memory,
+or iteration gain (`unmeasured_trade_off`) — by counting keywords and grid shapes
+in the manuscript itself. It needs a stored review, reads the round named by
+`round` (latest by default) against the current manuscript text, and answers
+`clear`, `flagged`, or `not_checked` for each check.
+
+```text
+deep_review action=validity path=paper/main.pdf                   # latest round, one critic call
+deep_review action=validity path=paper/main.pdf round=1 critic=false
+deep_review action=show path=paper/main.pdf section=validity
+```
+
+Read it with two cautions, and state both to the user:
+
+- A `flagged` state names an absence in the text, not a flaw in the work: the
+  counters read words and grid shapes, and the vocabularies and cut-offs are the
+  plugin's own, because the paper states the four criteria and no lexicon or
+  threshold. A paper that ablates off-line has nothing here to find. `not_checked`
+  is not a pass either — the manuscript carried too little to judge — so never tell
+  the user a paper is clean because nothing was flagged. Reference lists and
+  leading PDF line numbers are excluded before counting, and a review/synthesis
+  with no mechanism of its own answers `not_checked` for attribution rather than
+  `flagged`; a `clear` is an affirmative reading of the text, not proof.
+- The critic is at most one model call, on the session route, and it can only
+  annotate: it never changes a state, and `critic: false` makes no call at all.
+  Where the session has no model route, the call fails, or the reply is not JSON,
+  the deterministic checks still complete and the critic records `not_checked` with
+  the reason.
+
+`validity` never accepts or rejects the paper, and its four states are readings
+from counting rather than a score to climb; nothing here gates, and only
+`ah_check` blocks. It writes `extra_checks.json` beside the review and appends its
+own notebook entry tagged `validity`, so do not log that pass yourself.
+`provenance_audit` does not read the artifact yet, so a cross-ledger audit still
+sees only the stored claims and citation verdicts.
+
 ## State and artifacts
 
 ```
@@ -193,7 +236,8 @@ sample is too small.
   pdf-meta.json     page count, PDF type, OCR flags (pdf2md)
   citations.json    standalone verify-citations report
   estimate.json     last optional engine estimate
-  meta.json         input hash, engine/model, params, last run, summary, round index
+  extra_checks.json stored evaluation-validity checks (states, inventory, evidence, critic)
+  meta.json         input hash, engine/model, params, last run, summary, round index, validity summary
   runs.jsonl        append-only run history
 ```
 

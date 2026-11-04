@@ -611,9 +611,18 @@
 # Full-manuscript deep review with the vendored Open Deep Review engine
 # (vendor/open-deepreview): estimate, multi-pass segmented critique with
 # page/quote-anchored comments, scholar-peer summary with author questions,
-# and reference verification. Artifacts live under <cwd>/.dsh/deep-review/<key>/.
-# `review` calls the configured DEEPREVIEW_* endpoint and is token-expensive;
-# estimate/pdf2md/status/show/list make no model call. Node-only, no Bun.
+# and reference verification. Every pass is kept as a numbered round under
+# rounds/ and `compare` diffs two rounds. Artifacts live under
+# <cwd>/.dsh/deep-review/<key>/. `review` and `verify_citations` call the
+# session's own model through the host llm service over a loopback
+# OpenAI-compatible bridge — no separate endpoint or key — and are
+# token-heavy. `validity` runs four advisory evaluation-validity checks
+# (attribution, evaluator drift, benchmark coverage, unmeasured trade-off)
+# over a stored round plus a deterministic manuscript inventory, writing
+# extra_checks.json; it makes at most one critic call and none with
+# `critic: false`. estimate, pdf2md, status, show, compare, and list make no
+# model call. Advisory only: nothing here gates, and only ah_check blocks.
+# Node-only, no Bun.
 # See deep-review.js and vendor/open-deepreview/SOURCE.txt.
 - id: deep-review
   name: academic-harness/deep-review

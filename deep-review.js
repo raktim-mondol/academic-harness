@@ -17,6 +17,11 @@ import { basename, dirname, extname, join, relative, resolve as resolvePath, sep
 import { fileURLToPath } from 'node:url'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { run } from './academic-harness-cli.js'
+import { maskLatex } from './reporting-check.js'
+import { convertPdfMarkdown } from './pdf-to-markdown.js'
+import { runNumbersAudit } from './numbers-audit.js'
+import { appendNotebookEntryAt, notebookFile } from './notebook.js'
+import { escapeSourceTags, fenceMany, UNTRUSTED_RULE } from './untrusted-fence.js'
 import { withLock, writeJsonAtomic } from './store-lock.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 
@@ -26,8 +31,8 @@ const RUNNER = join(VENDOR_DIR, 'runner.mjs')
 const REGISTER = join(VENDOR_DIR, 'register.mjs')
 const VENDOR_COMMIT = 'c48e29450134d7a41559a73112962377f9602bce'
 
-const ACTIONS = ['review', 'estimate', 'pdf2md', 'verify_citations', 'status', 'show', 'compare', 'list']
-const SECTIONS = ['summary', 'comments', 'questions', 'checklist', 'claims', 'citations', 'markdown', 'rounds']
+const ACTIONS = ['review', 'estimate', 'pdf2md', 'verify_citations', 'status', 'show', 'compare', 'validity', 'list']
+const SECTIONS = ['summary', 'comments', 'questions', 'checklist', 'claims', 'citations', 'markdown', 'rounds', 'validity']
 const TOPOLOGIES = ['LOW', 'MID', 'HIGH', 'EXTRA_HIGH']
 const THINKING_LEVELS = ['LOW', 'MEDIUM', 'HIGH']
 const SEVERITIES = ['CRITICAL', 'MAJOR', 'MINOR', 'SUGGESTION', 'SEVERITY_UNSPECIFIED']
@@ -59,7 +64,7 @@ const ALLOWED_ENV = [
 ]
 const MAX_INPUT_BYTES = 50 * 1024 * 1024
 const MAX_FOCUS_CHARS = 4000
-const DEFAULT_TIMEOUTS = { review: 30, verify_citations: 30, estimate: 5, pdf2md: 5 }
+const DEFAULT_TIMEOUTS = { review: 30, verify_citations: 30, estimate: 5, pdf2md: 5, validity: 5 }
 const ARTIFACTS = {
   review_json: 'review.json',
   review_markdown: 'review.md',
@@ -67,6 +72,7 @@ const ARTIFACTS = {
   pdf_meta: 'pdf-meta.json',
   citations: 'citations.json',
   estimate: 'estimate.json',
+  extra_checks: 'extra_checks.json',
 }
 
 function workspaceRoot(exec) {
@@ -108,6 +114,7 @@ function storePaths(cwd, key) {
     pdfMeta: join(dir, ARTIFACTS.pdf_meta),
     citations: join(dir, ARTIFACTS.citations),
     estimate: join(dir, ARTIFACTS.estimate),
+    extraChecks: join(dir, ARTIFACTS.extra_checks),
   }
 }
 
@@ -820,13 +827,16 @@ function priorRoundDigest(paths, meta) {
   if (!meta?.review || !existsSync(paths.reviewJson)) return null
   const review = readJsonFile(paths.reviewJson)
   if (!review) return null
-  const stamp = `${meta.review?.finished_at ?? meta.last_run?.finished_at ?? ''}|${meta.input?.sha1 ?? ''}`
+  // last_run may be a later validity/citation/estimate pass; only a review run
+  // names the round. Using another action's id created an orphan rounds/ file.
+  const lastReview = meta.last_run?.action === 'review' ? meta.last_run : null
+  const stamp = `${meta.review?.finished_at ?? lastReview?.finished_at ?? ''}|${meta.input?.sha1 ?? ''}`
   return reviewDigest(review, {
-    run_id: meta.last_run?.run_id || `legacy-${sha1(stamp).slice(0, 12)}`,
-    started_at: meta.last_run?.started_at ?? null,
-    finished_at: meta.review?.finished_at ?? meta.last_run?.finished_at ?? null,
-    duration_ms: meta.last_run?.duration_ms ?? null,
-    state: meta.last_run?.state ?? 'SUCCEEDED',
+    run_id: lastReview?.run_id || `legacy-${sha1(stamp).slice(0, 12)}`,
+    started_at: lastReview?.started_at ?? null,
+    finished_at: meta.review?.finished_at ?? lastReview?.finished_at ?? null,
+    duration_ms: lastReview?.duration_ms ?? null,
+    state: lastReview?.state ?? 'SUCCEEDED',
     input_sha1: meta.input?.sha1 ?? null,
     input_path: meta.input?.path ?? null,
     params: meta.review?.params ?? meta.params ?? null,
@@ -1086,7 +1096,668 @@ function compareDigests(from, to) {
   }
 }
 
+/* ------------------------------------------------------------------ *
+ * Evaluation-validity checks (ScientistTwo roadmap Phase 2).
+ *
+ * Wrapper-side by design: these are review *criteria*, and the vendored
+ * engine stays unmodified, so VENDOR_COMMIT is not re-pinned. The four
+ * criteria come from the paper's AutoSOTA comparison; the vocabularies and
+ * thresholds below are the plugin's own, because the paper states neither.
+ * Every check is advisory and reports `not_checked` when the manuscript
+ * carries too little to judge — an absence of evidence is never a pass.
+ * ------------------------------------------------------------------ */
+
+const VALIDITY_ARTIFACT_VERSION = 1
+const VALIDITY_CHECK_IDS = ['attribution', 'evaluator_drift', 'benchmark_coverage', 'unmeasured_trade_off']
+const VALIDITY_LABELS = {
+  attribution: 'Attribution: does the gain survive removal of the named mechanism?',
+  evaluator_drift: 'Evaluator drift: is the change in the evaluation harness rather than the model?',
+  benchmark_coverage: 'Benchmark coverage: how wide is the results grid?',
+  unmeasured_trade_off: 'Unmeasured trade-off: is a counter-metric reported beside the headline gain?',
+}
+const CONTROL_PHRASES = [
+  'ema', 'exponential moving average', 'label smoothing', 'dropout', 'weight decay', 'warmup',
+  'learning rate', 'lr schedule', 'optimizer', 'adamw', 'adam', 'batch size', 'data augmentation',
+  'gradient clipping', 'model width', 'embedding dimension', 'network capacity', 'capacity',
+  'pretrained', 'pretraining', 'larger backbone', 'ensemble', 'more seeds', 'fine tuning',
+]
+const GAIN_PHRASES = [
+  'beat', 'beats', 'beating', 'outperform', 'outperforms', 'improve', 'improves', 'improving',
+  'improvement', 'surpass', 'surpasses', 'state of the art', 'sota', 'gain', 'gains', 'faster',
+  'fastest', 'speedup', 'reduction', 'reduce', 'reduces', 'reduced', 'cut', 'cuts', 'drop', 'drops', 'dropped',
+  'lower', 'lowers', 'lowered', 'decrease', 'decreases', 'decreased', 'rise', 'rises', 'increases',
+  'increase', 'achieves', 'saves', 'shorter', 'cheaper',
+]
+const COST_PHRASES = [
+  'latency', 'runtime', 'wall clock', 'wall-clock time', 'inference time', 'inference latency',
+  'training time', 'processing time', 'extra time', 'time per', 'reading time', 'turnaround', 'overhead',
+  'throughput', 'speedup', 'workload', 'memory footprint', 'peak memory', 'gpu memory', 'memory usage', 'flops', 'gpu hour', 'gpu hours',
+  'energy', 'solver iterations', 'iteration count', 'function evaluations',
+]
+const QUALITY_PHRASES = [
+  'accuracy', 'auroc', 'auc', 'f1', 'precision', 'recall', 'error', 'perplexity', 'bleu',
+  'rouge', 'mse', 'rmse', 'mae', 'nll', 'loss', 'dice', 'iou', 'ndcg', 'wer', 'calibration',
+  'ece', 'brier', 'correct', 'correctness', 'success', 'success rate', 'reliability', 'agreement',
+  'concordance', 'avgbio', 'avg bio', 'feasibility', 'constraint violation', 'violation', 'satisfaction', 'robustness',
+  'variance', 'confidence interval', 'standard deviation', 'quality',
+]
+const HARNESS_PHRASES = [
+  'evaluation script', 'eval script', 'evaluation harness', 'evaluation protocol', 'eval config',
+  'evaluation config', 'judge', 'llm judge', 'scoring function', 'metric parameters',
+  'shown to the judge', 'shown to the model', 'shown to the evaluator', 'shown to the grader',
+  'displayed to the judge', 'displayed to the model', 'displayed to the evaluator',
+  'max new tokens', 'checkpoint selection', 'evaluator', 'test set ordering',
+]
+const BASELINE_ROW = /\b(baseline|baselines|reference|vanilla|standard|unmodified|original|no[-_ ]?(?:ema|filter|smoothing|augmentation|normalization|pretraining)|sota|state[- ]of[- ]the[- ]art|auto[-_ ]?sota|identity|grayscale|grey|none|control|conventional|from[-_ ]?scratch|random|majority)\b/i
+const OURS_ROW = /\b(ours?|proposed|this work|our model|our method|our approach)\b/i
+const REMOVAL_ROW = /\b(?:w\/o|wo|without|no[-_]|ablat)\b/i
+/**
+ * Removal language that actually points at a removable part. A bare "without"
+ * is not enough — "without loss of generality" would read as an ablation and
+ * hand the attribution check a false pass.
+ */
+const REMOVAL_COMPONENT = '(?:component|module|branch|mechanism|loss|term|operator|stage|block|layer|augmentation|normalization|pretrain\\w*|sequest\\w*)'
+const WITHOUT_COMPONENT = '(?:component|module|branch|mechanism|loss|term|operator|stage|block|layer|augmentation|normalization|pretrain\\w*|sequest\\w*)'
+const STRONG_REMOVAL = new RegExp(`\\bw\\/o\\b|leave[ -]one[ -]out|component[ -]wise|from[ -]?scratch|without (?:the )?(?:proposed |core |main )?[\\w -]{0,24}${WITHOUT_COMPONENT}|\\b(?:remov|disabl|omit|exclud|drop)\\w* (?:the )?[\\w -]{0,24}(?:${REMOVAL_COMPONENT}|them|it)\\b|\\b(?:trained|fit|built|run) only on\\b|\\busing [\\w -]{1,30} alone\\b`, 'i')
+/**
+ * "We did not run an ablation" and "we leave ablation to future work" are
+ * absences, not removal evidence. A line that names a real removal arm as well
+ * ("w/o X", "removed the Y module") still counts.
+ */
+const NEGATED_REMOVAL = /\b(?:no|not|never|nor)\b[^.;]{0,60}\bablat\w*|\bablat\w*[^.;]{0,60}\b(?:not|no|never|future work|left? (?:it |this |that )?to future)\b|\b(?:we (?:do|did|does) not|we (?:leave|defer))\b[^.;]{0,60}(?:ablat\w*|component[ -]wise|removal|w\/o)/i
+// Concrete removal language used to keep a line that also carries a negation
+// ("we do not use X; instead we compare w/o Y"). Weaker signals (component-wise,
+// from-scratch, using X alone) do not override a negated clause.
+const POSITIVE_REMOVAL = new RegExp(`\\bw\\/o\\b|\\b(?:remov|disabl|omit|exclud|drop)\\w* (?:the )?[\\w -]{0,24}(?:${REMOVAL_COMPONENT}|them|it)\\b|without (?:the )?(?:proposed |core |main )?[\\w -]{0,24}${WITHOUT_COMPONENT}`, 'i')
+const PARAM_IDENTIFIER = /\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/
+/** A monospaced snake_case identifier only counts as harness context when its name is evaluator-shaped. */
+const EVALUATOR_IDENTIFIER = /(?:threshold|frac|judge|eval|scor|metric|prompt|token|display|checkpoint|sampling|sample|top_[kp]|temperature|window|context|truncat|filter|harness|rubric|grader)/i
+const MONOSPACE = /\\texttt\{|`|<code>/i
+const ACRONYM = /\b[A-Z][A-Z0-9]{1,9}\b/
+const MAX_INVENTORY_CHARS = 400_000
+const MAX_GRIDS = 40
+const MAX_GRID_ROWS = 60
+const MAX_EVIDENCE_PER_CHECK = 10
+const MAX_ARMS_REPORTED = 25
+/** Cost and provenance columns are not coverage axes; only a dataset-like column widens a grid. */
+const NON_COVERAGE_AXIS = /\b(?:latency|runtime|time|memory|flops?|params?|parameters?|size|cost|speed|throughput|energy|gpu|hours?|iterations?|tokens?|steps?|epochs?)\b/i
+// Live runs on a reasoning session model (DeepSeek-V4.1-Flash, effort High) used exactly 700
+// completion tokens and returned no JSON (and 4000 still ran out on 2 of 3 later calls): the cap was spent before any visible text. Still one
+// call and annotate-only; the budget just has to cover reasoning plus a small JSON object.
+const CRITIC_MAX_TOKENS = 8000
+
+/** Word-boundary phrase search over a line with punctuation collapsed to spaces. */
+function phraseLine(value) {
+  return ` ${String(value ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim()} `
+}
+
+function findPhrases(lines, phrases) {
+  const padded = phrases.map((phrase) => ` ${phrase} `)
+  const hits = []
+  for (const [index, line] of lines.entries()) {
+    const haystack = phraseLine(line)
+    if (haystack.length < 3) continue
+    for (const [slot, phrase] of phrases.entries()) {
+      if (haystack.includes(padded[slot])) hits.push({ phrase, line: index + 1 })
+    }
+  }
+  return hits
+}
+
+/** A claimed change in a reported quantity: the verb plus a number or a comparison. */
+function gainClaimHits(lines) {
+  return findPhrases(lines, GAIN_PHRASES)
+    .filter((hit) => /\d|baseline|compared|versus|outperform|beat|surpass|improve/i.test(String(lines[hit.line - 1] ?? '')))
+}
+
+/** A cost-side claim needs a magnitude, not just the word "memory". */
+function hasMagnitude(line) {
+  const text = String(line ?? '')
+  return findPhrases([line], GAIN_PHRASES).length > 0
+    || /\d+(?:[.,]\d+)?\s*%|\bby\s+\d+(?:[.,]\d+)?\s*%|\d+(?:[.,]\d+)?\s*(?:times|fold)\b/i.test(text)
+    // Case-sensitive x: "10x faster" is a multiplier, "10X Multiome" is a platform.
+    || /\d+(?:[.,]\d+)?\s*[x×]\b/.test(text)
+}
+
+/** `0.01 \to 0.05`, `0.01 → 0.05`, `50->10`: one changed value on one line. */
+function changedValues(line) {
+  const text = String(line ?? '')
+    .replace(/\\!/g, ' ')
+    .replace(/\\(?:to|rightarrow|gets|mapsto)\b/g, ' to ')
+    .replace(/[→⟶⇒]/g, ' to ')
+    .replace(/->|=>/g, ' to ')
+    .replace(/\$|\{\s*\}|\bfrom\b/g, (match) => (match === 'from' ? ' to ' : ' '))
+  const found = []
+  const pattern = /(\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?)\s+to\s+(\d+(?:[.,]\d+)?(?:[eE][-+]?\d+)?)/g
+  let match = pattern.exec(text)
+  while (match) {
+    found.push({ from: match[1], to: match[2] })
+    match = pattern.exec(text)
+  }
+  return found
+}
+
+function blankNonNewlines(value) {
+  return String(value ?? '').replace(/[^\r\n]/g, ' ')
+}
+
+/** Blank display-math environments before the prose mask; `$...$` is handled by maskLatex. */
+function maskLatexDisplayMath(text) {
+  return String(text ?? '')
+    .replace(/\\\[[\s\S]*?\\\]/g, blankNonNewlines)
+    .replace(/\\\([\s\S]*?\\\)/g, blankNonNewlines)
+    .replace(/\\begin\{(?:equation|align|eqnarray|gather|multline|displaymath)\*?\}[\s\S]*?\\end\{(?:equation|align|eqnarray|gather|multline|displaymath)\*?\}/g, blankNonNewlines)
+}
+
+/** Blank LaTeX comments but keep commands and math for the drift scan. */
+function maskLatexComments(text) {
+  const chars = String(text ?? '').split('')
+  for (let i = 0; i < chars.length; i += 1) {
+    if (chars[i] !== '%') continue
+    let backslashes = 0
+    for (let j = i - 1; j >= 0 && chars[j] === '\\'; j -= 1) backslashes += 1
+    if (backslashes % 2 === 1) continue
+    while (i < chars.length && chars[i] !== '\n' && chars[i] !== '\r') {
+      chars[i] = ' '
+      i += 1
+    }
+  }
+  return chars.join('')
+}
+
+/** Blank Markdown HTML comments and fenced code while preserving line numbering. */
+function maskMarkdownNonProse(text) {
+  const withoutComments = String(text ?? '').replace(/<!--[\s\S]*?-->/g, blankNonNewlines)
+  const lines = withoutComments.split(/\r\n|\r|\n/)
+  let fence = null
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = /^\s*(`{3,}|~{3,})/.exec(lines[i])
+    if (match) {
+      if (!fence) fence = match[1][0]
+      else if (match[1][0] === fence) fence = null
+      lines[i] = ''
+      continue
+    }
+    if (fence) lines[i] = ''
+  }
+  return lines.join('\n')
+}
+
+/** PDF text extracted by the simple converter often carries leading line numbers. */
+function normalizePdfText(text) {
+  return String(text ?? '')
+    .split(/\r\n|\r|\n/)
+    .map((line) => line.replace(/^[ \t]*\d{1,4}[ \t]+(?=[A-Za-z[(])/, ''))
+    .join('\n')
+}
+
+/**
+ * Blank a bibliography/reference list before counting. References are full of
+ * words the checks look for ("throughput", "training time", "ablation", metric
+ * names) and the PDF converter turns them into pipe rows that look like grids.
+ * Line numbering is preserved; an appendix/supplementary heading after the
+ * references stops the mask so its tables remain visible.
+ */
+function maskReferences(text, format) {
+  const source = String(text ?? '')
+  const lines = source.split(/\r\n|\r|\n/)
+  const cleanHeading = (line) => String(line ?? '').replace(/^\s*(?:#+\s*|\d{1,4}\s+)/, '').replace(/\*\*/g, ' ').trim()
+  // A converter can merge the heading with the preceding paragraph or the first
+  // citation ("**References** [1] ..."), so match the heading token anywhere on
+  // a line, and only after the first fifth of the document to skip body mentions.
+  const heading = (line) => /(?:^|[\s.;])(?:references|bibliography|literature cited|works cited)(?:\s+and\s+notes)?\s*(?:[:.]|\s+\[\d+\]|\s*$)/i.test(cleanHeading(line))
+  const after = (line) => /^(?:supplementary|appendix|extended data|supporting information)\b/i.test(cleanHeading(line))
+  const afterTex = (line) => /\\appendix\b|\\section\*?\{\s*(?:appendix|supplementary)/i.test(line)
+  const floor = Math.floor(lines.length * 0.2)
+  let start = -1
+  if (format === 'tex') {
+    start = lines.findIndex((line) => /\\bibliography\s*\{|\\begin\{thebibliography\}/.test(line) || /\\section\*?\{\s*(?:references|bibliography)\s*\}/i.test(line))
+  } else {
+    for (let index = floor; index < lines.length; index += 1) {
+      if (heading(lines[index])) {
+        start = index
+        break
+      }
+    }
+  }
+  if (start < 0) return { text: source, masked: false, line: null }
+  let end = lines.length
+  for (let index = start + 1; index < lines.length; index += 1) {
+    if (format === 'tex' ? afterTex(lines[index]) : after(lines[index])) {
+      end = index
+      break
+    }
+  }
+  for (let index = start; index < end; index += 1) lines[index] = ''
+  return { text: lines.join('\n'), masked: true, line: start + 1 }
+}
+
+/** A removal statement, or an ablation mention with a result/table behind it. */
+function removalEvidenceLine(value) {
+  const text = String(value ?? '').replace(/without loss of generality/gi, ' ')
+  const match = STRONG_REMOVAL.exec(text)
+  if (match) {
+    const after = text.slice(match.index + match[0].length, match.index + match[0].length + 140)
+    const nearby = text.slice(Math.max(0, match.index - 40), match.index + match[0].length + 140)
+    const result = /\b(?:lower|higher|improv|degrad|reduc|drop|accuracy|auc|auroc|rmse|f1|precision|recall)\b/i
+    // A pronoun ("removing them") only counts when the same neighbourhood names
+    // the removed thing or reports a result; "omitting them" about acronyms is
+    // not an ablation. "Trained only on" is a data split unless a result follows.
+    if (/\b(?:them|it)\b/i.test(match[0]) && !new RegExp(REMOVAL_COMPONENT, 'i').test(nearby) && !result.test(nearby)) return false
+    if (/\btrained only on\b/i.test(match[0]) && !result.test(after)) return false
+    return true
+  }
+  // "We validated this through ablation studies" without a table is an absence,
+  // not evidence (live: an unquantified aggregation ablation).
+  return /\bablat\w*/i.test(text) && /\b(?:table|figure|fig\.?|appendix|supplementary)\b/i.test(text)
+}
+
+/** The snake_case identifier on a line, with LaTeX escapes and markup removed. */
+function driftIdentifier(line) {
+  const text = String(line ?? '')
+    .replace(/\\[a-zA-Z]+\*?/g, ' ')
+    .replace(/\\_/g, '_')
+    .replace(/[{}`<>]/g, ' ')
+  return PARAM_IDENTIFIER.exec(text)?.[0] ?? null
+}
+
+/** Numbers, %, ±, and footnote stars are data; four or more letters is prose. */
+function stripCell(cell) {
+  return String(cell ?? '')
+    .replace(/\\multicolumn\s*(?:\{\d+\}\s*)?\{[^{}]*\}\s*/g, ' ')
+    .replace(/\\(?:cite[tp]?|ref|eqref|label|tag|footnote)\s*\{[^{}]*\}/g, ' ')
+    .replace(/\\[a-zA-Z]+\*?/g, ' ')
+    .replace(/[{}$~^_]/g, ' ')
+    .trim()
+}
+
+function cellNumeric(cell) {
+  const value = stripCell(cell)
+  if (!/\d/.test(value)) return false
+  return !/[a-z]{4,}/i.test(value)
+}
+
+function addGrid(grids, grid) {
+  if (grid.rows.length < 2) return
+  const truncated = grid.rows.length > MAX_GRID_ROWS
+  if (truncated) grid.rows = grid.rows.slice(0, MAX_GRID_ROWS)
+  grid.rows_truncated = truncated
+  grids.push(grid)
+}
+
+function parseLatexGrids(lines) {
+  const grids = []
+  let current = null
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    if (/^\s*%/.test(line)) continue
+    const open = /\\begin\{(?:tabularx?|array|longtable|table\*?)\}/.test(line)
+    const close = /\\end\{(?:tabularx?|array|longtable|table\*?)\}/.test(line)
+    if (open && !current) {
+      current = { source: 'latex', line: index + 1, rows: [] }
+      continue
+    }
+    if (close && current) {
+      addGrid(grids, current)
+      current = null
+      continue
+    }
+    if (!current) continue
+    const body = line
+      .replace(/\\(?:toprule|bottomrule|hline|cline|cmidrule)(?:\[[^\]]*\])?(?:\{\d+\})?/g, ' ')
+      // Expand a spanning header so the columns it covers still exist for axis counting.
+      .replace(/\\multicolumn\s*\{(\d+)\}\s*\{[^{}]*\}\s*\{([^{}]*)\}/g, (_, count, text) => {
+        const span = Math.min(Math.max(Number(count) || 1, 1), 20)
+        return Array.from({ length: span }, () => text).join(' & ')
+      })
+    if (!body.includes('&')) continue
+    for (const chunk of body.split(/\\\\/)) {
+      if (!chunk.includes('&')) continue
+      const cells = chunk.split(/(?<!\\)&/).map((cell) => stripCell(cell))
+      if (cells.some((cell) => cell !== '')) current.rows.push(cells)
+    }
+  }
+  return grids
+}
+
+function parseMarkdownGrids(lines) {
+  const grids = []
+  let current = null
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]
+    const cells = /^\s*\|.*\|\s*$/.test(line)
+      ? line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => stripCell(cell))
+      : null
+    if (!cells) {
+      if (current) {
+        addGrid(grids, current)
+        current = null
+      }
+      continue
+    }
+    const delimiter = cells.every((cell) => cell === '' || /^:?-{2,}:?$/.test(cell.replace(/\s/g, '')))
+    if (delimiter) continue
+    if (!current) current = { source: 'markdown', line: index + 1, rows: [] }
+    current.rows.push(cells)
+  }
+  if (current) addGrid(grids, current)
+  return grids
+}
+
+/**
+ * One results grid reduced to the axes the coverage check counts. Column labels
+ * are matched against the quality vocabulary; everything else is reported as an
+ * unnamed axis rather than guessed to be a dataset, because no dataset name list
+ * could be complete.
+ */
+function gridShape(grid) {
+  const header = grid.rows[0] ?? []
+  const body = grid.rows.slice(1)
+  const columns = header.length
+  let numericColumns = 0
+  const metricColumns = []
+  const otherAxes = []
+  for (let column = 1; column < columns; column += 1) {
+    const cells = body.map((row) => row[column] ?? '').filter((cell) => cell !== '')
+    const numericShare = cells.length ? cells.filter(cellNumeric).length / cells.length : 0
+    if (numericShare >= 0.5) numericColumns += 1
+    const label = String(header[column] ?? '').trim()
+    if (!label || numericShare >= 0.9 && !/[a-z]/i.test(label)) continue
+    const phrases = findPhrases([label], QUALITY_PHRASES)
+    if (phrases.length) metricColumns.push({ label, matched: phrases.map((hit) => hit.phrase) })
+    else if (!findPhrases([label], COST_PHRASES).length && !NON_COVERAGE_AXIS.test(label) && (ACRONYM.test(label) || /[A-Za-z]/.test(label))) {
+      otherAxes.push({ label, matched: [] })
+    }
+  }
+  const arms = []
+  const seen = new Set()
+  for (const row of body) {
+    const label = String(row[0] ?? '').trim()
+    if (label.length < 1 || label.length > 90) continue
+    const key = label.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    arms.push({
+      label,
+      baseline: BASELINE_ROW.test(label),
+      ours: OURS_ROW.test(label),
+      removal: REMOVAL_ROW.test(label),
+    })
+  }
+  return {
+    source: grid.source,
+    line: grid.line,
+    rows: body.length,
+    numeric_columns: numericColumns,
+    value_axes: numericColumns,
+    metric_columns: metricColumns.slice(0, MAX_ARMS_REPORTED),
+    other_axes: otherAxes.slice(0, MAX_ARMS_REPORTED),
+    arms: arms.slice(0, MAX_ARMS_REPORTED),
+    arms_total: arms.length,
+    removal_arms: arms.filter((arm) => arm.removal).length,
+    baseline_arms: arms.filter((arm) => arm.baseline).length,
+    ours_arms: arms.filter((arm) => arm.ours).length,
+    rows_truncated: grid.rows_truncated === true,
+  }
+}
+
+function evidenceItem(line, lines, kind) {
+  return {
+    kind,
+    line,
+    text: escapeSourceTags(clip(String(lines[line - 1] ?? '').replace(/\s+/g, ' '), 240)),
+  }
+}
+
+function dedupeByLine(hits, lines, kind) {
+  const seen = new Set()
+  const out = []
+  for (const hit of hits) {
+    if (seen.has(hit.line)) continue
+    seen.add(hit.line)
+    out.push(evidenceItem(hit.line, lines, kind))
+  }
+  return out
+}
+
+function axisCounts(lines, grids, gainHits) {
+  const metricColumns = new Set()
+  const otherAxes = new Set()
+  const armLabels = new Set()
+  let removalArms = 0
+  let baselineArms = 0
+  for (const grid of grids) {
+    for (const column of grid.metric_columns) metricColumns.add(column.label.toLowerCase())
+    for (const column of grid.other_axes) otherAxes.add(column.label.toLowerCase())
+    for (const arm of grid.arms) armLabels.add(arm.label.toLowerCase())
+    removalArms += grid.removal_arms
+    baselineArms += grid.baseline_arms
+  }
+  return {
+    grids: grids.length,
+    metric_axes: metricColumns.size,
+    other_axes: otherAxes.size,
+    value_axes: grids.reduce((max, grid) => Math.max(max, grid.value_axes ?? 0), 0),
+    arms: armLabels.size,
+    removal_arms: removalArms,
+    baseline_arms: baselineArms,
+    gain_claims: new Set(gainHits.map((hit) => hit.line)).size,
+    manuscript_lines: lines.length,
+  }
+}
+
+/**
+ * Attribution: the paper's own policy is that a gain must be attributable to
+ * the proposed mechanism in ablation, not merely move a metric. Removal
+ * evidence is a removal arm in a grid, the word ablation in the text, or a
+ * stored claim the engine tagged as ABLATION-backed.
+ */
+function checkAttribution({ prose, raw, grids, reviewClaims, reviewComments }) {
+  const opening = prose.slice(0, 80).join(' ')
+  const reviewLike = /\b(?:systematic review|scoping review|narrative review|literature review|meta-analysis|PRISMA)\b/i.test(opening)
+  const ownMechanism = /\b(?:our|we)\s+(?:propose|present|develop|introduce|design|train|build)\b[^.]{0,80}\b(?:model|method|architecture|algorithm|pipeline|classifier|system)\b/i.test(opening)
+  const removalLines = prose
+    .map((line, index) => ({ line: index + 1, text: String(line) }))
+    .filter((entry) => {
+      const text = entry.text.replace(/without loss of generality/gi, ' ')
+      if (NEGATED_REMOVAL.test(text) && !POSITIVE_REMOVAL.test(text)) return false
+      return removalEvidenceLine(text)
+    })
+  const gainHits = dedupeByLine(gainClaimHits(prose), raw, 'gain_claim')
+  const controlHits = dedupeByLine(findPhrases(prose, CONTROL_PHRASES), raw, 'generic_control')
+  const removalHits = dedupeByLine(removalLines, raw, 'removal_language')
+  const armRemoval = grids.filter((grid) => grid.removal_arms > 0).map((grid) => ({ kind: 'removal_arm', line: grid.line, text: `${grid.removal_arms} removal arm(s) in the grid starting here` }))
+  // The engine types a claim ABLATION when that is the kind of evidence it expected, even
+  // for a manuscript with no ablation (live: a PARTIALLY_SUPPORTED claim so typed on the
+  // TeCh case). Only a SUPPORTED one is removal evidence; the rest are listed, not counted.
+  const ablationTyped = reviewClaims.filter((claim) => String(claim?.evidence_type ?? '').toUpperCase() === 'ABLATION')
+  const claimRemoval = ablationTyped
+    .filter((claim) => String(claim?.status ?? '').toUpperCase() === 'SUPPORTED')
+    .map((claim) => ({ kind: 'review_claim_with_ablation_evidence', line: null, page: claim.page ?? null, text: escapeSourceTags(clip(claim.claim || '', 240)) }))
+  const unsettledAblation = ablationTyped
+    .filter((claim) => String(claim?.status ?? '').toUpperCase() !== 'SUPPORTED')
+    .map((claim) => ({ kind: 'review_claim_ablation_unsettled', line: null, page: claim.page ?? null, text: escapeSourceTags(clip(`[${claim.status ?? 'no status'}] ${claim.claim || ''}`, 240)) }))
+  const askedFor = reviewComments
+    .filter((comment) => /ablation|control group|confound|without.{0,24}(?:component|mechanism|module)/i.test(`${comment.summary || ''} ${comment.quote || ''}`))
+    .map((comment) => ({ kind: 'reviewer_asked_for_ablation', line: null, location: comment.location || null, severity: comment.severity, text: escapeSourceTags(clip(comment.summary || '', 240)) }))
+  const removalEvidence = [...armRemoval, ...removalHits, ...claimRemoval]
+  let state = 'not_checked'
+  let reason = 'no improvement claim the counter could locate, so there is nothing to attribute'
+  if (reviewLike && !ownMechanism) {
+    // A synthesis cites other people's gains; it has no mechanism of its own to
+    // attribute, so flagging it for a missing ablation would be a category error.
+    reason = 'the manuscript is a review/synthesis with no proposed mechanism of its own to attribute; cited gains are not its own ablation evidence'
+  } else if (gainHits.length && removalEvidence.length) {
+    state = 'clear'
+    reason = armRemoval.length
+      ? `${gainHits.length} claim(s) of a gain and ${armRemoval.length} removal arm(s) in the results grid`
+      : `${gainHits.length} claim(s) of a gain and ${removalEvidence.length} removal indicator(s) in the text${claimRemoval.length ? ' or stored claim evidence' : ''}; no removal arm appears in a grid`
+  } else if (gainHits.length) {
+    state = 'flagged'
+    reason = controlHits.length
+      ? `${gainHits.length} claim(s) of a gain and ${controlHits.length} generic-control mention(s), with no ablation, removal arm, or ablation-backed claim anywhere the counter could read`
+      : `${gainHits.length} claim(s) of a gain with no ablation, removal arm, or ablation-backed claim anywhere the counter could read`
+  }
+  return {
+    state,
+    reason,
+    // Show what decided the state first: removal evidence for `clear`, gains and
+    // controls for `flagged`.
+    evidence: (state === 'clear'
+      ? [...removalEvidence, ...unsettledAblation, ...askedFor, ...gainHits, ...controlHits]
+      : [...gainHits, ...controlHits, ...removalEvidence, ...unsettledAblation, ...askedFor]).slice(0, MAX_EVIDENCE_PER_CHECK),
+    tallies: { gain_claims: gainHits.length, generic_controls: controlHits.length, removal_indicators: removalEvidence.length, unsettled_ablation_claims: unsettledAblation.length, reviewer_requests: askedFor.length },
+  }
+}
+
+/**
+ * Evaluator drift: a changed value stated in the same breath as the evaluation
+ * harness, rather than the model. The T-SAE case is the shape — a threshold
+ * that changes what the judge is shown, with the SAE untouched.
+ */
+function checkEvaluatorDrift({ lines }) {
+  const pairs = []
+  for (const [index, line] of lines.entries()) {
+    const linePairs = changedValues(line)
+    if (!linePairs.length) continue
+    // Line-level work once per line, not once per pair: a single 400k-character
+    // line otherwise turns this scan quadratic and blocks the event loop.
+    const nearby = lines.slice(Math.max(0, index - 1), index + 2).join(' ')
+    const harness = findPhrases([nearby], HARNESS_PHRASES)
+    const identifier = driftIdentifier(line)
+    const mono = MONOSPACE.test(line)
+    const text = clip(String(line).replace(/\s+/g, ' '), 240)
+    for (const pair of linePairs) {
+      pairs.push({
+        line: index + 1,
+        from: pair.from,
+        to: pair.to,
+        harness_context: harness.map((hit) => hit.phrase),
+        identifier,
+        monospace: mono,
+        parameter_context: Boolean(identifier && mono && EVALUATOR_IDENTIFIER.test(identifier)),
+        text,
+      })
+    }
+  }
+  const inHarness = pairs.filter((pair) => pair.harness_context.length || pair.parameter_context)
+  let state = 'not_checked'
+  let reason = 'no before-and-after value pair appears in the manuscript text, so there is no stated change to locate'
+  if (pairs.length && inHarness.length) {
+    state = 'flagged'
+    reason = `${inHarness.length} of ${pairs.length} stated value change(s) sit in an evaluation-harness context rather than a model context`
+  } else if (pairs.length) {
+    state = 'clear'
+    reason = `${pairs.length} stated value change(s), none in an evaluation-harness or parameter context`
+  }
+  return {
+    state,
+    reason,
+    evidence: (inHarness.length ? inHarness : pairs).slice(0, MAX_EVIDENCE_PER_CHECK)
+      .map((pair) => ({ kind: 'changed_value', line: pair.line, text: `${pair.from} → ${pair.to}${pair.identifier ? ` (${pair.identifier})` : ''}${pair.harness_context.length ? ` — harness context: ${pair.harness_context.join(', ')}` : pair.parameter_context ? ' — evaluator-parameter context' : ''}` })),
+    tallies: { changed_values: pairs.length, in_harness_context: inHarness.length },
+  }
+}
+
+/**
+ * Coverage holism: the paper's diagnosis of the weaker system is "a single
+ * scalar metric on a single dataset". The grid axes are counted; the threshold
+ * deciding wide against thin is the plugin's, since the paper gives none.
+ */
+function checkBenchmarkCoverage({ grids, counts: tallies }) {
+  if (!grids.length) {
+    return {
+      state: 'not_checked',
+      reason: 'no results grid the counter could parse (it looks for a LaTeX table/tabular body and for Markdown pipe rows)',
+      evidence: [],
+      tallies: { ...tallies, axes_total: 0 },
+    }
+  }
+  // Width is judged from the widest grid: labelled metric/dataset axes when the
+  // headers carry them, otherwise the numeric value columns (real tables often
+  // put the metric name in the caption and the datasets in the header). A
+  // second arm is enough to be a comparator; the explicit baseline label is
+  // preferred but real tables name baselines "Identity", "Grayscale", etc.
+  const axes = Math.max(tallies.metric_axes + tallies.other_axes, tallies.value_axes)
+  const comparator = tallies.baseline_arms > 0 || tallies.arms >= 2
+  const evidence = grids.slice(0, MAX_EVIDENCE_PER_CHECK).map((grid) => ({
+    kind: 'grid',
+    line: grid.line,
+    text: `${grid.source} grid: ${grid.rows} row(s), ${grid.metric_columns.length} metric column(s), ${grid.other_axes.length} other column axis/axes, ${grid.numeric_columns} numeric column(s), ${grid.arms_total} arm(s), ${grid.baseline_arms} baseline-like, ${grid.removal_arms} removal-like`,
+  }))
+  let state = 'not_checked'
+  let reason = `${tallies.grids} grid(s) counted ${tallies.metric_axes} metric axis(es), ${tallies.other_axes} other axis(es), ${tallies.value_axes} numeric column(s) and ${tallies.arms} distinct arm label(s); that shape matches neither the thin grid the rule flags nor the wide grid the rule clears`
+  if (axes <= 1 || (tallies.gain_claims > 0 && !comparator)) {
+    state = 'flagged'
+    reason = axes <= 1
+      ? `${tallies.grids} grid(s) yield ${tallies.metric_axes} metric axis(es), ${tallies.other_axes} other axis(es) and ${tallies.value_axes} numeric column(s): a single-axis grid is where an isolated result hides`
+      : `${tallies.gain_claims} claim(s) of a gain, but no baseline-like or comparator arm appears in any of ${tallies.grids} grid(s)`
+  } else if ((tallies.metric_axes >= 2 && tallies.other_axes >= 1 && comparator) || (tallies.value_axes >= 3 && comparator)) {
+    state = 'clear'
+    reason = `${tallies.metric_axes} metric axis(es), ${tallies.other_axes} other axis(es), ${tallies.value_axes} numeric column(s), and ${tallies.baseline_arms} baseline-like arm(s) across ${tallies.grids} grid(s)`
+  }
+  return { state, reason, evidence, tallies: { ...tallies, axes_total: axes } }
+}
+
+/**
+ * Unmeasured trade-off: a speed or cost gain whose counter-metric is absent.
+ * Pinet is the case — 16.7% less latency bought by deleting the solver work
+ * that controls constraint violation, which is not in the registered metric.
+ */
+function checkUnmeasuredTradeOff({ prose, raw, grids }) {
+  const claims = []
+  for (const hit of findPhrases(prose, COST_PHRASES)) {
+    const line = prose[hit.line - 1] ?? ''
+    if (!/\d/.test(line)) continue
+    if (!hasMagnitude(line)) continue
+    const window = prose.slice(Math.max(0, hit.line - 6), hit.line + 4).join(' ')
+    const counter = findPhrases([window], QUALITY_PHRASES)
+    // A nearby results grid only counts when it actually has a baseline arm;
+    // otherwise any Accuracy header anywhere in the results section clears the
+    // claim without reporting the counter-metric beside the gain.
+    const grid = grids.find((item) => Math.abs(item.line - hit.line) <= 10 && item.baseline_arms > 0)
+    const columnCounter = grid
+      ? grid.metric_columns.filter((column) => column.matched.length).map((column) => column.label)
+      : []
+    claims.push({
+      line: hit.line,
+      phrase: hit.phrase,
+      counter: [...new Set([...counter.map((item) => item.phrase), ...columnCounter])],
+      text: clip(String(raw[hit.line - 1] ?? line).replace(/\s+/g, ' '), 240),
+    })
+  }
+  if (!claims.length) {
+    return { state: 'not_checked', reason: 'no cost-side improvement claim (latency, runtime, memory footprint, throughput, solver iterations) with a number attached', evidence: [], tallies: { cost_claims: 0, uncountered: 0 } }
+  }
+  const uncountered = claims.filter((claim) => !claim.counter.length)
+  return {
+    state: uncountered.length ? 'flagged' : 'clear',
+    reason: uncountered.length
+      ? `${uncountered.length} of ${claims.length} cost-side claim(s) have no quality or feasibility counter-metric in the surrounding text or in the same grid`
+      : `all ${claims.length} cost-side claim(s) name a quality or feasibility counter-metric nearby`,
+    evidence: claims.slice(0, MAX_EVIDENCE_PER_CHECK).map((claim) => ({
+      kind: 'cost_claim',
+      line: claim.line,
+      text: escapeSourceTags(`${claim.phrase}: ${claim.text}${claim.counter.length ? ` — counter-metric: ${claim.counter.join(', ')}` : ' — no counter-metric nearby'}`),
+    })),
+    tallies: { cost_claims: claims.length, uncountered: uncountered.length },
+  }
+}
+
+/** Evidence can name a manuscript line, a review page, or a comment location. */
+function evidenceWhere(item) {
+  if (item?.line != null) return `line ${item.line}`
+  if (item?.page != null) return `page ${item.page}`
+  if (item?.location) return String(item.location)
+  return 'review'
+}
+
+function validitySourceNote(format) {
+  return `the validity pass reads .tex, .md, .markdown, .txt, .text, and .pdf; a .${format || 'unknown'} file is not inventoried`
+}
+
 function engineInfo(exec) {
+
   let route = null
   try {
     route = sessionRoute(exec)
@@ -1321,13 +1992,17 @@ async function actionReview(args, exec, cwd, input, ctx) {
     if (markdownText != null) files[`${ROUNDS_DIR}/${run.run_id}.md`] = markdownText
 
     // Read before the write: a store from before rounds holds one review, and
-    // this run is about to overwrite it.
-    const prior = materializePriorRound(paths, readMeta(paths.dir))
+    // this run is about to overwrite it. A store that already has rounds needs
+    // no prior materialization, and doing it anyway writes an orphan file named
+    // after whatever action ran last (live: a validity run).
+    const current = readMeta(paths.dir)
+    const prior = current?.rounds?.length ? null : materializePriorRound(paths, current)
 
     const meta = await persistArtifacts(cwd, paths, { ...prior?.files, ...files }, (current) => {
       const next = mergeMeta(current, input, params, exec)
       next.last_run = run
       next.summary = summary
+      if (paperMarkdown != null) next.paper = { sha1: input.sha1, finished_at: run.finished_at }
       next.review = {
         sha1: input.sha1,
         review_id: ids.reviewId,
@@ -1439,6 +2114,7 @@ async function actionPdf2md(args, exec, cwd, input) {
     ? parsed.pagesNeedingOcr
     : pages.filter((page) => page?.needsOcr).map((page) => page?.pageNumber).filter((page) => page != null)
   const pdfMeta = {
+    source_sha1: input.sha1,
     filename: parsed?.filename ?? input.fileName,
     pdf_type: parsed?.pdfType ?? null,
     page_count: parsed?.pageCount ?? null,
@@ -1461,6 +2137,7 @@ async function actionPdf2md(args, exec, cwd, input) {
   }, (current) => {
     const next = mergeMeta(current, input, {}, exec)
     next.last_run = runRecord('pdf2md', startedAt)
+    next.paper = { sha1: input.sha1, finished_at: next.last_run.finished_at }
     return next
   })
 
@@ -1589,6 +2266,17 @@ function actionStatus(args, cwd, input) {
     input: meta.input,
     last_run: meta.last_run,
     summary: meta.summary,
+    validity: meta.validity
+      ? {
+          finished_at: meta.validity.finished_at,
+          round: meta.validity.round,
+          states: meta.validity.states,
+          flagged_total: meta.validity.flagged_total,
+          not_checked_total: meta.validity.not_checked_total,
+          critic_used: meta.validity.critic_used,
+          current: meta.validity.input_sha1 === input.sha1,
+        }
+      : null,
     rounds: {
       total: rounds.length,
       latest_round: meta.latest_round ?? (rounds.length || null),
@@ -1649,6 +2337,580 @@ function actionCompare(args, cwd, input) {
     input_changed: (from.input_sha1 ?? '') !== (to.input_sha1 ?? ''),
     ...compareDigests(fromDetail, toDetail),
     note: `Advisory: the engine re-issues comment ids per run, so findings are paired by wording, then wording similarity (≥${FUZZY_MIN_JACCARD} token overlap), then the quoted span — the "Matched by" line says which rule made each pair. A closed finding is a lead, not proof the criticism was resolved, and if the manuscript bytes did not change the movement is reviewer variance.`,
+  }
+}
+
+const VALIDITY_TEXT_FORMATS = new Set(['tex', 'md', 'markdown', 'txt', 'text', 'pdf'])
+
+/**
+ * Manuscript text for counting, preferring what the store already converted.
+ * A stored paper.md is reused only when its recorded source hash matches the
+ * PDF being checked; otherwise a revision would be described by the previous
+ * conversion while the result claimed it counted the current file.
+ */
+async function readValidityText(input, paths, stored, round) {
+  if (!VALIDITY_TEXT_FORMATS.has(input.format)) {
+    return { text: null, source: 'unsupported_format', note: validitySourceNote(input.format) }
+  }
+  if (input.format !== 'pdf') {
+    try {
+      return { text: readFileSync(input.abs, 'utf8'), source: 'manuscript', note: null }
+    } catch (error) {
+      return { text: null, source: 'read_failed', note: clip(error instanceof Error ? error.message : String(error), 200) }
+    }
+  }
+  const storedSha1 = stored?.paper?.sha1 ?? stored?.review?.sha1 ?? round?.input_sha1 ?? null
+  if (existsSync(paths.paperMarkdown) && storedSha1 && storedSha1 === input.sha1) {
+    try {
+      return {
+        text: readFileSync(paths.paperMarkdown, 'utf8'),
+        source: 'stored_paper_md',
+        note: 'line numbers name the stored Markdown conversion of the PDF, not PDF pages',
+      }
+    } catch {
+      // fall through to a fresh conversion
+    }
+  }
+  try {
+    const converted = await convertPdfMarkdown(readFileSync(input.abs))
+    if (converted?.success && typeof converted.markdown === 'string' && converted.markdown.trim()) {
+      const ocr = Array.isArray(converted.pages_needing_ocr) ? converted.pages_needing_ocr.length : 0
+      return {
+        text: converted.markdown,
+        source: 'pdf_converted',
+        note: `converted for this pass (${converted.pdf_type || 'unknown type'}, ${converted.page_count ?? '?'} page(s)); line numbers name the conversion${ocr ? `; ${ocr} page(s) were flagged for OCR and may be missing text` : ''}`,
+      }
+    }
+    return { text: null, source: 'pdf_conversion_failed', note: clip(converted?.error || 'the converter returned no Markdown', 200) }
+  } catch (error) {
+    return { text: null, source: 'pdf_conversion_failed', note: clip(error instanceof Error ? error.message : String(error), 200) }
+  }
+}
+
+/** Claims and comments of one stored round, in the digest's snake_case shape. */
+function validityReviewViews(fullReview, digest) {
+  if (fullReview) {
+    const result = fullReview.result && typeof fullReview.result === 'object' ? fullReview.result : {}
+    return {
+      source: 'review.json',
+      claims: listValue(result.claimEvidenceMap).map((claim) => ({
+        claim: claim?.claim ?? null,
+        page: claim?.page ?? null,
+        evidence_type: claim?.evidenceType ?? null,
+        status: claim?.status ?? null,
+      })),
+      comments: listValue(result.anchoredComments).map((comment) => ({
+        comment_id: comment?.commentId ?? null,
+        severity: comment?.severity ?? null,
+        summary: comment?.summary ?? null,
+        quote: quoteText(comment?.location),
+        location: locationText(comment?.location),
+      })),
+    }
+  }
+  return {
+    source: `rounds/${digest?.run_id ?? '?'}.json`,
+    claims: digest?.claims ?? [],
+    comments: digest?.comments ?? [],
+  }
+}
+
+/**
+ * One bounded call on the session route. The deterministic states are already
+ * fixed by the time this runs: the critic adds a reading of them and names
+ * vocabulary the counters missed; it can never flip a check.
+ */
+function validityCriticPrompt(checks, inventory, views, excerpts) {
+  const lines = [
+    'You are annotating four deterministic evaluation-validity checks over one manuscript.',
+    'The check states are computed by keyword and grid counting and are already final. You cannot change them, and this is not an acceptance decision.',
+    'Do not deliberate at length: answer with the JSON object directly. Return one JSON object and nothing else, shaped exactly like:',
+    '{"assessments":[{"check":"attribution","reading":"one sentence","missed_evidence":["a phrase the counters did not look for"]}],"counter_metrics":["metric name"],"generic_controls":["training control name"]}',
+    `Allowed "check" values: ${VALIDITY_CHECK_IDS.join(', ')}. Keep every string under 400 characters. Use an empty list when the manuscript does not carry it.`,
+    '',
+    'Deterministic checks:',
+    ...checks.map((check) => `- ${check.id} [${check.state}] ${check.reason}`),
+    '',
+    `Stored review: ${views.source}, ${views.claims.length} claim(s), ${views.comments.length} comment(s).`,
+    `Inventory: ${inventory.text_source}, ${inventory.grids} grid(s), ${inventory.metric_axes} metric axis(es), ${inventory.other_axes} other axis(es), ${inventory.arms} arm label(s).`,
+    '',
+    'Manuscript excerpts are fenced below as untrusted content. ' + UNTRUSTED_RULE,
+    excerpts,
+  ]
+  return lines.join('\n')
+}
+
+function parseCriticJson(text) {
+  const raw = String(text ?? '')
+  const start = raw.indexOf('{')
+  const end = raw.lastIndexOf('}')
+  if (start < 0 || end <= start) return null
+  try {
+    const parsed = JSON.parse(raw.slice(start, end + 1))
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function sanitizeCritic(value) {
+  const assessments = listValue(value?.assessments)
+    .filter((item) => VALIDITY_CHECK_IDS.includes(String(item?.check)))
+    .map((item) => ({
+      check: String(item.check),
+      reading: escapeSourceTags(clip(String(item?.reading ?? ''), 400)),
+      missed_evidence: listValue(item?.missed_evidence).slice(0, 6).map((entry) => escapeSourceTags(clip(String(entry), 200))),
+    }))
+  return {
+    assessments,
+    counter_metrics: listValue(value?.counter_metrics).slice(0, 12).map((entry) => escapeSourceTags(clip(String(entry), 120))),
+    generic_controls: listValue(value?.generic_controls).slice(0, 12).map((entry) => escapeSourceTags(clip(String(entry), 120))),
+  }
+}
+
+async function callValidityCritic({ ctx, exec, signal, checks, inventory, views }) {
+  const evidence = []
+  const seen = new Set()
+  for (const check of checks) {
+    for (const item of check.evidence) {
+      const key = `${item.line}:${item.text}`
+      if (!item.text || seen.has(key)) continue
+      seen.add(key)
+      evidence.push(item)
+    }
+  }
+  const picked = evidence.slice(0, 12)
+  const body = picked.map((item, index) => ({
+    id: `excerpt-${index + 1}`,
+    source: item.line != null
+      ? `${inventory.text_source} line ${item.line}`
+      : item.page != null
+        ? `review claim, page ${item.page}`
+        : item.location
+          ? `review comment at ${item.location}`
+          : 'review',
+    kind: 'manuscript-excerpt',
+    body: clip(item.text, 400),
+  }))
+  if (!ctx?.llm || typeof ctx.llm.stream !== 'function') {
+    return { used: false, state: 'not_checked', reason: 'no host llm service in this session; the deterministic counters ran on their own', assessments: [] }
+  }
+  const { text: fenced, count, dropped } = fenceMany(body, { perBodyChars: 900 })
+  if (!count) return { used: false, state: 'not_checked', reason: 'the checks produced no quotable evidence for the critic to read', assessments: [] }
+  const prompt = validityCriticPrompt(checks, inventory, views, fenced)
+  let bridge
+  try {
+    bridge = await startLlmBridge(ctx, exec)
+  } catch (error) {
+    return { used: false, state: 'not_checked', reason: clip(error instanceof Error ? error.message : String(error), 200), assessments: [] }
+  }
+  try {
+    const response = await fetch(`${bridge.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${bridge.token}` },
+      signal,
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        max_tokens: CRITIC_MAX_TOKENS,
+      }),
+    })
+    if (!response.ok) {
+      const detail = redact(String(await response.text().catch(() => '')), bridge.token)
+      return { used: true, state: 'not_checked', reason: clip(`the critic call returned HTTP ${response.status}${detail ? `: ${clip(detail, 200)}` : ''}`, 240), assessments: [] }
+    }
+    const payload = await response.json()
+    const parsed = parseCriticJson(payload?.choices?.[0]?.message?.content)
+    const usage = payload?.usage
+    const critic = sanitizeCritic(parsed)
+    const usable = Boolean(parsed && (critic.assessments.length || critic.counter_metrics.length || critic.generic_controls.length))
+    return {
+      used: true,
+      state: usable ? 'ok' : 'not_checked',
+      reason: usable
+        ? null
+        : parsed
+          ? 'the critic reply carried no usable assessments, counter-metrics, or controls, so nothing was attached'
+          : (usage?.completion_tokens ?? 0) >= CRITIC_MAX_TOKENS
+            ? `the critic used its whole ${CRITIC_MAX_TOKENS}-token budget without emitting a JSON object (a reasoning session model can spend it on thinking), so nothing was attached`
+            : 'the critic reply was not a JSON object, so nothing was attached',
+      calls: 1,
+      usage: usage ? { prompt_tokens: usage.prompt_tokens ?? 0, completion_tokens: usage.completion_tokens ?? 0 } : null,
+      excerpts: count,
+      excerpts_dropped: dropped.length,
+      ...critic,
+    }
+  } catch (error) {
+    if (signal?.aborted) throw error
+    return { used: true, state: 'not_checked', reason: clip(redact(error instanceof Error ? error.message : String(error), bridge.token), 200), assessments: [] }
+  } finally {
+    await bridge.close().catch(() => {})
+  }
+}
+
+function appendValidityNote(exec, { run, input, paths, checks, critic }) {
+  try {
+    const states = checks.map((check) => `${check.id} ${check.state}`).join(', ')
+    appendNotebookEntryAt(notebookFile(exec), {
+      id: `deep-review-validity-${run.run_id}`,
+      timestamp: Date.now(),
+      type: 'observation',
+      title: clip(`deep_review validity on ${input.rel}: ${states}`, 120),
+      body: `Advisory evaluation-validity pass over the stored deep review.\n\n${checks.map((check) => `- **${check.id}** — ${check.state}: ${check.reason}`).join('\n')}\n\nCritic: ${critic.used ? `one model call, ${critic.state}` : `not run (${critic.reason || 'skipped'})`}.`,
+      artifacts: [`${paths.dirRel}/${ARTIFACTS.extra_checks}`],
+      tags: ['deep-review', 'validity', `key:${input.key}`],
+    })
+  } catch {
+    // the notebook is a convenience, never a reason to fail a check
+  }
+}
+
+/**
+ * Deterministic validity evaluation over manuscript text. Exported for the
+ * Phase 0 calibration harness, which must measure the counters on a corpus
+ * without a stored review or a model call. `actionValidity` uses the same
+ * function, then adds the stored-review views, numeric audit, and critic.
+ */
+export function evaluateValidity({
+  text,
+  format = 'md',
+  claims = [],
+  comments = [],
+  source = 'manuscript',
+  note = null,
+} = {}) {
+  const raw = typeof text === 'string' ? text : ''
+  const capped = raw.length > MAX_INVENTORY_CHARS
+  const body = capped ? raw.slice(0, MAX_INVENTORY_CHARS) : raw
+  const normalized = format === 'pdf' ? normalizePdfText(body) : body
+  const references = maskReferences(normalized, format)
+  const analysis = references.text
+  const lines = analysis ? analysis.split(/\r\n|\r|\n/) : []
+  const tex = format === 'tex'
+  const markdownLike = format === 'md' || format === 'markdown'
+  // Prose counting drops comments, markup, and fenced examples; the drift scan
+  // keeps LaTeX commands and math but still drops commented-out lines.
+  const proseText = tex ? maskLatex(maskLatexDisplayMath(analysis)) : markdownLike ? maskMarkdownNonProse(analysis) : analysis
+  const proseLines = lines.length ? proseText.split(/\r\n|\r|\n/) : []
+  const driftLines = lines.length
+    ? (tex ? maskLatexComments(analysis) : markdownLike ? maskMarkdownNonProse(analysis) : analysis).split(/\r\n|\r|\n/)
+    : []
+  const gridLines = lines.length
+    ? (tex ? maskLatexComments(analysis) : markdownLike ? maskMarkdownNonProse(analysis) : analysis).split(/\r\n|\r|\n/)
+    : []
+  const allGrids = lines.length ? [...parseLatexGrids(gridLines), ...parseMarkdownGrids(gridLines)].map(gridShape) : []
+  const gridsTruncated = allGrids.length > MAX_GRIDS
+  const grids = allGrids.slice(0, MAX_GRIDS)
+  const gainHits = lines.length ? gainClaimHits(proseLines) : []
+  const tallies = axisCounts(lines, grids, gainHits)
+
+  const inventory = {
+    text_source: source,
+    text_note: note,
+    truncated_at_chars: capped ? MAX_INVENTORY_CHARS : null,
+    references_masked: references.masked,
+    reference_line: references.line,
+    pdf_line_numbers_stripped: format === 'pdf' && normalized !== body,
+    grids: grids.length,
+    metric_axes: tallies.metric_axes,
+    other_axes: tallies.other_axes,
+    value_axes: tallies.value_axes,
+    arms: tallies.arms,
+    baseline_arms: tallies.baseline_arms,
+    removal_arms: tallies.removal_arms,
+    gain_claims: tallies.gain_claims,
+    reviewer_context: { rounds: 1, models: [], topologies: [], changed: false },
+    grid_shapes: grids,
+    grids_truncated: gridsTruncated,
+    numeric_audit: null,
+  }
+
+  // Nothing readable means nothing to judge: every check says so with the reason.
+  const unreadable = () => ({
+    state: 'not_checked',
+    reason: note || 'no manuscript text could be read for counting',
+    evidence: [],
+    tallies: {},
+  })
+  const noText = !lines.length
+  const checks = [
+    {
+      id: 'attribution',
+      label: VALIDITY_LABELS.attribution,
+      ...(noText ? unreadable() : checkAttribution({
+        prose: proseLines,
+        raw: lines,
+        grids,
+        reviewClaims: claims,
+        reviewComments: comments,
+      })),
+    },
+    {
+      id: 'evaluator_drift',
+      label: VALIDITY_LABELS.evaluator_drift,
+      ...(noText ? unreadable() : checkEvaluatorDrift({ lines: driftLines })),
+    },
+    {
+      id: 'benchmark_coverage',
+      label: VALIDITY_LABELS.benchmark_coverage,
+      ...(noText ? unreadable() : checkBenchmarkCoverage({ grids, counts: tallies })),
+    },
+    {
+      id: 'unmeasured_trade_off',
+      label: VALIDITY_LABELS.unmeasured_trade_off,
+      ...(noText ? unreadable() : checkUnmeasuredTradeOff({ prose: proseLines, raw: lines, grids })),
+    },
+  ]
+
+  return {
+    inventory,
+    checks,
+    states: Object.fromEntries(checks.map((check) => [check.id, check.state])),
+    flagged: checks.filter((check) => check.state === 'flagged').map((check) => check.id),
+    not_checked: checks.filter((check) => check.state === 'not_checked').map((check) => check.id),
+  }
+}
+
+async function actionValidity(args, exec, cwd, input, ctx) {
+  const startedAt = new Date().toISOString()
+  const timeoutMinutes = timeoutMinutesFor('validity', args.timeout_minutes)
+  const paths = storePaths(cwd, input.key)
+  mkdirSync(paths.dir, { recursive: true })
+  const stored = readMeta(paths.dir)
+  if (!stored) throw new Error(`no stored deep review for ${input.rel}; run action "review" first`)
+  const entries = storedRounds(paths, stored)
+  if (!entries.length) throw new Error(`no stored review round for ${input.rel}; run action "review" first`)
+  const round = pickRound(entries, args.round, entries[entries.length - 1])
+  const isLatest = round.run_id === entries[entries.length - 1].run_id
+  const fullReview = isLatest && existsSync(paths.reviewJson) ? readJsonFile(paths.reviewJson) : null
+  const digest = fullReview ? null : roundDetail(paths, stored, round)
+  if (!fullReview && !digest) {
+    throw new Error(`round digest missing for ${round.run_id}; the ${ROUNDS_DIR}/ files were edited or deleted out of band`)
+  }
+  const views = validityReviewViews(fullReview, digest)
+  const criticWanted = args.critic !== false
+  const params = { critic: criticWanted, round: round.round, run_id: round.run_id }
+  const label = `Deep review validity checks: ${input.fileName}`
+
+  return runAsJob(ctx, exec, {
+    kind: 'deep-review',
+    label,
+    timeoutMs: timeoutMinutes * 60_000 + 60_000,
+  }, async (job, signal) => {
+    const read = await readValidityText(input, paths, stored, round)
+    const evaluation = evaluateValidity({
+      text: read.text,
+      format: input.format,
+      claims: views.claims,
+      comments: views.comments.filter((comment) => !/^section-/.test(String(comment.comment_id ?? ''))),
+      source: read.source,
+      note: read.note,
+    })
+    const { inventory, checks } = evaluation
+    inventory.reviewer_context = entries.length > 1
+      ? {
+          rounds: entries.length,
+          models: [...new Set(entries.map((entry) => entry.model).filter(Boolean))],
+          topologies: [...new Set(entries.map((entry) => entry.params?.topology).filter(Boolean))],
+          changed: new Set(entries.map((entry) => `${entry.model}|${entry.params?.topology}|${entry.params?.thinking_level}`)).size > 1,
+        }
+      : { rounds: entries.length, models: [], topologies: [], changed: false }
+
+    try {
+      const audit = await runNumbersAudit({ path: input.rel }, exec)
+      inventory.numeric_audit = audit?.error
+        ? { error: clip(String(audit.error), 200) }
+        : {
+            checked: audit?.summary?.checked ?? null,
+            flagged: audit?.summary?.flagged ?? null,
+            not_checked_total: audit?.summary?.not_checked ?? null,
+            by_kind: audit?.summary?.by_kind ?? {},
+            sections: listValue(audit?.sections).map((section) => section?.name).filter(Boolean),
+          }
+    } catch (error) {
+      inventory.numeric_audit = { error: clip(error instanceof Error ? error.message : String(error), 200) }
+    }
+
+    let critic = { used: false, state: 'not_checked', reason: criticWanted ? null : 'skipped: critic=false', assessments: [] }
+    if (criticWanted) {
+      critic = await callValidityCritic({ ctx, exec, signal, checks, inventory, views })
+    } else if (args.critic === false) {
+      critic.reason = 'skipped: critic=false'
+    }
+    for (const check of checks) {
+      const assessment = critic.assessments.find((item) => item.check === check.id)
+      if (assessment) check.advisory = assessment
+    }
+
+    const flagged = checks.filter((check) => check.state === 'flagged').map((check) => check.id)
+    const notChecked = checks.filter((check) => check.state === 'not_checked').map((check) => check.id)
+    const run = runRecord('validity', startedAt, {
+      state: 'SUCCEEDED',
+      validity: { round: round.round, flagged, not_checked: notChecked, critic: critic.used },
+    })
+    const artifact = {
+      schemaVersion: VALIDITY_ARTIFACT_VERSION,
+      generated_at: run.finished_at,
+      key: input.key,
+      input: { path: input.rel, format: input.format, sha1: input.sha1, size_bytes: input.sizeBytes },
+      review: {
+        run_id: round.run_id,
+        round: round.round,
+        source: views.source,
+        input_sha1: round.input_sha1 ?? null,
+        input_matches_review: (round.input_sha1 ?? null) === (input.sha1 ?? null),
+      },
+      states: Object.fromEntries(checks.map((check) => [check.id, check.state])),
+      inventory,
+      checks,
+      critic,
+      not_checked: checks.filter((check) => check.state === 'not_checked').map((check) => `${check.id}: ${check.reason}`),
+      notes: [
+        'Advisory evaluation-validity readings over a stored review and a deterministic manuscript inventory. They never accept or reject the paper, and only `ah_check` blocks.',
+        inventory.numeric_audit?.error ? `numbers_audit did not contribute: ${inventory.numeric_audit.error}` : null,
+        inventory.references_masked ? `references from line ${inventory.reference_line} onward were excluded from counting` : null,
+        read.note ? `text source: ${read.note}` : null,
+        inventory.truncated_at_chars != null ? `the manuscript was inventoried only up to ${MAX_INVENTORY_CHARS} characters` : null,
+        inventory.grids_truncated ? `grid counting stopped at ${MAX_GRIDS} grids` : null,
+        'vocabularies and thresholds are the plugin’s own; the paper states the four criteria but no lexicon or cut-off.',
+      ].filter(Boolean),
+    }
+
+    // A store from before rounds holds one review; this write bumps it to v2, so
+    // materialize that pass rather than leaving a v2 meta with an empty ladder.
+    const prior = stored.rounds?.length || !stored.review ? null : materializePriorRound(paths, stored)
+    const meta = await persistArtifacts(cwd, paths, { ...prior?.files, [ARTIFACTS.extra_checks]: artifact }, (current) => {
+      const next = mergeMeta(current, input, params, exec)
+      if (prior && !next.rounds.length) {
+        next.rounds = [prior.entry]
+        if (!next.latest_round) next.latest_round = prior.entry.round
+      }
+      next.last_run = run
+      next.validity = {
+        run_id: run.run_id,
+        finished_at: run.finished_at,
+        round: round.round,
+        review_run_id: round.run_id,
+        input_sha1: input.sha1,
+        states: artifact.states,
+        flagged_total: flagged.length,
+        not_checked_total: notChecked.length,
+        critic_used: critic.used === true,
+      }
+      return next
+    })
+
+    appendValidityNote(exec, { run, input, paths, checks, critic })
+
+    return {
+      action: 'validity',
+      key: input.key,
+      dir: paths.dirRel,
+      round: round.round,
+      review_source: views.source,
+      input_matches_review: artifact.review.input_matches_review,
+      states: artifact.states,
+      flagged_total: flagged.length,
+      not_checked_total: notChecked.length,
+      counts: {
+        text_source: inventory.text_source,
+        grids: inventory.grids,
+        metric_axes: inventory.metric_axes,
+        other_axes: inventory.other_axes,
+        value_axes: inventory.value_axes,
+        arms: inventory.arms,
+        baseline_arms: inventory.baseline_arms,
+        gain_claims: inventory.gain_claims,
+        numeric_checked: inventory.numeric_audit?.checked ?? null,
+        numeric_flagged: inventory.numeric_audit?.flagged ?? null,
+      },
+      checks: checks.map((check) => ({
+        id: check.id,
+        label: check.label,
+        state: check.state,
+        reason: check.reason,
+        tallies: check.tallies,
+        evidence: check.evidence.slice(0, 4),
+        advisory: check.advisory ?? null,
+      })),
+      critic: {
+        used: critic.used,
+        state: critic.state,
+        reason: critic.reason ?? null,
+        calls: critic.calls ?? 0,
+        usage: critic.usage ?? null,
+        excerpts: critic.excerpts ?? 0,
+        assessments: critic.assessments ?? [],
+        counter_metrics: critic.counter_metrics ?? [],
+        generic_controls: critic.generic_controls ?? [],
+      },
+      duration_ms: meta.last_run.duration_ms,
+      stored: `${paths.dirRel}/${ARTIFACTS.extra_checks}`,
+      note: 'Advisory: the four states come from keyword and grid counting, not from a judgement of the paper. A `flagged` check names what was absent from the text, and `not_checked` means the manuscript carried too little to judge — never that it is sound. Nothing here gates; only `ah_check` blocks.',
+    }
+  })
+}
+
+function showValidity(cwd, paths) {
+  const artifact = readJsonFile(paths.extraChecks)
+  if (!artifact) {
+    throw new Error(`no stored validity pass for this manuscript; run action "validity" first`)
+  }
+  return {
+    generated_at: artifact.generated_at ?? null,
+    schema_version: artifact.schemaVersion ?? null,
+    review: artifact.review ?? null,
+    states: artifact.states ?? {},
+    inventory: artifact.inventory
+      ? {
+          text_source: artifact.inventory.text_source,
+          grids: artifact.inventory.grids,
+          metric_axes: artifact.inventory.metric_axes,
+          other_axes: artifact.inventory.other_axes,
+          value_axes: artifact.inventory.value_axes ?? null,
+          references_masked: artifact.inventory.references_masked ?? false,
+          reference_line: artifact.inventory.reference_line ?? null,
+          pdf_line_numbers_stripped: artifact.inventory.pdf_line_numbers_stripped ?? false,
+          arms: artifact.inventory.arms,
+          baseline_arms: artifact.inventory.baseline_arms,
+          gain_claims: artifact.inventory.gain_claims,
+          reviewer_context: artifact.inventory.reviewer_context ?? null,
+          numeric_audit: artifact.inventory.numeric_audit ?? null,
+          truncated_at_chars: artifact.inventory.truncated_at_chars ?? null,
+        }
+      : null,
+    checks: listValue(artifact.checks).map((check) => ({
+      id: check?.id ?? null,
+      state: check?.state ?? null,
+      reason: check?.reason ?? null,
+      tallies: check?.tallies ?? {},
+      evidence: listValue(check?.evidence).slice(0, 10).map((item) => ({
+        ...item,
+        text: escapeSourceTags(item?.text ?? ''),
+      })),
+      advisory: check?.advisory
+        ? {
+            ...check.advisory,
+            reading: escapeSourceTags(check.advisory.reading ?? ''),
+            missed_evidence: listValue(check.advisory.missed_evidence).map((entry) => escapeSourceTags(entry)),
+          }
+        : null,
+    })),
+    critic: artifact.critic
+      ? {
+          ...artifact.critic,
+          assessments: listValue(artifact.critic.assessments).map((assessment) => ({
+            ...assessment,
+            reading: escapeSourceTags(assessment?.reading ?? ''),
+            missed_evidence: listValue(assessment?.missed_evidence).map((entry) => escapeSourceTags(entry)),
+          })),
+          counter_metrics: listValue(artifact.critic.counter_metrics).map((entry) => escapeSourceTags(entry)),
+          generic_controls: listValue(artifact.critic.generic_controls).map((entry) => escapeSourceTags(entry)),
+        }
+      : null,
+    not_checked: listValue(artifact.not_checked),
+    notes: listValue(artifact.notes),
+    stored: relative(cwd, paths.extraChecks),
   }
 }
 
@@ -1816,6 +3078,7 @@ function actionShow(args, cwd, input) {
   if (section === 'markdown') {
     return { ...base, ...showMarkdown(cwd, paths, args) }
   }
+  if (section === 'validity') return { ...base, ...showValidity(cwd, paths) }
   if (section === 'rounds') {
     const rounds = roundViews(paths, meta, input.sha1)
     return {
@@ -1880,6 +3143,7 @@ async function runDeepReview(args = {}, exec = {}, ctx = null) {
   if (action === 'verify_citations') return actionVerifyCitations(args, exec, cwd, input, ctx)
   if (action === 'status') return actionStatus(args, cwd, input)
   if (action === 'compare') return actionCompare(args, cwd, input)
+  if (action === 'validity') return actionValidity(args, exec, cwd, input, ctx)
   return actionShow(args, cwd, input)
 }
 
@@ -1947,6 +3211,13 @@ function renderDeepReview(value) {
         + `${totals.model_calls ? ` · ${totals.model_calls} model call(s), ${totals.prompt_tokens} in / ${totals.completion_tokens} out tokens` : ''}`
         + `${(rounds.total ?? 0) > 1 ? '; use action "compare" to see which findings moved' : '; a second review enables action "compare"'}.`,
       ...(rounds.recent || []).slice(-3).map((round) => `- round ${round.round}: ${round.comments ?? 0} comment(s), ${round.finished_at || '?'}${round.reviewed_this_input ? '' : ' (older manuscript)'}`),
+      ...(value.validity
+        ? [
+            `Validity checks: ${Object.entries(value.validity.states || {}).map(([id, state]) => `${id} ${state}`).join(', ')}`
+              + ` (${value.validity.finished_at || '?'}${value.validity.current ? '' : ' · older manuscript'}${value.validity.critic_used ? ' · critic used' : ''})`,
+            'Read them with action "show" section "validity"; re-run action "validity" to refresh.',
+          ]
+        : []),
     ].join('\n'))
   }
   if (value.action === 'compare') {
@@ -1983,6 +3254,28 @@ function renderDeepReview(value) {
     lines.push(value.note)
     return text(lines.join('\n'))
   }
+  if (value.action === 'validity') {
+    const lines = [
+      `Evaluation-validity checks for ${value.dir} — round ${value.round}, review read from ${value.review_source}`
+      + `${value.input_matches_review === false ? '; the manuscript bytes differ from that round, so the inventory counted the current file' : ''}.`,
+    ]
+    for (const check of value.checks || []) {
+      lines.push(`- ${check.id}: ${check.state} — ${check.reason}`)
+      for (const item of (check.evidence || []).slice(0, 2)) lines.push(`    ${evidenceWhere(item)}: ${escapeSourceTags(clip(item.text, 150))}`)
+      if (check.advisory?.reading) lines.push(`    critic reading: ${escapeSourceTags(clip(check.advisory.reading, 200))}`)
+    }
+    const counted = value.counts || {}
+    lines.push(`Inventory: ${counted.text_source}; ${counted.grids} grid(s); ${counted.metric_axes} metric axis(es); ${counted.other_axes} other column axis(es); ${counted.value_axes ?? '—'} numeric column(s); ${counted.arms} arm label(s); ${counted.baseline_arms} baseline-like; ${counted.gain_claims} gain claim(s).`)
+    if (counted.numeric_checked != null) {
+      lines.push(`numbers_audit: ${counted.numeric_checked} value(s) checked, ${counted.numeric_flagged} candidate(s) flagged.`)
+    }
+    lines.push(value.critic?.used
+      ? `Critic: one bounded model call on the session route${value.critic.usage ? ` (${value.critic.usage.prompt_tokens} in / ${value.critic.usage.completion_tokens} out tokens)` : ''}${value.critic.state === 'not_checked' ? `, and its reply was unusable: ${value.critic.reason}` : ''}.`
+      : `Critic: not run${value.critic?.reason ? ` — ${value.critic.reason}` : ''}.`)
+    lines.push(`Stored ${value.stored}; read it back with action "show" section "validity".`)
+    lines.push(value.note)
+    return text(lines.join('\n'))
+  }
   if (value.action === 'show') {
     if (value.section === 'summary') {
       return renderReviewSummary({ ...value.summary, dir: value.dir, stale: value.stale })
@@ -2012,6 +3305,21 @@ function renderDeepReview(value) {
       const lines = (value.rounds || []).map((round) => `- round ${round.round}: ${round.comments ?? 0} comment(s), ${round.questions ?? 0} question(s), ${round.flagged_citations ?? 0} flagged citation(s) · ${round.finished_at || '?'} · ${round.topology || 'default'}${round.reviewed_this_input ? '' : ' · older manuscript'}`)
       return text([`${value.total} round(s), latest ${value.latest_round}.`, ...lines, value.total > 1 ? 'Use action "compare" for what moved.' : 'Run "review" again after revising to build the ladder.'].join('\n'))
     }
+    if (value.section === 'validity') {
+      const lines = [
+        `Stored validity checks (${value.generated_at || '?'}) for ${value.stored}${value.stale ? ' — the manuscript changed since the review' : ''}.`,
+      ]
+      for (const check of value.checks || []) {
+        lines.push(`- ${check.id}: ${check.state} — ${check.reason}`)
+        for (const item of (check.evidence || []).slice(0, 3)) lines.push(`    ${evidenceWhere(item)}: ${escapeSourceTags(clip(item.text, 150))}`)
+        if (check.advisory?.reading) lines.push(`    critic reading: ${escapeSourceTags(clip(check.advisory.reading, 200))}`)
+        if (check.advisory?.missed_evidence?.length) lines.push(`    critic names: ${check.advisory.missed_evidence.slice(0, 3).map((entry) => escapeSourceTags(entry)).join('; ')}`)
+      }
+      if (value.not_checked?.length) lines.push(`Not checked (${value.not_checked.length}):`)
+      for (const item of value.not_checked || []) lines.push(`- ${clip(item, 200)}`)
+      lines.push('Advisory readings from keyword and grid counting; they never accept or reject the paper and nothing here gates.')
+      return text(lines.join('\n'))
+    }
     return text(value.markdown || '(empty review Markdown)')
   }
   if (value.action === 'list') {
@@ -2032,17 +3340,17 @@ export function apply(ctx) {
     name: 'deep_review',
     description: [
       'Run a Deep-Review-style multi-pass critique of a manuscript with the vendored Open Deep Review engine: segmented review passes, page/quote-anchored comments, a scholar-peer summary with questions for authors, and reference verification against OpenAlex/Crossref.',
-      'Actions: `review` (run the pipeline; slow and token-heavy), `estimate` (optional engine-run estimate; no model call), `pdf2md` (inspect a PDF), `verify_citations`, `status` (stored state, stale flag, round ladder), `show` (read stored summary/comments/questions/checklist/claims/citations/markdown/rounds), `compare` (diff two review rounds), `list` (stored reviews).',
-      'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. Every `review` is kept as a numbered round with its report under `rounds/`, so reviewing again after a revision does not erase the earlier round — use `compare` to see which comments closed, reopened, or changed severity, and which claims, checklist items, or citations moved. After a revision, review and then compare instead of eyeballing the two reports. While a review runs, the engine stage/percentage and model-call events stream to the session\'s background-jobs panel; the result includes a `job_id` so the user can expand the finished log. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer.',
+      'Actions: `review` (run the pipeline; slow and token-heavy), `estimate` (optional engine-run estimate; no model call), `pdf2md` (inspect a PDF), `verify_citations`, `status` (stored state, stale flag, round ladder), `show` (read stored summary/comments/questions/checklist/claims/citations/markdown/rounds/validity), `compare` (diff two review rounds), `validity` (four advisory evaluation-validity checks over the stored review and a deterministic manuscript inventory; one bounded critic call unless `critic: false`), `list` (stored reviews).',
+      'Results live under `.dsh/deep-review/<key>/`; `review` returns a compact summary and never the full report, so use `show` for detail. Every `review` is kept as a numbered round with its report under `rounds/`, so reviewing again after a revision does not erase the earlier round — use `compare` to see which comments closed, reopened, or changed severity, and which claims, checklist items, or citations moved. After a revision, review and then compare instead of eyeballing the two reports. While a review runs, the engine stage/percentage and model-call events stream to the session\'s background-jobs panel; the result includes a `job_id` so the user can expand the finished log. `review` and `verify_citations` run on the session model (the provider/model of the calling chat) through the host llm service — there is no separate key or endpoint; switching the session model switches the reviewer. `validity` also runs on the session model, makes at most one call, writes `extra_checks.json` beside the review, and records its own `notebook` entry tagged `validity` — do not duplicate that entry.',
       'Whenever the user asks to review, critique, referee, or give feedback on a paper or manuscript, ask them to choose `deep_review` (multi-pass, takes minutes) or a normal session review before calling this tool — even for a plain "review this paper" — unless they explicitly chose a mode. Describe the deep option in the question; the user may not know it exists.',
       'After finishing a paper, manuscript, or technical document, offer the same choice: deliver the draft, then ask whether the user wants a deep review of it. Offer only — never run `review` on a just-written document without the user agreeing.',
-      'This is not the systematic-review ledger (`review`) or a reporting checklist (`reporting_check`); for a referee report written by the session model, delegate to the `peer-reviewer` subagent. Findings are advisory. Load the `deep-review` skill for the workflow.',
+      'This is not the systematic-review ledger (`review`) or a reporting checklist (`reporting_check`); for a referee report written by the session model, delegate to the `peer-reviewer` subagent. `validity` is not a score and not a gate either: it reports whether the manuscript text carries a removal arm, a wide enough results grid, a harness-side change, and a counter-metric, and it answers `not_checked` when the text is too thin to tell. Only `ah_check` blocks. Findings are advisory. Load the `deep-review` skill for the workflow.',
     ].join(' '),
     parameters: {
       action: {
         type: 'string',
         enum: ACTIONS,
-        description: 'review, estimate, pdf2md, verify_citations, status, show, compare, or list. Default status.',
+        description: 'review, estimate, pdf2md, verify_citations, status, show, compare, validity, or list. Default status.',
       },
       path: { type: 'string', description: 'Workspace-relative manuscript path (PDF, TeX, Markdown, or text). Required for every action except list.' },
       topology: {
@@ -2061,11 +3369,11 @@ export function apply(ctx) {
       },
       citations: { type: 'boolean', description: 'Verify bibliography entries during review. Default true.' },
       scholar_peer: { type: 'boolean', description: 'Include the scholar-peer summary, strengths/weaknesses, checklist, and author questions. Default true.' },
-      timeout_minutes: { type: 'integer', description: 'Engine timeout in minutes (1–120). Defaults: review and verify_citations 30, estimate and pdf2md 5.' },
+      timeout_minutes: { type: 'integer', description: 'Engine timeout in minutes (1–120). Defaults: review and verify_citations 30, estimate, pdf2md, and validity 5.' },
       section: {
         type: 'string',
         enum: SECTIONS,
-        description: 'show: summary (default), comments, questions, checklist, claims, citations, markdown, or rounds (the stored review ladder with per-round counts).',
+        description: 'show: summary (default), comments, questions, checklist, claims, citations, markdown, rounds (the stored review ladder with per-round counts), or validity (the stored evaluation-validity checks).',
       },
       from: {
         type: 'string',
@@ -2074,6 +3382,14 @@ export function apply(ctx) {
       to: {
         type: 'string',
         description: 'compare: the later round — a round number or run_id. Default: the latest round.',
+      },
+      round: {
+        oneOf: [{ type: 'string' }, { type: 'integer' }],
+        description: 'validity: which stored review round to read — a round number (as a string or integer) or a run_id. Default: the latest round, whose full report is used when it is still stored.',
+      },
+      critic: {
+        type: 'boolean',
+        description: 'validity: make one bounded model call to annotate the deterministic findings. Default true; false keeps the pass offline with no model call. Never changes a check state.',
       },
       severity: {
         type: 'string',

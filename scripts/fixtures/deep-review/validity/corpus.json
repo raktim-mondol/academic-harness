@@ -1,0 +1,56 @@
+{
+  "label_source": "committed fixture expectations",
+  "notes": "Self-test corpus: each fixture is labeled with the state its case is designed to produce. A real corpus manifest lives outside the package.",
+  "papers": [
+    {
+      "id": "attribution-techem",
+      "path": "attribution-techem.md",
+      "labels": {
+        "attribution": "flagged",
+        "evaluator_drift": "not_checked",
+        "benchmark_coverage": "flagged",
+        "unmeasured_trade_off": "not_checked"
+      }
+    },
+    {
+      "id": "coverage-thin",
+      "path": "coverage-thin.md",
+      "labels": {
+        "attribution": "flagged",
+        "evaluator_drift": "not_checked",
+        "benchmark_coverage": "flagged",
+        "unmeasured_trade_off": "not_checked"
+      }
+    },
+    {
+      "id": "evaluator-drift-tsae",
+      "path": "evaluator-drift-tsae.md",
+      "labels": {
+        "attribution": "not_checked",
+        "evaluator_drift": "flagged",
+        "benchmark_coverage": "flagged",
+        "unmeasured_trade_off": "not_checked"
+      }
+    },
+    {
+      "id": "trade-off-pinet",
+      "path": "trade-off-pinet.md",
+      "labels": {
+        "attribution": "flagged",
+        "evaluator_drift": "clear",
+        "benchmark_coverage": "not_checked",
+        "unmeasured_trade_off": "flagged"
+      }
+    },
+    {
+      "id": "well-formed",
+      "path": "well-formed.md",
+      "labels": {
+        "attribution": "clear",
+        "evaluator_drift": "not_checked",
+        "benchmark_coverage": "clear",
+        "unmeasured_trade_off": "clear"
+      }
+    }
+  ]
+}

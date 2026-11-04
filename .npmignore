@@ -9,3 +9,6 @@ __pycache__/
 vendor/academic-harness/.venv/
 vendor/academic-harness/installed-version
 vendor/papermemory/build/
+
+reports/deep-review-validity-*.json
+reports/deep-review-validity-corpus.json

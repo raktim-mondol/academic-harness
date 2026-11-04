@@ -21,3 +21,6 @@ vendor/papermemory/*.egg-info/
 # LaTeX build outputs
 paper/rsi-local/main.pdf
 paper/rsi-local/main.bbl
+
+reports/deep-review-validity-*.json
+reports/deep-review-validity-corpus.json

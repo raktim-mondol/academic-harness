@@ -9,6 +9,11 @@
  *   --report   Read the stored `.dsh/deep-review/` artifacts a session already
  *              produced and report reviewer variance and agreement with those
  *              decisions. Writes into `reports/`.
+ *   --validity --corpus <manifest.json>
+ *              Run the four deterministic validity checks over a labeled corpus
+ *              (PDFs use the simple text converter; no OCR) and report agreement,
+ *              precision, recall, false alarms, false positives on well-formed
+ *              papers, and determinism. Writes into `reports/`.
  *
  * Why this exists before any change to the reviewer: a review tool that both
  * guides a revision and scores it reports its own influence. ScientistTwo shows
@@ -33,6 +38,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { matchPool } from '../deep-review.js'
 import { runOpenReview } from '../openreview.js'
+import { runValidityCorpus } from './deep-review-validity-calibration.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = dirname(HERE)
@@ -334,6 +340,20 @@ async function main() {
     await collect()
     return
   }
+  if (hasFlag('validity')) {
+    const corpus = String(arg('corpus', ''))
+    if (!corpus) {
+      console.error('--validity needs --corpus <manifest.json>')
+      process.exitCode = 1
+      return
+    }
+    const outDir = resolve(ROOT, String(arg('out-dir', 'reports')))
+    const result = await runValidityCorpus(resolve(ROOT, corpus), { outDir })
+    const v = result.report.validity
+    console.log(`papers: ${v.papers} · evaluable ${v.evaluated} · ${v.verdict} · false-positive papers ${v.false_positive_papers.length} · determinism mismatches ${v.determinism_mismatches.length}`)
+    console.log(`wrote ${result.jsonPath} and ${result.mdPath}`)
+    return
+  }
   const store = resolve(String(arg('store', process.cwd())))
   const samplePath = resolve(ROOT, String(arg('sample', 'scripts/fixtures/deep-review/calibration-sample.json')))
   const sample = existsSync(samplePath) ? readJson(samplePath) : null
@@ -375,9 +395,11 @@ if (hasFlag('help')) {
   console.log([
     'usage:',
     '  node scripts/deep-review-calibration.mjs --collect [--forums id,id | --query "term" [--venue ICLR.cc/2025/Conference]] [--limit N] [--out <manifest>]',
+    '  node scripts/deep-review-calibration.mjs --validity --corpus <manifest.json> [--out-dir reports]',
     '  node scripts/deep-review-calibration.mjs [--store <workspace>] [--sample <manifest>] [--out-dir reports]',
     '',
     'collect needs network (OpenReview). report is offline over artifacts a session already stored.',
+    'validity is offline; PDFs use the simple text converter and no OCR is run.',
     'deep_review itself cannot run here: it needs the host llm bridge, so review in a session first.',
   ].join('\n'))
 } else {

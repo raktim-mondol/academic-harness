@@ -36,6 +36,7 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `academic-harness-notebook` | Lab-notebook discipline for research sessions; see [Lab notebook](WORKSPACE.md#lab-notebook) |
 | `academic-search` | Routing across discovery, journal metrics, merged paper/BibTeX, and focused full-text context; see [Search](SEARCH.md) |
 | `systematic-review-ledger` | Full `review` tool workflow; see [Systematic reviews](RESEARCH.md#systematic-reviews) |
+| `deep-review` | `deep_review` multi-pass critique, the round ladder read with `compare`, and the four advisory evaluation-validity checks; see [Deep review](PAPERS.md#deep-review) |
 | `meta-analysis` | Pairwise pooling, heterogeneity, subgroup/meta-regression, publication-bias diagnostics, diagnostic accuracy, and forest/funnel/SROC plots; see [Meta-analysis](RESEARCH.md#meta-analysis) |
 | `reproducible-analysis` | Plan freeze, auditable `analysis_run` executions, `dataset_get` provenance downloads, `data_profile` leakage review, and `repro_package` shipping; see [Reproducible analysis](ANALYSIS.md) |
 | `submission-package` | `submission_pack` planning/building/status/export, journal requirements, drafts, and hashed manifests; see [Writing](WRITING.md#submission-package) |

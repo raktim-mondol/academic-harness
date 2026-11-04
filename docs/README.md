@@ -18,7 +18,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | Page | What it covers |
 |---|---|
 | [Search and discovery](SEARCH.md) | Literature databases, Consensus, Parallel, MCP connectors, web indexes, publication integrity |
-| [Papers and evidence](PAPERS.md) | Download, `paper_fold`, PDF conversion, PaperMemory, Paper2Agent |
+| [Papers and evidence](PAPERS.md) | Download, `paper_fold`, PDF conversion, `deep_review` with review rounds and the advisory evaluation-validity checks, PaperMemory, Paper2Agent |
 | [Writing, citation, and figures](WRITING.md) | The `ah_*` writing oracle, bibliography tools with custom CSL, submission packs, revision diffs, numbers audit, posters/slides, authorship/CRediT, LaTeX, figures, `image_generate`, `mermaid_render` |
 | [Reviews, synthesis, and records](RESEARCH.md) | Systematic reviews, dual-reviewer screening, structured extraction, meta-analysis, GRADE certainty and summary-of-findings tables, risk-of-bias appraisal, agreement statistics, hypothesis tournaments, pre-registration, causal DAGs, randomization/DOE, ethics and de-identification, data-management plans, grant budgets, clinical/regulatory records, dataset and policy tools |
 | [Reproducible analysis and data](ANALYSIS.md) | Frozen plans and auditable `analysis_run` executions, `experiment_log` sweeps, `dataset_get` provenance downloads, `data_profile` leakage review, `repro_package` shipping and Zenodo drafts |

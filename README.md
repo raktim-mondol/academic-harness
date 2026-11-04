@@ -112,8 +112,15 @@ starts, `review` runs on the session model (no separate key or endpoint), `show`
 review back, and `status` marks it stale after the manuscript changes. Every pass is kept as a
 numbered round, so reviewing again after a revision does not erase the first, and `compare` diffs
 two rounds — findings closed, opened, or moved in severity, plus claim, checklist, and citation
-transitions. Artifacts stay in `.dsh/deep-review/<key>/`, and `provenance_audit` indexes the claims
-stored there.
+transitions. `validity` reads a stored round against a deterministic count of the manuscript itself
+and answers four advisory questions: whether a claimed gain has a removal arm behind it rather than
+only generic training controls, whether a stated before-and-after change sits in the evaluation
+harness rather than the model, how wide the results grid actually is, and whether a quality or
+feasibility counter-metric is reported beside a speed or memory gain. Each answers `clear`,
+`flagged`, or `not_checked` — a flag names an absence in the text, not a flaw in the work, and
+`not_checked` is not a pass — with at most one critic model call on the session route and none with
+`critic: false`. Artifacts stay in `.dsh/deep-review/<key>/`, and `provenance_audit` indexes the
+claims stored there; it does not read `extra_checks.json` yet.
 [Read more](docs/PAPERS.md#deep-review)
 
 ## Deep research
