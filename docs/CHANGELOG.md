@@ -4,6 +4,8 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+## 0.44.0
+
 Phase 7 of [ScientistTwo → Academic Harness](SCIENTISTTWO-ROADMAP.md): the reviewer-response coverage ledger, shipped as a new tool with its own skill and workflow template.
 
 - **New `rebuttal` tool.** `rebuttal.js` + `rebuttal-store.js` under `.dsh/rebuttal/<slug>/`: write-once `rebuttal.json` round definition; append-only `points.jsonl` (`p0001…`), `tasks.jsonl` (`t0001…`), `links.jsonl` (`l0001…`), `answers.jsonl` (`a0001…`), `declines.jsonl` (`d0001…`), and per-import provenance envelopes in `imports.jsonl`; `exports/` reports. Nine actions — `import`, `plan`, `link`, `respond`, `decline`, `coverage`, `draft`, `export`, `status`. It is an advisory coverage ledger with no execution of its own: no network call (all openreview data is caller-supplied), never runs or creates an experiment (it links runs that already exist, by id), never edits a manuscript, never writes reviewer prose, stores no numbers of its own, and gates no turn — only `ah_check` blocks. Mutating calls take the shared ledger lock and re-derive counters, dedupe, and the cap inside it; foreign-ledger reads happen before the lock; `coverage`, `draft`, and `status` are lock-free re-derivations.
