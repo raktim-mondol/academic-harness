@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { apply, runReproPackage } from '../repro-package.js'
 import { freezeAnalysisPlan, runAnalysis } from '../analysis-store.js'
@@ -93,6 +93,26 @@ try {
   result = await run({ action: 'verify', slug: 'paper1' })
   assert.equal(result.result.problems.length, 0)
   assert.equal(result.result.ok, result.result.files)
+
+  // The manifest is the package: a file the build does not list is reported by
+  // verify, and a file an earlier build listed but this one drops is purged.
+  writeFileSync(join(packageDir, 'analysis', 'primary', 'left-behind.log'), 'from an older build\n')
+  result = await run({ action: 'verify', slug: 'paper1' })
+  assert.equal(result.result.leftover_files.join(), 'analysis/primary/left-behind.log', JSON.stringify(result.result))
+  assert.match(result.result.problems[0].status, /not in the package manifest/)
+  result = await run({ action: 'build', slug: 'paper1', overwrite: true })
+  assert.ok(!result.error)
+  assert.deepEqual(result.package.stale_files, [], 'a file no build ever wrote is not the builder\'s to delete, and not stale')
+  assert.ok(existsSync(join(packageDir, 'analysis', 'primary', 'left-behind.log')), 'the user file inside the package survives the rebuild')
+  rmSync(join(packageDir, 'analysis', 'primary', 'left-behind.log'))
+  writeFileSync(join(cwd, 'src', 'model.py'), 'x'.repeat(1024 * 1024 + 1)) // over the copy cap: this build ships no code file
+  result = await run({ action: 'build', slug: 'paper1', overwrite: true })
+  assert.ok(result.package.warnings.some((warning) => /larger than .* bytes, not copied/.test(warning)), JSON.stringify(result.package.warnings))
+  assert.ok(!existsSync(join(packageDir, 'code', 'src', 'model.py')), 'the earlier build\'s copy is purged with it')
+  assert.deepEqual(result.package.stale_files, [], 'and nothing was left behind undeleted')
+  writeFileSync(join(cwd, 'src', 'model.py'), 'print("model")\n')
+  result = await run({ action: 'build', slug: 'paper1', overwrite: true })
+  assert.ok(existsSync(join(packageDir, 'code', 'src', 'model.py')), 'it returns once the source fits')
 
   // Tampering is detected.
   writeFileSync(join(packageDir, 'code', 'src', 'model.py'), 'print("tampered")\n')

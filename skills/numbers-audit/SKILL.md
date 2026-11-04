@@ -52,3 +52,6 @@ metadata:
 - `stat_audit` for a narrower p/GRIM pass.
 - `reporting_check` for guideline evidence.
 - `numbers_audit` is included in `submission_pack` planning.
+- `analysis_run expect` / `verify_scores` compare declared numbers to hashed
+  outputs of an authorized rerun; use `integrity-audit` for the broader
+  four-column reading. A numerical consistency check is not a reproduction.

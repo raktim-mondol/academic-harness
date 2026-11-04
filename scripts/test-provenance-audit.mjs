@@ -2,7 +2,7 @@
 /**
  * Phase 3 — cross-ledger provenance audit (`provenance_audit`).
  *
- * Fake ledgers in a temp workspace prove: the five unsupported states are each
+ * Fake ledgers in a temp workspace prove: the unsupported states are each
  * reachable and distinguishable, a ledger that cannot be read is reported
  * `unknown` with its reason, a changed manuscript marks the evidence that
  * depends on it `stale` with old and new hashes, a link whose far end is
@@ -15,7 +15,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeWorkspace, fakeExec } from './helpers/test-workspace.mjs'
 import {
-  AUDIT_STATES, assertAuditWrite, buildProvenanceIndex, coverageOf, exportProvenance,
+  AUDIT_STATES, UNSUPPORTED_STATES, assertAuditWrite, buildProvenanceIndex, coverageOf, exportProvenance,
   impactOf, readAuditIndex, staleOf, unverifiedOf, unsupportedOf,
 } from '../provenance-store.js'
 import { runProvenanceAction, apply as applyProvenance } from '../provenance-audit.js'
@@ -35,7 +35,7 @@ const ok = (label, condition, detail = '') => {
   else { failures.push(label); console.log(`NOT OK — ${label}${detail ? `: ${detail}` : ''}`) }
 }
 const sha256Hex = (value) => `sha256:${createHash('sha256').update(value).digest('hex')}`
-const PROVENANCE_TOOL_ACTIONS = ['index', 'coverage', 'unsupported', 'stale', 'unverified', 'impact', 'export']
+const PROVENANCE_TOOL_ACTIONS = ['index', 'coverage', 'unsupported', 'stale', 'unverified', 'impact', 'arms', 'rollup', 'export']
 const stateOf = (index, id) => index.nodes.find((node) => node.id === id)?.state
 const reasonOf = (index, id) => index.nodes.find((node) => node.id === id)?.reason
 
@@ -328,7 +328,7 @@ ok('a not-reported checklist item is an unsupported claim', stateOf(index, 'clai
 
 const unsupported = unsupportedOf(index)
 ok('unsupported lists only claims', unsupported.items.every((item) => item.role === 'claim'))
-ok('unsupported separates all six states', Object.keys(unsupported.by_state).length === 6, JSON.stringify(unsupported.by_state))
+ok('unsupported separates every unsupported state', Object.keys(unsupported.by_state).length === UNSUPPORTED_STATES.length, JSON.stringify(unsupported.by_state))
 ok('supported claims are excluded from unsupported', !unsupported.items.some((item) => item.state === 'supported'))
 
 /* --------------------------------------------------------------- stale ripple */
@@ -509,6 +509,24 @@ for (const action of PROVENANCE_TOOL_ACTIONS) {
   ok(`registered ${action} renders without a model payload`, Array.isArray(parts) && parts[0]?.type === 'text' && parts[0].text.length > 5,
     JSON.stringify(parts)?.slice(0, 160))
 }
+// The sweep above only proves a string came back, so the two roll-ups are
+// asserted on content: a header alone would pass the loop above by accident.
+{
+  const armsValue = await registered.execute({ action: 'arms', audit: 'tool' }, exec)
+  const armsText = registered.output.render({ action: 'arms' }, armsValue)[0].text
+  ok('arms names all four readiness columns', ['Reported vs recomputed', 'Protocol digest', 'References', 'Method–code']
+    .every((column) => armsText.includes(column)), armsText.slice(0, 240))
+  ok('arms states an empty roll-up instead of rendering a bare header', /not checked|No ledger with a readiness column/.test(armsText),
+    armsText.slice(0, 240))
+  const rollupValue = await registered.execute({ action: 'rollup', audit: 'tool' }, exec)
+  const rollupText = registered.output.render({ action: 'rollup' }, rollupValue)[0].text
+  ok('rollup is labelled report only', /report only/i.test(rollupText), rollupText.slice(0, 200))
+  for (const stage of ['Problem', 'Limitations', 'Idea pool', 'Subset verdicts', 'Scale-up', 'Selection', 'Ablation', 'Review rounds', 'Integrity', 'Incumbent', 'Baseline gate', 'Cost/time']) {
+    ok(`rollup renders the ordered stage "${stage}"`, rollupText.includes(`${stage}:`) || rollupText.includes(`${stage} (`),
+      rollupText.slice(0, 300))
+  }
+  ok('rollup refuses to claim a promoted incumbent', !/promoted\b/i.test(rollupText), rollupText.slice(0, 300))
+}
 const renderedError = registered.output.render({ action: 'index' }, { error: 'boom' })
 ok('a tool error renders as text', renderedError[0].text === 'Error: boom')
 const unsupportedRender = registered.output.render({ action: 'unsupported' }, await registered.execute({ action: 'unsupported', audit: 'tool' }, exec))
@@ -531,7 +549,7 @@ const finalDrift = [...lastSnapshot].filter(([key, value]) => {
   return before.get(key) !== value
 })
 ok('the audit never wrote to a source ledger', finalDrift.length === 0, finalDrift.map(([key]) => key).join(', '))
-ok('every documented state is reachable', AUDIT_STATES.length === 8 && new Set(AUDIT_STATES).size === 8)
+ok('every documented state is reachable', AUDIT_STATES.length === 11 && new Set(AUDIT_STATES).size === 11)
 
 console.log(failures.length ? `\n${failures.length} failure(s):\n  ${failures.join('\n  ')}` : '\nall provenance audit checks passed')
 process.exit(failures.length ? 1 : 0)

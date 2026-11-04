@@ -14,6 +14,11 @@ import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 export const AUDIT_DEFAULT_MAX = 100
 
 const SEVERITY_RANK = { problem: 3, review: 2, info: 1 }
+// A check that could not run: the record is unverified, never clean.
+const UNVERIFIED_CODES = [
+  'no_doi', 'crossref_unavailable', 'integrity_unknown', 'not_checked',
+  'title_uncomparable', 'venue_uncomparable', 'first_author_uncomparable',
+]
 
 function recordYear(record) {
   return Number(record.issued?.['date-parts']?.[0]?.[0]) || null
@@ -34,11 +39,24 @@ function crossrefYear(work) {
   return Number(parts?.[0]) || null
 }
 
+/**
+ * Token overlap between two venue-like strings, or `null` when the pair cannot be
+ * compared (either side normalizes to nothing, or neither has a token of its own).
+ * Unknown is reported as unknown: it is never a perfect score.
+ */
 function tokenOverlap(a, b) {
   const left = new Set(normalizeTitle(a).split(/\s+/).filter((t) => t.length > 2))
   const right = normalizeTitle(b).split(/\s+/).filter((t) => t.length > 2)
-  if (!left.size || !right.length) return 1
+  if (!left.size || !right.length) return null
   return right.filter((t) => left.has(t)).length / Math.max(left.size, right.length)
+}
+
+/** True when both strings exist but at least one of them has no comparable tokens. */
+function incomparable(a, b) {
+  const left = String(a || '').trim()
+  const right = String(b || '').trim()
+  if (!left || !right) return false
+  return !normalizeTitle(left) || !normalizeTitle(right)
 }
 
 function finding(code, severity, detail, fix) {
@@ -48,8 +66,12 @@ function finding(code, severity, detail, fix) {
 function compareToCrossref(record, work, titleMatches) {
   const out = []
   const published = work?.title?.[0] || work?.title || ''
-  if (record.title && published && !titleMatches(record.title, published)) {
-    out.push(finding('title_mismatch', 'review', `Crossref title is "${published}"`, 'Check the DOI belongs to this paper, or correct the title.'))
+  if (record.title && published) {
+    if (incomparable(record.title, published)) {
+      out.push(finding('title_uncomparable', 'info', `the cited title "${record.title}" and the Crossref title "${published}" could not be compared lexically`, 'Check by hand that this DOI belongs to the paper you cite; unknown is not a pass.'))
+    } else if (!titleMatches(record.title, published)) {
+      out.push(finding('title_mismatch', 'review', `Crossref title is "${published}"`, 'Check the DOI belongs to this paper, or correct the title.'))
+    }
   }
   const have = recordYear(record)
   const want = crossrefYear(work)
@@ -57,12 +79,19 @@ function compareToCrossref(record, work, titleMatches) {
     out.push(finding('year_mismatch', 'review', `record says ${have}, Crossref says ${want}`, `Use ${want} unless you cite an earlier version.`))
   }
   const venue = work?.['container-title']?.[0]
-  if (record['container-title'] && venue && tokenOverlap(record['container-title'], venue) < 0.34) {
-    out.push(finding('venue_mismatch', 'review', `record venue "${record['container-title']}" vs Crossref "${venue}"`, 'Check abbreviations; correct if it is a different venue.'))
+  if (record['container-title'] && venue) {
+    const overlap = tokenOverlap(record['container-title'], venue)
+    if (overlap === null) {
+      out.push(finding('venue_uncomparable', 'info', `the cited venue "${record['container-title']}" and the Crossref venue "${venue}" share no comparable token`, 'Check the venue by hand (abbreviation, translation, or non-Latin name); unknown is not a pass.'))
+    } else if (overlap < 0.34) {
+      out.push(finding('venue_mismatch', 'review', `record venue "${record['container-title']}" vs Crossref "${venue}"`, 'Check abbreviations; correct if it is a different venue.'))
+    }
   }
   const family = firstFamily(record)
   const crossrefFamily = normalizeTitle(work?.author?.[0]?.family || '')
-  if (family && crossrefFamily && family !== crossrefFamily && !crossrefFamily.includes(family) && !family.includes(crossrefFamily)) {
+  if (incomparable(record.author?.[0]?.family || record.author?.[0]?.literal || '', work?.author?.[0]?.family || '')) {
+    out.push(finding('first_author_uncomparable', 'info', `the cited first author and the Crossref first author could not be compared lexically ("${record.author?.[0]?.family || record.author?.[0]?.literal}" vs "${work?.author?.[0]?.family || ''}")`, 'Check the author by hand; unknown is not a pass.'))
+  } else if (family && crossrefFamily && family !== crossrefFamily && !crossrefFamily.includes(family) && !family.includes(crossrefFamily)) {
     out.push(finding('first_author_mismatch', 'review', `first author "${family}" vs Crossref "${crossrefFamily}"`, 'Check author order and spelling.'))
   }
   return out
@@ -85,7 +114,8 @@ function integrityFindings(result) {
 /**
  * @param {object[]} records normalized CSL records
  * @param {object} deps fetchCrossref(doi) -> {ok,status,work,error}; integrity(doi) -> integrity result;
- *   titleMatches(a,b); citedKeys: Set|null (keys the manuscript cites); style
+ *   titleMatches(a,b) — true only for a comparable pair that matches; citedKeys: Set|null (keys the
+ *   manuscript cites); style
  */
 export async function auditReferences(records, deps) {
   const { entries, errors, warnings, duplicates } = validateRecords(records)
@@ -144,7 +174,7 @@ export async function auditReferences(records, deps) {
       findings.push(...shared)
     }
     const top = findings.reduce((max, f) => Math.max(max, SEVERITY_RANK[f.severity] || 0), 0)
-    const unverified = findings.some((f) => ['no_doi', 'crossref_unavailable', 'integrity_unknown', 'not_checked'].includes(f.code))
+    const unverified = findings.some((f) => UNVERIFIED_CODES.includes(f.code))
     references.push({
       key,
       doi: doi || null,
@@ -161,7 +191,7 @@ export async function auditReferences(records, deps) {
     caveats: [
       'The audit checks that references exist and match their records; it does not check that a reference supports the claim it is cited for.',
       'no_issues_found means these checks found nothing, not that the reference is correct or appropriate.',
-      'unverified means a check could not run (no DOI, lookup failed, or over the cap); it is not a pass.',
+      'unverified means a check could not run (no DOI, lookup failed, over the cap, or a title/venue/author that cannot be compared lexically); it is not a pass.',
     ],
   }
 }

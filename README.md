@@ -4,7 +4,7 @@
 ![DeepSeek Harness 0.2.1–0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1--0.2.x-5b7bd5)
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
-**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 768 scientific skills, and local self-improvement, all inside the DSH web UI.
+**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 774 bundled skills, and local self-improvement, all inside the DSH web UI.
 
 Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset with a research persona and academic tools, and keeps the general-purpose tools available on every preset.
 
@@ -53,21 +53,21 @@ Full instructions, troubleshooting, and the "one DSH surface at a time" rule are
 |---|---|---|
 | **Search and discovery** | `literature_search` router, `journal_search` (OpenAlex/DOAJ/Crossref metrics plus optional CiteScore/JIF), `paper_get` (merged metadata + BibTeX), `paper_context` (focused sections/snippets), `database_catalog`, `domain_search` (bioRxiv/medRxiv, INSPIRE, ACL, ADS, Scopus, Web of Science, Wikidata), OpenAlex, Semantic Scholar, PubMed, arXiv, Crossref, DOAJ, publisher Crossref deposits, Consensus, Parallel, Firecrawl, Scite, Tavily, Exa, Perplexity, Jina, CORE, Elicit, FutureHouse | [Search](docs/SEARCH.md) |
 | **Papers and evidence** | `paper_get`, `paper_download`, `paper_context`, `paper_fold`, `pdf_to_markdown`, `deep_review` (multi-pass manuscript critique with anchored comments and reference verification, powered by [open-deepreview](https://github.com/raktim-mondol/open-deepreview)), PaperMemory's 14 tools, `reference_library` (the native reference manager: BibTeX, BibLaTeX, RIS, and CSL-JSON in and out; imports Scopus and Web of Science RIS exports), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
-| **Writing and citation** | `ah_*` writing oracle and gate, `citation` (including DOI/arXiv/INSPIRE/title → BibTeX), `manuscript_citations`, `reporting_check` (CONSORT/STROBE/PRISMA/ARRIVE/TRIPOD+AI/CARE/STARD), LaTeX, Supervisor-Skills paper lifecycle, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
-| **Submission and communication** | `submission_pack` journal checklist and hashed bundle (never submits); `journal_search match` advisory venue fit with due-diligence signals; `manuscript_diff` latexdiff/Markdown/DOCX revision artifacts and response-letter skeleton; `numbers_audit` numerical-reporting candidates; `presentation_build` posters and slides with a vision-QA checklist; `authorship` CRediT/ICMJE ledger | [Writing](docs/WRITING.md#submission-and-communication) |
+| **Writing and citation** | `ah_*` writing oracle and gate, `citation` (including DOI/arXiv/INSPIRE/title → BibTeX, batch `audit`, and `repair` that writes a new .bib), `manuscript_citations`, `reporting_check` (CONSORT/STROBE/PRISMA/ARRIVE/TRIPOD+AI/CARE/STARD), LaTeX, Supervisor-Skills paper lifecycle, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
+| **Submission and communication** | `rebuttal` review-point coverage and evidence-linked responses; `submission_pack` journal checklist and hashed bundle (never submits); `journal_search match` advisory venue fit with due-diligence signals; `manuscript_diff` revision artifacts and response-letter skeleton; `numbers_audit` numerical-reporting candidates; `presentation_build` posters and slides with a vision-QA checklist; `authorship` CRediT/ICMJE ledger | [Writing](docs/WRITING.md#reviewer-response-ledger) |
 | **Reviews, synthesis, and hypotheses** | `review` PRISMA-style ledger with dual-reviewer screening, structured extraction, risk-of-bias appraisal (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), GRADE certainty and summary-of-findings tables, κ agreement, PRISMA flow and RoB exports; `meta_analysis` pairwise pooling, heterogeneity, subgroup/meta-regression, publication-bias diagnostics, and forest/funnel/SROC plots; `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors, append-only limitation records with coverage, experiment traces fed back into evolution, evidence-bound champion selection, and grounded novelty via `coscientist_verify` | [Research](docs/RESEARCH.md) |
 | **Deep research** | `deep_research`: a self-driving investigation on an append-only run ledger — frozen query, effort levels (`low`/`medium`/`high`) inferred from the request, scholarly sweep plus a web lane, contradiction graph, loci and depth notes, three drafts, four adversarial critics, capped-hunk repair, cite check against PaperMemory, independence clustering, untrusted-source fencing, and a ship gate that reports `not_checked` honestly | [Research](docs/RESEARCH.md#deep-research) |
-| **Reproducible analysis and data** | `analysis_run` frozen plans with immutable run manifests (argv execution, hashed inputs/outputs, redacted logs, timeouts, run diffs); `experiment_log` sweeps with best-by-named-metric; `dataset_get` DOI downloads with checksums and licenses; `data_profile` leakage and split-overview profiling; `repro_package` reader-facing reproducibility packages with confirm-gated Zenodo drafts | [Reproducible analysis](docs/ANALYSIS.md) |
-| **Provenance audit** | `provenance_audit` read-only cross-ledger index: joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH claim sidecars by stored ids and hashes; coverage, unsupported (`no_link`/`not_checked`/`unverified`/`stale`/`not_found`), stale hashes, impact, and Markdown/CSV/JSON/GraphML/Mermaid exports | [Provenance audit](docs/PROVENANCE.md) |
+| **Reproducible analysis and data** | `analysis_run` frozen plans, hashed manifests, declared numbers, re-execution checks, and frozen-rule compliance; `experiment_log` staged subset/full comparisons with named reproduced or reported references, protocol drift, verdicts and Pareto ranking; `ablation` linked removal arms and attribution; `dataset_get`, `data_profile`, and `repro_package` with compliance exclusions and confirm-gated Zenodo drafts | [Reproducible analysis](docs/ANALYSIS.md) |
+| **Provenance audit** | `provenance_audit` read-only cross-ledger index: joins review, reporting, deep-review (claims, citation verdicts, validity flags), notebook, analysis (expectations, re-executions, compliance), experiment, ablation, dataset, meta-analysis, and AH claim sidecars by stored ids and hashes; coverage, unsupported (`no_link`/`not_checked`/`unverified`/`stale`/`not_found`/`spec_drift`/`no_attribution`/`rerun_mismatch`/`verdict_missing`), stale hashes, impact, the four-column `arms` readiness roll-up, the report-only `rollup` loop record with a reproduced-baseline gate and honest cost/time, and Markdown/CSV/JSON/GraphML/Mermaid exports | [Provenance audit](docs/PROVENANCE.md) |
 | **Scientific data and toolkits** | `science_source` (UniProt, RCSB PDB, AlphaFold DB, PubChem) with provenance on every record; local `chem_toolkit` (RDKit), `seq_toolkit`, and `structure_toolkit` that log hashed inputs | [Scientific data](docs/SCIENCE-DATA.md) |
 | **Discovery and reference checks** | `literature_watch` saved searches with unseen-only digests, `paper_recommend`, `citation_network` (frozen OpenAlex sample, centrality and clusters), `paper_artifacts` link/accession extraction, `citation` batch `audit` | [Discovery](docs/DISCOVERY.md) |
-| **Identity, funding, and audits** | `author_lookup` (ORCID/ROR), `openreview`, `grant_search`, `patent_search`, `stat_audit`, `figure_audit`, `repo_audit`, `pdf_references` (GROBID); advisory, never verdicts | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
+| **Identity, funding, and audits** | `author_lookup` (ORCID/ROR), `openreview`, `grant_search`, `patent_search`, `stat_audit`, `figure_audit`, `repo_audit` (including `probe` and method→code `align`), `pdf_references` (GROBID); advisory, never verdicts | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
 | **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
 | **Study conduct, ethics, and grants** | `preregister` hashed write-once plans; `causal_dag` identification diagnostics and E-values; `design` seeded randomization/DOE; `ethics_protocol` and `deidentify` for ethics and PHI/PII review; `dmp` funder-shaped data-management plans; `grant_budget` multi-year budgets with arithmetic checks. None submits or certifies compliance | [Research](docs/RESEARCH.md#pre-registration) |
 | **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
 | **Workspace and notebook** | zvec-grep semantic search, lab notebook, `scientific_result`, `fold_text`, `research_template`, `sci_inspect` | [Workspace](docs/WORKSPACE.md) |
 | **Compute and delegation** | `runpod_run`/`modal_run`/`vastai_run`, `subagent` with optional `subagent_pro`/`subagent_vision` routes, specialist briefs, `agent-browser` | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) |
-| **Skills** | 768 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute | [Skills](docs/SKILLS.md) |
+| **Skills** | 774 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute; `pele` renders Mermaid without a browser | [Skills](docs/SKILLS.md) |
 | **Self-improvement** | Local RSI: capture, diagnose, admit, inject, compare against control, promote or quarantine | [RSI](docs/RSI.md) |
 | **Configuration** | Settings → Academic Harness API keys; every credential is optional at install | [Configuration](docs/CONFIGURATION.md) |
 
@@ -99,6 +99,19 @@ The complete tool list, with scope and links, is the **[tool index](docs/TOOLS.m
 
 Discovery finds candidate papers, `paper_resolve` collapses their identifiers, `paper_get` produces one merged metadata/BibTeX record, and `integrity_check` reports retraction status. A downloaded PDF is stored as content-addressed Markdown in PaperMemory, and a quotation must pass `quote_check` or `trace` before the agent treats it as evidence. The notebook records the work; `scientific_result` records the final finding.
 
+## Evidence-led research and revision
+
+![Evidence-led research and revision: limitations, ideas, staged experiments, attribution, review, revision, and integrity audit](docs/assets/diagrams/evidence-cycle.svg)
+
+The [ScientistTwo-inspired roadmap](docs/SCIENTISTTWO-ROADMAP.md) has implemented phases 0–10; maintenance continues. Its components support a **human-directed, auditable workflow**, not an unattended loop:
+
+1. **Ground ideas:** `coscientist` records source-quoted limitations, prior-art checks, idea coverage, experiment traces, and an evidence-bound selection.
+2. **Test and attribute:** `experiment_log` distinguishes reproduced from reported baselines and records subset/full stages, protocol drift and verdicts. `analysis_run` records reproducible runs and score checks; `ablation` links removal arms to evidence.
+3. **Review and revise:** `deep_review` preserves rounds, compares changes and records evaluator provenance. `rebuttal` tracks reviewer points, linked evidence, answers and declines; a fresh review can check what changed.
+4. **Audit the record:** `provenance_audit` joins existing ledgers, reports the four integrity columns and a read-only `rollup`, including missing evidence and unrecorded cost. Violations of frozen task rules are excluded from selection and reproducibility packages.
+
+Readings and verdict records are advisory, not acceptance decisions. The roll-up does not execute experiments or promote an incumbent; `not_checked` is not a pass. The existing `ah_check` writing gate remains separate. See [Research](docs/RESEARCH.md), [Analysis](docs/ANALYSIS.md), [Writing](docs/WRITING.md#reviewer-response-ledger), and [Provenance](docs/PROVENANCE.md).
+
 ## Deep review
 
 ![Deep review](docs/assets/diagrams/deep-review.svg)
@@ -124,7 +137,8 @@ significance — on a declared scale, each citing stored comment ids; it is one 
 never an acceptance decision or a gate. Rounds record whether the reviewer was `held_out` or
 `in_distribution`, and Phase 0 can correlate stored scores with real decisions. Artifacts stay in
 `.dsh/deep-review/<key>/`, and `provenance_audit` indexes the
-claims stored there; it does not read `extra_checks.json` yet.
+claims stored there together with `extra_checks.json` (a `flagged` validity check appears as an
+unverified claim; `clear` is not a claim).
 [Read more](docs/PAPERS.md#deep-review)
 
 ## Deep research

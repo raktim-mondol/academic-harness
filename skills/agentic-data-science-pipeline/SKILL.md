@@ -31,6 +31,10 @@ that discipline here.
 ## Related Supervisor-Skills
 
 For AI-assisted tool choice and research-workflow rules, use `vibe-research-workflow`. This pipeline is for large, staged analysis tasks, not for paper drafting or idea vetting.
+For a staged benchmark, hand off to `subset-first-eval`: freeze the benchmark,
+verify a reproduced baseline before comparison, and do not mix it with a
+reported-only reference. Use `integrity-audit` for the advisory evidence
+reading; neither skill authorizes autonomous execution or promotion.
 
 ## The loop
 

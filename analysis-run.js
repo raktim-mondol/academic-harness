@@ -7,13 +7,14 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
-  ANALYSIS_EXPORT_FORMATS, ANALYSIS_KINDS, analysisStatus, currentPlan,
-  diffAnalysisRuns, exportAnalysisRun, freezeAnalysisPlan, listAnalysisRuns,
-  runAnalysis, showAnalysisRun,
+  ANALYSIS_EXPORT_FORMATS, ANALYSIS_KINDS, ANALYSIS_METRIC_FORMATS, ANALYSIS_REFERENCES,
+  ANALYSIS_RULE_OPS, analysisStatus, complianceAnalysisRun, currentPlan,
+  diffAnalysisRuns, expectAnalysisScores, exportAnalysisRun, freezeAnalysisPlan,
+  listAnalysisRuns, runAnalysis, showAnalysisRun, verifyAnalysisScores,
 } from './analysis-store.js'
 import { notebookFile } from './notebook.js'
 
-const ACTIONS = ['plan', 'run', 'status', 'list', 'show', 'diff', 'export']
+const ACTIONS = ['plan', 'run', 'expect', 'verify_scores', 'compliance', 'status', 'list', 'show', 'diff', 'export']
 
 function text(value) {
   return String(value ?? '').trim()
@@ -55,6 +56,49 @@ function renderRun(run) {
   ].join('\n')
 }
 
+function renderExpect(value) {
+  const expectation = value.expectation
+  const lines = [
+    `Expectation ${expectation.expectation_id} v${expectation.version} ${value.unchanged ? 'unchanged' : 'declared'} for plan v${expectation.plan_version} (${expectation.reference} reference).`,
+    `${expectation.metrics.length} reported value(s):`,
+    ...expectation.metrics.map((metric) => `- ${metric.name} = ${metric.value}${metric.tolerance || metric.rel_tolerance ? ` (±${metric.tolerance}${metric.rel_tolerance ? ` / ${metric.rel_tolerance * 100}%` : ''})` : ''} ← ${metric.path}${metric.key ? `:${metric.key}` : ''} (${metric.format})`),
+  ]
+  if (expectation.reference_run_id) lines.push(`Reference run: ${expectation.reference_run_id}`)
+  lines.push('Expectations are declarations bound to the frozen plan; verifying them executes nothing.')
+  return lines.join('\n')
+}
+
+function renderVerification(value) {
+  const check = value.check
+  const headline = check.reproduction === true
+    ? 'Reproduction: true'
+    : check.reproduction === false
+      ? 'Reproduction: false'
+      : 'Reproduction: not checked'
+  const lines = [
+    `${headline} — run ${check.run_id} against expectation ${check.expectation_id} (${check.reference} reference).`,
+    check.reason,
+    `${check.counts.match} match · ${check.counts.mismatch} mismatch · ${check.counts.not_checked} not checked.`,
+    '',
+    ...check.metrics.map((metric) => `- ${metric.status} · ${metric.name}: expected ${metric.expected}, actual ${metric.actual ?? '—'}${metric.delta != null ? ` (Δ ${metric.delta})` : ''}${metric.reason ? ` — ${metric.reason}` : ''}`),
+    '',
+    'The repro_check artifact is stored with the run; a match is evidence for these declared numbers only.',
+  ]
+  return lines.join('\n')
+}
+
+function renderCompliance(value) {
+  const record = value.compliance
+  const lines = [
+    `Compliance ${record.compliance_id} for run ${record.run_id}: ${record.verdict} (${record.counts.satisfied} satisfied, ${record.counts.violated} violated, ${record.counts.not_checked} not checked).`,
+    '',
+    ...record.rules.map((rule) => `- ${rule.status} · ${rule.rule_id}: ${rule.statement}${rule.actual != null ? ` — actual ${JSON.stringify(rule.actual)}` : ''}${rule.reason ? ` — ${rule.reason}` : ''}`),
+    '',
+    record.note,
+  ]
+  return lines.join('\n')
+}
+
 function renderStatus(status) {
   const lines = [`Analysis "${status.slug}" at ${status.dir}`]
   lines.push(status.plan
@@ -63,6 +107,14 @@ function renderStatus(status) {
   lines.push(`Runs: ${status.runs}${status.failed ? `, ${status.failed} failed or timed out` : ''}.`)
   if (status.last_run) {
     lines.push(`Last: ${status.last_run.run_id} · exit ${status.last_run.exit_code ?? 'n/a'}${status.last_run.timed_out ? ' (timed out)' : ''} · ${status.last_run.duration_ms} ms`)
+  }
+  const checks = status.checks || {}
+  if (checks.expectations) {
+    const latest = checks.latest_verification
+    lines.push(`Expectations: ${checks.expectations} declared${latest ? `, latest verification ${latest.reproduction === true ? 'matched' : latest.reproduction === false ? 'mismatched' : 'not checked'} (${latest.run_id})` : ', never verified'}.`)
+  }
+  if (checks.compliance?.checked) {
+    lines.push(`Compliance: ${checks.compliance.checked} run(s) checked${checks.compliance.violated.length ? `, excluded: ${checks.compliance.violated.join(', ')}` : ', none excluded'}.`)
   }
   return lines.join('\n')
 }
@@ -80,7 +132,19 @@ function renderShow(run) {
   lines.push(`Command: ${run.command.join(' ')}`)
   for (const entry of run.inputs) lines.push(`input ${entry.path}: ${entry.sha256 || entry.status || entry.error}`)
   for (const entry of run.outputs) lines.push(`output ${entry.path}: ${entry.sha256 || entry.status || entry.error}`)
-  if (run.stdout_tail) lines.push('', '--- stderr tail ---', run.stderr_tail.trimEnd())
+  if (run.repro_check) {
+    lines.push('', `Reproduction: ${run.repro_check.reproduction === true ? 'true' : run.repro_check.reproduction === false ? 'false' : 'not checked'} — ${run.repro_check.reason}`)
+    for (const metric of run.repro_check.metrics || []) {
+      lines.push(`- ${metric.status} · ${metric.name}: expected ${metric.expected}, actual ${metric.actual ?? '—'}`)
+    }
+  }
+  if (run.compliance) {
+    lines.push('', `Compliance: ${run.compliance.verdict} (${run.compliance.counts.violated} violated)`)
+  }
+  if (run.excluded_by_compliance) {
+    lines.push('Compliance exclusion: a recorded violation keeps this run excluded from experiment best/dominance and repro_package.')
+  }
+  if (run.stderr_tail) lines.push('', '--- stderr tail ---', run.stderr_tail.trimEnd())
   return lines.join('\n')
 }
 
@@ -98,6 +162,9 @@ function renderValue(value) {
   switch (value.action) {
     case 'plan': return [{ type: 'text', text: renderPlan(value) }]
     case 'run': return [{ type: 'text', text: renderRun(value.run) }]
+    case 'expect': return [{ type: 'text', text: renderExpect(value) }]
+    case 'verify_scores': return [{ type: 'text', text: renderVerification(value) }]
+    case 'compliance': return [{ type: 'text', text: renderCompliance(value) }]
     case 'status': return [{ type: 'text', text: renderStatus(value.status) }]
     case 'list': return [{ type: 'text', text: renderList(value.runs) }]
     case 'show': return [{ type: 'text', text: renderShow(value.run) }]
@@ -147,6 +214,48 @@ export async function runAnalysisAction(args, exec, deps = {}) {
     return { action, run }
   }
 
+  if (action === 'expect') {
+    const metrics = args.expected ?? args.expect?.metrics
+    return {
+      action,
+      slug,
+      ...(await expectAnalysisScores({
+        cwd,
+        slug,
+        metrics,
+        reference: args.expected_reference ?? args.expect?.reference ?? 'reported',
+        referenceRunId: args.reference_run_id ?? args.expect?.reference_run_id ?? null,
+        notes: args.notes ?? args.expect?.notes ?? null,
+      })),
+    }
+  }
+
+  if (action === 'verify_scores') {
+    return {
+      action,
+      ...(await verifyAnalysisScores({
+        cwd,
+        slug,
+        runId: args.run_id ?? null,
+        allowEnvironmentDrift: Boolean(args.allow_environment_drift),
+        allowEntrypointChange: Boolean(args.allow_entrypoint_change),
+      })),
+    }
+  }
+
+  if (action === 'compliance') {
+    return {
+      action,
+      ...(await complianceAnalysisRun({
+        cwd,
+        slug,
+        runId: args.run_id ?? null,
+        evidence: args.evidence ?? null,
+        notes: args.notes ?? null,
+      })),
+    }
+  }
+
   if (action === 'status') {
     if (!currentPlan(cwd, slug) && !listAnalysisRuns(cwd, slug).length) {
       return { action, status: analysisStatus(cwd, slug), note: 'nothing recorded for this slug yet' }
@@ -187,16 +296,23 @@ export function apply(ctx) {
     name: 'analysis_run',
     description: [
       'Keep a reproducible analysis ledger under `.dsh/analysis/<slug>/`: a frozen plan plus immutable run manifests.',
-      `Actions: \`plan\` (freeze question, hypotheses, inputs, outputs, methods, alpha, exclusions, stopping rules, software, seed; changing a frozen plan needs \`new_version: true\` and a \`reason\`), \`run\` (execute an argv \`command\` array — never a shell — with an environment allowlist plus explicit \`env\`, a hard \`timeout_ms\`, hashed \`inputs\`/\`outputs\`, and a lab-notebook entry), \`status\`, \`list\`, \`show\`, \`diff\` (run vs run, or run vs the current plan and inputs), \`export\` (${ANALYSIS_EXPORT_FORMATS.join(' or ')} run report).`,
+      `Actions: \`plan\` (freeze question, hypotheses, inputs, outputs, methods, alpha, exclusions, stopping rules, software, seed, task_rules; changing a frozen plan needs \`new_version: true\` and a \`reason\`), \`run\` (execute an argv \`command\` array — never a shell — with an environment allowlist plus explicit \`env\`, a hard \`timeout_ms\`, hashed \`inputs\`/\`outputs\`, and a lab-notebook entry), \`expect\` (declare the reported numbers on the frozen plan: each metric has a name, value, output path, parse format ${ANALYSIS_METRIC_FORMATS.join('/')}, optional key/column/pattern, and tolerance; \`reference: reported|reproduced\` names which number it is), \`verify_scores\` (re-hash and parse a run's hashed outputs, compare them with the expectation, and write \`repro_check.json\` with \`reproduction: true|false|null\`; changed bytes, a failed run, a different plan, a changed entrypoint, or a changed interpreter are \`not checked\`, never a silent mismatch), \`compliance\` (check a run against the plan's frozen \`task_rules\`; a rule can carry a machine \`check\` (${ANALYSIS_RULE_OPS.join(', ')}) over a hashed output of that run, or caller \`evidence\`; a changed or foreign file is not checked; a violated run is excluded from \`experiment_log\` best/dominance, \`repro_package\`, and deposit rather than refined, and the violation is sticky), \`status\`, \`list\`, \`show\`, \`diff\` (run vs run, or run vs the current plan and inputs), \`export\` (${ANALYSIS_EXPORT_FORMATS.join(' or ')} run report).`,
       `Kinds: ${ANALYSIS_KINDS.join(', ')}. \`kind: "notebook"\` executes via jupyter nbconvert or papermill (a clear not_installed error otherwise) and stores the executed notebook under the run. Network is off by default (\`no_proxy=*\`; this is a convention, not a firewall) and \`network: true\` is recorded in the manifest. Explicit env values and key-looking text are redacted from stored logs; output paths outside the workspace are rejected; a nonzero exit or timeout is recorded, not hidden.`,
-      'The tool records what ran — hashes, environment, exit status — and never interprets the result or claims the science is correct; a copied notebook output is not evidence, the manifest is. Call `scientific_result` separately when a run produced a finding. Load the `reproducible-analysis` skill for the workflow.',
+      'The tool records what ran — hashes, environment, exit status — and never interprets the result or claims the science is correct; a copied notebook output is not evidence, the manifest is. A reproduction match is evidence for the declared numbers only, and a compliance violation is a reading of the declared rules, not a misconduct verdict. Call `scientific_result` separately when a run produced a finding. Load the `reproducible-analysis` skill for the workflow.',
     ].join(' '),
     parameters: {
-      action: { type: 'string', enum: ACTIONS, description: 'plan, run, status, list, show, diff, or export. Default status.' },
+      action: { type: 'string', enum: ACTIONS, description: 'plan, run, expect, verify_scores, compliance, status, list, show, diff, or export. Default status.' },
       slug: { type: 'string', description: 'Analysis slug (stable short name).' },
-      plan: { type: 'object', additionalProperties: true, description: 'Plan object for action=plan: {question, hypotheses, inputs, outputs, variables, primary_outcomes, secondary_outcomes, methods, alpha, corrections, missing_data_rules, exclusions, stopping_rules, software, seed, sensitivity_analyses, notes}.' },
+      plan: { type: 'object', additionalProperties: true, description: 'Plan object for action=plan: {question, hypotheses, inputs, outputs, variables, primary_outcomes, secondary_outcomes, methods, alpha, corrections, missing_data_rules, exclusions, stopping_rules, software, seed, task_rules, sensitivity_analyses, notes}. task_rules is a frozen array of strings or {id, statement, check:{path, format, key|column|pattern, op, value}}.' },
       new_version: { type: 'boolean', description: 'Supersede the frozen plan (plan; requires reason).' },
       reason: { type: 'string', description: 'Why the plan changed (plan with new_version).' },
+      expected: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'expect: reported metrics, each {name, value, path, format, key|column|key_column|row|pattern, tolerance?, rel_tolerance?, source?, unit?}. value is the reported number; path is the hashed run output it should be recomputed from.' },
+      expected_reference: { type: 'string', enum: ANALYSIS_REFERENCES, description: 'expect: reported (the paper/table number, default) or reproduced (a baseline this session re-ran). Never mix the two references for one comparison.' },
+      reference_run_id: { type: 'string', description: 'expect: run whose entrypoint and interpreter environment define "the same re-execution". Defaults to the latest successful run on the current plan.' },
+      allow_environment_drift: { type: 'boolean', description: 'verify_scores: compare anyway when the interpreter version or OS changed (recorded either way). Default false.' },
+      allow_entrypoint_change: { type: 'boolean', description: 'verify_scores: compare anyway when the command differs from the declared entrypoint. Default false.' },
+      evidence: { type: 'array', items: { type: 'object', additionalProperties: true }, description: 'compliance: caller evidence for rules without a machine check, each {rule_id, satisfied: true|false} or {rule_id, status: satisfied|violated|not_checked, detail}.' },
+      notes: { type: 'string', description: 'Free-text note stored with an expectation or compliance record.' },
       command: { type: 'array', items: { type: 'string' }, description: 'Executable and arguments as an argv array, e.g. ["python3", "analysis/main.py"] (run). No shell is used.' },
       kind: { type: 'string', enum: ANALYSIS_KINDS, description: 'Run kind (run). Default other; python/r probes record interpreter versions.' },
       notebook: { type: 'string', description: 'Workspace-relative .ipynb path for kind=notebook.' },
@@ -209,7 +325,7 @@ export function apply(ctx) {
       network: { type: 'boolean', description: 'Allow network conventions for this run (default false, recorded in the manifest).' },
       capture_packages: { type: 'boolean', description: 'For python runs, store `pip freeze` under the run environment/ (default false).' },
       notebook_entry: { type: 'boolean', description: 'Set false to skip appending the lab-notebook entry for a run (default true).' },
-      run_id: { type: 'string', description: 'Run id (show/diff/export).' },
+      run_id: { type: 'string', description: 'Run id (show/diff/export; verify_scores and compliance default to the latest run).' },
       compare_run_id: { type: 'string', description: 'Second run id for diff; omit to diff against the current plan and inputs.' },
       format: { type: 'string', enum: ANALYSIS_EXPORT_FORMATS, description: 'Export format (default markdown).' },
       overwrite: { type: 'boolean', description: 'Replace an existing export (default false).' },

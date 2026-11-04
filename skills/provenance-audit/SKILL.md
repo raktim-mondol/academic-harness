@@ -1,6 +1,6 @@
 ---
 name: provenance-audit
-description: Trace where a claim came from across the whole workspace with the read-only `provenance_audit` tool — join review evidence, extraction, appraisal and GRADE events, reporting_check verdicts, deep_review claims, notebook hypotheses, analysis and experiment runs, dataset downloads, meta-analysis studies, and Academic Harness claim sidecars by the ids and hashes they already store. Use before reporting a result, submitting a manuscript, editing a source that claims depend on, or answering "what supports this?"
+description: Trace where a claim came from across the whole workspace with the read-only `provenance_audit` tool — join review evidence, extraction, appraisal and GRADE events, reporting_check verdicts, deep_review claims, citation verdicts and validity flags, notebook hypotheses, analysis expectations/re-executions/compliance, experiment protocol digests and verdicts, ablation attribution, dataset downloads, meta-analysis studies, and Academic Harness claim sidecars by the ids and hashes they already store. Use the report-only `rollup` action for the ordered loop record across a coscientist cycle. Use before reporting a result, submitting a manuscript, editing a source that claims depend on, or answering "what supports this?"
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
@@ -28,6 +28,10 @@ the **record**, not about the science:
 | `unverified` | A verification was attempted and did not confirm it | Re-quote, re-resolve the paper, or downgrade the claim |
 | `stale` | The source behind the evidence changed | Re-verify before repeating the claim |
 | `not_found` | A recorded link has no far end (a missing record, run, entry, or file) | Fix the link or record the target |
+| `spec_drift` | An experiment run changed its evaluation protocol against its baseline | Compare against a matching baseline or disclose the change |
+| `rerun_mismatch` | A declared reported value did not reproduce in a re-execution | Inspect the metric, the tolerance, and the environment; do not restate the number as reproduced |
+| `no_attribution` | An ablation reading or human verdict attributes no component to the gain | Report the gain as unattributed, or plan a removal arm |
+| `verdict_missing` | A staged variant run or an ablation has no human verdict | Record the verdict before treating the run as selected |
 | `unknown` | The ledger itself could not be read | Say it is unknown — never call it unsupported |
 
 Support is never inferred from co-occurrence, citation proximity, or a model
@@ -43,12 +47,12 @@ judgement. A `deep_review` engine verdict, for instance, is recorded as
    ```
 
    Default selection indexes every review, reporting check, stored deep review,
-   notebook, analysis plan, experiment, dataset, meta-analysis, and (when the
-   workspace has `ah.yaml`) Academic Harness claim sidecar. Narrow it with
-   `review`, `reporting`, `meta`, `analysis`, `experiment`, `dataset`,
-   `deep_review`, and `manuscript`; exclude AH sidecars with `include_ah: false`.
-   Add `verify_quotes: true` only when PaperMemory is available — otherwise the
-   stored quote-check statuses are used, unchanged.
+   notebook, analysis plan, experiment, ablation, dataset, meta-analysis, and
+   (when the workspace has `ah.yaml`) Academic Harness claim sidecar. Narrow it
+   with `review`, `reporting`, `meta`, `analysis`, `experiment`, `ablation`,
+   `dataset`, `deep_review`, and `manuscript`; exclude AH sidecars with
+   `include_ah: false`. Add `verify_quotes: true` only when PaperMemory is
+   available — otherwise the stored quote-check statuses are used, unchanged.
 
 2. **Read coverage first.**
 
@@ -68,9 +72,10 @@ judgement. A `deep_review` engine verdict, for instance, is recorded as
    ```
 
    `unsupported` lists only claims (evidence, extractions, appraisals, GRADE
-   domain ratings, checklist items, hypotheses, manuscript clauses), split by
-   the five unsupported states. Fix `no_link` and `not_checked` by recording the
-   missing link, not by rephrasing the claim.
+   domain ratings, checklist items, hypotheses, manuscript clauses, analysis
+   expectations, compliance readings, experiment verdicts, ablation
+   attribution), split by the nine unsupported states. Fix `no_link` and
+   `not_checked` by recording the missing link, not by rephrasing the claim.
 
 4. **Check staleness after any source changed.**
 
@@ -95,7 +100,37 @@ judgement. A `deep_review` engine verdict, for instance, is recorded as
    review records, extractions, hypotheses, runs, and pooled studies would need
    revisiting.
 
-6. **Attach the audit.**
+6. **Read the readiness roll-up.**
+
+   ```text
+   provenance_audit action=arms audit=paper
+   ```
+
+   One table, four columns — reported vs recomputed, protocol digest,
+   references, method–code — over the artifacts that already exist. A missing
+   column is `n/a`, never a pass; `ready` means the recorded columns are
+   verified, `partial` means something is unchecked, and `not_ready` means a
+   recorded mismatch, drift, flag, or missing verdict. It re-indexes first and
+   is a reading, not an acceptance decision.
+
+7. **Roll the loop up.**
+
+   ```text
+   provenance_audit action=rollup audit=paper coscientist=cycle manuscript=paper.md
+   ```
+
+   One ordered record: frozen problem → limitations → idea pool → subset
+   verdicts → scale-up → selection → ablation → review rounds with
+   `evaluator_kind` → integrity columns → incumbent. It is a **report, not a
+   store**: it reads the coscientist ledger directly, writes no promotion, and
+   leaves the champion `selected`. Cost/time sums only what the ledgers
+   recorded (`analysis_run` durations and `deep_review` round duration/tokens);
+   everything else is listed as missing, never zero. The baseline-gate row says
+   whether a reproduced baseline was itself checked by
+   `analysis_run expect`/`verify_scores`; compute no headline gain and do not
+   average over successful cases only.
+
+8. **Attach the audit.**
 
    ```text
    provenance_audit action=export audit=paper format=markdown
@@ -112,6 +147,13 @@ judgement. A `deep_review` engine verdict, for instance, is recorded as
   silently re-ingested into PaperMemory is only `stale` if a hash was recorded.
 - `scientific_result` cards are not persisted, and the `preregister` ledger
   (Phase 5A) is not indexed yet; both are reported `unknown` with that reason.
+- The audit does not execute anything. `rerun_mismatch` reads an
+  `analysis_run` verification that already happened, and `arms` is a roll-up,
+  not a re-run or an acceptance decision.
+- `rollup` does not promote an incumbent and does not compute a headline gain;
+  a missing duration or token tally is `not recorded`, never zero, and the
+  report shows its denominators instead of averaging over successful cases
+  only.
 - Academic Harness unit provenance (who wrote each unit) belongs to
   `ah_provenance`; the audit indexes cited-clause bindings, not authorship.
 - A clean audit is not a correct paper. It says which claims have recorded

@@ -14,16 +14,21 @@ the science.**
 
 Freezes a plan, then executes against it. State lives under
 `<cwd>/.dsh/analysis/<slug>/`: `plan.jsonl` (append-only plan versions),
-`runs.jsonl` (one immutable manifest per run), and `runs/<id>/` (stdout,
-stderr, manifest, artifacts).
+`runs.jsonl` (one immutable manifest per run), `expectations.jsonl` and
+`verifications.jsonl` (the re-execution ledger), `compliance.jsonl` (frozen-rule
+readings), and `runs/<id>/` (stdout, stderr, manifest, artifacts, plus
+`repro_check.json` and `compliance.json` when those checks ran).
 
 | Action | What it does |
 |---|---|
-| `plan` | Freeze question, hypotheses, inputs, outputs, methods, alpha, corrections, missing-data rules, exclusions, stopping rules, software, seed. Re-submitting the same plan is a no-op; changing it needs `new_version: true` plus a reason, and the old versions stay. |
+| `plan` | Freeze question, hypotheses, inputs, outputs, methods, alpha, corrections, missing-data rules, exclusions, stopping rules, software, seed, and optional `task_rules`. Re-submitting the same plan is a no-op; changing it needs `new_version: true` plus a reason, and the old versions stay. |
 | `run` | Execute an **argv array** (never a shell) with an environment allowlist plus explicit `env`, hashed inputs before and outputs after, a hard `timeout_ms`, and a lab-notebook entry. `kind: notebook` executes via jupyter or papermill and stores the executed notebook. |
-| `status` / `list` / `show` | Ledger state; a run's manifest with log tails. |
+| `expect` | Declare the **reported** numbers on the frozen plan: each metric has a name, value, output path, parse format (`json`, `csv`, `tsv`, `kv`, `regex`), optional key/column/pattern, and absolute or relative tolerance. `reference: reported|reproduced` names which number it is, and the reference run's command and interpreter environment are captured so "the same re-execution" is checkable. |
+| `verify_scores` | Re-hash and parse a later run's **hashed** outputs, compare them with the expectation, and write `runs/<id>/repro_check.json` with `reproduction: true|false|null`. It is `not_checked` when the bytes changed after the run, the run failed or timed out, followed a different plan, changed its entrypoint, or the interpreter environment changed — never a silent mismatch. |
+| `compliance` | Check a run against the plan's frozen `task_rules`. A rule can carry a machine `check` (`equals`, `not_equals`, `greater_than`, `less_than`, `min`, `max`, `contains`, `not_contains`, `matches`, `exists`, `absent`) over a hashed output of **that run** (`exists`/`absent` take a path only), or accept caller-supplied evidence. A changed or foreign file is `not_checked`. A `violated` run is excluded from `experiment_log` best/dominance and from `repro_package` build and deposit; it is never "refined", and the exclusion is sticky. |
+| `status` / `list` / `show` | Ledger state; a run's manifest with log tails, plus its stored `repro_check` and compliance reading. |
 | `diff` | Run vs run, or run vs the current plan and input hashes: plan, command, seed, environment, inputs, outputs, exit status. |
-| `export` | Markdown or JSON run report with the "reproducibility evidence, not a guarantee" note. |
+| `export` | Markdown or JSON run report with the "reproducibility evidence, not a guarantee" note, including the reported-vs-recomputed and compliance sections when present. |
 
 Execution guardrails: ambient secrets are not forwarded and explicit values
 are redacted from stored logs (along with key-looking text); output paths
@@ -31,6 +36,49 @@ outside the workspace are rejected; a nonzero exit or timeout is recorded, not
 hidden; network is off by convention (`no_proxy=*` — a guardrail, not a
 firewall) and `network: true` is recorded in the manifest. The tool uses the
 host's existing permission model; it is not a privilege boundary.
+
+### Re-execution and compliance
+
+The ledger distinguishes **what was reported** from **what a re-run produced**.
+`expect` binds the reported numbers to the frozen plan hash and to a reference
+run's command and interpreter fingerprint. `verify_scores` reads only outputs
+the run itself hashed: it re-hashes the file and, if the bytes changed after
+the run, reports `not_checked` rather than judging different bytes as the
+run's result. It writes the paper-style `repro_check.json` beside the run
+(`"reproduction": true` only when every declared value matched within
+tolerance) and appends a verification event. A mismatch is `reproduction:
+false`; a timeout, a failed process, a different plan version, a changed
+entrypoint, or a changed interpreter turns the whole reading into
+`not_checked` with the reason, unless `allow_environment_drift` /
+`allow_entrypoint_change` explicitly overrides it. Notebook fingerprints
+ignore the per-run executed-notebook path but still compare the notebook and
+engine. Tolerances get a tiny floating-point allowance (`1e-9 × max(1,
+|expected|)`), so `0.25 ± 0.01` is not split by binary representation.
+
+`compliance` reads the frozen `task_rules` and evaluates what it can. A rule
+with a `check` is machine-checked against a **hashed output of that run**: a
+path the run did not write, or bytes that changed since the run, is
+`not_checked`, never a pass. `exists`/`absent` rules take a path only and read
+the manifest's recorded write status, so a later deletion cannot rewrite
+history. A rule without a check needs caller evidence (`{rule_id, satisfied}`
+or a status). The overall verdict is `violated` if any rule was violated,
+`not_checked` if any rule could not be decided, and `compliant` only when every
+rule was satisfied. A violating run is **excluded**, the paper's only discard
+action: `experiment_log` drops it from `best`, `dominance`, and grouping when a
+run links to it, and `repro_package` leaves it out of the built package and the
+deposit (re-checked at deposit time), recording it under `excluded_runs`. A
+recorded violation is **sticky**: a later reading cannot launder the run back
+into a selection, and a corrupt compliance ledger fails closed rather than
+silently clearing exclusions. A non-zero exit is `not_checked`, not a
+violation; the rules are the only thing being read.
+
+Neither check is a verdict on the science. `reproduction: true` is evidence for
+the declared numbers only, and a compliance reading is a reading of the declared
+rules — not misconduct. The matching precursors are `repo_audit action=probe`
+(does a runnable benchmark entrypoint exist?) and `repo_audit action=align`
+(which `file:line` implements each method anchor?), both of which execute
+nothing. The ordered record across ideation, these runs, ablation, and review is
+[`provenance_audit action=rollup`](PROVENANCE.md#actions).
 
 ## `experiment_log`
 
@@ -67,6 +115,18 @@ declared metrics: a run dominates only when it is at least as good on every
 declared metric and strictly better on one. Runs missing a declared metric are
 listed as incomplete and not ranked. This is the plugin's specification of the
 paper's undefined "preferred" relation, not a scientific claim.
+
+**Compliance exclusion.** An experiment run linked to an `analysis_run` whose
+compliance ledger contains a `violated` verdict is excluded from `best`, `dominance`,
+and grouping. The exports still list it, marked as excluded (a `compliance`
+column in `runs.csv`, a `compliance: excluded` tag in `mlflow.json`, the
+`compliance.details` entry in `experiment.json`, and a Compliance-exclusions
+section in `report.md`), so an export is an audit trail rather than a curated
+ranking. The run stays visible with its `excluded` record naming the analysis
+run and the violated rule ids — the analysis ledger owns the rule evaluation,
+and this is a ledger join, not a second compliance implementation.
+`repro_package` applies the same join when it filters analysis and experiment
+runs.
 
 **Verdicts.** `verdict` records an advisory human decision on a run:
 `good`, `engineer`, or `bad`, with a required reason, an optional
@@ -179,4 +239,3 @@ None of those ledgers can answer "what supports this claim?" on its own.
 `provenance_audit` joins them — plus `review`, `reporting_check`, `deep_review`,
 `meta_analysis`, and Academic Harness claim sidecars — into one read-only index;
 see [Provenance audit](PROVENANCE.md).
-

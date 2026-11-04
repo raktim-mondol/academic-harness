@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { apply, runExperimentAction } from '../experiment-log.js'
 import { makeWorkspace, fakeExec } from './helpers/test-workspace.mjs'
+import { freezeAnalysisPlan, runAnalysis } from '../analysis-store.js'
 
 const workspace = makeWorkspace('ah-experiment-')
 const cwd = workspace.cwd
@@ -69,9 +70,16 @@ try {
   result = await run({ action: 'best', slug: 'sweep', metric: 'nonexistent', direction: 'higher' })
   assert.match(result.error, /no run records metric/)
 
-  // Links, status, list, show.
-  result = await run({ action: 'link', slug: 'sweep', run_id: 'x0002', target_kind: 'analysis_run', target_id: 'run-2026-primary', note: 'confirmation' })
+  // Links, status, list, show. An analysis_run link must name a real run: a
+  // dangling one would silently disable the compliance exclusion it claims to carry.
+  await freezeAnalysisPlan({ cwd, slug: 'primary', plan: { question: 'Baseline check?', outputs: ['out/primary.json'] } })
+  const analysisRun = await runAnalysis({ cwd, slug: 'primary', command: ['python3', '-c', 'open("out/primary.json","w").write("{\\"x\\": 1}")'], notebookEntry: null })
+  assert.equal(analysisRun.exit_code, 0)
+  result = await run({ action: 'link', slug: 'sweep', run_id: 'x0002', target_kind: 'analysis_run', target_id: analysisRun.run_id, note: 'confirmation' })
   assert.equal(result.link.target.kind, 'analysis_run')
+  assert.equal(result.link.target.id, analysisRun.run_id)
+  result = await run({ action: 'link', slug: 'sweep', run_id: 'x0002', target_kind: 'analysis_run', target_id: 'run-2026-nope' })
+  assert.match(result.error, /no analysis run "run-2026-nope"/, 'a dangling analysis link is refused, not recorded')
   await assert.rejects(
     run({ action: 'link', slug: 'sweep', run_id: 'x0002', target_kind: 'wiki', target_id: 'x' }),
     /must be one of/,
@@ -101,7 +109,7 @@ try {
   assert.match(result.error, /already exists/)
   result = await run({ action: 'export', slug: 'sweep', format: 'csv', overwrite: false })
   const csv = readFileSync(join(cwd, result.path), 'utf8')
-  assert.match(csv.split('\n')[0], /run_id,ts,seed,parent,role,baseline_ref,stage,protocol_digest,spec_drift,lr,epochs,accuracy,loss,f1,verdict,artifacts,notes/)
+  assert.match(csv.split('\n')[0], /run_id,ts,seed,parent,role,baseline_ref,stage,protocol_digest,spec_drift,lr,epochs,accuracy,loss,f1,verdict,compliance,artifacts,notes/)
   assert.match(csv, /x0001,.*out\/run1\.json/)
   result = await run({ action: 'export', slug: 'sweep', format: 'json' })
   const json = JSON.parse(readFileSync(join(cwd, result.path), 'utf8'))

@@ -20,6 +20,7 @@ import {
 } from './ledger-kit.js'
 import { withLock } from './store-lock.js'
 import { resolveWorkspacePath } from './workspace-path.js'
+import { excludedAnalysisRunIndex, hasAnalysisRun } from './analysis-store.js'
 
 export const EXPERIMENT_DIRECTIONS = ['higher', 'lower']
 export const EXPERIMENT_EXPORT_FORMATS = ['csv', 'json', 'markdown', 'mlflow']
@@ -363,17 +364,19 @@ export function compareExperiments(cwd, slugValue, { field = null } = {}) {
   const runs = listExperimentRuns(cwd, slugValue)
   if (!runs.length) return { experiment: definition, runs: [], metrics: [], best: {}, note: 'No runs logged yet.' }
   const latest = latestVerdicts(cwd, slugValue)
+  const compliance = experimentCompliance(cwd, slugValue)
+  const eligible = runs.filter((run) => !compliance.excluded.has(run.run_id))
   const metrics = metricNames(definition, runs)
   const directions = Object.fromEntries(definition.metrics.map((entry) => [entry.name, entry.direction || 'higher']))
   const best = {}
   for (const name of metrics) {
-    const winner = bestRun(runs, name, directions[name])
+    const winner = bestRun(eligible, name, directions[name])
     if (winner) best[name] = { run_id: winner.run_id, value: winner.metrics[name], direction: directions[name] || 'higher' }
   }
   let grouped = null
   if (field) {
     const groups = new Map()
-    for (const run of runs) {
+    for (const run of eligible) {
       const key = run.params?.[field]
       const label = key == null ? '(missing)' : String(key)
       if (!groups.has(label)) groups.set(label, [])
@@ -405,9 +408,15 @@ export function compareExperiments(cwd, slugValue, { field = null } = {}) {
       spec_drift: run.spec_drift ?? null,
       verdict: latest.get(run.run_id) ?? null,
       artifact_count: run.artifacts.length,
+      excluded: compliance.excluded.get(run.run_id) ?? null,
     })),
     best,
     grouped,
+    compliance: {
+      excluded_run_ids: compliance.excluded_run_ids,
+      details: compliance.details,
+      note: 'Runs linked to a compliance-violating analysis_run are excluded from best and grouping; they remain listed with their exclusion.',
+    },
   }
 }
 
@@ -422,10 +431,21 @@ export function bestExperimentRun(cwd, slugValue, { metric, direction = null } =
   }
   if (!EXPERIMENT_DIRECTIONS.includes(wanted)) throw new Error(`direction must be one of ${EXPERIMENT_DIRECTIONS.join(', ')}`)
   const runs = listExperimentRuns(cwd, slugValue)
-  const winner = bestRun(runs, name, wanted)
-  if (!winner) throw new Error(`no run records metric "${name}"`)
-  const tied = runs.filter((run) => run.metrics[name] === winner.metrics[name])
-  return { metric: name, direction: wanted, run: winner, tied_runs: tied.map((run) => run.run_id) }
+  const compliance = experimentCompliance(cwd, slugValue)
+  const eligible = runs.filter((run) => !compliance.excluded.has(run.run_id))
+  const winner = bestRun(eligible, name, wanted)
+  if (!winner) {
+    const excludedCount = runs.filter((run) => compliance.excluded.has(run.run_id) && run.metrics[name] != null).length
+    throw new Error(`no run records metric "${name}" among eligible runs${excludedCount ? ` (${excludedCount} excluded by compliance)` : ''}`)
+  }
+  const tied = eligible.filter((run) => run.metrics[name] === winner.metrics[name])
+  return {
+    metric: name,
+    direction: wanted,
+    run: winner,
+    tied_runs: tied.map((run) => run.run_id),
+    excluded_run_ids: compliance.excluded_run_ids.filter((runId) => runs.some((run) => run.run_id === runId && run.metrics[name] != null)),
+  }
 }
 
 /**
@@ -443,9 +463,11 @@ export function dominanceExperiment(cwd, slugValue) {
   if (missingDirection.length) {
     throw new Error(`dominance needs a direction for every metric; missing: ${missingDirection.map((metric) => metric.name).join(', ')}`)
   }
+  const compliance = experimentCompliance(cwd, slugValue)
+  const eligible = runs.filter((run) => !compliance.excluded.has(run.run_id))
   const complete = []
   const incomplete = []
-  for (const run of runs) {
+  for (const run of eligible) {
     const missing = definition.metrics.filter((metric) => run.metrics[metric.name] == null).map((metric) => metric.name)
     if (missing.length) incomplete.push({ run_id: run.run_id, missing })
     else complete.push(run)
@@ -484,8 +506,9 @@ export function dominanceExperiment(cwd, slugValue) {
     })),
     dominated: dominated.map((run) => run.run_id),
     incomplete,
+    excluded: compliance.details,
     relations: relations.slice(0, 100),
-    note: 'Pareto front over declared metrics and directions: a run dominates only when it is at least as good on every declared metric and strictly better on one. Runs missing a declared metric are incomplete and not ranked. No run here is a scientific claim.',
+    note: 'Pareto front over declared metrics and directions: a run dominates only when it is at least as good on every declared metric and strictly better on one. Runs missing a declared metric are incomplete and not ranked; runs linked to a compliance-violating analysis are excluded. No run here is a scientific claim.',
   }
 }
 
@@ -497,6 +520,83 @@ export function latestVerdicts(cwd, slugValue) {
   const map = new Map()
   for (const verdict of listExperimentVerdicts(cwd, slugValue)) map.set(verdict.run_id, verdict)
   return map
+}
+
+function linkedAnalysisRun(link) {
+  if (link?.target?.kind !== 'analysis_run') return null
+  const raw = text(link.target.id)
+  if (!raw) return null
+  const parts = raw.split(/[:/]/).filter(Boolean)
+  const run_id = parts.at(-1) || null
+  if (!run_id) return null
+  // `slug:run_id` and `.dsh/analysis/<slug>/runs/<id>` both name the owning
+  // ledger; a bare run id does not, and is matched across slugs.
+  const marker = parts.lastIndexOf('analysis')
+  const slug = marker >= 0 && parts[marker + 1] && parts[marker + 2] === 'runs'
+    ? parts[marker + 1]
+    : parts.length > 1 && parts[0] !== run_id && parts[0] !== 'analysis' ? parts[0] : null
+  return { slug, run_id }
+}
+
+/**
+ * An experiment run inherits a compliance exclusion from any analysis_run it
+ * links to. The analysis ledger owns the rule evaluation; this is a ledger join,
+ * not a second compliance implementation.
+ *
+ * The violation is cited from the violating reading, and every violated link is
+ * kept: a run tied to two bad analyses does not lose one of them. The exclusion
+ * index is only read when a link exists, so an experiment with no analysis link
+ * never depends on any other ledger. A link naming a run that does not exist is
+ * reported instead of silently granting eligibility.
+ */
+export function experimentCompliance(cwd, slugValue) {
+  const excluded = new Map()
+  const unresolved = []
+  const links = []
+  for (const link of listExperimentLinks(cwd, slugValue)) {
+    const analysis = linkedAnalysisRun(link)
+    if (analysis) links.push({ experiment_run_id: link.run_id, slug: analysis.slug, analysis_run_id: analysis.run_id })
+  }
+  if (!links.length) return { excluded, excluded_run_ids: [], details: [], unresolved, analysis_links: 0 }
+  const index = excludedAnalysisRunIndex(cwd, { targets: links })
+  for (const link of links) {
+    const hit = index.by_run.get(link.analysis_run_id)
+    const entry = hit && (!link.slug || hit.slug === link.slug) ? hit : null
+    if (entry) {
+      const violated = (entry.compliance?.rules || []).filter((rule) => rule.status === 'violated').map((rule) => rule.rule_id)
+      const prior = excluded.get(link.experiment_run_id)
+      if (prior) {
+        prior.violated = [...new Set([...prior.violated, ...violated])]
+        prior.analysis_run_ids.push(link.analysis_run_id)
+        prior.compliance_ids.push(entry.compliance?.compliance_id ?? null)
+      } else {
+        excluded.set(link.experiment_run_id, {
+          analysis_slug: entry.slug,
+          analysis_run_id: link.analysis_run_id,
+          analysis_run_ids: [link.analysis_run_id],
+          compliance_id: entry.compliance?.compliance_id ?? null,
+          compliance_ids: [entry.compliance?.compliance_id ?? null],
+          violated,
+        })
+      }
+      continue
+    }
+    if (!hasAnalysisRun(cwd, link.slug, link.analysis_run_id)) {
+      unresolved.push({
+        run_id: link.experiment_run_id,
+        analysis_slug: link.slug ?? null,
+        analysis_run_id: link.analysis_run_id,
+        reason: 'no such analysis run, so no compliance exclusion can apply',
+      })
+    }
+  }
+  return {
+    excluded,
+    excluded_run_ids: [...excluded.keys()],
+    details: [...excluded.entries()].map(([runId, entry]) => ({ run_id: runId, ...entry })),
+    unresolved,
+    analysis_links: links.length,
+  }
 }
 
 function normalizeBudget(input) {
@@ -575,6 +675,15 @@ export async function linkExperimentRun({ cwd, slug: slugValue, runId, targetKin
   if (!LINK_TARGET_KINDS.includes(kind)) throw new Error(`target_kind must be one of ${LINK_TARGET_KINDS.join(', ')}`)
   const id = text(targetId)
   if (!id) throw new Error('target_id is required')
+  if (kind === 'analysis_run') {
+    const analysis = linkedAnalysisRun({ target: { kind, id } })
+    if (!analysis) throw new Error(`target_id "${id}" does not name an analysis run`)
+    // A dangling link is not merely untidy: an exclusion joined on it would
+    // silently never apply, so the target must exist when the link is recorded.
+    if (!hasAnalysisRun(cwd, analysis.slug, analysis.run_id)) {
+      throw new Error(`no analysis run "${analysis.run_id}"${analysis.slug ? ` in analysis "${analysis.slug}"` : ' in this workspace'}; link the run that produced the number`)
+    }
+  }
   return withLock(f.dir, () => {
     const event = { run_id: run.run_id, ts: nowIso(), target: { kind, id }, note: text(note) || null }
     appendJsonl(f.links, [event])
@@ -590,6 +699,7 @@ export function experimentStatus(cwd, slugValue) {
   const verdicts = readJsonl(f.verdicts)
   const baselines = runs.filter((run) => run.role === 'baseline')
   const drift = runs.filter((run) => run.spec_drift?.state === 'drift')
+  const compliance = experimentCompliance(cwd, slugValue)
   return {
     slug: definition.slug,
     name: definition.name,
@@ -605,14 +715,18 @@ export function experimentStatus(cwd, slugValue) {
     links: links.length,
     verdicts: verdicts.length,
     latest_verdict: verdicts.at(-1) ?? null,
+    compliance: {
+      excluded_run_ids: compliance.excluded_run_ids,
+      details: compliance.details,
+    },
   }
 }
 
-function runsCsv(definition, runs, verdicts = []) {
+function runsCsv(definition, runs, verdicts = [], compliance = null) {
   const metrics = metricNames(definition, runs)
   const params = [...new Set(runs.flatMap((run) => Object.keys(run.params || {})))]
   const latest = new Map(verdicts.map((verdict) => [verdict.run_id, verdict]))
-  const header = ['run_id', 'ts', 'seed', 'parent', 'role', 'baseline_ref', 'stage', 'protocol_digest', 'spec_drift', ...params, ...metrics, 'verdict', 'artifacts', 'notes']
+  const header = ['run_id', 'ts', 'seed', 'parent', 'role', 'baseline_ref', 'stage', 'protocol_digest', 'spec_drift', ...params, ...metrics, 'verdict', 'compliance', 'artifacts', 'notes']
   const lines = [header.map(csvCell).join(',')]
   for (const run of runs) {
     lines.push([
@@ -621,6 +735,7 @@ function runsCsv(definition, runs, verdicts = []) {
       ...params.map((name) => run.params?.[name] ?? ''),
       ...metrics.map((name) => run.metrics?.[name] ?? ''),
       latest.get(run.run_id)?.verdict ?? '',
+      compliance?.excluded.has(run.run_id) ? 'excluded' : '',
       run.artifacts.map((entry) => entry.path).join('; '),
       run.notes ?? '',
     ].map(csvCell).join(','))
@@ -628,7 +743,7 @@ function runsCsv(definition, runs, verdicts = []) {
   return `${lines.join('\n')}\n`
 }
 
-function runsMarkdown(definition, runs, links, verdicts = []) {
+function runsMarkdown(definition, runs, links, verdicts = [], compliance = null) {
   const latest = new Map(verdicts.map((verdict) => [verdict.run_id, verdict]))
   const metrics = metricNames(definition, runs)
   const directions = Object.fromEntries(definition.metrics.map((entry) => [entry.name, entry.direction || 'higher']))
@@ -647,7 +762,8 @@ function runsMarkdown(definition, runs, links, verdicts = []) {
     lines.push(`| ${run.run_id} | ${run.ts} | ${metrics.map((name) => (run.metrics[name] == null ? '' : mdCell(run.metrics[name]))).join(' | ')} | ${run.artifacts.length} | ${mdCell(run.notes || '')} |`)
   }
   const bestLines = metrics.flatMap((name) => {
-    const winner = bestRun(runs, name, directions[name] || 'higher')
+    const eligible = compliance ? runs.filter((run) => !compliance.excluded.has(run.run_id)) : runs
+    const winner = bestRun(eligible, name, directions[name] || 'higher')
     return winner ? [`- ${name} (${directions[name] || 'higher'}): ${winner.run_id} = ${winner.metrics[name]}`] : []
   })
   if (bestLines.length) lines.push('', '## Best per named metric', '', ...bestLines)
@@ -670,11 +786,17 @@ function runsMarkdown(definition, runs, links, verdicts = []) {
   if (links.length) {
     lines.push('', '## Links', '', ...links.map((link) => `- ${link.run_id} → ${link.target.kind}:${link.target.id}${link.note ? ` (${link.note})` : ''}`))
   }
+  if (compliance?.details.length) {
+    lines.push('', '## Compliance exclusions', '', ...compliance.details.map((entry) => `- ${entry.run_id}: excluded because analysis_run ${entry.analysis_run_ids.join(', ')} (${entry.analysis_slug}) violated ${(entry.violated || []).join(', ') || 'a declared task rule'} in ${entry.compliance_ids.filter(Boolean).join(', ') || 'a recorded reading'}`))
+  }
+  if (compliance?.unresolved.length) {
+    lines.push('', '## Unresolved analysis links', '', ...compliance.unresolved.map((entry) => `- ${entry.run_id} → analysis_run ${entry.analysis_run_id}${entry.analysis_slug ? ` (${entry.analysis_slug})` : ''}: ${entry.reason}`))
+  }
   lines.push('', 'Logged runs and metrics as recorded. No metric here is a scientific claim, and missing values stay blank.', '')
   return lines.join('\n')
 }
 
-function runsMlflow(definition, runs, verdicts = []) {
+function runsMlflow(definition, runs, verdicts = [], compliance = null) {
   const latest = new Map(verdicts.map((verdict) => [verdict.run_id, verdict]))
   return {
     experiment: { experiment_id: definition.slug, name: definition.name, tags: { question: definition.question } },
@@ -693,6 +815,7 @@ function runsMlflow(definition, runs, verdicts = []) {
           ...(run.role ? { role: run.role, baseline_ref: run.baseline_ref ?? '', stage: run.stage ?? '', protocol_digest: run.protocol_digest ?? '' } : {}),
           ...(run.spec_drift?.state ? { spec_drift: run.spec_drift.state } : {}),
           ...(latest.get(run.run_id) ? { verdict: latest.get(run.run_id).verdict } : {}),
+          ...(compliance?.excluded.has(run.run_id) ? { compliance: 'excluded' } : {}),
         },
         params: Object.fromEntries(Object.entries(run.params || {}).map(([key, value]) => [key, String(value)])),
         metrics: Object.entries(run.metrics || {}).map(([key, value]) => ({ key, value, timestamp: new Date(run.ts).getTime() * 1000 })),
@@ -708,6 +831,7 @@ export function exportExperiment({ cwd, slug: slugValue, format = 'markdown', ov
   const runs = readJsonl(f.runs)
   const links = readJsonl(f.links)
   const verdicts = readJsonl(f.verdicts)
+  const compliance = experimentCompliance(cwd, slugValue)
   const wanted = text(format).toLowerCase()
   if (!EXPERIMENT_EXPORT_FORMATS.includes(wanted)) {
     throw new Error(`format must be one of ${EXPERIMENT_EXPORT_FORMATS.join(', ')}`)
@@ -716,16 +840,16 @@ export function exportExperiment({ cwd, slug: slugValue, format = 'markdown', ov
   let body
   if (wanted === 'csv') {
     name = 'runs.csv'
-    body = runsCsv(definition, runs, verdicts)
+    body = runsCsv(definition, runs, verdicts, compliance)
   } else if (wanted === 'json') {
     name = 'experiment.json'
-    body = `${JSON.stringify({ experiment: definition, runs, links, verdicts }, null, 2)}\n`
+    body = `${JSON.stringify({ experiment: definition, runs, links, verdicts, compliance: compliance.details }, null, 2)}\n`
   } else if (wanted === 'mlflow') {
     name = 'mlflow.json'
-    body = `${JSON.stringify(runsMlflow(definition, runs, verdicts), null, 2)}\n`
+    body = `${JSON.stringify(runsMlflow(definition, runs, verdicts, compliance), null, 2)}\n`
   } else {
     name = 'report.md'
-    body = runsMarkdown(definition, runs, links, verdicts)
+    body = runsMarkdown(definition, runs, links, verdicts, compliance)
   }
   const written = exportText(join(f.exports, name), body, { overwrite })
   return { format: wanted, path: written.path.slice(cwd.length + 1), bytes: written.bytes }

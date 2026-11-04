@@ -2,6 +2,13 @@
 
 This page covers the local ledgers that keep work auditable past the context window: systematic reviews, meta-analysis, hypothesis tournaments, clinical and regulatory records, and dataset/venue/funder policy.
 
+For limitation and prior-art triage, load `limitation-mining` and
+`novelty-triage`. The `research_template` actions `limitation-mining`,
+`subset-first-eval`, `ablation-plan`, `rebuttal-plan`, and
+`review-round-diff` are prompt templates, not executors. They connect existing
+ledgers without turning a generated hypothesis or a lexical novelty reading
+into a scientific finding.
+
 ## Systematic reviews
 
 `review` is a preset-only native tool — local, no key, no database — that keeps a systematic or scoping review auditable. State lives under `<cwd>/.dsh/review/<slug>/` as append-only JSONL event logs plus a write-once `protocol.json`; the current state is derived from the log, so concurrent subagent writes cannot corrupt it and overrides keep their history.

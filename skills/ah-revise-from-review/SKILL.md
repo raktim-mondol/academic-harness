@@ -13,3 +13,9 @@ Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 4. **Map and respond.** Call `ah_review_set` with the item, the unit ids you changed (they are printed in the edit results and in `ah_check` output), `status: addressed`, and a response in the voice of the authors that says what changed and where. For a rebuttal use `status: rebutted` and give the reason and, if it applies, the unit where the text already says it. A response that says "we added..." must have a mapped unit whose text really changed, or the harness refuses it.
 5. **Build the letter.** `ah_review_respond` writes it from the items and the real diffs since the snapshot. Read what it reports: items marked addressed with no change, missing responses, units that changed but belong to no item. Fix those, then build again.
 6. **Report** to the author: items addressed, items rebutted (with the reason), items waiting on a decision, and anything the letter flagged.
+
+For stored multi-pass rounds, `deep_review action=compare` reports closed,
+still-present, and new findings; identical manuscript bytes make reviewer
+variance a possible explanation, not evidence of revision. For supplementary
+tasks and evidence links use `rebuttal-experiments`. It does not replace the
+engine's author decisions or `ah_review_respond`, and does not run experiments.

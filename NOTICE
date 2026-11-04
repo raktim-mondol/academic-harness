@@ -28,6 +28,12 @@ skill into every session, was not ported — DSH has no equivalent hook
 mechanism — and its guidance was folded into this plugin's own system prompt
 instead (see the "Research discipline" section of `prompt.js`).
 
+The `pele` skill (`skills/pele`) is vendored from `jpmanson/pele-skill` at
+commit `50ffbb57f3c4cd7b9f96f7bb02c69c70e6371973` (MIT License,
+Copyright 2026 Juan Pablo Manson). Its skill files are unchanged; the upstream
+license is included at `skills/pele/LICENSE`. The separately installed `pele`
+npm package is not vendored as part of the skill.
+
 503 profession-specific expert-reasoning skills (accelerator-physicist,
 zoologist, marine-biologist, and so on) are vendored under `skills/` from the
 open-source `K-Dense-AI/scientific-agents` catalogue (MIT License). Each was

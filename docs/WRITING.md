@@ -2,6 +2,11 @@
 
 This page covers the writing side: the Academic Harness engine for long LaTeX documents, bibliography formatting and consistency, compilation, and the figure toolchain.
 
+For stored review-round comparisons use the `review-round-diff` research
+template; for evidence-linked replies use `rebuttal-plan` and
+`rebuttal-experiments`. Templates never start a new review without approval,
+and the writing engine remains authoritative for its own response letter.
+
 ![Writing loop](assets/diagrams/writing-loop.svg)
 
 ## Academic Harness engine
@@ -82,11 +87,15 @@ The suite is self-contained in `skills/`, but it refers to the upstream handbook
 
 ## References and citation
 
-`citation` is a preset-only native tool — local, no key — with four actions:
+`citation` is a preset-only native tool — local, no key — with five actions:
 
 - `format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers.
 - `bibtex` / `ris` export from CSL-JSON records, existing BibTeX/RIS text, or DOIs (Crossref content negotiation).
-- `validate` reports missing fields, duplicate DOIs/keys, and invalid DOIs; `check_dois: true` checks each DOI against Crossref (identity only, not claim support).
+- `validate` reports missing fields, duplicate DOIs/keys, and invalid DOIs; `check_dois: true` checks each DOI against Crossref (identity only, not claim support). A DOI whose title cannot be compared is listed as unverified, never as passed.
+- `audit` checks a bibliography as a batch: DOI validity, Crossref title/year/venue/first-author match, retraction/concern/correction status, duplicates, uncited entries, and style fit, with per-reference `problem` / `review` / `unverified` / `no_issues_found`. A check that cannot run is `unverified`: a title, venue, or author that cannot be compared lexically (a non-Latin name normalizes to nothing) is reported as such, never counted as a match or invented as a mismatch.
+- `repair` re-audits and grounds each metadata mismatch (`doi_not_registered`, `invalid_doi`, `title_mismatch`, `year_mismatch`, `venue_mismatch`, `first_author_mismatch`) through DOI and title lookup. A grounded record is accepted only when its title matches the cited paper: a bare substring of a short title is not a match — the shorter title must carry at least 3 tokens, or 2 non-stopword tokens, otherwise the ≥ 0.6 token-overlap test alone decides — and a pair whose titles cannot be compared lexically never passes (an exact string comparison is the only fallback). When the cited record carries a registered DOI, a title-only match must additionally be corroborated by the first author, the year, or the venue, and the corroboration is recorded in the sidecar; an uncorroborated or containment-only acceptance does not end the search, so a later identifier (usually the DOI) can supersede it, and every refusal is reported with its reason. It writes a **new** `.bib` plus a `.repair.json` sidecar; the input is never edited, an unresolved record is reported rather than guessed, and a retracted record is reported, not rewritten (a correction or expression of concern does not block a metadata repair). The new `.bib` is re-serialized from parsed records, so fields the exporter cannot represent may be dropped, and two entries sharing a citation key are separated on write by a suffix: the sidecar reports the key actually emitted (`grounded_key`, `key_preserved: false`, and why), and the summary tells you to re-check the manuscript's `\cite{...}` keys. The original file remains the reference for those fields.
+
+The audit vocabulary is the plugin's own (`problem`, `review`, `unverified`, `no_issues_found`); the `HALLUCINATED` / `MISMATCH` labels belong to the vendored review engine and are not produced by `citation`. Repair is therefore keyed on the audit's finding codes, never on those labels. `repair` needs `output_path` for the new `.bib` and refuses to write over the input; `overwrite: true` replaces an earlier repaired file. Use it when an audit reports a wrong or unregistered DOI or a metadata mismatch, then re-run `audit` on the repaired file.
 
 The IEEE, Chicago author-date, and MLA CSL styles are vendored under `styles/` (CC BY-SA 3.0; see [styles/README.md](../styles/README.md)). Set `CROSSREF_MAILTO` or `UNPAYWALL_EMAIL` for the Crossref polite pool.
 

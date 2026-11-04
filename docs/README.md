@@ -19,16 +19,16 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 |---|---|
 | [Search and discovery](SEARCH.md) | Literature databases, Consensus, Parallel, MCP connectors, web indexes, publication integrity |
 | [Papers and evidence](PAPERS.md) | Download, `paper_fold`, PDF conversion, `deep_review` with review rounds and the advisory evaluation-validity checks, PaperMemory, Paper2Agent |
-| [Writing, citation, and figures](WRITING.md) | The `ah_*` writing oracle, bibliography tools with custom CSL, submission packs, revision diffs, the reviewer-response ledger, numbers audit, posters/slides, authorship/CRediT, LaTeX, figures, `image_generate`, `mermaid_render` |
+| [Writing, citation, and figures](WRITING.md) | The `ah_*` writing oracle, bibliography tools with custom CSL and citation repair, submission packs, revision diffs, the reviewer-response ledger, numbers audit, posters/slides, authorship/CRediT, LaTeX, figures, `image_generate`, `mermaid_render` |
 | [Reviews, synthesis, and records](RESEARCH.md) | Systematic reviews, dual-reviewer screening, structured extraction, meta-analysis, GRADE certainty and summary-of-findings tables, risk-of-bias appraisal, agreement statistics, hypothesis tournaments, pre-registration, causal DAGs, randomization/DOE, ethics and de-identification, data-management plans, grant budgets, clinical/regulatory records, dataset and policy tools |
-| [Reproducible analysis and data](ANALYSIS.md) | Frozen plans and auditable `analysis_run` executions, `experiment_log` sweeps, `dataset_get` provenance downloads, `data_profile` leakage review, `repro_package` shipping and Zenodo drafts |
-| [Provenance audit](PROVENANCE.md) | The read-only cross-ledger index: how `provenance_audit` joins review, reporting, deep-review, notebook, analysis, experiment, dataset, meta-analysis, and AH records, and what its seven states do and do not mean |
+| [Reproducible analysis and data](ANALYSIS.md) | Frozen plans and auditable `analysis_run` executions, declared reported numbers and re-execution checks, frozen-rule compliance, `experiment_log` sweeps, `dataset_get` provenance downloads, `data_profile` leakage review, `repro_package` shipping and Zenodo drafts |
+| [Provenance audit](PROVENANCE.md) | The read-only cross-ledger index: how `provenance_audit` joins review, reporting, deep-review, notebook, analysis, experiment, ablation, dataset, meta-analysis, and AH records, what its eleven states do and do not mean, the four-column `arms` roll-up, and the report-only `rollup` loop record |
 | [Scientific data and toolkits](SCIENCE-DATA.md) | `science_source` over UniProt, RCSB PDB, AlphaFold DB, and PubChem, and the local `chem_toolkit`, `seq_toolkit`, and `structure_toolkit` |
 | [Discovery and reference checks](DISCOVERY.md) | Saved searches, recommendations, citation networks, data-link extraction, and the bibliography audit |
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 768-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 774-skill catalogue, its sources, and workflow skills |
 | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) | Author identity, OpenReview, grants, patents, statistical/figure/repo audits, GROBID references |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 

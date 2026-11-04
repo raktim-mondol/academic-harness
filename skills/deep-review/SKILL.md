@@ -35,6 +35,9 @@ reporting-guideline verdict.
 
 `deep_review` findings are advisory criticism. It does not decide acceptance and
 does not replace the user's judgment.
+For the stored-round-to-author-response handoff use `rebuttal-experiments`; for
+an audit of reruns, protocols, references, and code alignment use
+`integrity-audit`. Neither replaces the review or author decisions.
 
 ## Route every paper-review request
 
@@ -226,8 +229,9 @@ Read it with two cautions, and state both to the user:
 from counting rather than a score to climb; nothing here gates, and only
 `ah_check` blocks. It writes `extra_checks.json` beside the review and appends its
 own notebook entry tagged `validity`, so do not log that pass yourself.
-`provenance_audit` does not read the artifact yet, so a cross-ledger audit still
-sees only the stored claims and citation verdicts.
+`provenance_audit` indexes the artifact: a `flagged` validity check appears as
+an `unverified` claim, a `not_checked` check stays `not_checked`, and `arms`
+reports the validity flags beside the citation column.
 
 ### 8. Read the advisory score
 

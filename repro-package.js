@@ -41,6 +41,9 @@ function renderValue(value) {
       return [{ type: 'text', text: `Reproducibility plan "${value.plan.slug}" frozen: ${value.plan.name}\nOutput directory: ${value.plan.output_dir}${value.plan.include_data ? ' (data will be copied)' : ' (data referenced, not copied)'}` }]
     case 'build': {
       const lines = [`Built ${value.package.path}: ${value.package.files} file(s), ${value.package.bytes} bytes.`]
+      if (value.package.stale_files?.length) {
+        lines.push(`From an earlier build, no longer in the package, and not deleted (${value.package.stale_files.length} file(s)):`, ...value.package.stale_files.map((stale) => `- ${stale.path}: ${stale.reason}`))
+      }
       if (value.package.warnings.length) lines.push('Warnings:', ...value.package.warnings.map((warning) => `- ${warning}`))
       lines.push('The package is reproducibility evidence, not a guarantee.')
       return [{ type: 'text', text: lines.join('\n') }]
@@ -117,14 +120,14 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'repro_package',
     description: [
-      'Build reproducibility packages from the other ledgers. `plan` freezes an inventory (title, authors, analysis_run slugs/run ids, experiment_log slugs, dataset_get slugs/DOIs, code files, manuscript, repo, license, funder, citation, output dir, include_data). `build` writes a reader-facing package — manifest.json with SHA-256 per file, environment/ snapshot, generated Dockerfile, README with run order and data availability, CITATION.cff, codemeta.json, RO-Crate 1.1 metadata, checksums.sha256 — without uploading anything. `verify` re-hashes the package against its manifest; `status` reports readiness.',
-      '`deposit` targets Zenodo only: without `confirm: true` it returns a preview (files, license blockers, preview_hash); with confirm and an unchanged preview_hash and a configured ZENODO_API_KEY it creates a draft deposition and uploads files — it never publishes, and data are not copied into the package unless include_data is set. Unknown licenses and failed runs are flagged, never hidden. The package is evidence of reproducibility, not proof the result is correct.',
+      'Build reproducibility packages from the other ledgers. `plan` freezes an inventory (title, authors, analysis_run slugs/run ids, experiment_log slugs, dataset_get slugs/DOIs, code files, manuscript, repo, license, funder, citation, output dir, include_data). `build` writes a reader-facing package — manifest.json with SHA-256 per file, environment/ snapshot, generated Dockerfile, README with run order and data availability, CITATION.cff, codemeta.json, RO-Crate 1.1 metadata, checksums.sha256 — without uploading anything. `verify` re-hashes the package against its manifest and reports files still on disk that the manifest no longer lists; `status` reports readiness.',
+      '`deposit` targets Zenodo only: without `confirm: true` it returns a preview (files, license blockers, preview_hash); with confirm and an unchanged preview_hash and a configured ZENODO_API_KEY it creates a draft deposition and uploads files — it never publishes, and data are not copied into the package unless include_data is set. Unknown licenses and failed runs are flagged, never hidden. Runs excluded by an `analysis_run` compliance violation are left out of the package and recorded under `excluded_runs` with the violated rule ids; an experiment run inherits the exclusion from the analysis run it links to. Rebuilding with `overwrite: true` removes the previous build\'s artifacts under the builder-managed directories, which is what makes "rebuild before deposit" enough to clear an excluded run; files the builder does not own are never deleted, only named. The package is evidence of reproducibility, not proof the result is correct.',
     ].join(' '),
     parameters: {
       action: { type: 'string', enum: ACTIONS, description: 'plan, build, verify, status, or deposit. Default status.' },
       slug: { type: 'string', description: 'Package slug.' },
       plan: { type: 'object', additionalProperties: true, description: 'Inventory for plan: {name, authors, analyses:[{slug,run_id?}], experiments:[{slug}], datasets:[{slug}], code_files:[], manuscript, repo, license, funder, citation, output_dir, include_data, notes}.' },
-      overwrite: { type: 'boolean', description: 'Rebuild over an existing output directory (default false).' },
+      overwrite: { type: 'boolean', description: 'Rebuild over an existing output directory (default false). The rebuild removes the previous build\'s files under the builder-managed directories, so artifacts of runs that are no longer included do not survive; anything else on disk is left alone and reported.' },
       confirm: { type: 'boolean', description: 'Required for deposit, together with preview_hash.' },
       preview_hash: { type: 'string', description: 'preview_hash from the deposit preview (deposit).' },
       preview_only: { type: 'boolean', description: 'Return the deposit preview without checking confirmation (deposit).' },

@@ -114,7 +114,7 @@ function compactBoard(view) {
     steps_used: view.steps_used,
     step_budget: view.step_budget,
     max_hypotheses: view.max_hypotheses,
-    max_matches: view.max_matches,
+    max_matches: view.max_matches ?? null,
     avg_top_elo: view.avg_top_elo,
     top_elo: view.top_elo,
     termination: view.termination,
@@ -635,7 +635,11 @@ export function apply(ctx) {
     },
     async execute(args, exec) {
       try {
-        return await runCosc(args, exec)
+        // DSH validates that tool results survive a JSON round trip. Optional
+        // store fields can be undefined, and non-finite numbers are not JSON.
+        return JSON.parse(JSON.stringify(await runCosc(args, exec), (_key, value) => (
+          typeof value === 'number' && !Number.isFinite(value) ? null : value
+        )))
       } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) }
       }

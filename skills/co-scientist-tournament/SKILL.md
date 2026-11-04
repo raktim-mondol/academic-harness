@@ -160,6 +160,10 @@ and termination rules are in `references/tournament.md`.
 
 The tournament records the method's weaknesses and freezes the chosen idea; it does
 not repair the method and does not accept it.
+For focused work load `limitation-mining` or `novelty-triage`; for staged
+testing use `subset-first-eval`, and for the four advisory checks use
+`integrity-audit`. A scoped `tournament-slug#h1` experiment parameter prevents
+ambiguous bare idea ids from being attributed across tournaments.
 
 - **Record a limitation, do not edit one.** `coscientist limitation limitation_action: "add"`
   takes the methodological flaw, the verbatim source quote span, why it limits the

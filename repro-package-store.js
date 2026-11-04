@@ -8,13 +8,18 @@
  */
 import os from 'node:os'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import {
+  copyFileSync, existsSync, lstatSync, readFileSync, readdirSync, realpathSync,
+  statSync, unlinkSync, writeFileSync,
+} from 'node:fs'
+import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import {
   ensureDir, exportText, hashFile, nowIso, readJson, slug as slugify,
   stableStringify, writeOnceJson, sha256,
 } from './ledger-kit.js'
 import { resolveWorkspacePath } from './workspace-path.js'
+import { excludedAnalysisRunIndex } from './analysis-store.js'
+import { experimentCompliance } from './experiment-store.js'
 
 function text(value) {
   return String(value ?? '').trim()
@@ -124,6 +129,91 @@ function copyInto(cwd, srcRel, destRel, packageDir, role, source, warnings, entr
   return entry
 }
 
+/**
+ * The subdirectories a build owns inside `output_dir`. Only files the builder
+ * wrote under these can be purged when a rebuild drops them: `output_dir` may
+ * hold the user's own files, and the package root holds metadata every rebuild
+ * rewrites in place. `data/` is where `include_data` dataset copies land.
+ */
+const MANAGED_DIRS = ['analysis', 'environment', 'experiments', 'data', 'code']
+
+function segments(rel) {
+  return text(rel).split(/[\\/]+/).filter((segment) => segment !== '')
+}
+
+/** Manifest paths are built with `join`; compare them on a separator-neutral key. */
+function relKey(rel) {
+  return segments(rel).join('/')
+}
+
+function entryPresent(abs) {
+  try {
+    lstatSync(abs)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** The file list of the build already on disk, or an empty list if there is none. */
+function previousBuildPaths(outAbs) {
+  const manifestAbs = join(outAbs, 'manifest.json')
+  if (!existsSync(manifestAbs)) return []
+  try {
+    const previous = JSON.parse(readFileSync(manifestAbs, 'utf8'))
+    if (!Array.isArray(previous?.files)) return []
+    return previous.files.map((entry) => text(entry?.path)).filter(Boolean)
+  } catch {
+    // An unreadable previous manifest costs us the purge, not the rebuild.
+    return []
+  }
+}
+
+/**
+ * Decide what may happen to one stale path (listed by the previous build, absent
+ * from the new one). Returns the absolute path to delete, or a reason it must be
+ * left alone. Containment is checked twice: the managed-directory prefix, then a
+ * real-path check through the workspace helper, so a symlinked or traversing
+ * entry name can never move the delete outside this package directory.
+ */
+function staleDeletionTarget({ cwd, outRel, outReal, rel }) {
+  const parts = segments(rel)
+  if (!parts.length || isAbsolute(text(rel))) return { reason: 'not a path inside the package directory' }
+  if (parts.some((part) => part === '.' || part === '..')) return { reason: 'not a path inside the package directory' }
+  if (parts.length < 2 || !MANAGED_DIRS.includes(parts[0])) return { reason: `outside the builder-managed directories (${MANAGED_DIRS.join(', ')})` }
+  let target
+  try {
+    target = resolveWorkspacePath(cwd, join(outRel, ...parts))
+  } catch (error) {
+    return { reason: `resolves outside the workspace (${error instanceof Error ? error.message : String(error)})` }
+  }
+  if (target !== outReal && !target.startsWith(`${outReal}${sep}`)) return { reason: 'resolves outside the package directory' }
+  return { target }
+}
+
+/** Regular files the builder owns on disk, as package-relative paths. */
+function managedFilesOnDisk(outAbs) {
+  const found = []
+  const walk = (abs, rel) => {
+    let items
+    try {
+      items = readdirSync(abs, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const item of items) {
+      const childAbs = join(abs, item.name)
+      const childRel = `${rel}/${item.name}`
+      // Symlinks and other kinds are never the builder's own output: not listed,
+      // never followed, never deleted.
+      if (item.isDirectory()) walk(childAbs, childRel)
+      else if (item.isFile()) found.push(childRel)
+    }
+  }
+  for (const dir of MANAGED_DIRS) walk(join(outAbs, dir), dir)
+  return found
+}
+
 function repoInfo(cwd, declared) {
   if (declared) return declared
   const remote = spawnSync('git', ['remote', 'get-url', 'origin'], { cwd, encoding: 'utf8', timeout: 10_000, shell: false })
@@ -199,11 +289,24 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
     throw new Error(`${outRel} exists and is not empty; pass overwrite: true to rebuild`)
   }
   ensureDir(outAbs)
+  // Read the previous build's file list before this one overwrites manifest.json.
+  // Without it an `overwrite: true` rebuild leaves the earlier build's copies on
+  // disk, and the directory users tar and ship would still hold artifacts the new
+  // manifest says are not part of the package (excluded runs above all).
+  const previousPaths = previousBuildPaths(outAbs)
+  let outReal = outAbs
+  try {
+    outReal = realpathSync(outAbs)
+  } catch {
+    // ensureDir just created it; the lexical path is the best we have.
+  }
   const entries = []
   const warnings = []
   const includedRuns = []
   const includedExperiments = []
   const includedDatasets = []
+  const excludedRuns = []
+  const analysisExclusions = excludedAnalysisRunIndex(cwd)
 
   for (const reference of plan.analyses) {
     const ledgerDir = join(cwd, '.dsh', 'analysis', slugify(reference.slug))
@@ -211,8 +314,23 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
     const runs = existsSync(join(ledgerDir, 'runs.jsonl'))
       ? readFileSync(join(ledgerDir, 'runs.jsonl'), 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
       : []
-    const selected = reference.run_id ? runs.filter((run) => run.run_id === reference.run_id) : runs.slice(-1)
-    if (!selected.length) { warnings.push(`analysis "${reference.slug}": no matching runs`); continue }
+    const candidates = reference.run_id ? runs.filter((run) => run.run_id === reference.run_id) : [...runs].reverse()
+    const selected = []
+    for (const run of candidates) {
+      const excluded = analysisExclusions.by_run.get(run.run_id)
+      if (excluded) {
+        excludedRuns.push({
+          slug: run.slug, run_id: run.run_id, analysis_slug: excluded.slug,
+          compliance_id: excluded.compliance?.compliance_id ?? null,
+          violated: (excluded.compliance?.rules || []).filter((rule) => rule.status === 'violated').map((rule) => rule.rule_id),
+        })
+        warnings.push(`run ${run.run_id} excluded from the package: analysis compliance verdict violated${excluded.compliance?.compliance_id ? ` (${excluded.compliance.compliance_id})` : ''}`)
+        continue
+      }
+      if (reference.run_id) selected.push(run)
+      else if (!selected.length) selected.push(run)
+    }
+    if (!selected.length) { warnings.push(`analysis "${reference.slug}": no eligible runs (all excluded or none found)`); continue }
     for (const run of selected) {
       if (run.exit_code !== 0 || run.timed_out) warnings.push(`run ${run.run_id} did not succeed (exit ${run.exit_code ?? 'n/a'}${run.timed_out ? ', timed out' : ''}); included as recorded`)
       const manifestRel = join('analysis', run.slug, `${run.run_id}-manifest.json`)
@@ -231,10 +349,29 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
     const ledgerDir = join(cwd, '.dsh', 'experiments', slugify(reference.slug))
     if (!existsSync(join(ledgerDir, 'experiment.json'))) { warnings.push(`experiment "${reference.slug}" not found`); continue }
     copyInto(cwd, relative(cwd, join(ledgerDir, 'experiment.json')), join('experiments', `${slugify(reference.slug)}-experiment.json`), outAbs, 'experiment-definition', `experiment_log/${reference.slug}`, warnings, entries)
+    let experimentRunCount = 0
+    const experimentExcluded = []
     if (existsSync(join(ledgerDir, 'runs.jsonl'))) {
-      copyInto(cwd, relative(cwd, join(ledgerDir, 'runs.jsonl')), join('experiments', `${slugify(reference.slug)}-runs.jsonl`), outAbs, 'experiment-runs', `experiment_log/${reference.slug}`, warnings, entries)
+      const raw = readFileSync(join(ledgerDir, 'runs.jsonl'), 'utf8')
+      const runs = raw.split('\n').filter(Boolean).map((line) => JSON.parse(line))
+      const compliance = experimentCompliance(cwd, reference.slug)
+      const kept = runs.filter((run) => !compliance.excluded.has(run.run_id))
+      experimentRunCount = kept.length
+      for (const run of runs.filter((entry) => compliance.excluded.has(entry.run_id))) {
+        experimentExcluded.push(run.run_id)
+        excludedRuns.push({ slug: slugify(reference.slug), run_id: run.run_id, experiment: true, ...compliance.excluded.get(run.run_id) })
+        warnings.push(`experiment run ${run.run_id} excluded from the package: its linked analysis_run violated the frozen task rules`)
+      }
+      if (experimentExcluded.length) {
+        const rel = join('experiments', `${slugify(reference.slug)}-runs.jsonl`)
+        const abs = join(outAbs, rel)
+        writeFileSync(abs, kept.map((run) => `${JSON.stringify(run)}\n`).join(''), 'utf8')
+        entries.push({ path: rel, role: 'experiment-runs', bytes: statSync(abs).size, sha256: `sha256:${hashFile(abs)}`, source: `experiment_log/${reference.slug}` })
+      } else {
+        copyInto(cwd, relative(cwd, join(ledgerDir, 'runs.jsonl')), join('experiments', `${slugify(reference.slug)}-runs.jsonl`), outAbs, 'experiment-runs', `experiment_log/${reference.slug}`, warnings, entries)
+      }
     }
-    includedExperiments.push({ slug: slugify(reference.slug) })
+    includedExperiments.push({ slug: slugify(reference.slug), runs: experimentRunCount, excluded_runs: experimentExcluded })
   }
 
   for (const reference of plan.datasets) {
@@ -286,6 +423,7 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
     experiments: includedExperiments,
     datasets: includedDatasets,
     include_data: plan.include_data,
+    excluded_runs: excludedRuns,
     files: entries,
     warnings,
     note: 'Reproducibility evidence: recorded environment, manifests, and hashes. Not a guarantee that the result is correct or that this package reproduces it.',
@@ -304,6 +442,7 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
     '',
     ...(includedRuns.length ? includedRuns.map((run) => `1. \`${run.command.join(' ')}\` (analysis "${run.slug}", ${run.run_id}, recorded exit ${run.exit_code ?? 'n/a'})`) : ['1. _no analysis runs included_']),
     '',
+    ...(excludedRuns.length ? ['## Compliance exclusions', '', ...excludedRuns.map((run) => `- ${run.run_id}${run.analysis_slug ? ` (analysis ${run.analysis_slug})` : ''}: excluded because it violated frozen task rules${run.violated?.length ? ` (${run.violated.join(', ')})` : ''}`), ''] : []),
     '## Expected outputs',
     '',
     ...(entries.filter((entry) => entry.role === 'analysis-manifest').length
@@ -344,12 +483,46 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
   exportText(checksumsAbs, `${checksums}\n`, { overwrite: true })
   entries.push({ path: 'checksums.sha256', role: 'package-metadata', bytes: Buffer.byteLength(`${checksums}\n`), sha256: `sha256:${hashFile(checksumsAbs)}`, source: 'repro_package' })
 
+  // Purge what the earlier build wrote and this one no longer ships. Single files
+  // only, only under a managed directory, only inside `outAbs`: a user file in the
+  // output directory is never deleted, and if the previous build claimed it we say
+  // so instead of touching it.
+  const shipped = new Set(entries.map((entry) => relKey(entry.path)))
+  const staleFiles = []
+  for (const rel of previousPaths) {
+    if (shipped.has(relKey(rel))) continue
+    const { target, reason } = staleDeletionTarget({ cwd, outRel, outReal, rel })
+    if (!target) {
+      if (entryPresent(join(outAbs, ...segments(rel)))) staleFiles.push({ path: rel, reason })
+      continue
+    }
+    let stats
+    try {
+      stats = lstatSync(target)
+    } catch {
+      continue // already gone: nothing to delete and nothing to report
+    }
+    if (!stats.isFile()) {
+      staleFiles.push({ path: rel, reason: 'not a regular file' })
+      continue
+    }
+    try {
+      unlinkSync(target)
+    } catch (error) {
+      staleFiles.push({ path: rel, reason: `could not be deleted (${error instanceof Error ? error.message : String(error)})` })
+    }
+  }
+  if (staleFiles.length) {
+    warnings.push(`${outRel} contains ${staleFiles.length} file(s) from an earlier build that are no longer in the package: ${staleFiles.map((stale) => `${stale.path} — ${stale.reason}`).join('; ')}`)
+  }
+
   return {
     slug: plan.slug,
     path: outRel,
     files: entries.length,
     bytes: entries.reduce((sum, entry) => sum + entry.bytes, 0),
     warnings,
+    stale_files: staleFiles,
     manifest_hash: `sha256:${sha256(stableStringify(manifest))}`,
   }
 }
@@ -365,13 +538,20 @@ export function verifyReproPackage({ cwd, slug: slugValue }) {
     if (!existsSync(abs)) return { path: entry.path, status: 'missing' }
     return { path: entry.path, status: `sha256:${hashFile(abs)}` === entry.sha256 ? 'ok' : 'changed' }
   })
+  // Hashes alone are not verification: a file the current manifest does not list
+  // is still in the directory readers tar and ship. Report it.
+  const listed = new Set(manifest.files.map((entry) => relKey(entry.path)))
+  const leftovers = managedFilesOnDisk(outAbs)
+    .filter((rel) => !listed.has(rel))
+    .map((rel) => ({ path: rel, status: 'not in the package manifest' }))
   return {
     slug: plan.slug,
     path: plan.output_dir,
     built_at: manifest.created_at,
     files: results.length,
     ok: results.filter((entry) => entry.status === 'ok').length,
-    problems: results.filter((entry) => entry.status !== 'ok'),
+    problems: [...results.filter((entry) => entry.status !== 'ok'), ...leftovers],
+    leftover_files: leftovers.map((entry) => entry.path),
     warnings: manifest.warnings || [],
   }
 }
@@ -413,6 +593,25 @@ export function reproDepositPreview(cwd, slugValue) {
   const blockers = []
   if (!metadata.license) blockers.push('license is not stated; Zenodo requires one')
   if (manifest.warnings?.some((warning) => /did not succeed/.test(warning))) blockers.push('an included run did not succeed')
+
+  // A package built before a compliance verdict can still contain the run. Do
+  // not let deposit ship it: re-join the exclusions against the current ledgers.
+  const exclusions = excludedAnalysisRunIndex(cwd)
+  for (const run of manifest.environment?.runs || []) {
+    if (!exclusions.by_run.has(run.run_id)) continue
+    blockers.push(`analysis run ${run.run_id} (${run.slug}) is now excluded by analysis compliance; rebuild the package with overwrite: true before deposit — that removes the artifacts of the previous build, including this run's`)
+  }
+  for (const reference of plan.experiments) {
+    const compliance = experimentCompliance(cwd, reference.slug)
+    if (!compliance.excluded_run_ids.length) continue
+    const runsFile = join(outAbs, 'experiments', `${slugify(reference.slug)}-runs.jsonl`)
+    if (!existsSync(runsFile)) continue
+    const included = new Set(readFileSync(runsFile, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line).run_id))
+    const stillIncluded = compliance.excluded_run_ids.filter((runId) => included.has(runId))
+    if (stillIncluded.length) {
+      blockers.push(`experiment run(s) ${stillIncluded.join(', ')} in "${reference.slug}" are now excluded by analysis compliance; rebuild the package with overwrite: true before deposit — that removes the artifacts of the previous build, including this run's`)
+    }
+  }
   return {
     slug: plan.slug,
     target: 'zenodo',

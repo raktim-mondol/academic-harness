@@ -346,7 +346,7 @@ export function makeCitationKey(record) {
   return key
 }
 
-function sanitizeKey(value) {
+export function sanitizeKey(value) {
   const raw = String(value || '')
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')

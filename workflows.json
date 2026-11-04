@@ -116,6 +116,50 @@
     "requiresFiles": true
   },
   {
+    "id": "limitation-mining",
+    "name": "Mine Method Limitations",
+    "description": "Record source-grounded limitations, remedy families, and coverage for a hypothesis tournament",
+    "category": "paper",
+    "icon": "Search",
+    "prompt": "Load limitation-mining. For tournament {slug}, inspect the authorized source {source}, identify checkable methodological flaws and their verbatim source spans, and propose at least two distinct remedy families per flaw. Record limitations through coscientist action=limitation, verify sufficiency only with a reasoned reading, and report status, coverage, open and exhausted records. Do not invent quotes or treat a logged remedy as evidence that it works.",
+    "suggestedSkills": ["limitation-mining", "co-scientist-tournament"],
+    "placeholders": [{"key":"slug","label":"Tournament slug","required":true},{"key":"source","label":"Hypothesis ID or workspace source","required":true}],
+    "requiresFiles": false
+  },
+  {
+    "id": "subset-first-eval",
+    "name": "Plan a Subset-First Evaluation",
+    "description": "Freeze a benchmark, name and verify the baseline, and plan a subset before full evaluation",
+    "category": "data",
+    "icon": "ListChecks",
+    "prompt": "Load subset-first-eval. For experiment {slug}, clarify question {question}, benchmark datasets, splits, metrics, task rules, protocol, and reproducible sampling. Freeze the plan before outcomes, distinguish reproduced from reported baselines, and use analysis_run and experiment_log for authorized runs and links. Report drift, compliance exclusions, missing results, and sampling limits; request author approval before a full run. Never infer success from missing evidence.",
+    "suggestedSkills": ["subset-first-eval", "experiment-tracking", "reproducible-analysis"],
+    "placeholders": [{"key":"slug","label":"Experiment slug","required":true},{"key":"question","label":"Research question","required":true}],
+    "requiresFiles": false
+  },
+  {
+    "id": "ablation-plan",
+    "name": "Plan an Ablation Grid",
+    "description": "Freeze paired component-removal arms and link their evidence to existing runs",
+    "category": "data",
+    "icon": "ListChecks",
+    "prompt": "Load ablation-attribution. For ablation {slug} and selected idea {idea}, establish the method and question, freeze the reference arm and component-removal grid with datasets, directed metrics, expected changes, and replicates. Record links to existing experiment_log or hashed analysis_run records; ablation does not execute experiments. Report paired deltas, ties, missing cells, advisory attribution, and the human verdict when recorded. Never invent values or prune to hide evidence.",
+    "suggestedSkills": ["ablation-attribution"],
+    "placeholders": [{"key":"slug","label":"Ablation slug","required":true},{"key":"idea","label":"Selected idea ID","required":true}],
+    "requiresFiles": false
+  },
+  {
+    "id": "review-round-diff",
+    "name": "Compare Review Rounds",
+    "description": "Compare stored deep-review rounds and distinguish revision closure from reviewer variance",
+    "category": "paper",
+    "icon": "ClipboardCheck",
+    "prompt": "Load deep-review. For manuscript {manuscript}, inspect stored review rounds and use deep_review action=compare to compare the selected rounds. Report new, persistent, and closed findings with source anchors, evaluator provenance, and the identical-manuscript reviewer-variance caveat. A closed finding is a lead, not proof of correction. Do not start a new review without the user's approval; when reviewer responses are requested, hand off to rebuttal-experiments and the author-controlled writing engine where applicable.",
+    "suggestedSkills": ["deep-review", "rebuttal-experiments"],
+    "placeholders": [{"key":"manuscript","label":"Manuscript path","required":true}],
+    "requiresFiles": false
+  },
+  {
     "id": "rebuttal-plan",
     "name": "Plan a Rebuttal Ledger",
     "description": "Coverage ledger over reviewer points: import, plan capped supplementary stubs, link existing runs, record answers and declines, read coverage",

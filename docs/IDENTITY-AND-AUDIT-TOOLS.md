@@ -53,6 +53,8 @@ Static reproducibility checklist (README, LICENSE, environment file, tests, CI, 
 
 - Code is not executed unless `run_tests: true`.
 - `GITHUB_TOKEN` (env only) is optional for API metadata.
+- `action: "probe"` is the cheap precursor: it looks for a runnable benchmark entrypoint (package/pyproject scripts, Makefile targets, top-level run/eval/benchmark scripts, Docker CMD, and README commands) and reports `runnable: yes|no|unknown`, `has_benchmark_entrypoint`, and `offers_re_execution: yes|maybe|no`. It executes nothing; a `no` means `analysis_run action=expect`/`verify_scores` is not offered yet.
+- `action: "align"` maps method-section anchors to verified `file:line`: pass `anchors: [{id?, kind: equation|symbol|constant|default|other, text|pattern, file?, claim?}]`; each anchor is `verified` (exactly one match), `ambiguous` (several, so narrow it), `missing`, or `not_checked` (invalid pattern, a file that was not scanned, or a pattern that exceeded its time budget). Each verified match yields a `bind_calls` entry `{claim, source, lines}` for `ah_claims_bind`. It writes nothing and never edits the manuscript; a match is a location, not a semantic proof that the code implements the method. Scans are confined to the repository, skip symlinks and oversized files (reported as `skipped_files`), and run caller-supplied patterns in a vm with a hard timeout so a catastrophic regex is reported, not hung.
 
 ### `grant_search`
 

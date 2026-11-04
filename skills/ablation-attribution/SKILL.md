@@ -2,7 +2,7 @@
 name: ablation-attribution
 description: Use when a paper or method claims a gain from a component and you need a frozen removal grid, records linked to hashed runs, paired deltas against a reference, and an advisory attribution reading with a human verdict. Covers start, plan, record, report, verdict, prune, show, status, and export.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

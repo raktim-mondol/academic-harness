@@ -38,7 +38,8 @@ function renderRunLine(run) {
   const staged = run.role ? ` · ${run.role}${run.baseline_ref ? `/${run.baseline_ref}` : ''}${run.stage ? `/${run.stage}` : ''}` : ''
   const drift = run.spec_drift?.state === 'drift' ? ' · SPEC DRIFT' : ''
   const verdict = run.verdict?.verdict ? ` · verdict ${run.verdict.verdict}` : ''
-  return `- ${run.run_id} · ${run.ts}${run.seed != null ? ` · seed ${run.seed}` : ''}${params ? ` · ${params}` : ''}${metrics ? ` · ${metrics}` : ''}${staged}${drift}${verdict}${run.artifacts?.length ? ` · ${run.artifacts.length} artifact(s)` : ''}`
+  const excluded = run.excluded ? ' · EXCLUDED (compliance)' : ''
+  return `- ${run.run_id} · ${run.ts}${run.seed != null ? ` · seed ${run.seed}` : ''}${params ? ` · ${params}` : ''}${metrics ? ` · ${metrics}` : ''}${staged}${drift}${verdict}${excluded}${run.artifacts?.length ? ` · ${run.artifacts.length} artifact(s)` : ''}`
 }
 
 function renderValue(value) {
@@ -75,6 +76,9 @@ function renderValue(value) {
       if (value.comparison.grouped) {
         lines.push('', `Grouped by param "${value.field}":`, ...value.comparison.grouped.map((group) => `- ${group.value}: ${group.runs} run(s)`))
       }
+      if (value.comparison.compliance?.excluded_run_ids.length) {
+        lines.push('', `Excluded by compliance: ${value.comparison.compliance.excluded_run_ids.join(', ')}`)
+      }
       return [{ type: 'text', text: lines.join('\n') }]
     }
     case 'best': {
@@ -85,6 +89,7 @@ function renderValue(value) {
           renderRunLine(value.best.run),
         )
         if (value.best.tied_runs.length > 1) lines.push(`Tied runs: ${value.best.tied_runs.join(', ')}`)
+        if (value.best.excluded_run_ids?.length) lines.push(`Excluded by compliance: ${value.best.excluded_run_ids.join(', ')}`)
       }
       if (value.dominance) {
         if (lines.length) lines.push('')
@@ -96,6 +101,9 @@ function renderValue(value) {
         if (value.dominance.dominated.length) lines.push(`Dominated: ${value.dominance.dominated.join(', ')}`)
         if (value.dominance.incomplete.length) {
           lines.push(`Incomplete (missing metrics, not ranked): ${value.dominance.incomplete.map((entry) => `${entry.run_id} (${entry.missing.join(', ')})`).join('; ')}`)
+        }
+        if (value.dominance.excluded?.length) {
+          lines.push(`Excluded by compliance: ${value.dominance.excluded.map((entry) => entry.run_id).join(', ')}`)
         }
         lines.push(value.dominance.note)
       }
@@ -120,6 +128,7 @@ function renderValue(value) {
       if (s.baseline_runs?.length) lines.push(`Baselines: ${s.baseline_runs.map((entry) => `${entry.run_id} (${entry.baseline_ref || '?'})`).join(', ')}.`)
       if (s.spec_drift_runs?.length) lines.push(`Spec drift: ${s.spec_drift_runs.map((entry) => `${entry.run_id} (${entry.changed.join(', ') || 'digest'})`).join(', ')}.`)
       if (s.latest_verdict) lines.push(`Latest verdict: ${s.latest_verdict.run_id} ${s.latest_verdict.verdict}${s.latest_verdict.forced ? ' (forced)' : ''}.`)
+      if (s.compliance?.excluded_run_ids?.length) lines.push(`Excluded by compliance: ${s.compliance.excluded_run_ids.join(', ')}.`)
       return [{ type: 'text', text: lines.join('\n') }]
     }
     case 'list':
@@ -250,7 +259,7 @@ export function apply(ctx) {
     description: [
       'Keep an experiment registry under `.dsh/experiments/<slug>/` for sweeps, simulations, pilots, and model comparisons that are not a single pre-registered analysis (use `analysis_run` for that).',
       'Actions: `start` (question, named metrics with higher/lower directions, an optional benchmark spec — datasets, splits, baseline_arm, task_rules — and an optional protocol: eval_script + metric_params; write-once unless `resume: true`), `log` (append a run: params, metrics, hashed workspace artifacts, seed, parent, environment; staged runs add role baseline|variant, baseline_ref reproduced|reported, stage subset|slice|full, a sampling rule, and a protocol whose SHA-256 is checked against the matching baseline as spec_drift; a rerun is a new run — nothing is deduplicated), `compare` (all runs, best per named metric, optional grouping by a param `field`), `best` (by an explicit `metric` and `direction`, and/or `dominance: true` for the multi-metric Pareto front), `verdict` (advisory human decision good|engineer|bad with reason, engineering_round, and budget; a budget-exhausted engineer is recorded force-bad), `link` (run → notebook/scientific_result/analysis_run/experiment_run/paper/review id), `status`, `list`, `show`, `export` (csv, json, markdown, or MLflow-compatible json).',
-      'Missing metrics stay blank, never zero. Artifact paths are workspace-confined and hashed. A baseline_run with a protocol_digest is the reference for later staged runs; a variant must name a matching baseline_ref, and a changed eval script or metric parameters is reported as spec_drift, not silently accepted. The tool records logged values and human verdicts and makes no scientific claim about them. Load the `experiment-tracking` skill for the workflow.',
+      'Missing metrics stay blank, never zero. Artifact paths are workspace-confined and hashed. A baseline_run with a protocol_digest is the reference for later staged runs; a variant must name a matching baseline_ref, and a changed eval script or metric parameters is reported as spec_drift, not silently accepted. A run linked to an `analysis_run` that failed its frozen task rules is excluded from `best` and `dominance` (the analysis ledger owns that check); the run stays visible with its exclusion. The tool records logged values and human verdicts and makes no scientific claim about them. Load the `experiment-tracking` skill for the workflow.',
     ].join(' '),
     parameters: {
       action: { type: 'string', enum: ACTIONS, description: 'start, log, compare, best, verdict, link, status, list, show, or export. Default status.' },

@@ -361,6 +361,8 @@ Specialist: `peer-reviewer`, `statistician`, or the method's domain reviewer. Ru
 this when a hypothesis's method, not just its wording, has a checkable weakness:
 a pooled readout, an evaluator changed between arms, an equation that assumes away
 the condition of interest, a benchmark that cannot show the claimed effect.
+The `limitation-mining` skill gives the full ledger workflow; retain the
+source span and leave exhausted or unverified records visible.
 
 > Read METHOD SOURCE: `<hypothesis id or workspace file>` and the ranked
 > hypotheses in `<slug>`. Identify one methodological flaw that is **checkable from

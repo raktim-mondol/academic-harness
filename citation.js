@@ -4,8 +4,8 @@
  * All parsing/formatting is local (citation-format.js). Network is used only
  * for DOI input (Crossref content negotiation) and optional DOI checks.
  */
-import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
-import { basename, isAbsolute, join, relative, resolve } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
@@ -16,17 +16,33 @@ import { libraryRecords } from './papermemory-library.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
 import { resolveBibtexForIdentifier } from './bibtex-resolve.js'
+import { resolveWorkspacePath as resolveWritePath } from './workspace-path.js'
 import { auditReferences } from './citation-audit.js'
 import { runIntegrityCheck } from './integrity-check.js'
 import { extractMarkdownCitations, extractTexCitations } from './manuscript-citations.js'
 import {
-  SUPPORTED_STYLES, formatBibliography, formatCitations, normalizeCsl,
-  parseBibtex, parseInput, registerCslStyle, toBibtex, toRis, validateRecords,
+  SUPPORTED_STYLES, assignCitationKeys, formatBibliography, formatCitations, normalizeCsl,
+  parseBibtex, parseInput, registerCslStyle, sanitizeKey, toBibtex, toRis, validateRecords,
 } from './citation-format.js'
 
 const CROSSREF_WORKS = 'https://api.crossref.org/works'
 const MAX_INPUT_BYTES = 10 * 1024 * 1024
 const MAX_CSTYLE_BYTES = 1024 * 1024
+const MAX_REPAIR = 100
+const REPAIR_CODES = new Set([
+  'doi_not_registered', 'invalid_doi', 'title_mismatch', 'year_mismatch',
+  'venue_mismatch', 'first_author_mismatch',
+])
+const INTEGRITY_CODES = new Set(['retracted', 'expression_of_concern', 'corrected'])
+// A bare substring match only counts when the shorter title carries enough of
+// its own to identify a paper; "Housing" does not.
+const TITLE_CONTAINMENT_MIN_TOKENS = 3
+const TITLE_CONTAINMENT_MIN_MEANINGFUL = 2
+const TITLE_STOPWORDS = new Set(['a', 'an', 'the', 'on', 'of', 'for', 'and', 'in', 'to', 'with', 'from', 'by', 'at', 'is', 'are', 'as'])
+
+function text(value) {
+  return String(value ?? '').trim()
+}
 
 function privateIpv4(address) {
   const match = String(address || '').match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
@@ -218,7 +234,8 @@ function readWorkspaceText(cwd, path) {
 }
 
 function writeWorkspaceText(cwd, path, body) {
-  const target = resolveWorkspacePath(cwd, path)
+  const target = resolveWritePath(cwd, path, { forWrite: true })
+  mkdirSync(dirname(target), { recursive: true })
   writeFileSync(target, body)
   return target
 }
@@ -269,18 +286,43 @@ async function fetchCrossrefWork(doi, exec) {
   return { ok: true, work: result.data?.message || null }
 }
 
-/** Token-overlap check used by optional DOI verification. */
+function titleTokens(value) {
+  return String(value || '').split(/\s+/).filter(Boolean)
+}
+
+/** True when `shorter` sits inside `longer` and carries enough of its own to name a paper. */
+function containedTitle(shorter, longer) {
+  if (!longer.includes(shorter)) return false
+  const tokens = titleTokens(shorter)
+  if (tokens.length >= TITLE_CONTAINMENT_MIN_TOKENS) return true
+  return tokens.filter((token) => !TITLE_STOPWORDS.has(token)).length >= TITLE_CONTAINMENT_MIN_MEANINGFUL
+}
+
+/**
+ * Token-overlap check used by optional DOI verification and the repair title gate.
+ * A pair that cannot be compared — either side empty, or either side normalizes to
+ * nothing, as a Chinese/Arabic/Cyrillic title does — is never a match: unknown is
+ * reported as unverified, never clean.
+ */
 export function titleMatches(expected, actual) {
   const a = normalizeTitle(expected)
   const b = normalizeTitle(actual)
-  if (!a || !b) return true
-  if (a === b || a.includes(b) || b.includes(a)) return true
-  const aTokens = a.split(/\s+/).filter(Boolean)
-  const bTokens = b.split(/\s+/).filter(Boolean)
-  if (!aTokens.length || !bTokens.length) return true
+  if (!a || !b) return false
+  if (a === b) return true
+  if (containedTitle(a, b) || containedTitle(b, a)) return true
+  const aTokens = titleTokens(a)
+  const bTokens = titleTokens(b)
   const set = new Set(aTokens)
   const overlap = bTokens.filter((token) => set.has(token)).length
   return overlap / Math.max(aTokens.length, bTokens.length) >= 0.6
+}
+
+/** True when both titles exist and both survive lexical normalization. */
+function comparableTitles(expected, actual) {
+  const a = String(expected || '').trim()
+  const b = String(actual || '').trim()
+  if (!a || !b) return false
+  return Boolean(normalizeTitle(a)) && Boolean(normalizeTitle(b))
 }
 
 async function loadRecords(args, exec) {
@@ -316,27 +358,42 @@ async function loadRecords(args, exec) {
   throw new Error('give records, doi, text, path, or library')
 }
 
-async function checkDois(records, exec) {
+async function checkDois(records, exec, deps = {}) {
+  const fetchWork = deps.fetchCrossref || ((doi) => fetchCrossrefWork(doi, exec))
   const warnings = []
   const checked = []
+  const unverified = []
   const seen = new Set()
   for (const record of records) {
     const doi = canonicalDoi(record.DOI)
     if (!doi || seen.has(doi)) continue
     seen.add(doi)
-    const result = await fetchCrossrefWork(doi, exec)
+    const result = await fetchWork(doi)
     if (!result.ok) {
       warnings.push(`${doi}: Crossref lookup failed (${result.error || `HTTP ${result.status}`}); DOI existence is unverified`)
+      unverified.push(doi)
       continue
     }
     const published = result.work?.title?.[0] || result.work?.title || ''
-    if (record.title && published && !titleMatches(record.title, published)) {
+    if (record.title && published && !comparableTitles(record.title, published)) {
+      warnings.push(`${doi}: the Crossref title "${published}" and the cited title "${record.title}" could not be compared lexically; the DOI resolved, but the title match is unverified`)
+      unverified.push(doi)
+    } else if (record.title && published && !titleMatches(record.title, published)) {
       warnings.push(`${doi}: Crossref title "${published}" does not match "${record.title}"`)
     } else {
       checked.push(doi)
     }
   }
-  return { warnings, checked }
+  return { warnings, checked, unverified }
+}
+
+/** What the writer actually did to this record's citation key, in the emitted .bib. */
+function repairedKeyNote(reference) {
+  if (reference.key_preserved) return ''
+  if (reference.key_suffixed) {
+    return ` — key renamed to ${reference.grounded_key} to avoid a duplicate citation key; re-check every \\cite{${reference.unchanged_key}}`
+  }
+  return ' — key changed, re-check citations'
 }
 
 function renderCitation(value) {
@@ -362,7 +419,26 @@ function renderCitation(value) {
       lines.push(`- DUPLICATE ${duplicate.field} "${duplicate.value}": ${duplicate.entries.join(', ')}`)
     }
     if (value.doi_checks?.length) lines.push(`- DOI checks passed: ${value.doi_checks.join(', ')}`)
+    if (value.doi_unverified?.length) lines.push(`- DOI checks unverified (a lookup failed or the titles could not be compared; not a pass): ${value.doi_unverified.join(', ')}`)
     if (!value.errors.length && !value.warnings.length && !value.duplicates.length) lines.push('- No issues found.')
+    return [{ type: 'text', text: lines.join('\n') }]
+  }
+  if (value.action === 'repair') {
+    const lines = [
+      `Citation repair: ${value.count} record(s) · ${value.targets} target(s) · ${value.repaired} repaired · ${value.unresolved} unresolved · ${value.skipped} skipped.`,
+    ]
+    for (const ref of value.references.slice(0, 30)) {
+      if (ref.status === 'repaired') {
+        const changes = Object.entries(ref.changes || {}).map(([field, change]) => field).join(', ')
+        lines.push(`- repaired ${ref.key}: ${ref.grounded?.title || ''}${ref.grounded?.doi ? ` (${ref.grounded.doi})` : ''} via ${ref.source}${changes ? ` — changed ${changes}` : ''}${repairedKeyNote(ref)}`)
+      } else if (ref.status === 'unresolved') {
+        lines.push(`- unresolved ${ref.key}: ${ref.reason}${ref.rejected?.length ? ` (tried: ${ref.rejected.map((entry) => entry.identifier).join('; ')})` : ''}`)
+      } else if (ref.status === 'skipped') {
+        lines.push(`- skipped ${ref.key}: ${ref.reason}`)
+      }
+    }
+    if (value.references.length > 30) lines.push(`- …${value.references.length - 30} more in the sidecar`)
+    lines.push('', `Wrote ${value.output_path} and ${value.sidecar_path}.`, value.note)
     return [{ type: 'text', text: lines.join('\n') }]
   }
   if (value.output_path) {
@@ -377,10 +453,301 @@ function renderCitation(value) {
   return [{ type: 'text', text: body || 'No citation output.' }]
 }
 
+function repairNeed(reference) {
+  const codes = [...new Set((reference.findings || []).map((finding) => finding.code))]
+  if (codes.includes('retracted')) {
+    return { needed: false, codes: ['retracted'], reason: 'recorded as retracted; metadata repair is not the remedy' }
+  }
+  const repairable = codes.filter((code) => REPAIR_CODES.has(code))
+  if (repairable.length) return { needed: true, codes: repairable }
+  const integrity = codes.filter((code) => INTEGRITY_CODES.has(code))
+  if (integrity.length) return { needed: false, codes: integrity, reason: `recorded integrity finding (${integrity.join(', ')}), not a metadata mismatch` }
+  return { needed: false, codes, reason: 'no repairable mismatch was recorded' }
+}
+
+function repairCandidates(original, codes) {
+  const identifiers = []
+  const doi = canonicalDoi(original.DOI)
+  const title = String(original.title || '').trim()
+  const titleFirst = codes.includes('title_mismatch')
+  if (titleFirst && title) identifiers.push(title)
+  if (doi && !codes.includes('doi_not_registered')) identifiers.push(doi)
+  if (!titleFirst && title) identifiers.push(title)
+  if (doi && !identifiers.includes(doi)) identifiers.push(doi)
+  return identifiers
+}
+
+function repairYear(record) {
+  const parts = record?.issued?.['date-parts']?.[0]
+  return Number(Array.isArray(parts) ? parts[0] : null) || null
+}
+
+function repairFamily(record) {
+  const author = record?.author?.[0]
+  return String(author?.family || author?.literal || '').trim().toLowerCase()
+}
+
+function repairVenue(record) {
+  return String(record?.['container-title'] || '').trim().toLowerCase()
+}
+
+/** Fields the grounded record agrees with the cited record on, besides the title. */
+function corroborateRepair(original, candidate) {
+  const matched = []
+  const citedFamily = repairFamily(original)
+  const foundFamily = repairFamily(candidate)
+  if (citedFamily && foundFamily && (citedFamily === foundFamily
+    || (Math.min(citedFamily.length, foundFamily.length) >= 3
+      && (citedFamily.includes(foundFamily) || foundFamily.includes(citedFamily))))) {
+    matched.push('first_author')
+  }
+  const citedYear = repairYear(original)
+  const foundYear = repairYear(candidate)
+  if (citedYear && foundYear && citedYear === foundYear) matched.push('issued')
+  const citedVenue = repairVenue(original)
+  const foundVenue = repairVenue(candidate)
+  if (citedVenue && foundVenue && titleMatches(citedVenue, foundVenue)) matched.push('container-title')
+  return matched
+}
+
+/**
+ * The repair title gate. `basis` says how the title evidence was obtained:
+ * `doi_identity` (the grounded DOI is the cited DOI), `exact_title` (the titles are
+ * the same string once normalized, or exactly the same where normalization yields
+ * nothing), or `title_match` (lexical overlap only). A pair whose titles cannot be
+ * compared never passes.
+ */
+function acceptableRepair(original, candidate) {
+  const originalTitle = String(original.title || '').trim()
+  const candidateTitle = String(candidate.title || '').trim()
+  const originalDoi = canonicalDoi(original.DOI)
+  const candidateDoi = canonicalDoi(candidate.DOI)
+  const sameDoi = Boolean(originalDoi) && originalDoi === candidateDoi
+  if (!candidateTitle) return { ok: false, reason: 'the grounded record has no title' }
+  if (!originalTitle) {
+    if (sameDoi) return { ok: true, basis: 'doi_identity' }
+    return { ok: false, reason: 'the cited record has no title, so a different grounding cannot be verified' }
+  }
+  const normalizedOriginal = normalizeTitle(originalTitle)
+  const normalizedCandidate = normalizeTitle(candidateTitle)
+  if (!normalizedOriginal || !normalizedCandidate) {
+    // A non-Latin title normalizes to nothing; the helper refuses such a pair, so
+    // fall back to exact casing/space comparison rather than letting an
+    // incomparable title accept any paper.
+    return originalTitle === candidateTitle
+      ? { ok: true, basis: 'exact_title' }
+      : { ok: false, reason: `the grounded title "${candidateTitle}" does not match "${originalTitle}" (titles could not be compared lexically)` }
+  }
+  if (!titleMatches(originalTitle, candidateTitle)) {
+    return { ok: false, reason: `the grounded title "${candidateTitle}" does not match "${originalTitle}"` }
+  }
+  if (sameDoi) return { ok: true, basis: 'doi_identity' }
+  return { ok: true, basis: normalizedOriginal === normalizedCandidate ? 'exact_title' : 'title_match' }
+}
+
+async function repairReferences(records, audit, { resolveBibtex, maxRepair }) {
+  const outputs = []
+  const repairedRecords = [...records]
+  let repaired = 0
+  let unresolved = 0
+  let skipped = 0
+  let attempted = 0
+
+  audit.references.forEach((reference, index) => {
+    const original = records[index]
+    if (!original) {
+      skipped += 1
+      outputs.push({ key: reference.key, index, status: 'skipped', codes: [], reason: 'no matching input record' })
+      return
+    }
+    const need = repairNeed(reference)
+    if (!need.needed) {
+      skipped += 1
+      outputs.push({
+        key: reference.key,
+        index,
+        status: 'skipped',
+        codes: need.codes,
+        reason: need.reason,
+        original: { doi: canonicalDoi(original.DOI) || null, title: original.title || null },
+      })
+      return
+    }
+    outputs.push({ key: reference.key, index, status: 'pending', codes: need.codes })
+  })
+
+  for (const outcome of outputs) {
+    if (outcome.status !== 'pending') continue
+    if (attempted >= maxRepair) {
+      outcome.status = 'skipped'
+      outcome.reason = `over the ${maxRepair}-reference repair cap`
+      skipped += 1
+      continue
+    }
+    attempted += 1
+    const original = records[outcome.index]
+    const identifiers = repairCandidates(original, outcome.codes)
+    const originalDoi = canonicalDoi(original.DOI)
+    const rejected = []
+    let resolved = null
+    for (const identifier of identifiers) {
+      let value
+      try {
+        value = await resolveBibtex(identifier)
+      } catch (error) {
+        rejected.push({ identifier, reason: error instanceof Error ? error.message : String(error) })
+        continue
+      }
+      if (!value?.bibtex) {
+        rejected.push({ identifier, reason: 'no grounded BibTeX was returned' })
+        continue
+      }
+      let parsed
+      try {
+        parsed = parseBibtex(value.bibtex)
+      } catch (error) {
+        rejected.push({ identifier, reason: `grounded BibTeX did not parse (${error instanceof Error ? error.message : String(error)})` })
+        continue
+      }
+      if (!parsed.length) {
+        rejected.push({ identifier, reason: 'grounded BibTeX had no record' })
+        continue
+      }
+      const candidate = parsed[0]
+      const check = acceptableRepair(original, candidate)
+      if (!check.ok) {
+        rejected.push({ identifier, reason: check.reason })
+        continue
+      }
+      // A title-only acceptance is not identity when the cited record carries a
+      // registered DOI: the grounded record must also agree on author, year, or venue.
+      const requiresCorroboration = Boolean(originalDoi) && check.basis !== 'doi_identity'
+      const corroboratedBy = check.basis === 'doi_identity'
+        ? ['doi']
+        : requiresCorroboration ? corroborateRepair(original, candidate) : []
+      if (requiresCorroboration && !corroboratedBy.length) {
+        rejected.push({
+          identifier,
+          reason: `the grounded title "${candidate.title}" resembles the cited title, but neither the first author, the year, nor the venue corroborates it; not accepted on title alone`,
+        })
+        continue
+      }
+      const confirmed = check.basis === 'doi_identity' || corroboratedBy.length > 0
+      const candidateResolution = {
+        record: candidate,
+        source: value.source || 'lookup',
+        identifier,
+        basis: check.basis,
+        corroboratedBy,
+        confirmed,
+        rank: confirmed ? 2 : (check.basis === 'exact_title' ? 1 : 0),
+      }
+      if (!resolved || candidateResolution.rank > resolved.rank) resolved = candidateResolution
+      // Only a corroborated acceptance ends the search; a weaker one stays open so a
+      // later identifier (usually the DOI) can supersede it.
+      if (confirmed) break
+    }
+    if (!resolved) {
+      unresolved += 1
+      Object.assign(outcome, {
+        status: 'unresolved',
+        reason: 'no live lookup produced a record whose title matches the cited paper',
+        rejected,
+        original: { doi: canonicalDoi(original.DOI) || null, title: original.title || null },
+      })
+      continue
+    }
+    const replacement = { ...resolved.record }
+    const originalKey = text(original['citation-key'])
+    if (originalKey) replacement['citation-key'] = originalKey
+    if (original.id && !replacement.id) replacement.id = original.id
+    repairedRecords[outcome.index] = replacement
+    repaired += 1
+    const changes = {}
+    for (const [field, value] of Object.entries({
+      DOI: replacement.DOI ?? null,
+      title: replacement.title ?? null,
+      issued: replacement.issued ?? null,
+      'container-title': replacement['container-title'] ?? null,
+      author: replacement.author?.map((author) => author.family || author.literal).filter(Boolean) ?? null,
+    })) {
+      const before = field === 'author'
+        ? (original.author || []).map((author) => author.family || author.literal).filter(Boolean)
+        : (original[field] ?? null)
+      if (JSON.stringify(before) !== JSON.stringify(value)) changes[field] = { from: before, to: value }
+    }
+    Object.assign(outcome, {
+      status: 'repaired',
+      source: resolved.source,
+      matched_identifier: resolved.identifier,
+      title_basis: resolved.basis,
+      corroborated_by: resolved.corroboratedBy,
+      unchanged_key: originalKey || null,
+      original: { doi: canonicalDoi(original.DOI) || null, title: original.title || null },
+      grounded: {
+        doi: canonicalDoi(replacement.DOI) || null,
+        title: replacement.title || null,
+        issued: replacement.issued ?? null,
+      },
+      changes,
+      rejected,
+    })
+  }
+
+  // `toBibtex` writes the emitter's own keys: assignCitationKeys suffixes any key two
+  // entries share (the duplicate citation-key case the audit reports). Report the key
+  // actually emitted, so `key_preserved` cannot claim a key the new .bib renamed.
+  const emittedKeys = assignCitationKeys(repairedRecords).map((record) => record['citation-key'] || null)
+  for (const outcome of outputs) {
+    if (outcome.status !== 'repaired') continue
+    const originalKey = outcome.unchanged_key || ''
+    const emitted = emittedKeys[outcome.index] || null
+    outcome.grounded_key = emitted
+    outcome.key_preserved = Boolean(originalKey) && emitted === originalKey
+    outcome.key_suffixed = !outcome.key_preserved && Boolean(originalKey) && sanitizeKey(originalKey) === originalKey
+    if (!outcome.key_preserved) {
+      outcome.key_reason = outcome.key_suffixed
+        ? `the emitted key "${emitted}" was suffixed to avoid a duplicate citation key; \\cite{${originalKey}} in the manuscript now points elsewhere`
+        : (originalKey
+          ? `the emitted key "${emitted}" replaces the cited key "${originalKey}"`
+          : `the cited record had no citation key; the emitted key is "${emitted}"`)
+    }
+  }
+
+  return { repairedRecords, outcomes: outputs, counts: { targets: attempted, repaired, unresolved, skipped } }
+}
+
+function repairSource(args) {
+  if (Array.isArray(args.records) && args.records.length) return '(records)'
+  if (args.library) return '(library)'
+  if (typeof args.identifier === 'string' && args.identifier.trim()) return args.identifier.trim()
+  if (args.doi) return '(doi)'
+  if (typeof args.text === 'string' && args.text.trim()) return '(text)'
+  if (typeof args.path === 'string' && args.path.trim()) return args.path.trim()
+  return '(records)'
+}
+
+async function checkCitations(records, args, deps, exec) {
+  let citedKeys = null
+  if (typeof args.manuscript === 'string' && args.manuscript.trim()) {
+    const source = readWorkspaceText(workspaceRoot(exec), args.manuscript)
+    const cited = /\.(md|markdown|qmd|rmd)$/i.test(args.manuscript) ? extractMarkdownCitations(source) : extractTexCitations(source)
+    citedKeys = cited.nociteAll ? null : new Set(cited.keys.keys())
+  }
+  return await auditReferences(records, {
+    fetchCrossref: deps.fetchCrossref || ((doi) => fetchCrossrefWork(doi, exec)),
+    integrity: deps.integrity || ((doi) => runIntegrityCheck({ doi }, exec).catch((error) => ({ error: error.message }))),
+    titleMatches,
+    citedKeys,
+    style: args.style || 'apa',
+    maxAudit: args.max_audit,
+  })
+}
+
 export async function runCitation(args, exec, deps = {}) {
   const action = args.action || 'format'
-  if (!['format', 'bibtex', 'ris', 'validate', 'audit'].includes(action)) {
-    throw new Error('action must be format, bibtex, ris, validate, or audit')
+  if (!['format', 'bibtex', 'ris', 'validate', 'audit', 'repair'].includes(action)) {
+    throw new Error('action must be format, bibtex, ris, validate, audit, or repair')
   }
   if ((args.style_file || args.style_url) && action !== 'format') {
     throw new Error('style_file/style_url apply to action=format only')
@@ -405,9 +772,9 @@ export async function runCitation(args, exec, deps = {}) {
 
   if (action === 'validate') {
     const result = validateRecords(records)
-    let doiCheck = { warnings: [], checked: [] }
+    let doiCheck = { warnings: [], checked: [], unverified: [] }
     if (args.check_dois) {
-      doiCheck = await checkDois(result.entries, exec)
+      doiCheck = await checkDois(result.entries, exec, deps)
     }
     return {
       action,
@@ -416,25 +783,61 @@ export async function runCitation(args, exec, deps = {}) {
       warnings: [...result.warnings, ...doiCheck.warnings],
       duplicates: result.duplicates,
       doi_checks: doiCheck.checked,
+      doi_unverified: doiCheck.unverified,
     }
   }
 
   if (action === 'audit') {
-    let citedKeys = null
-    if (typeof args.manuscript === 'string' && args.manuscript.trim()) {
-      const source = readWorkspaceText(workspaceRoot(exec), args.manuscript)
-      const cited = /\.(md|markdown|qmd|rmd)$/i.test(args.manuscript) ? extractMarkdownCitations(source) : extractTexCitations(source)
-      citedKeys = cited.nociteAll ? null : new Set(cited.keys.keys())
-    }
-    const audit = await auditReferences(records, {
-      fetchCrossref: deps.fetchCrossref || ((doi) => fetchCrossrefWork(doi, exec)),
-      integrity: deps.integrity || ((doi) => runIntegrityCheck({ doi }, exec).catch((error) => ({ error: error.message }))),
-      titleMatches,
-      citedKeys,
-      style: args.style || 'apa',
-      maxAudit: args.max_audit,
-    })
+    const audit = await checkCitations(records, args, deps, exec)
     return { action, count: records.length, manuscript: args.manuscript || null, ...audit }
+  }
+
+  if (action === 'repair') {
+    const cwd = workspaceRoot(exec)
+    const outputPath = typeof args.output_path === 'string' ? args.output_path.trim() : ''
+    if (!outputPath) throw new Error('repair needs output_path for the new .bib; the input file is never overwritten')
+    const inputAbs = typeof args.path === 'string' && args.path.trim() ? resolveReadPath(cwd, args.path) : null
+    const inputReal = inputAbs && existsSync(inputAbs) ? realpathSync(inputAbs) : inputAbs
+    const outputAbs = resolveWritePath(cwd, outputPath, { forWrite: true })
+    if (inputReal && inputReal === outputAbs) throw new Error('repair writes a new .bib; output_path must differ from the input path')
+    if (existsSync(outputAbs) && !args.overwrite) throw new Error(`${outputPath} already exists; pass overwrite: true`)
+    const sidecarPath = outputPath.replace(/\.bib$/i, '') + '.repair.json'
+    const sidecarAbs = resolveWritePath(cwd, sidecarPath, { forWrite: true })
+    if (sidecarAbs === outputAbs) throw new Error('repair sidecar would overwrite output_path; choose another output_path')
+    if (inputReal && sidecarAbs === inputReal) throw new Error('repair sidecar would overwrite the input bibliography; choose another output_path')
+    if (existsSync(sidecarAbs) && !args.overwrite) throw new Error(`${sidecarPath} already exists; pass overwrite: true`)
+    const maxRepair = Math.min(Math.max(Number(args.max_repair) || 25, 1), MAX_REPAIR)
+    const audit = await checkCitations(records, args, deps, exec)
+    const resolveBibtex = deps.resolveBibtex || ((identifier) => resolveBibtexForIdentifier(identifier, { signal: exec?.signal }))
+    const { repairedRecords, outcomes, counts } = await repairReferences(records, audit, { resolveBibtex, maxRepair })
+    const bibtex = toBibtex(repairedRecords)
+    writeWorkspaceText(cwd, outputPath, `${bibtex}\n`)
+    const sidecar = {
+      schema_version: 1,
+      tool: 'citation',
+      action: 'repair',
+      generated_at: new Date().toISOString(),
+      source: repairSource(args),
+      output_path: outputPath,
+      max_repair: maxRepair,
+      counts,
+      normalized: true,
+      note: 'The input bibliography was not modified. A record was replaced only when the grounded title matches the cited paper (never on a bare substring of a short title, and never where the titles cannot be compared) and, when the cited record carries a registered DOI, the grounded author, year, or venue corroborates it; every unresolved record is reported, never guessed. The new .bib is re-serialized from parsed records, so fields the exporter cannot represent may be dropped and a citation key shared by two entries is suffixed; the sidecar reports the key actually emitted. The original file remains the reference for those fields. A repair corrects metadata, not whether the reference supports the claim.',
+      references: outcomes.map((outcome) => {
+        const { index, ...rest } = outcome
+        return rest
+      }),
+    }
+    writeWorkspaceText(cwd, sidecarPath, `${JSON.stringify(sidecar, null, 2)}\n`)
+    return {
+      action,
+      count: records.length,
+      ...counts,
+      output_path: outputPath,
+      sidecar_path: sidecarPath,
+      references: sidecar.references,
+      note: sidecar.note,
+    }
   }
 
   if (action === 'bibtex' || action === 'ris') {
@@ -470,12 +873,13 @@ export function apply(ctx) {
       'Format, export, or validate citations and bibliographies.',
       '`format` renders a bibliography in APA (default), Vancouver, Harvard, IEEE, Chicago author-date, or MLA, with optional in-text markers. A custom CSL style can be loaded from a workspace `style_file` or an http(s) `style_url`; it is validated, cached under `.dsh/styles/`, and used for this call. `bibtex` and `ris` produce reference-manager files from records, BibTeX/RIS text, DOIs, or a single `identifier` (DOI → arXiv → INSPIRE → S2 → synthesized). `validate` reports missing fields, duplicate DOIs/keys, and optionally checks each DOI against Crossref. `audit` is the batch check for a manuscript or .bib: per-reference DOI validity, Crossref metadata match (title/year/venue/first author), retraction/concern/correction status via integrity_check, duplicates, missing fields, uncited entries (with `manuscript`), and style fit, each with a suggested fix. Audit does not check that a reference supports the claim it is cited for; unknown is reported as unverified, never clean.',
       'Accepts CSL-JSON records, BibTeX, RIS, a workspace path, `library` (papers from the PaperMemory reference library, under its own keys; to write a project .bib use `papermemory_library` export), or `identifier` for one canonical entry. Use paper_get when you need a merged paper record rather than a citation. No key; set CROSSREF_MAILTO (or UNPAYWALL_EMAIL) for the Crossref polite pool. Use this instead of hand-writing bibliography entries or citation keys.',
+      '`repair` re-audits the input, then grounds each metadata mismatch (`doi_not_registered`, `invalid_doi`, `title_mismatch`, `year_mismatch`, `venue_mismatch`, `first_author_mismatch`) through DOI and title resolution (Crossref, arXiv, INSPIRE, S2, paper_get). It accepts only a record whose title matches the cited paper: a bare substring of a one- or two-word title is not a match, a pair whose titles cannot be compared lexically is not a match (only an exact string comparison is), and when the cited record carries a registered DOI a title-only match must also be corroborated by first author, year, or venue. Weaker acceptances stay open so a later identifier can supersede them, and the sidecar reports the key the writer actually emitted, including a key suffixed to avoid a duplicate. It writes a NEW .bib plus a `.repair.json` sidecar; the input is never modified, writes refuse symlinked targets, a retracted record is reported as not repairable, a correction or expression of concern does not block metadata repair, and an unresolved record is reported, never guessed. The new .bib is re-serialized from parsed records, so fields the exporter cannot represent may be dropped; the sidecar records that. The audit vocabulary is `problem|review|unverified|no_issues_found`; the engine-side `HALLUCINATED|MISMATCH` labels are not produced by this tool.',
     ].join(' '),
     parameters: {
       action: {
         type: 'string',
-        enum: ['format', 'bibtex', 'ris', 'validate', 'audit'],
-        description: 'format (bibliography), bibtex, ris, validate, or audit (batch reference audit). Default format.',
+        enum: ['format', 'bibtex', 'ris', 'validate', 'audit', 'repair'],
+        description: 'format (bibliography), bibtex, ris, validate, audit (batch reference audit), or repair (ground mismatched records and write a new .bib). Default format.',
       },
       records: {
         type: 'array',
@@ -522,7 +926,9 @@ export function apply(ctx) {
       manuscript: { type: 'string', description: 'audit: workspace-relative .tex or .md manuscript, used to find uncited bibliography entries.' },
       max_audit: { type: 'number', description: 'audit: most DOIs to check online, 1-500. Default 100.' },
       check_dois: { type: 'boolean', description: 'Validate DOIs against Crossref (validate action). Adds network calls, one per DOI.' },
-      output_path: { type: 'string', description: 'Workspace-relative path to write the output. For format, writes the bibliography only.' },
+      output_path: { type: 'string', description: 'Workspace-relative path to write the output. For format, writes the bibliography only. For repair, the new .bib (required; the input is never overwritten).' },
+      max_repair: { type: 'number', description: 'repair: most records to ground online, 1-100. Default 25.' },
+      overwrite: { type: 'boolean', description: 'repair: replace existing output_path/sidecar files. Default false.' },
     },
     output: {
       schema: { type: 'json' },

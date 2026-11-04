@@ -126,6 +126,7 @@ try {
     evaluation_rubric: 'Novelty, correctness, testability.',
   }, exec)
   assert.equal(started.resumed, false)
+  assert.deepEqual(started, JSON.parse(JSON.stringify(started)), 'start returns lossless JSON to the tool host')
   assert.match(text(renderTournament(started)), /Started tournament/)
   assert.match(text(renderTournament(started)), /Budget: 6 hypotheses/)
 
@@ -135,6 +136,9 @@ try {
     action: 'add', slug, strategy: 'generation:literature_exploration', round: 1, ...CLAIMS[0],
   }, exec)
   assert.equal(firstClaim.hypothesis.id, 'h1')
+  const uncappedStatus = await tournament.execute({ action: 'status', slug }, exec)
+  assert.equal(uncappedStatus.board.max_matches, null, 'an absent match cap is explicit rather than undefined')
+  assert.deepEqual(uncappedStatus, JSON.parse(JSON.stringify(uncappedStatus)), 'status returns lossless JSON to the tool host')
 
   const dupe = await tournament.execute({
     action: 'add',

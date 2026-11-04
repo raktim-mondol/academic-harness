@@ -64,7 +64,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/notebook/<sessionId>.jsonl` | `notebook` | Running lab-notebook entries, shared across a delegation tree |
 | `<cwd>/.dsh/review/<slug>/` | `review` | Write-once `protocol.json`, `extraction_template.json`, and `grade.json`; append-only screening, evidence, extraction, appraisal, and GRADE logs; frozen `instruments.json`; exports |
 | `<cwd>/.dsh/meta/<slug>/` | `meta_analysis` | Write-once `protocol.json`; append-only studies and analyses; forest/funnel/SROC plots; exports |
-| `<cwd>/.dsh/analysis/<slug>/` | `analysis_run` | Append-only plan versions and run manifests; per-run logs, artifacts, and environment captures |
+| `<cwd>/.dsh/analysis/<slug>/` | `analysis_run` | Append-only plan versions and run manifests; per-run logs, artifacts, environment captures, `repro_check.json`, and `compliance.json`; expectation, verification, and compliance ledgers |
 | `<cwd>/.dsh/experiments/<slug>/` | `experiment_log` | Write-once experiment definition; append-only runs and links; verdicts; exports |
 | `<cwd>/.dsh/ablation/<slug>/` | `ablation` | Write-once method spec and frozen plan; records linked to experiment/analysis runs, verdicts, pruning events; exports |
 | `<cwd>/.dsh/data/<slug>/` + `data/<slug>/` | `dataset_get` | Download manifest with licenses and checksums; downloaded files under the workspace `data/` tree |
@@ -72,7 +72,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/watch/<slug>/` | `literature_watch` | Append-only saved-search ledger and seen-record state; digests |
 | `<cwd>/.dsh/network/<slug>/` | `citation_network` | Frozen OpenAlex sample with source, retrieval time, and hash; analyses and exports |
 | `<cwd>/.dsh/science/` | `science_source`, `chem_toolkit`, `seq_toolkit`, `structure_toolkit` | Fetched records with provenance and `runs.jsonl` (tool, action, input hashes, versions) |
-| `<cwd>/.dsh/provenance/<audit>/` | `provenance_audit` | The **only** thing the audit writes: `index.json` (a rebuilt cache of the joined graph) and `exports/` views. Source ledgers are read, never written |
+| `<cwd>/.dsh/provenance/<audit>/` | `provenance_audit` | The **only** thing the audit writes: `index.json` (a rebuilt cache of the joined graph) and `exports/` views. Source ledgers are read, never written; `arms` rebuilds the index and returns a readiness reading without a second cache |
 | `<cwd>/.dsh/preregister/<slug>/` | `preregister` | Editable draft, write-once hashed versions, and draft/freeze events; exports |
 | `<cwd>/.dsh/causal/<slug>/` | `causal_dag` | Append-only DAG versions, stored analyses, E-value calculations, and graph exports |
 | `<cwd>/.dsh/design/<slug>/` | `design` | Append-only seeded randomization and DOE schedules; exports |
@@ -118,7 +118,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (768 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (774 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 

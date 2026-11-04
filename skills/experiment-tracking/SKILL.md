@@ -1,6 +1,6 @@
 ---
 name: experiment-tracking
-description: Track hyperparameter sweeps, simulations, pilots, and model comparisons with the native `experiment_log` ledger — append-only runs with params, metrics, hashed artifacts, seeds, parents, and captured environment; a staged benchmark contract with baseline/variant roles, subset/slice/full stages, sampling rules, and a protocol digest that reports spec drift; advisory good/engineer/bad verdicts with a force-bad exhausted engineering budget; best by named metric or the multi-metric Pareto front; compare tables; links to notebook entries, analysis runs, and papers; CSV/JSON/Markdown/MLflow export. Use when a set of runs is too large or too varied for a single pre-registered analysis plan.
+description: Track hyperparameter sweeps, simulations, pilots, and model comparisons with the native `experiment_log` ledger — append-only runs with params, metrics, hashed artifacts, seeds, parents, and captured environment; a staged benchmark contract with baseline/variant roles, subset/slice/full stages, sampling rules, and a protocol digest that reports spec drift; advisory good/engineer/bad verdicts with a force-bad exhausted engineering budget; best by named metric or the multi-metric Pareto front, with runs linked to a compliance-violating analysis run excluded; compare tables; links to notebook entries, analysis runs, and papers; CSV/JSON/Markdown/MLflow export. Use when a set of runs is too large or too varied for a single pre-registered analysis plan.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
@@ -83,7 +83,13 @@ run that confirms it.
 
 5. **Link, don't duplicate.** `action=link run_id=x0007 target_kind=analysis_run
    target_id=run-…` connects a promising configuration to the pre-registered
-   confirmation run, a notebook entry, or a paper.
+   confirmation run, a notebook entry, or a paper. The link is live: if the
+   linked `analysis_run` fails its frozen task rules (`analysis_run
+   action=compliance`), this experiment run is excluded from `best`,
+   `dominance`, and grouping; the exports keep the row with an exclusion
+   marker, so they remain an audit trail. It stays visible with an `excluded`
+   record naming the analysis run and the violated rule ids — discard the
+   solution, do not "refine" it, and a recorded violation is sticky.
 
 6. **Export.** `export format=csv|json|markdown` for reports; `format=mlflow`
    for an MLflow-compatible JSON (interop, not an MLflow backend).
@@ -97,4 +103,6 @@ run that confirms it.
 - Do not present compare/best output or a verdict as a result; findings go
   through `analysis_run`, `scientific_result`, or the manuscript with their own
   verification. The Pareto front and the verdict are advisory records.
+- Never add a compliance-excluded run back into a selection by hand; fix the
+  violation or report the exclusion.
 - Data-leakage checks belong to `data_profile`, not here.

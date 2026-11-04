@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **768 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **774 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -19,12 +19,13 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`karpathy`](https://github.com/K-Dense-AI/karpathy) | 1 adapted skill | `hyperparameter-optimization` — pre-registered, verify-before-claiming search loop for tuning a DL/LLM model |
 | [`figures4papers`](https://github.com/ChenLiu-1996/figures4papers) | 1 adapted skill | `scientific-figure-making` — publication matplotlib house style + helpers for bars/trends/heatmaps |
 | [`diagram-design`](https://github.com/cathrynlavery/diagram-design) | 1 vendored skill | `diagram-design` — 39 editorial HTML+SVG diagram types; no Mermaid slop |
+| [`pele-skill`](https://github.com/jpmanson/pele-skill) | 1 vendored skill | `pele` — render Mermaid diagrams to SVG or HTML without a browser; Node.js 20+ and npm required |
 | First-party, distilled from Gottweis et al. / Ghareeb et al. 2026 | 1 skill | `generating-scientific-hypotheses` — literature-grounded hypothesis generation: search-checked novelty, ranked falsifiable cards (see [NOTICE](../NOTICE)) |
 | [`Paper2Agent`](https://github.com/jmiao24/Paper2Agent) | 3 vendored skills | `paper2agent` (router), `paper2skill`, and `paper2mcp` — turn a paper and/or its code repo into a reviewed paper skill and a tested FastMCP server. See [Paper agents](PAPERS.md#paper-agents-paper2agent) |
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 768.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 774.
 
 ## Workflow and tool skills
 
@@ -45,9 +46,14 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `presentation-build` | `presentation_build` posters/slides plus the `subagent_vision` QA step; see [Writing](WRITING.md#posters-and-slides) |
 | `authorship-credit` | `authorship` CRediT/ICMJE records, statements, and unresolved disagreements; see [Writing](WRITING.md#authorship-and-credit) |
 | `experiment-tracking` | `experiment_log` sweeps and staged comparison contracts (baseline/variant, stages, protocol drift, verdicts, Pareto best), links, and exports; see [Reproducible analysis](ANALYSIS.md#experiment_log) |
+| `subset-first-eval` | Freeze the benchmark, verify a named baseline, and record subset-to-full evaluation without mixing references |
+| `limitation-mining` | Record source-quoted flaws, distinct remedy families, sufficiency, and coverage |
+| `novelty-triage` | Inspect grounded prior-art readings, references, quote spans, and inconclusive searches |
+| `method-code-alignment` | Map method anchors to code locations and review them before binding claims |
+| `integrity-audit` | Advisory four-column audit across reruns, protocols, references, and method–code alignment |
 | `ablation-attribution` | `ablation` component removal grids, records linked to experiment/analysis runs, paired deltas, advisory attribution readings, verdicts, and pruning; see [Reproducible analysis](ANALYSIS.md#ablation) |
 | `rebuttal-experiments` | `rebuttal` reviewer-response coverage ledger — import stored reviews, plan capped supplementary stubs, link existing runs, record answers and declines, read coverage, draft the letter handoffs; see [Writing](WRITING.md#reviewer-response-ledger) |
-| `provenance-audit` | Reading and acting on the read-only cross-ledger index — the seven states, coverage, unsupported, stale, impact, and graph exports; see [Provenance audit](PROVENANCE.md) |
+| `provenance-audit` | Reading and acting on the read-only cross-ledger index — the eleven states, coverage, unsupported, stale, impact, the four-column `arms` readiness roll-up, the report-only `rollup` loop record, and graph exports; see [Provenance audit](PROVENANCE.md) |
 | `grade-certainty` | GRADE domain judgements, derived suggestion, human overall certainty, evidence profile, and summary-of-findings exports; see [GRADE certainty](RESEARCH.md#grade-certainty) |
 | `risk-of-bias-appraisal` | `review` risk-of-bias workflow (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), reconciliation, agreement, and rob exports; see [Risk-of-bias appraisal](RESEARCH.md#risk-of-bias-appraisal) |
 | `co-scientist-tournament` | The tournament loop, subagent briefs, budget defaults, limitation mining, trace-informed evolution, and champion selection; see [Hypothesis tournaments](RESEARCH.md#hypothesis-tournaments) |
@@ -61,6 +67,7 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `papermemory` | The PaperMemory workflow; see [Paper memory](PAPERS.md#paper-memory) |
 | `zvec-grep` | Install, index, and routing details for workspace search; see [Workspace search](WORKSPACE.md#workspace-search) |
 | `agent-browser` | Driving a real browser through the agent-browser CLI; see [Browsing the web](AGENTS.md#browsing-the-web) |
+| `pele` | Render Mermaid to SVG or HTML using the skill's pinned Pele dependency; installs that dependency in the skill directory on first use |
 | `runpod`, `modal`, `vastai` | The rest of each CLI: Serverless, volumes, secrets, Hub templates, GPU availability, Vast.ai bids/volumes; see [Remote compute](COMPUTE.md#beyond-the-tools) |
 | `paper2agent`, `paper2skill`, `paper2mcp` | Turning a paper or repo into a skill and an MCP server; see [Paper agents](PAPERS.md#paper-agents-paper2agent) |
 | `remove-ai-signs` | Style editing for machine-sounding prose; it does not evade detection or remove provenance |

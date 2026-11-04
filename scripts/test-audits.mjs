@@ -4,7 +4,7 @@
  */
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply as applyStat, runStatAudit } from '../stat-audit.js'
@@ -194,8 +194,145 @@ try {
   assert.equal(data.run_tests.ran, false, 'tests must not run by default')
   assert.equal(data.github, null)
   assert.ok(data.reproducibility_notes.some((note) => /Tests were not executed/.test(note)))
+
+  // Phase 8: probe finds a runnable benchmark entrypoint without executing it.
+  writeFileSync(join(repoDir, 'package.json'), JSON.stringify({ scripts: { test: 'node -e "process.exit(0)"', bench: 'node bench.js' } }))
+  writeFileSync(join(repoDir, 'README.md'), '# Demo\n\nRun the benchmark:\n\nnpm run bench\n')
+  const probe = await runRepoAudit({ action: 'probe', path: repoDir }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.equal(probe.runnable, 'yes')
+  assert.equal(probe.has_benchmark_entrypoint, true)
+  assert.equal(probe.offers_re_execution, 'yes')
+  assert.ok(probe.candidates.some((candidate) => candidate.command === 'npm run bench'))
+  assert.match(probe.advisory, /nothing was executed/i)
+
+  // Phase 8: align maps method anchors to file:line and emits ah_claims_bind calls.
+  writeFileSync(join(repoDir, 'src', 'config.py'), 'THRESHOLD = 0.05\nimport os\n')
+  writeFileSync(join(repoDir, 'src', 'other.py'), 'THRESHOLD = 0.05\n')
+  const aligned = await runRepoAudit({
+    action: 'align',
+    path: repoDir,
+    anchors: [
+      { id: 'threshold', kind: 'constant', text: '0.05', file: 'src/config.py', claim: 'the threshold is 0.05' },
+      { id: 'missing', kind: 'equation', pattern: 'softmax\\(x\\)' },
+      { id: 'ambiguous', kind: 'symbol', text: 'THRESHOLD' },
+    ],
+  }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.deepEqual(aligned.counts, { verified: 1, ambiguous: 1, missing: 1, not_checked: 0 })
+  assert.equal(aligned.bind_calls.length, 1)
+  assert.equal(aligned.bind_calls[0].source, 'src/config.py')
+  assert.equal(aligned.bind_calls[0].lines, '1-1')
+  assert.equal(aligned.anchors.find((anchor) => anchor.id === 'ambiguous').matches.length > 1, true)
+  const unfiltered = await runRepoAudit({
+    action: 'align', path: repoDir, anchors: [{ id: 'threshold', text: '0.05' }],
+  }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.equal(unfiltered.anchors[0].status, 'ambiguous', 'two files match without a file filter')
+
+  // A catastrophic regex is bounded by the vm time budget.
+  writeFileSync(join(repoDir, 'src', 'slow.py'), `${'a'.repeat(40)}!\n`)
+  const slow = await runRepoAudit({
+    action: 'align', path: repoDir, anchors: [{ id: 'slow', pattern: '(a+)+$' }],
+  }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.equal(slow.anchors[0].status, 'not_checked')
+  assert.match(slow.anchors[0].reason, /budget/)
+
+  // An anchor naming a non-code file is not_checked, not missing.
+  const unscanned = await runRepoAudit({
+    action: 'align', path: repoDir, anchors: [{ id: 'readme', text: 'Demo', file: 'README.md' }],
+  }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.equal(unscanned.anchors[0].status, 'not_checked')
+  assert.match(unscanned.anchors[0].reason, /was not scanned/)
+
+  // A refused top-level `file` scan reads nothing, so no anchor may be reported
+  // `missing` (which would assert the method is absent from the code) and no
+  // bind_calls entry may point at content that was never looked at.
+  let repoTool
+  applyRepo({ tools: { register: (tool) => { repoTool = tool } } })
+  writeFileSync(join(repoDir, 'README.md'), '# Demo\n\nRun the benchmark:\n\nnpm run bench\n\nWe use a cosine schedule.\n')
+  for (const [name, escaped] of [['lexical escape', '../outside.py'], ['absolute escape', join(tmpdir(), 'outside.py')], ['nonexistent', 'src/nope.py']]) {
+    const refused = await runRepoAudit({
+      action: 'align',
+      path: repoDir,
+      file: escaped,
+      anchors: [
+        { id: 'literal', text: 'THRESHOLD', claim: 'the threshold is 0.05' },
+        { id: 'pattern', pattern: 'THRESHOLD' },
+      ],
+    }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+    assert.equal(refused.scanned_files, 0, `align file ${name} scans nothing`)
+    assert.deepEqual(refused.anchors.map((anchor) => anchor.status), ['not_checked', 'not_checked'], `align file ${name} is not_checked, not missing`)
+    assert.equal(refused.counts.missing, 0)
+    assert.match(refused.anchors[0].reason, /was not scanned/)
+    assert.equal(refused.bind_calls.length, 0, 'nothing is bound from unread content')
+    assert.match(repoTool.output.render({}, refused)[0].text, /no code\/config file was scanned/)
+  }
+
+  // `file` is confined to code/config content: prose yields no scanned content,
+  // so a claim cannot be bound to the manuscript text it was lifted from.
+  const proseScan = await runRepoAudit({
+    action: 'align',
+    path: repoDir,
+    file: 'README.md',
+    anchors: [{ id: 'prose', text: 'cosine schedule', claim: 'we use a cosine schedule' }],
+  }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.equal(proseScan.scanned_files, 0, 'a prose file is not scanned')
+  assert.equal(proseScan.anchors[0].status, 'not_checked')
+  assert.match(proseScan.anchors[0].reason, /not a code\/config file/)
+  assert.equal(proseScan.bind_calls.length, 0, 'prose never reaches ah_claims_bind')
+
+  // A legitimate code file still scans, matches, and offers a bind call.
+  const singleFile = await runRepoAudit({
+    action: 'align',
+    path: repoDir,
+    file: 'src/config.py',
+    anchors: [{ id: 'threshold', text: 'THRESHOLD', claim: 'the threshold constant is 0.05' }],
+  }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+  assert.equal(singleFile.scanned_files, 1)
+  assert.deepEqual(singleFile.counts, { verified: 1, ambiguous: 0, missing: 0, not_checked: 0 })
+  assert.equal(singleFile.bind_calls.length, 1)
+  assert.equal(singleFile.bind_calls[0].source, 'src/config.py')
+  assert.match(repoTool.output.render({}, singleFile)[0].text, /1 code\/config file\(s\) scanned/)
+
+  // Symlinked files are not followed.
+  const outsideDir = mkdtempSync(join(tmpdir(), 'ah-outside-'))
+  try {
+    writeFileSync(join(outsideDir, 'secret.py'), 'SECRET_CONSTANT = 42\n')
+    symlinkSync(join(outsideDir, 'secret.py'), join(repoDir, 'src', 'linked.py'))
+    const linked = await runRepoAudit({
+      action: 'align', path: repoDir, anchors: [{ id: 'secret', text: 'SECRET_CONSTANT' }],
+    }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+    assert.equal(linked.anchors[0].status, 'missing', 'a symlink outside the repository is not read')
+
+    // Requesting that symlink by name is a refused scan, not an absent anchor.
+    const linkedFile = await runRepoAudit({
+      action: 'align', path: repoDir, file: 'src/linked.py', anchors: [{ id: 'secret', text: 'SECRET_CONSTANT' }],
+    }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+    assert.equal(linkedFile.scanned_files, 0, 'a symlink escape reads no content')
+    assert.equal(linkedFile.anchors[0].status, 'not_checked')
+    assert.match(linkedFile.anchors[0].reason, /was not scanned/)
+    assert.equal(linkedFile.bind_calls.length, 0)
+  } finally {
+    rmSync(outsideDir, { recursive: true, force: true })
+  }
 } finally {
   rmSync(repoDir, { recursive: true, force: true })
+}
+
+{
+  // README prose is not a command; a fenced command is.
+  const proseDir = mkdtempSync(join(tmpdir(), 'ah-probe-prose-'))
+  try {
+    writeFileSync(join(proseDir, 'README.md'), '# Demo\n\nPython is a language. Make sure to cite the data.\n')
+    const prose = await runRepoAudit({ action: 'probe', path: proseDir }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+    assert.equal(prose.runnable, 'no', 'prose is not a command')
+    assert.equal(prose.has_benchmark_entrypoint, false)
+
+    writeFileSync(join(proseDir, 'README.md'), '# Demo\n\n```bash\npython3 eval.py --split test\n```\n')
+    const fenced = await runRepoAudit({ action: 'probe', path: proseDir }, {}, { fetchJson: async () => ({ ok: false, status: 404 }) })
+    assert.ok(fenced.candidates.some((candidate) => candidate.command === 'python3 eval.py --split test'))
+    assert.equal(fenced.has_benchmark_entrypoint, true)
+  } finally {
+    rmSync(proseDir, { recursive: true, force: true })
+  }
 }
 
 {

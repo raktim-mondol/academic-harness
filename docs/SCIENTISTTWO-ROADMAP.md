@@ -1,6 +1,6 @@
 # ScientistTwo → Academic Harness: implementation roadmap
 
-Status: **Phases 0–7 implemented; Phases 8–10 are plan.** See §3 for what shipped and what is still proposed.
+Status: **Phases 0–10 implemented; documentation and skill maintenance continue.** See §3 for what shipped and its limitations.
 Source paper: *ScientistTwo: Pioneering the Human Knowledge Frontier with Autonomous AI* (Google Cloud AI Research — J. Nam, J. Yoon, et al.), LaTeX bundle reviewed locally.
 Shaping decision: the plugin stays **advisory**. ScientistTwo's contribution we keep is its *control structure* — critic verdicts, per-stage round budgets, attribution-before-acceptance, staged compute, and post-hoc integrity audits. Its autonomy we do not keep.
 
@@ -49,11 +49,11 @@ Code-grounded facts the plan builds on.
 
 1. ~~**Review rounds**~~ — **closed by Phase 1.** `deep_review` used to overwrite; rounds plus `compare` now make a revision's effect measurable.
 2. ~~**Evaluation-validity criteria.**~~ — **closed by Phase 2.** Engine heuristics (`review_heuristics.ts:21-45`) police unfair criticism (H1 "not surprising", H3 unanchored novelty claim, H5 penalizing unclaimed-SOTA, H7 "too simple", H15 preference-as-flaw) and still say nothing about validity; `deep_review`'s `validity` action now counts attribution, evaluator drift, benchmark coverage, and unmeasured trade-offs wrapper-side, as advisory readings rather than a verdict.
-3. **Advisory score + evaluator provenance.** No score anywhere; nothing records whether the reviewer that graded the draft also guided its revision.
-4. **Staged experimentation contract.** `experiment_log` records numbers but has no benchmark spec, no baseline/variant role, no subset→full stage, no verdict vocabulary, no protocol digest, no single-metric-vs-dominance distinction.
-5. **Ablation and attribution.** The word "ablation" appears in tool code only inside `rsi-core.js`; no planner, no component arms, no attribution veto.
-6. **Baseline reference identity.** The paper compares the *subset* stage against the reproduced baseline and the *full-set* stage against the **original reported SOTA** (`tables/overview.tex:15-16`). Nothing in the plugin distinguishes the two references, so a run can silently compare against the wrong one.
-7. **Score verification by re-execution** (reported vs recomputed), **spec-compliance with discard**, **method–code alignment anchors**, **citation repair**.
+3. ~~**Advisory score + evaluator provenance.**~~ — **closed by Phase 3:** scored review dimensions and evaluator kind are recorded as advisory readings.
+4. ~~**Staged experimentation contract.**~~ — **closed by Phase 4:** benchmark specs, roles, stages, verdicts, protocol digests and dominance are recorded.
+5. ~~**Ablation and attribution.**~~ — **closed by Phase 5:** linked removal arms and advisory attribution readings are recorded by `ablation`.
+6. ~~**Baseline reference identity.**~~ — **closed by Phase 4:** reproduced and reported references are named separately; the roll-up reports baseline verification.
+7. ~~**Score verification by re-execution** (reported vs recomputed), **spec-compliance with discard**, **method–code alignment anchors**, **citation repair**.~~ — **closed by Phase 8.** `analysis_run` gains `expect`, `verify_scores`, and `compliance`; `repo_audit` gains `probe` and `align`; `citation` gains `repair`; `provenance_audit` gains `arms` and the `no_attribution`/`rerun_mismatch`/`verdict_missing` states.
 8. ~~**Limitation records** as first-class, quotable, coupled-to-ideas artifacts.~~ — **closed by Phase 6.** Limitations are append-only records with a verified source quote span, remedy families, a round-capped sufficiency reading, and checkable idea coupling; `trace` reads failed/pruned experiments back into evolution, `select` freezes a champion with an evidence digest, and `coscientist_verify novelty` grounds the novelty score in a retrieved reference set and verbatim quote spans.
 
 ---
@@ -111,7 +111,7 @@ Both sections print `not_checked` below their sample floor (3 same-manuscript pa
 - **Two corrections to the plan this section replaces.** `paper_context` is **not** used for the local inventory: `runPaperContext` takes an external identifier and does network tiering, so it cannot inventory the file under review — the pass reads the manuscript itself (and `html-sections` is not involved either, for the same reason). `numbers_audit` is reused, but only for its numeric half: its row counter is provably blind to a multi-column grid, so grid counting goes through the pass's own parser. And the coverage contrast the plan called "the paper's v1 contrast" is in the bundle **ScientistOne-vs-ScientistTwo** (`sections/4_experiment.tex:13`), and the 4-figures/2-tables vs 9/12 counts are an author self-report that includes the appendix — so `benchmark_coverage` counts the grid axes it can actually see instead of reproducing that comparison. Those axis and arm counts are aggregated across every parsed grid, so a second table can widen a thin first one.
 - **The thresholds and vocabularies are ours.** The paper states the four criteria and no lexicon and no cut-off, so `CONTROL_PHRASES`, `GAIN_PHRASES`, `COST_PHRASES`, `QUALITY_PHRASES`, `HARNESS_PHRASES`, and the wide-versus-thin grid rule are invented here, and `extra_checks.json` carries that as a standing note.
 - **Calibrated against real papers (Phase 0).** Reference/bibliography sections are masked (stopping at an appendix/supplementary heading), leading PDF line numbers are stripped, coverage counts numeric value columns and treats a second arm as a comparator, baselines are recognized by names like Identity/Grayscale/from-scratch, an ablation mention needs a table/figure to count, and a review/synthesis with no mechanism of its own answers `attribution: not_checked`; `evaluateValidity` is exported so the harness and the action share one implementation. See `reports/deep-review-validity-20261103T235613.md` and the Phase 0 section.
-- **Not wired:** `provenance_audit` does not read `extra_checks.json`, so these findings do not appear in a cross-ledger audit yet — it still joins only the stored `deep_review` claims and citation verdicts. Wiring them in belongs with Phase 8's `action=arms`.
+- **Wired in Phase 8:** `provenance_audit` now reads `extra_checks.json`; a `flagged` validity check is indexed as an `unverified` claim (with the check's reason), a `not_checked` check stays `not_checked`, a `clear` check is not a claim, and `arms` reports the validity flags.
 - Docs: `docs/PAPERS.md` (new *Evaluation-validity checks* subsection), `docs/TOOLS.md`, `docs/ARCHITECTURE.md` (store row, which Phase 1 left without `rounds/`), `docs/DEVELOPMENT.md` (the wrapper bullet, which said these criteria were "planned"), `docs/SKILLS.md` (a `deep-review` row in the workflow-and-tool table, which had every other first-party tool skill but this one), `docs/README.md` index blurb, `README.md`, the `deep-review` skill §7, `prompt.js`, the preset row comment, and `docs/CHANGELOG.md` under *Unreleased*.
 
 **Vendor policy:** these are criteria, so they *could* live in `prompts.ts`/`review_heuristics.ts`. Default is wrapper-side to keep `VENDOR_COMMIT` (`deep-review.js:27`) unpinned-dragged; any vendor edit is recorded in `vendor/open-deepreview/SOURCE.txt` and `NOTICE` and the commit is re-pinned. Revisit only if Phase 0 shows the wrapper pass is structurally limited. **Shipped as wrapper-side, as decided.**
@@ -227,7 +227,7 @@ Advisory coverage ledger with no execution of its own.
 
 **Exit:** every reviewer point has a stored state with cited, digest-pinned evidence behind it or a labelled absence; the loop closes against a fresh round; and no reading here accepts, gates, or hides anything. ✅
 
-### Phase 8 — Re-execution, compliance, and alignment · L · depends on 4
+### Phase 8 — Re-execution, compliance, and alignment · L · depends on 4 · ✅ implemented
 
 Where the remaining integrity checks belong, per the audits: execution belongs to `analysis_run` (it already owns argv, env allowlist, hashing, timeouts), repo questions to `repo_audit`, joins to `provenance_audit`.
 
@@ -239,7 +239,18 @@ Where the remaining integrity checks belong, per the audits: execution belongs t
 - `provenance_audit action=arms` — one artifact, four columns (reported vs recomputed, protocol digest, references, method–code) rendered as a readiness roll-up over artifacts that already exist; plus new unsupported states `no_attribution`, `rerun_mismatch`, `verdict_missing`.
 - Scope correction to hold onto: the four-check "CoE Integrity Audit" is **ScientistOne's** framework, imported and cited; ScientistTwo's own contribution is the enforcement side (three refinement agents plus prompt design), and the audit is **not a pipeline stage** — it is absent from the overview table and the shared pseudocode, and two of its four checks are manuscript-side repairs. Also: score verification has **no** repair agent (it is prevented upstream by prompting for self-contained reproducible scripts), so the plugin's equivalent prevention lives in the `analysis_run`/`experiment_log` guidance text, not in a new agent.
 
-### Phase 9 — Loop roll-up, not a loop runner · S→M · decide at the end of Phase 8
+**Shipped, on the tools that already own the work — no new executor and no second gate:**
+
+- **`analysis_run action=expect` / `verify_scores`.** The plan gains frozen `task_rules`; `expect` declares the reported numbers (name, value, output path, `json`/`csv`/`tsv`/`kv`/`regex` parsing, optional key/column/pattern, absolute or relative tolerance) with `reference: reported|reproduced`, and captures the reference run's command and interpreter fingerprint. `verify_scores` reads only outputs the run hashed, re-hashes the file, and writes `runs/<id>/repro_check.json` with `reproduction: true|false|null`; the event is appended to `verifications.jsonl`. It is `not_checked` when the bytes changed, the run failed or timed out, followed a different plan, changed its entrypoint, or the interpreter changed (`allow_environment_drift` / `allow_entrypoint_change` override explicitly), and tolerances get a `1e-9 × max(1, |expected|)` floating-point allowance. This is the paper's artifact shape, not a new scoring model.
+- **`analysis_run action=compliance`.** A rule can be machine-checked (`equals`, `not_equals`, `greater_than`, `less_than`, `min`, `max`, `contains`, `not_contains`, `matches`, `exists`, `absent`) over a hashed output, or take caller evidence. The verdict is `violated` / `not_checked` / `compliant`; a violating run is **discarded**, not refined. `experiment-store` joins links to analysis runs and drops a violating run from `best`, `dominance`, and grouping (exports keep the row with an exclusion marker); `repro-package-store` omits it (and linked experiment runs) from the build and deposit, records `excluded_runs`, and re-checks exclusions before deposit. A recorded violation is sticky, so a later reading cannot launder the run back in.
+- **`repo_audit action=probe` / `action=align`.** `probe` detects package/pyproject scripts, Makefile targets, run/eval/benchmark scripts, Docker CMD, and README commands without executing anything, reporting `runnable` and `offers_re_execution`. `align` maps method anchors to `file:line` (`verified` exactly one, `ambiguous` several, `missing` none) and returns `bind_calls` `{claim, source, lines}` for `ah_claims_bind`; it writes nothing and never edits the manuscript.
+- **`citation action=repair`.** The roadmap's `HALLUCINATED`/`MISMATCH` labels are engine-side; the plugin's audit vocabulary is `problem|review|unverified|no_issues_found`. Repair is keyed on the audit's finding codes, grounds each mismatch through DOI/title lookup, accepts only a record whose title matches the cited paper, preserves the citation key when one existed, writes a **new** `.bib` plus a `.repair.json` sidecar, reports a retracted record as not repairable metadata, and never edits the input.
+- **`provenance_audit action=arms` + three states.** `arms` rebuilds the index and returns the four-column readiness roll-up (reported vs recomputed, protocol digest, references, method–code) with `ready`/`partial`/`not_ready` totals and `n/a` where a column does not apply. New unsupported states: `no_attribution`, `rerun_mismatch`, `verdict_missing`. The index now reads `ablation`, analysis expectations/re-executions/compliance, and `deep_review extra_checks.json` (a `flagged` validity check becomes an `unverified` claim; `clear` is not a claim), closing the Phase 2 note.
+- Tests: `scripts/test-analysis-run.mjs`, `scripts/test-phase8-compliance.mjs`, `scripts/test-audits.mjs`, `scripts/test-citation-repair.mjs`, `scripts/test-provenance-arms.mjs`. Docs: ANALYSIS, PROVENANCE, TOOLS, IDENTITY-AND-AUDIT-TOOLS, WRITING, ARCHITECTURE, CHANGELOG, README, `prompt.js`, and the `reproducible-analysis` / `provenance-audit` / `experiment-tracking` skills.
+
+**Exit:** a declared number can be matched, mismatched, or honestly `not_checked`; a rule-violating solution is discarded from every downstream selection and package; method anchors have a `file:line`; a bibliography mismatch has a new grounded `.bib`; and the four integrity columns are one readiness reading. ✅
+
+### Phase 9 — Loop roll-up, not a loop runner · S→M · ✅ implemented as a report
 
 Start as a **report**, not a store: `provenance_audit` (or a `deep_review`-style `show`) renders the ordered record — frozen problem → limitations → idea pool → subset verdicts → scale-up → selection → ablation/attribution → review rounds with evaluator kind → integrity columns → promoted incumbent — by joining ids that Phases 4–8 create, with per-stage cost/time summed from the ledgers that already log them.
 
@@ -247,7 +258,18 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 
 **Improvement over the paper, free:** in the paper the reproduced subset baseline is the one artifact with **no critic and no refine** (`tables/overview.tex:14`), so the reference number underpinning the entire accept/refine chain is unverified until the final re-run. Because our `analysis_run` already produces immutable manifests, we can gate the baseline itself at Phase 4/8 — a strictly better loop shape than the source.
 
-### Phase 10 — Skills, templates, prompt, docs · S · continuous with each phase
+**Decision at the end of Phase 8: report-only, no `frontier` store.** The ordered record is a join over ledgers that already exist; a store would duplicate them and add a promotion path the non-goals do not want. Shipped as `provenance_audit action=rollup`.
+
+- **The ordered record.** `rollup` renders frozen problem → limitations and coverage → idea pool → subset verdicts → scale-up → selection → ablation/attribution → review rounds with `evaluator_kind` → the four integrity columns → incumbent. A coscientist tournament is the cycle; without one, a workspace record still surfaces the Phase 4–8 evidence. Experiment runs link to an idea through the existing `paramsReference` convention (`params.idea_id` / `hypothesis_id`), and ablation definitions link through `idea_id`; no new id scheme is introduced.
+- **Read-only, no index pollution.** The tournament half is read directly with `deriveState`/`limitationStatus`; idea and limitation prose is not added to `.dsh/provenance/<audit>/index.json`. The integrity rows are the same `armsOf` rows, not a second computation.
+- **Honest cost/time.** Analysis `duration_ms` and deep-review round `duration_ms`/`usage` are summed; experiment, ablation, ideation, and selection stages with no recorded measure are listed as missing, never zero. The report computes no headline gain, shows denominators, and explicitly refuses the paper's successful-cases-only +25.2% and 33/107 (including VM cost) framing. No dollar figure is invented.
+- **Baseline gate.** A linked `reference: reproduced` analysis is `verified` only when a distinct recorded re-execution confirms it; otherwise the report says `partial`/`unverified`/`not_checked`/`not_linked`/`excluded` with the reason. A missing reference run or self-check does not establish re-execution.
+- **No promotion.** The incumbent is reported `selected` with `promotion: not_recorded`. Starting the next cycle with the champion as the declared baseline remains a deliberate action; the report never writes it.
+- Tests: `scripts/test-provenance-rollup.mjs` covers a full cycle, cost/missing measures, baseline gate, selected-but-not-promoted incumbent, read-only behavior, and rendering; `test-provenance-audit.mjs` sweeps the registered action on an empty workspace. Docs: PROVENANCE, TOOLS, README, `docs/README.md`, SKILLS, `prompt.js`, the `provenance-audit` skill, and the CHANGELOG.
+
+**Exit:** the ordered loop record is readable from existing ledgers, its cost/time is honest about missing measures, the reproduced baseline is visibly gated, and nothing is promoted or stored. ✅
+
+### Phase 10 — Skills, templates, prompt, docs · S · ✅ implemented; maintenance continuous
 
 - `workflows.json` rows (zero code, ship any week): `limitation-mining`, `subset-first-eval`, `ablation-plan`, `rebuttal-plan`, `review-round-diff`. Format: `{id, name, description, category, icon, prompt, requiresFiles, placeholders[]}`.
 - New skills — each `skills/<kebab>/SKILL.md`, dir name == `name`, description begins "Use when…" and lists **only** triggers, ≤1024 chars, plus `license: MIT`, `metadata.version`, `metadata.skill-author: Academic Harness`:
@@ -256,6 +278,8 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 - `prompt.js` sections for the new actions, and the two habits the paper insists on: reproduce before you compare, and never mix the reproduced and reported references.
 - Docs: `docs/TOOLS.md` rows with correct scope (preset-only), new sections in PAPERS / ANALYSIS / RESEARCH / WRITING / PROVENANCE, `docs/SKILLS.md`, `docs/CHANGELOG.md`, `NOTICE` for any vendored diff or adapted paper material. Phase 2 shipped its share: the validity clause in the `deep_review` row, an *Evaluation-validity checks* subsection in PAPERS, a `deep-review` row in the `docs/SKILLS.md` workflow-and-tool table (that table listed every other first-party tool skill and was missing this one), the `docs/README.md` index blurb, and an *Unreleased* changelog entry; `NOTICE` gained nothing, because no vendor file moved and no paper text was copied — the four criteria are paraphrased.
 - Tests wired into `scripts/run-tests.mjs` + `package.json` `test:*`; CI `verify.yml` boots the profile and imports every module.
+
+**Shipped:** all seven skills and all five `research_template` entries are present; the tournament, analysis, review, revision, and audit handoffs and the catalogue/prompt/docs are updated. `npm run test:phase10` checks metadata, discovery, template placeholders, package inclusion, and first-install seeding without overwriting existing user skills. CI's existing `npm test` sweep runs that test. Ongoing documentation and skill maintenance remains continuous.
 
 ---
 
@@ -266,18 +290,18 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 | 0 Calibration | — | ✅ shipped | M |
 | 1 Review rounds | — | ✅ shipped (`compare`, rounds, v1 upgrade, token tallies) | M |
 | 2 Validity checks | 0 (proof), 1 (cleaner input) | ✅ shipped (`validity`, four checks, one bounded critic, `extra_checks.json`, `meta.validity`) | M |
-| 3 Score + provenance | 0, 1 | yes | M |
-| 4 Staged experiment contract | — | yes; unblocks 5/7/8 | M–L |
-| 5 `ablation` | 4 | no | L |
+| 3 Score + provenance | 0, 1 | ✅ shipped | M |
+| 4 Staged experiment contract | — | ✅ shipped | M–L |
+| 5 `ablation` | 4 | ✅ shipped | L |
 | 6 Limitations + novelty + traces | PaperMemory anchors | ✅ shipped (`limitation`, `trace`, `select`, grounded novelty) | M |
 | 7 `rebuttal` | 1, 4, 5 | ✅ shipped (`import`, `plan`, `link`, `respond`, `decline`, `coverage`, `draft`, `export`, `status`) | M–L |
-| 8 Re-execution / compliance / align | 4, 5 | partial | L |
-| 9 Loop roll-up | 4–8 | last, maybe never as a store | S–M |
-| 10 Skills/docs/tests | per phase | continuous | S |
+| 8 Re-execution / compliance / align | 4, 5 | ✅ shipped (`expect`, `verify_scores`, `compliance`, `repo_audit probe`/`align`, `citation repair`, `arms`, three new states) | L |
+| 9 Loop roll-up | 4–8 | ✅ shipped as `provenance_audit action=rollup` (report only; no store, no promote) | S–M |
+| 10 Skills/docs/tests | per phase | ✅ shipped; maintenance continuous | S |
 
-Recommended cut: **0 → 1 → 4 → 2 → 5 → 3 → 6 → 7 → 8 → decide 9.**
+Recommended cut: **0 → 1 → 4 → 2 → 5 → 3 → 6 → 7 → 8 → 9 (report-only) → Phase 10 continuous.**
 Phases 1 and 4 are the two structural holes — review history and a staged, verdicted, reference-named experiment record — and everything else composes on them.
-Phase 2 was taken before 4, so what has actually shipped is 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7; 4 unblocked 5 and 7 and still unblocks 8.
+Phase 2 was taken before 4, so the delivered sequence is 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10; Phase 9 shipped as a report, not a `frontier` store, and Phase 10 maintenance continues.
 
 ---
 
@@ -292,6 +316,8 @@ Phase 2 was taken before 4, so what has actually shipped is 0 → 1 → 2 → 3 
 | Re-execution cost and safety | `analysis_run`'s argv-only executor, env allowlist with redaction, hard timeouts; remote via `runpod_run`/`modal_run`/`vastai_run`; confirm-gated; `not_checked` rather than silent skip; never in the session workspace by default |
 | Scope creep back toward autonomy | Phase 9 stays last and is decided on evidence; no runner in any phase |
 | Two similar stores (ablation vs experiment_log; rebuttal vs ah_review) | both are ledgers over other ledgers: they link ids and never store their own numbers |
+| The roll-up inherits the paper's successful-cases-only or cost framing | `rollup` computes no headline gain, shows denominators, lists unrecorded cost/time as missing, and refuses the 33/107 + VM-cost framing in the report itself |
+| Store creep toward a `frontier` ledger | Phase 9 shipped as a read-only report; promotion stays an author action and no frontier ledger was created |
 | Novelty/attribution scoring invented where the paper is silent | every such spec is documented as ours in its guide section, not presented as a port |
 
 ---
