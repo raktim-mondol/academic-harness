@@ -447,7 +447,7 @@
     "test:deep-research-effort": "node scripts/test-deep-research-effort.mjs",
     "test:deep-research": "node scripts/test-deep-research.mjs",
     "test:deep-research-all": "node scripts/test-deep-research-mechanisms.mjs && node scripts/test-deep-research-effort.mjs && node scripts/test-deep-research-store.mjs && node scripts/test-deep-research.mjs",
-    "test:deep-review": "node scripts/test-deep-review-tool.mjs && node scripts/test-deep-review-validity.mjs && node scripts/test-deep-review-validity-calibration.mjs",
+    "test:deep-review": "node scripts/test-deep-review-tool.mjs && node scripts/test-deep-review-validity.mjs && node scripts/test-deep-review-validity-calibration.mjs && node scripts/test-deep-review-score-correlation.mjs && node scripts/test-deep-review-calibration-report.mjs",
     "test:deep-review-validity": "node scripts/test-deep-review-validity.mjs && node scripts/test-deep-review-validity-calibration.mjs",
     "test:reporting": "node scripts/test-reporting-check.mjs",
     "test:rsi": "node scripts/test-rsi.mjs",

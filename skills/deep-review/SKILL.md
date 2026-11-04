@@ -1,10 +1,10 @@
 ---
 name: deep-review
-description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, kept as numbered rounds that `compare` can diff, plus four advisory evaluation-validity readings over the manuscript's own text and grids. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, a second opinion beyond the session model, whether a revision closed the findings from an earlier review, or whether a reported gain survives removing its mechanism, changing the evaluator, and reading the results grid against a baseline.
+description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, kept as numbered rounds that `compare` can diff, plus four advisory evaluation-validity readings over the manuscript's own text and grids and an advisory dimension score with held-out/in-distribution provenance. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, a second opinion beyond the session model, whether a revision closed the findings from an earlier review, whether a reported gain survives removing its mechanism, changing the evaluator, and reading the results grid against a baseline, or for an automated soundness/originality/clarity/significance reading on a declared scale.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
-  version: "1.2"
+  version: "1.3"
   skill-author: Academic Harness
 ---
 
@@ -176,6 +176,11 @@ state both to the user:
   the rounds is reviewer variance. Measure that before crediting a revision with
   closing anything, and never average over it silently.
 
+When the revision was guided by a prior round's rubric or report, pass
+`rubric_round` to the next review so the round is recorded honestly as
+`in_distribution`; otherwise it stays `held_out`. The kind appears in
+`show section=rounds`, `compare`, and the stored score.
+
 `compare` never accepts or rejects the paper, and the round ladder is not a
 score to climb. Where the user wants the tool itself checked,
 `node scripts/deep-review-calibration.mjs --report` summarizes stored rounds and
@@ -224,6 +229,39 @@ own notebook entry tagged `validity`, so do not log that pass yourself.
 `provenance_audit` does not read the artifact yet, so a cross-ledger audit still
 sees only the stored claims and citation verdicts.
 
+### 8. Read the advisory score
+
+`score` makes one bounded model call over a stored round and returns four
+dimension readings on a declared numeric scale: `soundness`, `originality`,
+`clarity`, and `significance`. Every dimension must cite one to four stored
+comment ids; a dimension without a numeric reading or a valid citation is
+`not_checked`, never guessed. The overall is the model's score or the mean of
+the scored dimensions (source recorded), plus confidence and limitations.
+
+```text
+deep_review action=score path=paper/main.pdf
+deep_review action=score path=paper/main.pdf round=1 rubric="Score 1–10 ..."
+deep_review action=show path=paper/main.pdf section=score
+```
+
+- The scale and rubric source are in the artifact: a per-call `rubric`, the
+  `DEEP_REVIEW_DEFAULT_RUBRIC` setting, or the built-in 1–5 rubric. A numeric
+  range in the rubric text sets the scale.
+- `evaluator_kind` is `held_out` by default. Pass `rubric_round` on `review`
+  when a prior round's rubric or report fed the revision; that round is
+  `in_distribution`. Old rounds and v1 stores are `held_out` with
+  `evaluator_kind_source: inferred`.
+- A missing model route, failed call, or non-JSON reply completes with
+  `state: not_checked` and a reason. `not_checked` is not a pass.
+- The score is an automated reviewer's reading, **not an acceptance decision, a
+  venue outcome, or a gate**. Read a low dimension as a prompt to inspect its
+  cited comments, not as a target to optimize. When both evaluator kinds exist,
+  quote the held-out reading as the honest headline. The Phase 0 calibration
+  report can correlate stored scores with real decisions and prints
+  `not_checked` below its sample floor.
+- `DEEP_REVIEW_MAX_ROUNDS` and the per-review ceiling setting are optional
+  review budgets; raise or clear them rather than bypassing a refusal.
+
 ## State and artifacts
 
 ```
@@ -237,7 +275,8 @@ sees only the stored claims and citation verdicts.
   citations.json    standalone verify-citations report
   estimate.json     last optional engine estimate
   extra_checks.json stored evaluation-validity checks (states, inventory, evidence, critic)
-  meta.json         input hash, engine/model, params, last run, summary, round index, validity summary
+  score.json        stored advisory dimension score (scale, rubric source, dimensions, comment ids)
+  meta.json         input hash, engine/model, params, last run, summary, round index, validity and score summaries
   runs.jsonl        append-only run history
 ```
 

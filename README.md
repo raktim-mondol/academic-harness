@@ -119,7 +119,11 @@ harness rather than the model, how wide the results grid actually is, and whethe
 feasibility counter-metric is reported beside a speed or memory gain. Each answers `clear`,
 `flagged`, or `not_checked` — a flag names an absence in the text, not a flaw in the work, and
 `not_checked` is not a pass — with at most one critic model call on the session route and none with
-`critic: false`. Artifacts stay in `.dsh/deep-review/<key>/`, and `provenance_audit` indexes the
+`critic: false`. `score` adds four advisory dimension readings — soundness, originality, clarity and
+significance — on a declared scale, each citing stored comment ids; it is one bounded model call,
+never an acceptance decision or a gate. Rounds record whether the reviewer was `held_out` or
+`in_distribution`, and Phase 0 can correlate stored scores with real decisions. Artifacts stay in
+`.dsh/deep-review/<key>/`, and `provenance_audit` indexes the
 claims stored there; it does not read `extra_checks.json` yet.
 [Read more](docs/PAPERS.md#deep-review)
 

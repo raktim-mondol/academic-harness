@@ -114,9 +114,10 @@ Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, gl
 | `pdf2md` | Parse a PDF and store its Markdown plus page and OCR metadata |
 | `verify_citations` | Check bibliography entries without running a full review |
 | `status` | Stored state for a manuscript, including whether it is stale and the round ladder |
-| `show` | Read back `summary`, `comments`, `questions`, `checklist`, `claims`, `citations`, `markdown`, `rounds`, or `validity` |
+| `show` | Read back `summary`, `comments`, `questions`, `checklist`, `claims`, `citations`, `markdown`, `rounds`, `validity`, or `score` |
 | `compare` | Diff two stored review rounds: which findings closed, reopened, changed severity, and which claims, checklist items, or citations moved |
 | `validity` | Four advisory evaluation-validity checks over a stored round plus a deterministic inventory of the manuscript; `round` picks the round, `critic: false` makes no model call |
+| `score` | Advisory `soundness`, `originality`, `clarity`, and `significance` readings on a declared scale, each citing stored comment ids; one bounded model call |
 | `list` | Stored deep reviews under `.dsh/deep-review/` |
 
 `review` returns a compact summary (severity counts, top comments, question and flagged-citation counts, quality-audit scores) and never the full report. Use `show` for details; `show comments` pages with `limit`/`offset` and only includes comment bodies with `include_body: true`. `show citations` covers only references the engine flagged — clean references are omitted upstream, so "no flagged references" is the accurate phrasing.
@@ -149,9 +150,27 @@ The critic is at most one model call, on temperature 0 with a small output budge
 
 The pass writes `extra_checks.json` beside the review, a `meta.validity` summary that `status` reports with whether it still matches the current manuscript, a row in `runs.jsonl`, and its own notebook entry tagged `validity`. Read it back with `show section=validity`, and note that `provenance_audit` does not read `extra_checks.json` yet, so these findings do not appear in a cross-ledger audit. The four states are readings from counting, not a judgement of the paper: they name what was absent from the text, nothing here gates, and only `ah_check` blocks.
 
+### Advisory score and evaluator provenance
+
+`score` reads one stored review round and makes **one bounded model call** on the session route. It returns four dimension readings on a declared numeric scale — `soundness`, `originality`, `clarity`, and `significance` — and every dimension cites one to four comment ids from that stored review. A dimension with no numeric reading or no valid stored comment id is `not_checked`, never guessed; the overall reading is the model's score or the mean of the scored dimensions, with the source recorded, plus confidence and limitations. `score.json` (schema version 1) and `meta.score` sit beside the review, `show section=score` reads them back, and `status` reports the latest overall, scale, round, and whether it still matches the manuscript. The one call is the whole cost; a missing model route, failed call, or non-JSON reply completes with `not_checked` and a reason.
+
+The score's scale and rubric source are named in the artifact: `caller` (a `rubric` argument), `setting` (`DEEP_REVIEW_DEFAULT_RUBRIC`), or `default` (a 1–5 rubric with dimension definitions). A numeric range in the rubric text (`1–5`, `1–10`) sets the declared scale; otherwise 1–5 applies.
+
+**Evaluator provenance is recorded per round.** `evaluator_kind` is `held_out` by default and becomes `in_distribution` when a `review` is given `rubric_round`, naming a prior round whose rubric or report fed the revision. Old rounds and v1 stores are read as `held_out` with `evaluator_kind_source: inferred`; a declared round records the referenced round. This is the paper's own distinction between the reviewer that guided the revision and a held-out reviewer that did not, and it is the honest half of any "reviewer threshold" claim. `show rounds`, `compare`, and `status` expose the kind; the score records the selected round's kind.
+
+Settings:
+
+| Field | Default | Effect |
+|---|---|---|
+| `DEEP_REVIEW_DEFAULT_RUBRIC` | built-in 1–5 rubric | Rubric text and declared range for `score`; a `rubric` argument wins |
+| `DEEP_REVIEW_MAX_ROUNDS` | unset (no limit) | Refuse a new `review` once that many rounds are stored for one manuscript |
+| `DEEP_REVIEW_COST_CEILING_USD` | unset (no ceiling) | Check the engine's median estimate before a review and refuse if it exceeds the amount |
+
+Read the score as **an automated reviewer's reading, not a decision**: it is not an acceptance decision, a venue outcome, or a gate; nothing keys off the number. `not_checked` dimensions are not passes. The Phase 0 calibration report joins stored scores to accepted/rejected decisions and reports point-biserial `r`, AUC, mean scores by bucket, evaluator-kind counts, and a held-out subset; below its sample floor it says `not_checked` rather than inventing a correlation.
+
 ### Calibration
 
-`scripts/deep-review-calibration.mjs` measures the reviewer instead of trusting it. `--collect` builds a sample manifest from OpenReview (real ratings and decisions, no model call); `--report` reads the stored rounds in a workspace and reports reviewer variance — finding overlap between two rounds of an unchanged manuscript — and agreement between severity counts and accepted versus rejected decisions. Both say `not_checked` below their sample floor rather than producing a number that the data does not support. It is not named `test-*.mjs` on purpose: `npm test` globs that prefix, and the collector needs the network.
+`scripts/deep-review-calibration.mjs` measures the reviewer instead of trusting it. `--collect` builds a sample manifest from OpenReview (real ratings and decisions, no model call); `--report` reads the stored rounds in a workspace and reports reviewer variance — finding overlap between two rounds of an unchanged manuscript — agreement between severity counts and accepted versus rejected decisions, and the correlation between stored overall scores and those decisions (point-biserial `r`, AUC, mean scores by bucket, evaluator-kind counts, and a separate held-out subset). Both say `not_checked` below their sample floor rather than producing a number that the data does not support. It is not named `test-*.mjs` on purpose: `npm test` globs that prefix, and the collector needs the network.
 
 `scripts/deep-review-validity-calibration.mjs` is the corpus measurement Phase 2 owed. It takes a manifest of papers, converts PDFs with the simple text converter (no OCR; pages the converter flags for OCR are noted, not processed), runs the same `evaluateValidity` function `deep_review action=validity` uses, and writes `reports/deep-review-validity-<stamp>.{md,json}`. Per check it reports labeled examples, state agreement, flag rate, precision and recall, missed clears (the dangerous error), abstentions, false alarms, and false-positive papers among well-formed studies; it also fails a determinism check if identical bytes produce different states or evidence. Labels are an independent reader's reading, not ground truth, and attribution in corpus mode is text/grid-side unless a manifest row supplies stored-review `claims`/`comments`. The main harness exposes the mode as `--validity --corpus <manifest>`, and `scripts/fixtures/deep-review/validity/corpus.json` is the offline self-test. A manifest row is:
 

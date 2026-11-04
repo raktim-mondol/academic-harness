@@ -90,6 +90,16 @@ These are optional numbers, not credentials. An explicit argument to `coscientis
 | `CO_SCIENTIST_SEED` | unset | Makes a tournament's sampled task schedule reproducible. |
 | `CO_SCIENTIST_EMBED_MODEL` | `text-embedding-004` | Model used by `coscientist embed`; reuses `GEMINI_API_KEY`. |
 
+### Deep review
+
+Optional preferences for `deep_review`. They are read per call; an explicit tool argument wins where one exists.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `DEEP_REVIEW_DEFAULT_RUBRIC` | built-in 1–5 rubric | Rubric text for `score`; a declared range such as `1–5` or `1–10` sets the numeric scale. A per-call `rubric` argument overrides it. |
+| `DEEP_REVIEW_MAX_ROUNDS` | unset (no limit) | Refuse a new `review` once that many rounds are stored for one manuscript. Raise it or review a different path to continue. |
+| `DEEP_REVIEW_COST_CEILING_USD` | unset (no ceiling) | Before a review, check the engine's median cost estimate and refuse if it exceeds this amount. This is a user preference, not an autonomy gate. |
+
 ### Workspace index
 
 | Field | Default | Meaning |
@@ -108,6 +118,7 @@ The Academic Harness preset mounts once as a **standing composition** for the li
 | `IMAGE_MODEL` | Immediately on dropdown selection, no Save |
 | Tournament numbers | New tournaments; explicit arguments win |
 | `ZVEC_GREP_AUTO_INDEX` | The next Academic Harness session, no restart |
+| `DEEP_REVIEW_DEFAULT_RUBRIC`, `DEEP_REVIEW_MAX_ROUNDS`, `DEEP_REVIEW_COST_CEILING_USD` | The next `deep_review` call, no restart |
 | MCP connector keys (Firecrawl, Scite) | After stopping and restarting `dsh` |
 | `SUBAGENT_PRO_*`, `SUBAGENT_VISION_*` | After a `dsh` restart |
 | `ZVEC_GREP_EMBEDDING`, `ZVEC_GREP_API_KEY` | New index runs read the current value; a `dsh` restart also hands it to `zg server on` for the search daemon |

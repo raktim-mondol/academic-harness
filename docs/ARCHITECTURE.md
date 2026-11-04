@@ -79,7 +79,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/deidentify/<slug>/` | `deidentify` | Masked scan reports, redaction records with residual reports, and exports; the workspace-local `.dsh/deidentify/.term-key` keys custom-term hashes |
 | `<cwd>/.dsh/dmp/<slug>/` | `dmp` | Append-only plan inputs and sections; exports |
 | `<cwd>/.dsh/budget/<slug>/` | `grant_budget` | Append-only budget inputs and stored computations; exports |
-| `<cwd>/.dsh/deep-review/<key>/` | `deep_review` | `review.json`, `review.md`, parsed `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `extra_checks.json` (the `validity` checks), `meta.json`, `rounds/<run_id>.json` and `rounds/<run_id>.md` for every kept round, append-only `runs.jsonl` |
+| `<cwd>/.dsh/deep-review/<key>/` | `deep_review` | `review.json`, `review.md`, parsed `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `extra_checks.json` (the `validity` checks), `score.json` (the advisory dimension score), `meta.json`, `rounds/<run_id>.json` and `rounds/<run_id>.md` for every kept round, append-only `runs.jsonl` |
 | `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl` |
 | `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
 | `<cwd>/.zvec-grep/` | zvec-grep | Workspace index |

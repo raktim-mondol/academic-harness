@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url'
 import { matchPool } from '../deep-review.js'
 import { runOpenReview } from '../openreview.js'
 import { runValidityCorpus } from './deep-review-validity-calibration.mjs'
+import { scoreCorrelation } from './calibration-metrics.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = dirname(HERE)
@@ -151,6 +152,7 @@ function storedRounds(root, key) {
     file_name: meta.input?.file_name ?? null,
     sha1: meta.input?.sha1 ?? null,
     engine: meta.engine ?? null,
+    score: readJson(join(dir, 'score.json')),
     actions: (() => {
       const runs = join(dir, 'runs.jsonl')
       if (!existsSync(runs)) return []
@@ -249,6 +251,8 @@ function agreement(stored, sample) {
       comments: latest.detail.counts?.comments ?? null,
       flagged_citations: latest.detail.counts?.flagged_citations ?? null,
       checklist_no: (latest.detail.counts?.checklist_by_status?.NO) ?? 0,
+      score: Number.isFinite(Number(record.score?.overall?.score)) ? Number(record.score.overall.score) : null,
+      evaluator_kind: record.score?.review?.evaluator_kind ?? record.review?.evaluator_kind ?? latest.detail?.evaluator_kind ?? null,
     })
   }
   const bucketOf = (name) => matched.filter((row) => row.bucket === name)
@@ -256,6 +260,7 @@ function agreement(stored, sample) {
   const accepts = bucketOf('accept')
   const rejects = bucketOf('reject')
   const enough = matched.length >= MIN_ROWS_FOR_AGREEMENT && accepts.length && rejects.length
+  const heldOutRows = matched.filter((row) => row.score != null && row.evaluator_kind === 'held_out')
   return {
     matched: matched.length,
     min_rows_for_a_number: MIN_ROWS_FOR_AGREEMENT,
@@ -267,6 +272,8 @@ function agreement(stored, sample) {
           reject: { critical: mean(rejects, (row) => row.critical), major: mean(rejects, (row) => row.major), checklist_no: mean(rejects, (row) => row.checklist_no) },
         }
       : null,
+    score_correlation: scoreCorrelation(matched, { min: MIN_ROWS_FOR_AGREEMENT }),
+    score_correlation_held_out: scoreCorrelation(heldOutRows, { min: MIN_ROWS_FOR_AGREEMENT }),
     detail: matched.slice(0, 20),
     verdict: enough
       ? 'measured — compare against the held-out rule: a reviewer that also guided the revision is not a neutral judge'
@@ -325,11 +332,28 @@ function markdown(report) {
         ]
       : []),
     '',
+    '## Score correlation with real decisions',
+    '',
+    `- ${report.agreement.score_correlation.verdict}`,
+    ...(report.agreement.score_correlation.scored
+      ? [
+          `- scored: ${report.agreement.score_correlation.scored} (${report.agreement.score_correlation.accepts} accepted, ${report.agreement.score_correlation.rejects} rejected; ${report.agreement.score_correlation.held_out} held_out, ${report.agreement.score_correlation.in_distribution} in_distribution)`,
+          ...(report.agreement.score_correlation.auc != null
+            ? [`- mean accepted ${report.agreement.score_correlation.mean_accept}, mean rejected ${report.agreement.score_correlation.mean_reject}; point-biserial r ${report.agreement.score_correlation.point_biserial_r}, AUC ${report.agreement.score_correlation.auc}`]
+            : []),
+        ]
+      : ['- no stored score joined to a decided sample yet; run action "score" in a session, then re-run this report']),
+    `- held-out subset: ${report.agreement.score_correlation_held_out.verdict}`,
+    ...(report.agreement.score_correlation_held_out.auc != null
+      ? [`- held-out: mean accepted ${report.agreement.score_correlation_held_out.mean_accept}, mean rejected ${report.agreement.score_correlation_held_out.mean_reject}; r ${report.agreement.score_correlation_held_out.point_biserial_r}, AUC ${report.agreement.score_correlation_held_out.auc}`]
+      : []),
+    '- A positive r/AUC means the advisory score separates accepted from rejected manuscripts in this sample. It is not a decision predictor, and the held-out subset is the honest headline when both evaluator kinds are present.',
+    '',
     '## Interpretation limits',
     '',
     '- OpenReview decisions are not comparable across venues, and the sample is small by construction.',
     '- If the same reviewer rubric guided a revision, its later score is in-distribution; report the held-out reviewer as the headline number.',
-    '- This harness never runs the reviewer: `deep_review` needs the host llm bridge, so reviews come from a session first.',
+    '- This harness never runs the reviewer or the score: `deep_review` needs the host llm bridge, so reviews and scores come from a session first; the harness reads the stored `score.json`.',
     '',
   ]
   return lines.join('\n')

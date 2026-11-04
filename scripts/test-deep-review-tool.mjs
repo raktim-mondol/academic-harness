@@ -220,6 +220,7 @@ process.exit(3)
 
 const cwd = mkdtempSync(join(tmpdir(), 'ah-deep-review-'))
 const llmCalls = []
+let llmReply = '{"ok":true}'
 const jobEvents = []
 let jobSpec
 let jobHooks
@@ -249,7 +250,7 @@ const ctx = {
     async *stream(options) {
       llmCalls.push(options)
       yield { type: 'block-start', index: 0, blockType: 'text' }
-      yield { type: 'text-delta', index: 0, text: '{"ok":true}' }
+      yield { type: 'text-delta', index: 0, text: llmReply }
       yield { type: 'usage', usage: { inputTokens: 120, outputTokens: 40, totalTokens: 160 } }
       yield { type: 'finish', reason: { kind: 'stop' } }
     },
@@ -269,6 +270,9 @@ const saved = {
   engine: process.env.DEEPREVIEW_ENGINE,
   openai: process.env.OPENAI_API_KEY,
   github: process.env.GITHUB_TOKEN,
+  rubric: process.env.DEEP_REVIEW_DEFAULT_RUBRIC,
+  maxRounds: process.env.DEEP_REVIEW_MAX_ROUNDS,
+  ceiling: process.env.DEEP_REVIEW_COST_CEILING_USD,
 }
 
 let tool
@@ -512,6 +516,7 @@ try {
   assert.equal(l1.round, 1)
   assert.equal(l1.rounds, 1)
   assert.equal(l1.seeded_prior_round, null)
+  assert.equal(l1.evaluator_kind, 'held_out', 'the first review is held out by default')
   assert.equal(l1.usage.calls, 1, 'a round records the bridge token tally')
   assert.equal(l1.usage.prompt_tokens, 120)
   const ldir = storeDir(l1)
@@ -522,9 +527,13 @@ try {
   const runId1 = ladderMeta().rounds[0].run_id
 
   writeFileSync(join(cwd, '.phase2'), 'second fixture')
-  const l2 = await call({ action: 'review', path: 'ladder.md' })
+  const l2 = await call({ action: 'review', path: 'ladder.md', rubric_round: '1' })
   assert.equal(l2.round, 2)
   assert.equal(l2.rounds, 2)
+  assert.equal(l2.evaluator_kind, 'in_distribution', 'a declared rubric round marks the next review in-distribution')
+  assert.deepEqual(l2.rubric_round, { round: 1, run_id: runId1 })
+  assert.equal(ladderMeta().rounds[1].evaluator_kind, 'in_distribution')
+  assert.equal(ladderMeta().review.evaluator_kind, 'in_distribution')
   assert.ok(existsSync(join(cwd, l2.artifacts.round.markdown)), 'round two keeps its own report')
   assert.equal(ladderMeta().rounds.length, 2)
   assert.equal(readFileSync(join(cwd, l2.artifacts.review), 'utf8').includes('rev-0002'), true)
@@ -572,13 +581,140 @@ try {
   assert.equal(s.latest_round, 2)
   assert.equal(s.rounds[0].comments, 4)
   assert.equal(s.rounds[0].model, 'deepseek-flash', 'each round records the reviewer model that produced it')
+  assert.equal(s.rounds[0].evaluator_kind, 'held_out')
+  assert.equal(s.rounds[1].evaluator_kind, 'in_distribution')
   assert.equal(s.rounds[1].reviewed_this_input, true)
   s = await call({ action: 'status', path: 'ladder.md' })
   assert.equal(s.rounds.total, 2)
   assert.equal(s.rounds.totals.model_calls, 2)
   assert.equal(s.rounds.totals.prompt_tokens, 240)
 
-  // 16. a store written before rounds is read as round 1, then kept on upgrade
+  // 16. score: advisory dimensions cite stored comment ids, with evaluator provenance
+  process.env.DEEP_REVIEW_DEFAULT_RUBRIC = 'Score each dimension on a 1–5 scale.'
+  llmReply = JSON.stringify({
+    dimensions: {
+      soundness: { score: 4, reading: 'The causal claim is weakened by the missing intervention.', comment_ids: ['x1'] },
+      originality: { score: 3, reading: 'The contribution is incremental.', comment_ids: ['x2'] },
+      clarity: { score: 4, reading: 'The report is clear.', comment_ids: ['x3'] },
+      significance: { score: 3, reading: 'The result matters modestly.', comment_ids: ['x4'] },
+    },
+    overall: { score: 3.5, reading: 'A promising but incomplete study.' },
+    confidence: 'medium',
+    limitations: ['No external validation.'],
+  })
+  const scoreCalls = llmCalls.length
+  const score = await call({ action: 'score', path: 'ladder.md' })
+  assert.equal(llmCalls.length, scoreCalls + 1, 'score makes exactly one model call')
+  assert.equal(score.action, 'score')
+  assert.equal(score.round, 2)
+  assert.equal(score.evaluator_kind, 'in_distribution')
+  assert.equal(score.evaluator_kind_source, 'declared')
+  assert.deepEqual(score.scale, { min: 1, max: 5, label: '1–5' })
+  assert.equal(score.rubric_source, 'setting')
+  assert.equal(score.state, 'ok')
+  assert.equal(score.dimensions.soundness.score, 4)
+  assert.deepEqual(score.dimensions.soundness.comment_ids, ['x1'])
+  assert.equal(score.dimensions.clarity.score, 4)
+  assert.equal(score.overall.score, 3.5)
+  assert.equal(score.overall.source, 'model')
+  assert.equal(score.confidence, 'medium')
+  assert.deepEqual(score.limitations, ['No external validation.'])
+  assert.equal(score.usage.completion_tokens, 40)
+  const scoreFile = join(ldir, 'score.json')
+  assert.ok(existsSync(scoreFile), 'score.json is stored')
+  const scoreMeta = ladderMeta().score
+  assert.equal(scoreMeta.evaluator_kind, 'in_distribution')
+  assert.equal(scoreMeta.overall, 3.5)
+  assert.equal(scoreMeta.round, 2)
+  const shownScore = await call({ action: 'show', path: 'ladder.md', section: 'score' })
+  assert.equal(shownScore.section, 'score')
+  assert.equal(shownScore.dimensions.soundness.score, 4)
+  assert.equal(shownScore.review.evaluator_kind, 'in_distribution')
+  const statusScore = await call({ action: 'status', path: 'ladder.md' })
+  assert.equal(statusScore.score.overall, 3.5)
+  assert.equal(statusScore.score.current, true)
+  const renderedScore = tool.output.render({}, score)
+  assert.match(renderedScore[0].text, /Advisory score/)
+  assert.match(renderedScore[0].text, /not an acceptance decision/)
+  assert.match(renderedScore[0].text, /soundness: 4\/5/)
+  assert.match(renderedScore[0].text, /x1/)
+
+  // A dimension with no valid stored comment id is not_checked; no dimension
+  // can carry an unsupported score.
+  llmReply = JSON.stringify({
+    dimensions: {
+      soundness: { score: 5, reading: 'No citation.', comment_ids: ['missing'] },
+      originality: { score: 5, reading: 'No citation.', comment_ids: ['missing'] },
+      clarity: { score: 5, reading: 'No citation.', comment_ids: ['missing'] },
+      significance: { score: 5, reading: 'No citation.', comment_ids: ['missing'] },
+    },
+    overall: { score: 5, reading: 'Unsupported.' },
+  })
+  const uncited = await call({ action: 'score', path: 'ladder.md' })
+  assert.equal(uncited.state, 'not_checked')
+  assert.equal(uncited.dimensions.soundness.state, 'not_checked')
+  assert.equal(uncited.overall.state, 'not_checked')
+
+  // A null score is an abstention, not a zero.
+  llmReply = JSON.stringify({
+    dimensions: {
+      soundness: { score: null, reading: 'No numeric reading.', comment_ids: ['x1'] },
+      originality: { score: 3, reading: 'Incremental.', comment_ids: ['x2'] },
+      clarity: { score: 4, reading: 'Clear.', comment_ids: ['x3'] },
+      significance: { score: 3, reading: 'Modest.', comment_ids: ['x4'] },
+    },
+    overall: { score: 3, reading: 'Mixed.' },
+  })
+  const nullScore = await call({ action: 'score', path: 'ladder.md' })
+  assert.equal(nullScore.dimensions.soundness.state, 'not_checked')
+  assert.equal(nullScore.state, 'ok')
+  assert.equal(nullScore.overall.score, 3)
+
+  // No host llm route: the score is not_checked, not an error or a silent pass.
+  const savedLlm = ctx.llm
+  ctx.llm = null
+  const noLlmScore = await call({ action: 'score', path: 'ladder.md' })
+  assert.equal(noLlmScore.state, 'not_checked')
+  assert.match(noLlmScore.reason, /host llm service/)
+  ctx.llm = savedLlm
+
+  // The setting can declare a different scale; the artifact names the source.
+  process.env.DEEP_REVIEW_DEFAULT_RUBRIC = 'Score each dimension on a 1–10 scale.'
+  llmReply = JSON.stringify({
+    dimensions: {
+      soundness: { score: 7, reading: 'Solid.', comment_ids: ['x1'] },
+      originality: { score: 7, reading: 'New enough.', comment_ids: ['x2'] },
+      clarity: { score: 7, reading: 'Clear.', comment_ids: ['x3'] },
+      significance: { score: 7, reading: 'Relevant.', comment_ids: ['x4'] },
+    },
+    overall: { score: 7, reading: 'Strong.' },
+    confidence: 'high',
+    limitations: [],
+  })
+  const scaled = await call({ action: 'score', path: 'ladder.md' })
+  assert.deepEqual(scaled.scale, { min: 1, max: 10, label: '1–10' })
+  assert.equal(scaled.rubric_source, 'setting')
+  assert.equal(scaled.overall.score, 7)
+  delete process.env.DEEP_REVIEW_DEFAULT_RUBRIC
+  llmReply = '{"ok":true}'
+
+  // 17. the round limit setting refuses a review before spending the engine run
+  writeFileSync(join(cwd, 'limit.md'), '# Limit\n')
+  process.env.DEEP_REVIEW_MAX_ROUNDS = '1'
+  const limitOne = await call({ action: 'review', path: 'limit.md' })
+  assert.equal(limitOne.round, 1)
+  const limitTwo = await call({ action: 'review', path: 'limit.md' })
+  assert.match(limitTwo.error, /review round limit reached/)
+  delete process.env.DEEP_REVIEW_MAX_ROUNDS
+
+  // 18. the per-review cost ceiling blocks before the review job is created
+  writeFileSync(join(cwd, 'ceiling.md'), '# Ceiling\n')
+  process.env.DEEP_REVIEW_COST_CEILING_USD = '1'
+  const blocked = await call({ action: 'review', path: 'ceiling.md' })
+  assert.match(blocked.error, /exceeds DEEP_REVIEW_COST_CEILING_USD/)
+  delete process.env.DEEP_REVIEW_COST_CEILING_USD
+
+  // 19. a store written before rounds is read as round 1, then kept on upgrade
   writeFileSync(join(cwd, 'legacy.md'), '# Legacy\n\nOld store.\n')
   const legacyDir = join(cwd, '.dsh', 'deep-review', createHash('sha1').update('legacy.md').digest('hex').slice(0, 16))
   mkdirSync(legacyDir, { recursive: true })
@@ -639,5 +775,13 @@ try {
   else process.env.OPENAI_API_KEY = saved.openai
   if (saved.github == null) delete process.env.GITHUB_TOKEN
   else process.env.GITHUB_TOKEN = saved.github
+  for (const [name, value] of [
+    ['DEEP_REVIEW_DEFAULT_RUBRIC', saved.rubric],
+    ['DEEP_REVIEW_MAX_ROUNDS', saved.maxRounds],
+    ['DEEP_REVIEW_COST_CEILING_USD', saved.ceiling],
+  ]) {
+    if (value == null) delete process.env[name]
+    else process.env[name] = value
+  }
   rmSync(cwd, { recursive: true, force: true })
 }

@@ -3,7 +3,8 @@
  * connectors, image generation, and remote-compute tools, plus a handful of
  * non-secret preferences (IMAGE_MODEL, SUBAGENT_PRO_BASE_URL,
  * SUBAGENT_PRO_MODEL, SUBAGENT_VISION_BASE_URL, SUBAGENT_VISION_MODEL,
- * ZVEC_GREP_EMBEDDING, ZVEC_GREP_AUTO_INDEX) that ride
+ * DEEP_REVIEW_DEFAULT_RUBRIC, DEEP_REVIEW_MAX_ROUNDS,
+ * DEEP_REVIEW_COST_CEILING_USD, ZVEC_GREP_EMBEDDING, ZVEC_GREP_AUTO_INDEX) that ride
  * along in the same schema/UI section for convenience — editable from
  * Settings -> Academic Harness API keys.
  * Registered at plugin load; resolveEnv() (credential-env.js) reads the live
@@ -83,6 +84,9 @@ export const KEY_FIELDS = [
   'CO_SCIENTIST_DUP_THRESHOLD',
   'CO_SCIENTIST_SEED',
   'CO_SCIENTIST_EMBED_MODEL',
+  'DEEP_REVIEW_DEFAULT_RUBRIC',
+  'DEEP_REVIEW_MAX_ROUNDS',
+  'DEEP_REVIEW_COST_CEILING_USD',
   'ZVEC_GREP_EMBEDDING',
   'ZVEC_GREP_API_KEY',
   'ZVEC_GREP_AUTO_INDEX',

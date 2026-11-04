@@ -1,6 +1,6 @@
 # ScientistTwo → Academic Harness: implementation roadmap
 
-Status: **Phases 0, 1, and 2 implemented; Phases 3–10 are plan.** See §3 for what shipped and what is still proposed.
+Status: **Phases 0–3 implemented; Phases 4–10 are plan.** See §3 for what shipped and what is still proposed.
 Source paper: *ScientistTwo: Pioneering the Human Knowledge Frontier with Autonomous AI* (Google Cloud AI Research — J. Nam, J. Yoon, et al.), LaTeX bundle reviewed locally.
 Shaping decision: the plugin stays **advisory**. ScientistTwo's contribution we keep is its *control structure* — critic verdicts, per-stage round budgets, attribution-before-acceptance, staged compute, and post-hoc integrity audits. Its autonomy we do not keep.
 
@@ -117,14 +117,16 @@ Both sections print `not_checked` below their sample floor (3 same-manuscript pa
 **Vendor policy:** these are criteria, so they *could* live in `prompts.ts`/`review_heuristics.ts`. Default is wrapper-side to keep `VENDOR_COMMIT` (`deep-review.js:27`) unpinned-dragged; any vendor edit is recorded in `vendor/open-deepreview/SOURCE.txt` and `NOTICE` and the commit is re-pinned. Revisit only if Phase 0 shows the wrapper pass is structurally limited. **Shipped as wrapper-side, as decided.**
 **Exit:** catches the four cases on fixtures with no false positives on well-formed papers, measured against Phase 0. Fixture half ✅ (a well-formed study raises no flags; the live Web UI pass on Markdown and PDF rounds is recorded in the CHANGELOG). Phase 0 measurement ✅ on the 14-paper corpus: **0 false-positive papers, 0 false alarms on every check, 43/56 overall state agreement, determinism mismatches 0**; `attribution` 14/14, `evaluator_drift` 8/14 with one missed clear, `benchmark_coverage` 10/14 and `unmeasured_trade_off` 11/14 with no false alarms (abstentions dominate). The corpus has no reader-flagged coverage/trade-off failures, so their recall remains fixture-backed rather than corpus-measured; the evaluator miss is a granularity change the keyword rule cannot see.
 
-### Phase 3 — Advisory score with evaluator provenance · M
+### Phase 3 — Advisory score with evaluator provenance · M · ✅ implemented
 
-- Dimension readings (soundness / originality / clarity / significance) on a declared venue scale, each citing the comment ids that produced it; `show` section `score`. Scale source named in the artifact; nothing keys a gate off the number.
-- **`evaluator_kind: in_distribution | held_out`** — recorded per round, and set to `in_distribution` whenever a prior round's rubric text fed revision. This is the paper's own methodological split (ScholarPeer in-loop, Stanford Agentic Reviewer held out) and it is the honest half of "reviewer threshold".
-- Settings additions (extend the existing block listed in `docs/TOOLS.md` §Settings-only surfaces): default rubric, max rounds, per-run cost ceiling.
-- Wording reviewed for verdict-creep in `prompt.js`, `docs/PAPERS.md`, `docs/WRITING.md`.
+- **`score` action on `deep_review`.** One bounded model call reads a stored review round and returns `soundness`, `originality`, `clarity`, and `significance` readings on a declared numeric scale. Every dimension cites one to four stored comment ids; a dimension with no numeric reading or no valid citation is `not_checked`, never guessed. The overall reading is the model's score or the mean of the scored dimensions, with its source recorded, plus confidence and limitations. `score.json` (`schemaVersion` 1), `meta.score`, `show section=score`, and `status` expose it. The one call is on the session route; a missing route, failed call, or non-JSON reply completes with `not_checked` and a reason.
+- **Evaluator provenance.** Every review round records `evaluator_kind: held_out | in_distribution`. The default is `held_out`; pass `rubric_round` on `review` when a prior round's rubric or report fed the revision, and the next round is recorded `in_distribution` with the referenced round. Old rounds and v1 stores read as `held_out` with `evaluator_kind_source: inferred`. `show rounds`, `compare`, and `status` expose the kind; the score records the selected round's kind.
+- **Settings.** `DEEP_REVIEW_DEFAULT_RUBRIC` (rubric text and declared range), `DEEP_REVIEW_MAX_ROUNDS` (refuse a review at the limit), and `DEEP_REVIEW_COST_CEILING_USD` (engine median estimate checked before a review) are read per call, default to no restriction, and appear in Settings. This extends the block in `docs/TOOLS.md` §Settings-only surfaces.
+- **Phase 0 correlation.** `deep-review-calibration.mjs --report` reads stored scores, joins the overall score to accepted/rejected decisions, and reports mean scores by bucket, point-biserial `r`, AUC, evaluator-kind counts, and a held-out subset. Below the existing sample floor it says `not_checked`. The dependency-free metrics live in `scripts/calibration-metrics.mjs`; `test-deep-review-calibration-report.mjs` exercises the report on synthetic scored stores.
+- **Wording.** `prompt.js`, `docs/PAPERS.md`, and `docs/WRITING.md` state the advisory posture: the score is an automated reading, not an acceptance decision or a gate, and the held-out subset is the honest headline when both evaluator kinds are present.
+- **Tests.** `test-deep-review-tool.mjs` covers the score, citation filtering, evaluator provenance, scale source, round limit, cost ceiling, and store/show/status; `test-deep-review-score-correlation.mjs` covers the metrics; `test-deep-review-calibration-report.mjs` covers the report path.
 
-**Exit:** Phase 0 harness reports correlation against real decisions; docs state advisory posture in the tool's own description text.
+**Exit:** Phase 0 harness reports correlation against real decisions; docs state advisory posture in the tool's own description text. ✅ — the report path and metrics are implemented and tested; it prints `not_checked` until a workspace has at least six scored reviews joined to a decided sample with both classes.
 
 ### Phase 4 — Staged experimentation contract · M–L · unblocks 5, 7, 8
 

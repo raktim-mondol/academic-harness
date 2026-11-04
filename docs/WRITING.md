@@ -52,6 +52,12 @@ In a project directory:
 
 T3 (does this cited clause match the source) is advisory and never a gate. Optional model backends in `ah.yaml` are `http` (OpenAI-compatible, including local Ollama) or `command`. The engine's unused `pi` backend is not required.
 
+## Deep review scores are advisory
+
+`deep_review action=score` is an automated reviewer's reading of a stored round, not a venue decision. It makes one bounded model call and returns `soundness`, `originality`, `clarity`, and `significance` on a declared scale; each dimension must cite stored comment ids, and a dimension without a citation is `not_checked`. Read it with `show section=score` and treat a low number as a prompt to inspect the cited comments, not as a reason to rewrite prose until the number rises.
+
+The same reviewer can be `held_out` or `in_distribution`. The default is held out; when a prior round's rubric or report guided the revision, pass `rubric_round` to the next `review` so the tool records the honest kind. A held-out reading is the one to quote when both exist. `DEEP_REVIEW_DEFAULT_RUBRIC`, `DEEP_REVIEW_MAX_ROUNDS`, and `DEEP_REVIEW_COST_CEILING_USD` set the rubric/scale and the review budget; none of them keys a gate, and only `ah_check` blocks. Do not present the score as an acceptance probability, a venue prediction, or a target to optimize.
+
 ## Supervisor-Skills paper lifecycle
 
 The bundled [Supervisor-Skills](https://github.com/HKUSTDial/Supervisor-Skills) suite adds 12 stage-specific skills for general paper work outside an `ah.yaml` project:

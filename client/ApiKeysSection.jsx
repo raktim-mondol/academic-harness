@@ -68,6 +68,9 @@ const KEYS = [
   { field: 'CO_SCIENTIST_DUP_THRESHOLD', label: 'Duplicate gate', group: 'Hypothesis tournament', hint: 'Similarity (0-1) at which `coscientist` add discards a near-duplicate hypothesis. Leave empty for the measure default (0.70 lexical, 0.92 cosine); set 1 to turn the gate off.' },
   { field: 'CO_SCIENTIST_SEED', label: 'Schedule seed', group: 'Hypothesis tournament', hint: 'Number that makes a tournament\'s sampled task schedule reproducible. Leave empty for a non-deterministic run.' },
   { field: 'CO_SCIENTIST_EMBED_MODEL', label: 'Embedding model', group: 'Hypothesis tournament', hint: 'Optional. Model for `coscientist embed`, which switches the duplicate gate to cosine. Defaults to text-embedding-004 and needs GEMINI_API_KEY; leave empty to keep the lexical gate, which needs no key and no network.' },
+  { field: 'DEEP_REVIEW_DEFAULT_RUBRIC', label: 'Default score rubric', group: 'Deep review', type: 'text', hint: 'Rubric for `deep_review action=score`. Include a declared numeric range such as "1–5" or "1–10"; otherwise the default 1–5 scale applies. The rubric source is recorded in score.json. Leave empty for the built-in rubric.' },
+  { field: 'DEEP_REVIEW_MAX_ROUNDS', label: 'Max review rounds', group: 'Deep review', type: 'text', hint: 'Optional. Refuse a new `review` once this many rounds are stored for one manuscript. Leave empty or 0 for no limit. A round after a revision is what makes `compare` meaningful.' },
+  { field: 'DEEP_REVIEW_COST_CEILING_USD', label: 'Per-review cost ceiling (USD)', group: 'Deep review', type: 'text', hint: 'Optional. Before a review, ask the engine for its median cost estimate and refuse if it exceeds this amount. Leave empty or 0 for no ceiling. This is a user preference, not an autonomy gate.' },
   { field: 'ZVEC_GREP_AUTO_INDEX', label: 'Index at session start', group: 'Workspace search (zvec-grep)', type: 'select', options: ZVEC_GREP_AUTO_INDEX_OPTIONS, hideCustom: true, hint: 'Default is No. When No, you can still ask in chat to index, and the agent will ask first when semantic search would help. When Yes, an Academic Harness session indexes that workspace in the background if no index exists yet. Applies to the next session — no restart. While indexing, a progress bar with estimated time and Cancel appear here and in the session header. There is no timeout.' },
   { field: 'ZVEC_GREP_EMBEDDING', label: 'zvec-grep embedding', group: 'Workspace search (zvec-grep)', type: 'select', options: ZVEC_GREP_EMBEDDING_OPTIONS, hint: 'Default local model for new zg indexes (potion-retrieval-32m, ~130 MB download, no API key). Existing indexes keep their stored model. A new index run uses the current value; restart dsh so the search daemon uses it too.' },
   { field: 'ZVEC_GREP_API_KEY', label: 'zvec-grep remote embedding key', group: 'Workspace search (zvec-grep)', hint: 'Leave empty. Only needed for a remote (Qwen) embedding model, not for the default local Potion models.' },
@@ -310,7 +313,7 @@ export function ApiKeysSection(props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', padding: '4px 0' }}>
       <p style={{ margin: 0, opacity: 0.75, fontSize: '0.9em' }}>
-        API keys for Academic Harness's academic- and web-search connectors, image generation, remote-compute tools, and optional zvec-grep remote embeddings.
+        API keys for Academic Harness's academic- and web-search connectors, image generation, remote-compute tools, optional zvec-grep remote embeddings, and the deep-review score preferences.
         A key set here is used only when the matching environment variable isn't already set when DSH starts.
       </p>
       {!writable && (

@@ -642,8 +642,13 @@
           # (attribution, evaluator drift, benchmark coverage, unmeasured trade-off)
           # over a stored round plus a deterministic manuscript inventory, writing
           # extra_checks.json; it makes at most one critic call and none with
-          # `critic: false`. estimate, pdf2md, status, show, compare, and list make no
-          # model call. Advisory only: nothing here gates, and only ah_check blocks.
+          # `critic: false`. `score` makes one bounded call for advisory
+          # soundness/originality/clarity/significance readings on a declared scale,
+          # each citing stored comment ids, writing score.json; rounds record
+          # held_out vs in_distribution (pass rubric_round when a prior rubric fed a
+          # revision). Settings: default rubric, max rounds, per-review cost ceiling.
+          # estimate, pdf2md, status, show, compare, and list make no model call.
+          # Advisory only: nothing here gates, and only ah_check blocks.
           # Node-only, no Bun.
           # See deep-review.js and vendor/open-deepreview/SOURCE.txt.
           - id: deep-review

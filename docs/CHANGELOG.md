@@ -2,6 +2,18 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+Phase 3 of [ScientistTwo → Academic Harness](SCIENTISTTWO-ROADMAP.md): the advisory score with evaluator provenance.
+
+- **New `score` action on `deep_review`.** One bounded model call reads a stored review round and returns advisory `soundness`, `originality`, `clarity`, and `significance` readings on a declared numeric scale, each citing one to four stored comment ids. A dimension with no numeric reading or no valid comment id is `not_checked`, never guessed. The overall reading is the model's score or the mean of the scored dimensions (source recorded), with confidence and limitations. The scale and rubric source (`caller`, `setting`, or `default`) are recorded; no acceptance decision, venue outcome, or gate is produced.
+- **No model route is not a pass.** A session without the host LLM service, a failed call, or a non-JSON reply still completes and stores `score.json` with `state: not_checked` and the reason. `show section=score` and `status` read it back; `score.json` (`schemaVersion` 1) and `meta.score` are new artifacts on the existing v2 store, with the same v1 materialization as `validity`.
+- **Evaluator provenance per round.** Every review round records `evaluator_kind: held_out | in_distribution`. The default is `held_out`; pass `rubric_round` on `review` when a prior round's rubric or report fed the revision, and the next round is recorded `in_distribution` with the referenced round. Old rounds and v1 stores are read as `held_out` with `evaluator_kind_source: inferred`. The score records the selected round's kind, and `show rounds`, `compare`, and `status` expose it.
+- **Settings.** `DEEP_REVIEW_DEFAULT_RUBRIC` sets the score rubric and its declared scale; `DEEP_REVIEW_MAX_ROUNDS` refuses a review once that many rounds are stored; `DEEP_REVIEW_COST_CEILING_USD` checks the engine's median estimate before a review and refuses if it exceeds the ceiling. All three are read per call, default to no restriction, and are editable in Settings → Academic Harness API keys.
+- **Phase 0 score correlation.** `scripts/deep-review-calibration.mjs --report` now reads stored `score.json`, joins the overall score to accepted/rejected decisions, and reports point-biserial `r`, AUC, mean scores by bucket, evaluator-kind counts, and a separate held-out subset. It prints `not_checked` below the existing sample floor instead of a number the data cannot carry. `scripts/calibration-metrics.mjs` holds the dependency-free metrics and has an offline test.
+- **Wording.** `prompt.js`, `docs/PAPERS.md`, and `docs/WRITING.md` state the advisory posture explicitly: the score is an automated reading, not an acceptance decision, and nothing keys a gate off it.
+- Tests: `scripts/test-deep-review-tool.mjs` covers the score, citation filtering, evaluator provenance, round limit, cost ceiling, scale source, and store/show/status surfaces; `scripts/test-deep-review-score-correlation.mjs` tests the metrics; `scripts/test-deep-review-calibration-report.mjs` exercises the report end-to-end on synthetic scored stores.
+
 ## 0.42.0
 
 Phase 2 of [ScientistTwo → Academic Harness](SCIENTISTTWO-ROADMAP.md): the evaluation-validity criteria, landed wrapper-side as one new action. Nothing in `vendor/` moved, so `VENDOR_COMMIT` stays unpinned-dragged.
