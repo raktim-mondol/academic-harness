@@ -4,6 +4,10 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+## 0.43.1
+
+- **Fix `deep_research` run ordering.** `listRuns` now breaks identical `created_at` timestamps by descending run id, so `runs` and `status` reliably report the newest run first even when two runs start in the same millisecond. This was exposed by CI, where the previous tie fell back to directory order.
+
 ## 0.43.0
 
 Phases 3–6 of [ScientistTwo → Academic Harness](SCIENTISTTWO-ROADMAP.md): the advisory review score with evaluator provenance, the staged experiment contract, the ablation ledger, and limitation, trace, selection, and grounded-novelty records on the hypothesis tournament.
