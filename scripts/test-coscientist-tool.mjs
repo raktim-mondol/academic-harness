@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { apply as applyTournament, runCosc } from '../coscientist.js'
 import { apply as applyRank, runCoscRank } from '../coscientist-rank.js'
 import { attachVectors, addHypothesis, proposeMatch, recordFeedback, recordProvenance, startTournament } from '../coscientist-store.js'
+import { logExperimentRun, startExperiment, verdictExperiment } from '../experiment-store.js'
 
 const cwd = mkdtempSync(join(tmpdir(), 'ah-cosc-tool-'))
 const exec = { agent: { session: { header: { cwd } } } }
@@ -93,7 +94,9 @@ try {
   assert.match(rank.description, /BOTH presentation orders/)
   assert.ok(Object.keys(tournamentParams).length > 20, 'the tournament tool must expose the whole surface')
   assert.equal(tournamentParams.stage.enum.length, 5)
-  assert.equal(tournamentParams.action.enum.length, 14)
+  assert.equal(tournamentParams.action.enum.length, 17)
+  assert.deepEqual(tournamentParams.limitation_action.enum, ['add', 'verify', 'status'])
+  assert.deepEqual(tournamentParams.limitation_verdict.enum, ['sufficient', 'insufficient'])
   assert.equal(rankParams.action.enum.length, 6)
   assert.deepEqual(rankParams.verdict_ab.enum, ['A', 'B', 'draw'])
   assert.deepEqual(tournamentParams.constraints.items.type, 'string')
@@ -594,6 +597,123 @@ try {
   assert.match(graphFile.path, /exports\/tournament\.mmd$/)
   assert.match(readFileSync(join(cwd, graphFile.path), 'utf8'), /flowchart TD/)
   await assert.rejects(() => runCosc({ action: 'export', slug: 'phase4', format: 'mermaid' }, embedExec), /already exists/)
+
+  // ── Phase 6: limitation, select, trace through the tool surface ───────────
+  const p6 = 'phase6-tool'
+  const p6exec = { agent: { session: { header: { cwd } } } }
+  await tournament.execute({ action: 'start', slug: p6, goal: 'Phase 6 tool surface', max_hypotheses: 4, step_budget: 200, seed: 11 }, p6exec)
+  const p6a = await tournament.execute({
+    action: 'add', slug: p6,
+    title: 'Pooled sampling hides the distal compartment effect',
+    summary: 'A pooled assay cannot separate distal loss from somatic compensation.',
+    content: 'The pooled assay hides the distal effect and predicts no compartment-specific rescue.',
+    rationale: 'The measurement averages away the proposed location of action.',
+  }, p6exec)
+  assert.equal(p6a.hypothesis.id, 'h1')
+
+  const p6limit = await tournament.execute({
+    action: 'limitation', slug: p6, limitation_action: 'add',
+    flaw: 'The claim is about a distal compartment but the assay pools every compartment.',
+    why: 'Pooling removes the spatial variable, so the prediction is not identifiable.',
+    opportunities: ['compartment-resolved sampling', 'proximal washout control'],
+    quote: 'The pooled assay hides the distal effect',
+    source: 'h1',
+  }, p6exec)
+  assert.equal(p6limit.limitation.id, 'l1')
+  assert.match(text(renderTournament(p6limit)), /Recorded limitation/)
+  assert.match(text(renderTournament(p6limit)), /addresses_limitation/)
+
+  const p6b = await tournament.execute({
+    action: 'add', slug: p6, addresses_limitation: ['l1'],
+    title: 'A compartment-resolved assay identifies the distal buffer effect',
+    summary: 'Measuring each compartment separately removes the pooled-readout confound.',
+    content: 'Predicts that the distal reading, not the somatic reading, tracks axon loss.',
+    rationale: 'The measurement is taken where the mechanism is claimed to act.',
+  }, p6exec)
+  assert.deepEqual(p6b.hypothesis.limitation_ids, ['l1'])
+  assert.match(text(renderTournament(p6b)), /Addresses limitations: l1/)
+
+  // The limitation cannot be verified before it exists, and a bad subaction is refused.
+  const noLimit = await tournament.execute({
+    action: 'limitation', slug: p6, limitation_action: 'verify', limitation_id: 'l404',
+    limitation_verdict: 'insufficient', limitation_reason: 'missing',
+  }, p6exec)
+  assert.match(noLimit.error, /unknown limitation id/)
+  await assert.rejects(
+    () => runCosc({ action: 'limitation', slug: p6, limitation_action: 'maybe' }, p6exec),
+    /limitation_action must be one of/,
+  )
+
+  for (const id of ['h1', 'h2']) {
+    for (const stage of stages) {
+      await tournament.execute({ action: 'review', slug: p6, id, stage, verdict: 'pass', ...scoreCard }, p6exec)
+    }
+  }
+
+  let p6verify = await tournament.execute({
+    action: 'limitation', slug: p6, limitation_action: 'verify', limitation_id: 'l1',
+    limitation_verdict: 'insufficient', limitation_reason: 'still pooled', max_rounds: 2,
+  }, p6exec)
+  assert.equal(p6verify.limitation.state, 'insufficient')
+  assert.match(text(renderTournament(p6verify)), /round 1\/2/)
+  p6verify = await tournament.execute({
+    action: 'limitation', slug: p6, limitation_action: 'verify', limitation_id: 'l1',
+    limitation_verdict: 'insufficient', limitation_reason: 'no compartment control', max_rounds: 2,
+  }, p6exec)
+  assert.equal(p6verify.exhausted, true)
+  assert.match(text(renderTournament(p6verify)), /round cap is spent/)
+
+  const p6status = await tournament.execute({ action: 'limitation', slug: p6, limitation_action: 'status' }, p6exec)
+  assert.equal(p6status.coverage.covered, 1)
+  assert.match(text(renderTournament(p6status)), /\| id \| state \| rounds \| addressed by \| flaw \|/)
+  assert.match(text(renderTournament(p6status)), /\| l1 \| exhausted \| 2\/2 \| h2 \|/)
+
+  const p6selected = await tournament.execute({
+    action: 'select', slug: p6, id: 'h2', compared_ids: ['h1'],
+    rationale: 'The compartment-resolved assay answers the recorded limitation and its prediction is measurable.',
+  }, p6exec)
+  assert.equal(p6selected.selection.champion_id, 'h2')
+  assert.match(p6selected.selection.evidence_digest, /^sha256:/)
+  assert.match(text(renderTournament(p6selected)), /Selected `h2` as champion/)
+  const p6board = await tournament.execute({ action: 'status', slug: p6 }, p6exec)
+  assert.equal(p6board.board.champion.id, 'h2')
+  assert.match(text(renderTournament(p6board)), /Champion \(frozen by `select`\)/)
+  const missingWhy = await tournament.execute({ action: 'select', slug: p6, id: 'h2' }, p6exec)
+  assert.match(missingWhy.error, /rationale is required/)
+
+  // Experiment traces: one failed run and one good run, both naming h2.
+  await startExperiment({ cwd, slug: 'phase6-tool-exp', experiment: { question: 'Do compartment readings track axon loss?', metrics: [{ name: 'accuracy', direction: 'higher' }] } })
+  const goodToolRun = await logExperimentRun({ cwd, slug: 'phase6-tool-exp', params: { hypothesis_id: 'h2' }, metrics: { accuracy: 0.8 } })
+  const badToolRun = await logExperimentRun({ cwd, slug: 'phase6-tool-exp', params: { hypothesis_id: 'h2', variant: 'pooled' }, metrics: { accuracy: 0.52 } })
+  await verdictExperiment({ cwd, slug: 'phase6-tool-exp', runId: badToolRun.run.run_id, verdict: 'bad', reason: 'pooling erases the gain' })
+
+  const traced = await tournament.execute({ action: 'trace', slug: p6, experiment: 'phase6-tool-exp', id: 'h2' }, p6exec)
+  assert.equal(traced.total_runs, 2)
+  assert.equal(traced.failed_total, 1)
+  assert.equal(traced.pruned_total, 1)
+  assert.equal(traced.runs[0].state, 'pruned', 'failed runs are returned first')
+  assert.match(traced.notes[0], /pooling erases the gain/)
+  assert.match(text(renderTournament(traced)), /PRUNED phase6-tool-exp\/x0002/)
+  assert.ok(goodToolRun.run.run_id && badToolRun.run.run_id)
+
+  // An evolution dispatch carries the failed trace as a constraint.
+  let evolutionDispatch = null
+  for (let i = 0; i < 80 && !evolutionDispatch; i += 1) {
+    const dispatched = await tournament.execute({ action: 'next', slug: p6 }, p6exec)
+    assert.equal(dispatched.error, undefined, dispatched.error)
+    if (dispatched.terminate) break
+    if (dispatched.task === 'evolution') evolutionDispatch = dispatched
+  }
+  assert.ok(evolutionDispatch, 'a seeded tournament with an active pool must eventually sample evolution')
+  assert.equal(evolutionDispatch.traces.failed_total, 1)
+  assert.match(text(renderTournament(evolutionDispatch)), /Experiment traces to respect/)
+  assert.match(text(renderTournament(evolutionDispatch)), /pooling erases the gain/)
+
+  const p6export = await tournament.execute({ action: 'export', slug: p6, format: 'markdown' }, p6exec)
+  assert.equal(p6export.error, undefined, p6export.error)
+  const p6exportBody = readFileSync(join(cwd, p6export.path), 'utf8')
+  assert.match(p6exportBody, /## Limitations/)
+  assert.match(p6exportBody, /## Selected champion/)
 
   console.log('coscientist-tool OK')
 } finally {

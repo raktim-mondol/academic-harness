@@ -3,8 +3,10 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  CITATION_STATUSES, CLAIM_SUPPORTS, MAX_CITATIONS_PER_CALL, MIN_SHARED_TOKENS, TITLE_MATCH_THRESHOLD,
-  apply, extractDoi, runCoscVerify, titleSimilarity, titleTokens, verifyCitation,
+  CITATION_STATUSES, CLAIM_SUPPORTS, MAX_CITATIONS_PER_CALL, MIN_SHARED_TOKENS, NOVELTY_DEFAULT_REFERENCES,
+  NOVELTY_MAX_REFERENCES, NOVELTY_METHOD, TITLE_MATCH_THRESHOLD,
+  apply, bestQuoteSpan, cleanAbstract, extractDoi, referenceFromCrossref, referenceOverlap, runCoscVerify,
+  titleSimilarity, titleTokens, verifyCitation,
 } from '../coscientist-verify.js'
 import { addHypothesis, deriveState, recordReview, startTournament, leaderboard } from '../coscientist-store.js'
 import { resetLimitersForTests } from '../search-http.js'
@@ -77,6 +79,43 @@ const baseRoutes = [
     ok: true, status: 200,
     data: { id: 'https://openalex.org/W2', doi: `https://doi.org/${RETRACTED_DOI}`, display_name: 'A study of cryptic exon inclusion that was withdrawn', is_retracted: true, is_paratext: false },
   }],
+  ['query.bibliographic=Ribosomal stalling gates the stress-granule response', {
+    ok: true,
+    status: 200,
+    data: { message: { items: [
+      {
+        DOI: '10.1000/near-stall',
+        title: ['Ribosomal stalling at short uORFs gates stress-granule assembly'],
+        issued: { 'date-parts': [[2021]] },
+        'container-title': ['Molecular Cell'],
+        abstract: '<jats:p>Stalling at a short uORF limits granule assembly after arsenite exposure. The effect is specific to the uORF and not a general translation block.</jats:p>',
+      },
+      {
+        DOI: '10.1000/far-stall',
+        title: ['Stress granules are buffering-driven assemblies'],
+        issued: { 'date-parts': [[2019]] },
+        'container-title': ['Cell Reports'],
+        abstract: '<jats:p>Granule assembly follows a buffering threshold rather than ribosomal stalling.</jats:p>',
+      },
+    ] } },
+  }],
+  ['query.bibliographic=Booming novelty retrieval', { ok: false, status: 500, error: 'server' }],
+  ['query.bibliographic=Tagged title novelty retrieval', {
+    ok: true,
+    status: 200,
+    data: { message: { items: [{
+      DOI: '10.1000/tagged',
+      title: ['EASYSTIFF\n                  <sup>®</sup>\n                  , a portable device able to separately analyze each compartment'],
+      issued: { 'date-parts': [[2023]] },
+      'container-title': ['Skin Mechanics'],
+      abstract: '<jats:p>This device measures each compartment separately and reports stiffness.</jats:p>',
+    }] } },
+  }],
+  ['query.bibliographic=Empty novelty retrieval', {
+    ok: true,
+    status: 200,
+    data: { message: { items: [{ DOI: '10.1000/untitled', title: [], issued: { 'date-parts': [[2020]] } }] } },
+  }],
 ]
 
 const deps = (routes = baseRoutes, env = {}) => ({
@@ -105,6 +144,28 @@ try {
   assert.equal(titleSimilarity('alpha beta', 'alpha beta gamma delta'), 0, 'two shared tokens is coincidence, not identity')
   assert.ok(MIN_SHARED_TOKENS >= 3)
   assert.equal(titleSimilarity('', 'anything'), 0)
+
+  // ── grounded novelty helpers ───────────────────────────────────────────────
+  assert.equal(NOVELTY_DEFAULT_REFERENCES, 2, 'the paper retrieves two references; that is the default, not a formula')
+  assert.equal(NOVELTY_MAX_REFERENCES, 10)
+  assert.match(NOVELTY_METHOD, /not a formula from the paper/)
+  assert.equal(cleanAbstract('<jats:p>A &amp; B</jats:p>'), 'A & B')
+  const parsedReference = referenceFromCrossref({
+    DOI: '10.1000/alpha', title: ['Alpha beta gamma'], abstract: '<jats:p>Delta epsilon.</jats:p>',
+  })
+  assert.equal(parsedReference.doi, '10.1000/alpha')
+  assert.equal(parsedReference.text_basis, 'title_abstract')
+  assert.equal(parsedReference.abstract, 'Delta epsilon.')
+  const taggedReference = referenceFromCrossref({
+    DOI: '10.1000/tagged',
+    title: ['EASYSTIFF\n                  <sup>®</sup>\n                  , a portable device'],
+    abstract: '<jats:p>Stiffness is read per compartment.</jats:p>',
+  })
+  assert.equal(taggedReference.title, 'EASYSTIFF ® , a portable device', 'a tagged title is normalized before it can anchor a quote')
+  assert.equal(referenceFromCrossref({ DOI: '10.1000/none', title: [] }), null, 'an untitled record is not prior art')
+  assert.equal(referenceOverlap('alpha beta gamma', { title: 'alpha beta', abstract: null }), 0.667)
+  const span = bestQuoteSpan('alpha beta gamma', { title: 'T', abstract: 'delta epsilon. alpha beta gamma theta.' })
+  assert.equal(span.quote, 'alpha beta gamma theta.', 'the quote is the best-overlapping sentence, verbatim')
 
   // ── verifyCitation classification ──────────────────────────────────────────
   const real = await verifyCitation(`https://doi.org/${REAL_DOI}`, {}, deps())
@@ -259,6 +320,67 @@ try {
   await assert.rejects(() => runCoscVerify({ action: 'claims', slug, id, claims: [] }, exec, deps()), /non-empty/)
   await assert.rejects(() => runCoscVerify({ action: 'claims', slug, id, claims: Array.from({ length: 21 }, () => ({ claim: 'c', support: 'supports', confidence: 0.5 })) }, exec, deps()), /at most 20/)
 
+  // ── grounded novelty: retrieval, documented score, verbatim quotes ─────────
+  const novelty = await runCoscVerify({ action: 'novelty', slug, id }, exec, deps())
+  assert.equal(novelty.state, 'checked')
+  assert.equal(novelty.references.length, 2)
+  assert.ok(novelty.references[0].overlap >= novelty.references[1].overlap, 'nearest prior art is listed first')
+  assert.equal(novelty.score_source, 'lexical_overlap')
+  assert.equal(novelty.score, novelty.computed_score)
+  assert.ok(novelty.score >= 0 && novelty.score <= 10)
+  assert.equal(novelty.quotes.length, 2)
+  for (const quote of novelty.quotes) {
+    const reference = novelty.references.find((entry) => entry.doi === quote.reference_doi)
+    assert.ok(reference, `quote names a retrieved reference: ${quote.reference_doi}`)
+    assert.ok(`${reference.title}. ${reference.abstract}`.includes(quote.quote), 'the stored quote is verbatim')
+  }
+  const storedNovelty = deriveState(cwd, slug).byId.get(id).noveltyCheck
+  assert.equal(storedNovelty.state, 'checked')
+  assert.equal(storedNovelty.references.length, 2)
+  assert.equal(storedNovelty.method, NOVELTY_METHOD)
+  const statusWithNovelty = await runCoscVerify({ action: 'status', slug, id }, exec, deps())
+  assert.equal(statusWithNovelty.novelty.state, 'checked')
+  assert.equal(statusWithNovelty.novelty.references, 2)
+  assert.equal(statusWithNovelty.novelty.quotes, 2)
+  assert.match(text([{ type: 'text', text: JSON.stringify(statusWithNovelty) }]), /lexical_overlap/)
+
+  const pinned = await runCoscVerify({
+    action: 'novelty', slug, id, novelty_score: 3.5,
+    quotes: [{ quote: 'Stalling at a short uORF limits granule assembly after arsenite exposure.', reference_doi: '10.1000/near-stall', note: 'closest prior art' }],
+  }, exec, deps())
+  assert.equal(pinned.score, 3.5, 'a caller reading is pinned, not recomputed')
+  assert.equal(pinned.score_source, 'caller')
+  assert.equal(pinned.quotes.length, 1)
+  assert.equal(pinned.quotes[0].note, 'closest prior art')
+  assert.ok(pinned.computed_score >= 0 && pinned.computed_score <= 10, 'the lexical reading is still recorded beside it')
+
+  await assert.rejects(
+    () => runCoscVerify({ action: 'novelty', slug, id, novelty_score: 11 }, exec, deps()),
+    /between 0 and 10/,
+  )
+  await assert.rejects(
+    () => runCoscVerify({ action: 'novelty', slug, id, quotes: [{ quote: 'a sentence no retrieved reference contains' }] }, exec, deps()),
+    /not a verbatim span/,
+  )
+
+  const taggedNovelty = await runCoscVerify({ action: 'novelty', slug, id, query: 'Tagged title novelty retrieval' }, exec, deps())
+  assert.equal(taggedNovelty.state, 'checked', 'a tagged title must not break the quote it anchors')
+  assert.equal(taggedNovelty.references[0].title, 'EASYSTIFF ® , a portable device able to separately analyze each compartment')
+  assert.equal(taggedNovelty.quotes.length, 1)
+  assert.ok(`${taggedNovelty.references[0].title}. ${taggedNovelty.references[0].abstract}`.includes(taggedNovelty.quotes[0].quote))
+
+  const failedNovelty = await runCoscVerify({ action: 'novelty', slug, id, query: 'Booming novelty retrieval' }, exec, deps())
+  assert.equal(failedNovelty.state, 'not_checked')
+  assert.match(failedNovelty.reason, /failed/)
+  assert.equal(failedNovelty.score, undefined, 'a failed retrieval records no score')
+  assert.match(text([{ type: 'text', text: `Novelty evidence: ${failedNovelty.reason}` }]), /failed/)
+  const untitledNovelty = await runCoscVerify({ action: 'novelty', slug, id, query: 'Empty novelty retrieval' }, exec, deps())
+  assert.equal(untitledNovelty.state, 'not_checked')
+  assert.match(untitledNovelty.reason, /usable title/)
+  const finalStatus = await runCoscVerify({ action: 'status', slug, id }, exec, deps())
+  assert.equal(finalStatus.novelty.state, 'not_checked')
+  assert.match(finalStatus.novelty.reason, /usable title/)
+
   // ── retraction status is reported, and never changes the penalty ───────────
   const withIntegrity = await runCoscVerify({
     action: 'citations', slug,
@@ -320,8 +442,11 @@ try {
   apply(ctx)
   assert.equal(registered.length, 1)
   assert.equal(registered[0].name, 'coscientist_verify')
-  assert.equal(registered[0].parameters.properties.action.enum.length, 3)
+  assert.equal(registered[0].parameters.properties.action.enum.length, 4)
+  assert.match(registered[0].description, /grounded novelty/)
+  assert.match(registered[0].parameters.properties.novelty_score.description, /0-10/)
   assert.deepEqual(registered[0].parameters.properties.claims.items.type, 'object')
+  assert.deepEqual(registered[0].parameters.properties.quotes.items.type, 'object')
 
   console.log('coscientist-verify OK')
 } finally {

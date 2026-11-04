@@ -496,6 +496,16 @@
 - id: experiment-log
   name: academic-harness/experiment-log
 
+# Ablation/attribution ledger (Phase 5): a frozen component x arm x dataset x
+# metric plan, records that link cells to existing experiment_log/analysis_run
+# runs (it never executes), paired removal deltas with ties and missing cells,
+# an advisory attribution reading, human good|refine|unattributed verdicts, and
+# append-only pruning. State lives under <cwd>/.dsh/ablation/<slug>/. The
+# reading is advisory; only ah_check blocks. See ablation.js and
+# ablation-store.js.
+- id: ablation
+  name: academic-harness/ablation
+
 # Dataset downloads with provenance (Phase 2C): resolve a DOI through DataCite
 # and the Zenodo/Figshare file APIs, download into data/<slug>/ with size
 # caps, verify checksums, and keep a manifest under <cwd>/.dsh/data/<slug>/.
@@ -641,19 +651,24 @@
 # <cwd>/.dsh/coscientist/<slug>/, shared by the delegation tree the way the
 # review ledger is. `coscientist` owns the ledger and the scheduling policy
 # (`next` samples the next task, `status` says when to stop); `coscientist_rank`
-# owns matchups and Glicko-2 rating updates with position-bias control. Neither
+# owns matchups and Glicko-2 rating updates with position-bias control. Phase 6
+# adds append-only limitation records with verified source quotes and coverage,
+# `trace` of failed/pruned experiment_log runs (also carried by evolution
+# dispatches), and an evidence-bound `select` that freezes a champion. Neither
 # calls a model: the session does the reasoning, usually through `subagent`.
 # Rating math and thresholds live in coscientist-models.js, storage in
-# coscientist-store.js, both dependency-free. No realm.
+# coscientist-store.js, trace joins in coscientist-trace.js, all dependency-free. No realm.
 - id: coscientist
   name: academic-harness/coscientist
 - id: coscientist-rank
   name: academic-harness/coscientist-rank
 
-# Citation integrity and claim support for the tournament. This is the only tournament module that reaches the network
-# — Crossref for existence, reusing integrity-check for retraction status — and
-# it shares one process-wide Crossref limiter with crossref_lookup. It never
-# calls a model: `claims` records judgements a subagent already made.
+# Citation integrity, claim support, and grounded novelty for the tournament. This is the only tournament module that reaches the network
+# — Crossref for existence and reference retrieval, reusing integrity-check for
+# retraction status — and it shares one process-wide Crossref limiter with
+# crossref_lookup. It never calls a model: `claims` records judgements a subagent
+# already made, and `novelty` stores a documented lexical prior-art reading pinned
+# to verbatim quotes from the retrieved set.
 - id: coscientist-verify
   name: academic-harness/coscientist-verify
 

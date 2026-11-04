@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **766 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **767 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -24,7 +24,7 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 766.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 767.
 
 ## Workflow and tool skills
 
@@ -44,11 +44,12 @@ The remaining first-party workflow, tool, notebook, compute, and specialist-brie
 | `numbers-audit` | `numbers_audit` numerical-reporting candidates and `not_checked` handling; see [Writing](WRITING.md#numbers-audit) |
 | `presentation-build` | `presentation_build` posters/slides plus the `subagent_vision` QA step; see [Writing](WRITING.md#posters-and-slides) |
 | `authorship-credit` | `authorship` CRediT/ICMJE records, statements, and unresolved disagreements; see [Writing](WRITING.md#authorship-and-credit) |
-| `experiment-tracking` | `experiment_log` sweeps with named-metric best, compare, links, and MLflow-compatible export; see [Reproducible analysis](ANALYSIS.md#experiment_log) |
+| `experiment-tracking` | `experiment_log` sweeps and staged comparison contracts (baseline/variant, stages, protocol drift, verdicts, Pareto best), links, and exports; see [Reproducible analysis](ANALYSIS.md#experiment_log) |
+| `ablation-attribution` | `ablation` component removal grids, records linked to experiment/analysis runs, paired deltas, advisory attribution readings, verdicts, and pruning; see [Reproducible analysis](ANALYSIS.md#ablation) |
 | `provenance-audit` | Reading and acting on the read-only cross-ledger index — the seven states, coverage, unsupported, stale, impact, and graph exports; see [Provenance audit](PROVENANCE.md) |
 | `grade-certainty` | GRADE domain judgements, derived suggestion, human overall certainty, evidence profile, and summary-of-findings exports; see [GRADE certainty](RESEARCH.md#grade-certainty) |
 | `risk-of-bias-appraisal` | `review` risk-of-bias workflow (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), reconciliation, agreement, and rob exports; see [Risk-of-bias appraisal](RESEARCH.md#risk-of-bias-appraisal) |
-| `co-scientist-tournament` | The tournament loop, subagent briefs, and budget defaults; see [Hypothesis tournaments](RESEARCH.md#hypothesis-tournaments) |
+| `co-scientist-tournament` | The tournament loop, subagent briefs, budget defaults, limitation mining, trace-informed evolution, and champion selection; see [Hypothesis tournaments](RESEARCH.md#hypothesis-tournaments) |
 | `power-and-sample-size` | Study-planning workflow for `power_analysis`; see [Study planning](RESEARCH.md#study-planning) |
 | `causal-dag` | Drawing assumptions, reading adjustment/front-door sets, instruments, colliders, and E-values; see [Causal DAGs](RESEARCH.md#causal-dags) |
 | `experimental-design` | Randomized allocation, balance diagnostics, and DOE choices; see [Randomization and DOE](RESEARCH.md#randomization-and-doe) |

@@ -297,6 +297,11 @@ pass its path as `transcript`.
 `strategy: evolution:<name>`. The child starts at 85 % of its best parent's rating
 and must earn the rest. Output contract is the same as §4.
 
+An `evolution` dispatch carries failed and pruned `experiment_log` traces. Give
+them to the mutation subagent as **constraints**, not as a suggestion: name the
+assumption or mechanism the failed run already refuted, and require the mutation
+to drop it or explain what changed. `coscientist trace` reads the full record.
+
 | Mutation | Brief |
 |---|---|
 | `grounding` | Find the 2–3 weakest aspects of the original; strengthen or correct them with literature; fill reasoning gaps with evidence. Produce an *improved* hypothesis, not a summary. |
@@ -347,3 +352,45 @@ Specialist: `experiment-designer`.
 Record with `coscientist design_protocol` using the `steps` array (action + details
 joined). `experiment-designer` remains the authority on controls, power, and the
 analysis plan; this brief only fixes the format the ledger stores.
+
+## 13. Limitation mining and champion selection
+
+### 13.1 Limitation mining
+
+Specialist: `peer-reviewer`, `statistician`, or the method's domain reviewer. Run
+this when a hypothesis's method, not just its wording, has a checkable weakness:
+a pooled readout, an evaluator changed between arms, an equation that assumes away
+the condition of interest, a benchmark that cannot show the claimed effect.
+
+> Read METHOD SOURCE: `<hypothesis id or workspace file>` and the ranked
+> hypotheses in `<slug>`. Identify one methodological flaw that is **checkable from
+> the text**, quote the offending equation or step **verbatim**, and explain why it
+> limits the method. Then list 2–5 **generic remedy families** (not one chosen
+> fix, not a restatement of the flaw). JSON only:
+> `{"flaw": "…", "why": "…", "quote": "verbatim span", "source": "<hypothesis id or path>",
+> "opportunities": ["family 1", "family 2", "…"]}`
+
+Record with `coscientist limitation limitation_action: "add"`. The tool refuses a
+quote that is not a verbatim span of the named source and fewer than two remedy
+families. Then record a sufficiency reading with `limitation_action: "verify"`:
+`sufficient` or `insufficient` plus a reason. Do not rewrite an earlier limitation;
+append a narrower one. If the round cap is spent, report `exhausted` and leave the
+decision to the scientist.
+
+### 13.2 Champion selection
+
+Run after the tournament stops and after open limitations are recorded. Specialist:
+`experiment-designer` or the domain lead.
+
+> Compare the surviving active candidates `<ids>` on: tournament rating with RD and
+> matches played; best review scores per dimension; citation and grounded-novelty
+> check state; and every recorded `experiment_log` run whose params name the
+> candidate, including failed and pruned runs. Recommend one champion for drafting
+> and ablation. Do not treat rating as scientific merit. JSON only:
+> `{"champion_id": "h2", "compared_ids": ["h1", "h3"],
+> "rationale": "why this candidate, what the traces and reviews show,
+> what remains unproven", "evidence_note": "which runs and checks were read"}`
+
+Record with `coscientist select`. The tool stores the comparison and an evidence
+digest; it does not accept a candidate that is not active. A selection is not an
+acceptance decision, and a later cycle may append another one.

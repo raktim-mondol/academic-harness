@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, existsSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
-  addHypothesis, deriveState, exportTournament, leaderboard, lineage, matchHistory,
-  nextTask, proposeMatch, recordFeedback, recordMatch, recordProvenance, recordReview,
-  recordSafety, setStatus, similarityNeighbours, startTournament, saveExperimentProtocol,
-  saveSynthesis,
+  DEFAULT_LIMITATION_ROUNDS, LIMITATION_VERDICTS,
+  addHypothesis, addLimitation, deriveState, exportTournament, knowledgeGraph, leaderboard, lineage, limitationStatus,
+  matchHistory, nextTask, proposeMatch, recordFeedback, recordMatch, recordNovelty, recordProvenance,
+  recordReview, recordSafety, selectChampion, setStatus, similarityNeighbours, startTournament,
+  saveExperimentProtocol, saveSynthesis, verifyLimitation,
 } from '../coscientist-store.js'
+import { logExperimentRun, startExperiment, verdictExperiment } from '../experiment-store.js'
 import { GLICKO2_DEFAULTS, seededGlicko2Rating } from '../coscientist-models.js'
 
 const cwd = mkdtempSync(join(tmpdir(), 'ah-cosc-store-'))
@@ -452,6 +454,203 @@ try {
   const rebuilt = deriveState(cwd, 'lineage')
   assert.equal(cached.counts.total, rebuilt.counts.total)
   assert.deepEqual(cached.hypotheses.map((h) => `${h.id}:${h.rating}`).sort(), rebuilt.ranked.map((h) => `${h.id}:${h.rating}`).sort())
+
+  // ── Phase 6: limitations, grounded novelty, selection ───────────────────────
+  assert.deepEqual(LIMITATION_VERDICTS, ['sufficient', 'insufficient'])
+  assert.equal(DEFAULT_LIMITATION_ROUNDS, 16)
+
+  const p6 = 'phase6'
+  await startTournament({ cwd, slug: p6, protocol: { goal: 'Phase 6 coverage', max_hypotheses: 5 } })
+  const p6h1 = await addHypothesis({
+    cwd, slug: p6,
+    hypothesis: {
+      title: 'Compartment-specific calcium buffering sets distal axon vulnerability',
+      summary: 'A distal buffer depletion precedes structural loss and is independent of the soma.',
+      content: 'Predicts that restoring the distal buffer rescues axon caliber even when the cell body is stressed.',
+      rationale: 'Distal segments lack the buffer reserve found proximally.',
+    },
+  })
+  assert.equal(p6h1.hypothesis.id, 'h1')
+
+  await assert.rejects(
+    () => addHypothesis({
+      cwd, slug: p6, limitationIds: ['l404'],
+      hypothesis: { title: 'An idea pointing at a missing limitation', summary: 'Unique wording for the unknown-limitation gate.', content: 'Predicts nothing yet.' },
+    }),
+    /unknown limitation id/,
+  )
+  await assert.rejects(
+    () => addLimitation({ cwd, slug: p6, flaw: 'A flaw', why: 'It limits the method', opportunities: ['one fix'], quote: 'Predicts that restoring', source: 'h1' }),
+    /at least two remedy families/,
+  )
+  await assert.rejects(
+    () => addLimitation({ cwd, slug: p6, flaw: 'A flaw', why: 'It limits the method', opportunities: ['sampling', 'control'], quote: 'this sentence is absent', source: 'h1' }),
+    /not a verbatim span/,
+  )
+
+  const l1 = await addLimitation({
+    cwd, slug: p6,
+    flaw: 'The model assumes a well-mixed soma, but the prediction is about a distal compartment.',
+    why: 'A pooled readout cannot distinguish distal buffer loss from somatic compensation, so the claim is not identified.',
+    opportunities: ['compartment-resolved sampling', 'buffer washout with a proximal control'],
+    quote: 'Predicts that restoring the distal buffer rescues axon caliber',
+    source: 'h1',
+  })
+  assert.equal(l1.limitation.id, 'l1')
+  assert.equal(l1.limitation.state, 'open')
+  assert.equal(l1.limitation.quote_verified, true)
+  assert.equal(l1.limitation.source_kind, 'hypothesis')
+
+  writeFileSync(join(cwd, 'methods.md'), 'The assay pools all compartments, so distal effects cannot be separated.\n')
+  const l2 = await addLimitation({
+    cwd, slug: p6,
+    flaw: 'The assay pools all compartments.',
+    why: 'Pooling removes the very spatial variable the method claims to explain.',
+    opportunities: ['microfluidic compartment isolation', 'laser capture of distal segments'],
+    quote: 'The assay pools all compartments',
+    source: 'methods.md',
+  })
+  assert.equal(l2.limitation.id, 'l2')
+  assert.equal(l2.limitation.source_kind, 'file')
+
+  const p6h2 = await addHypothesis({
+    cwd, slug: p6, limitationIds: ['l1'],
+    hypothesis: {
+      title: 'A compartment-resolved buffer assay separates distal from somatic effects',
+      summary: 'Measuring the distal buffer directly removes the pooled-compartment confound.',
+      content: 'Predicts that the distal buffer reading, not the somatic one, tracks axon loss.',
+      rationale: 'The measurement is now taken where the proposed mechanism acts.',
+    },
+  })
+  assert.deepEqual(p6h2.hypothesis.limitation_ids, ['l1'])
+  const p6h3 = await addHypothesis({
+    cwd, slug: p6,
+    hypothesis: {
+      title: 'A pending idea that has not completed review',
+      summary: 'It is not yet a surviving candidate for selection.',
+      content: 'Predicts nothing until it is reviewed.',
+    },
+  })
+  assert.equal(p6h3.hypothesis.status, 'pending_review')
+
+  const coverageOpen = limitationStatus(cwd, p6)
+  assert.equal(coverageOpen.coverage.limitations, 2)
+  assert.equal(coverageOpen.coverage.covered, 0, 'a pending idea does not cover a limitation')
+  assert.equal(coverageOpen.coverage.uncovered, 2)
+
+  for (const id of ['h1', 'h2']) {
+    for (const stage of ['initial', 'full', 'deep_verification', 'simulation', 'observation']) {
+      await recordReview({ cwd, slug: p6, id, stage, verdict: 'pass', noveltyScore: 7, correctnessScore: 7, testabilityScore: 7 })
+    }
+  }
+  const coverageActive = limitationStatus(cwd, p6)
+  assert.equal(coverageActive.coverage.covered, 1, 'h2 addresses l1 now that it is active')
+  assert.deepEqual(coverageActive.limitations.find((entry) => entry.id === 'l1').addressed_by_active, ['h2'])
+
+  let verified = await verifyLimitation({ cwd, slug: p6, id: 'l1', verdict: 'insufficient', reason: 'the buffer family is still pooled', maxRounds: 2 })
+  assert.equal(verified.limitation.state, 'insufficient')
+  assert.equal(verified.round, 1)
+  verified = await verifyLimitation({ cwd, slug: p6, id: 'l1', verdict: 'insufficient', reason: 'still no compartment control', maxRounds: 2 })
+  assert.equal(verified.limitation.state, 'exhausted')
+  assert.equal(verified.exhausted, true)
+  await assert.rejects(
+    () => verifyLimitation({ cwd, slug: p6, id: 'l1', verdict: 'insufficient', reason: 'one more', maxRounds: 2 }),
+    /spent its 2 verification rounds/,
+  )
+  const sufficient = await verifyLimitation({ cwd, slug: p6, id: 'l2', verdict: 'sufficient', reason: 'the compartment assay closes the confound', maxRounds: 2 })
+  assert.equal(sufficient.limitation.state, 'sufficient')
+  await assert.rejects(
+    () => verifyLimitation({ cwd, slug: p6, id: 'l2', verdict: 'insufficient', reason: 'reopen', maxRounds: 2 }),
+    /already sufficient/,
+  )
+  await assert.rejects(
+    () => verifyLimitation({ cwd, slug: p6, id: 'l1', verdict: 'maybe', reason: 'x', maxRounds: 2 }),
+    /must be one of/,
+  )
+
+  await assert.rejects(
+    () => selectChampion({ cwd, slug: p6, id: 'h3', rationale: 'it is not active' }),
+    /only an active survivor/,
+  )
+  const selection = await selectChampion({ cwd, slug: p6, id: 'h2', comparedIds: ['h1'], rationale: 'The compartment-resolved assay directly addresses the mechanism and the prediction is measurable.' })
+  assert.equal(selection.selection.champion_id, 'h2')
+  assert.deepEqual(selection.selection.compared_ids, ['h1'])
+  assert.match(selection.selection.evidence_digest, /^sha256:[0-9a-f]{64}$/)
+  assert.equal(selection.traces.failed_total, 0)
+  assert.equal(deriveState(cwd, p6).championId, 'h2')
+  assert.equal(leaderboard(cwd, p6).champion.id, 'h2')
+
+  const storedNovelty = await recordNovelty({
+    cwd, slug: p6, id: 'h2', state: 'checked', query: 'distal calcium buffering axon vulnerability',
+    score: 6.5, computedScore: 7.2, scoreSource: 'caller', method: 'test method',
+    references: [{
+      doi: '10.1000/prior', title: 'Compartment-resolved calcium buffering in motor neurons', year: 2020,
+      venue: 'Neuron', abstract: 'We show that distal calcium buffering is rate limiting for axon maintenance.',
+      text_basis: 'title_abstract', overlap: 0.6, url: 'https://doi.org/10.1000/prior',
+    }],
+    quotes: [{ quote: 'distal calcium buffering is rate limiting', reference_doi: '10.1000/prior', note: 'closest prior art' }],
+  })
+  assert.equal(storedNovelty.novelty.state, 'checked')
+  assert.equal(storedNovelty.novelty.score, 6.5)
+  assert.equal(storedNovelty.novelty.references.length, 1)
+  assert.equal(storedNovelty.novelty.quotes[0].reference_doi, '10.1000/prior')
+  await assert.rejects(
+    () => recordNovelty({
+      cwd, slug: p6, id: 'h2', state: 'checked', score: 5,
+      references: [{ doi: '10.1000/prior', title: 'Compartment-resolved calcium buffering in motor neurons' }],
+      quotes: [{ quote: 'a sentence the reference never contains' }],
+    }),
+    /not a verbatim span/,
+  )
+  await assert.rejects(
+    () => recordNovelty({ cwd, slug: p6, id: 'h2', state: 'not_checked' }),
+    /reason is required/,
+  )
+  await recordNovelty({ cwd, slug: p6, id: 'h1', state: 'not_checked', reason: 'Crossref returned no reference with a usable title' })
+  assert.equal(leaderboard(cwd, p6).ranked.find((row) => row.id === 'h2').novelty_check.score, 6.5)
+  assert.equal(leaderboard(cwd, p6).ranked.find((row) => row.id === 'h1').novelty_check.state, 'not_checked')
+
+  const graph = knowledgeGraph(cwd, p6)
+  assert.ok(graph.nodes.some((node) => node.kind === 'limitation' && node.id === 'l1'))
+  assert.ok(graph.edges.some((edge) => edge.kind === 'addresses' && edge.from === 'h2' && edge.to === 'l1'))
+  assert.ok(graph.edges.some((edge) => edge.kind === 'prior_art'))
+  assert.match(graph.mermaid, /classDef limitation/)
+  assert.match(graph.mermaid, /addresses/)
+
+  // Experiment traces feed the selection evidence, failed runs included.
+  await startExperiment({ cwd, slug: 'phase6-exp', experiment: { question: 'Does the distal buffer assay track axon loss?', metrics: [{ name: 'accuracy', direction: 'higher' }] } })
+  const goodRun = await logExperimentRun({ cwd, slug: 'phase6-exp', params: { hypothesis_id: 'h2' }, metrics: { accuracy: 0.81 }, notes: 'compartment assay main run' })
+  const badRun = await logExperimentRun({ cwd, slug: 'phase6-exp', params: { hypothesis_id: 'h2', variant: 'no-buffer' }, metrics: { accuracy: 0.55 } })
+  await verdictExperiment({ cwd, slug: 'phase6-exp', runId: badRun.run.run_id, verdict: 'bad', reason: 'removing the buffer erases the gain' })
+  const withTraces = await selectChampion({
+    cwd, slug: p6, id: 'h2', comparedIds: ['h1'], experiment: 'phase6-exp',
+    rationale: 'The compartment assay and the failed no-buffer run both narrow the mechanism to the distal buffer.',
+  })
+  assert.equal(withTraces.traces.failed_total, 1)
+  assert.equal(withTraces.comparison.find((entry) => entry.id === 'h2').traces.linked_runs, 2)
+  assert.notEqual(withTraces.selection.evidence_digest, selection.selection.evidence_digest, 'the digest covers the traces the selector saw')
+  assert.equal(withTraces.traces.experiments[0].experiment, 'phase6-exp')
+  assert.ok(goodRun.run.run_id && badRun.run.run_id)
+
+  const p6Report = exportTournament({ cwd, slug: p6, format: 'markdown' })
+  const p6Markdown = readFileSync(join(cwd, p6Report.path), 'utf8')
+  assert.match(p6Markdown, /## Limitations/)
+  assert.match(p6Markdown, /## Selected champion/)
+  assert.match(p6Markdown, /Grounded novelty \(checked\)/)
+  assert.match(p6Markdown, /compartment-resolved sampling/)
+  assert.match(p6Markdown, /“distal calcium buffering is rate limiting”/)
+  assert.match(p6Markdown, /failed or pruned traces considered/i)
+  assert.match(p6Markdown, /Addresses limitations\.\*\* l1/)
+  const p6Json = exportTournament({ cwd, slug: p6, format: 'json' })
+  const p6Parsed = JSON.parse(readFileSync(join(cwd, p6Json.path), 'utf8'))
+  assert.equal(p6Parsed.limitations.length, 2)
+  assert.equal(p6Parsed.champion, 'h2')
+  assert.equal(p6Parsed.selections.length, 2)
+  assert.equal(p6Parsed.hypotheses.find((hyp) => hyp.id === 'h2').novelty_check.score, 6.5)
+  const p6Mermaid = exportTournament({ cwd, slug: p6, format: 'mermaid' })
+  const p6Diagram = readFileSync(join(cwd, p6Mermaid.path), 'utf8')
+  assert.match(p6Diagram, /l1\["/)
+  assert.match(p6Diagram, /-.->\|"addresses"\|/)
 
   console.log('coscientist-store OK')
 } finally {

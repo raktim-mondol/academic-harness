@@ -17,7 +17,10 @@ import {
 } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { reviewSlug } from './review-store.js'
+import { sha256, stableStringify } from './ledger-kit.js'
 import { writeJsonAtomic, withLock } from './store-lock.js'
+import { resolveWorkspacePath } from './workspace-path.js'
+import { paramsReference, traceExperiments } from './coscientist-trace.js'
 import {
   GLICKO2_DEFAULTS,
   SAFETY_SEVERITIES, applyFeedbackAsGlicko2Match, citationPenalty, combineSwappedVerdicts,
@@ -44,6 +47,14 @@ export const VETO_STAGES = ['initial', 'full']
 export const VERDICTS = ['pass', 'fail', 'uncertain']
 export const HYPOTHESIS_STATUSES = ['pending_review', 'active', 'rejected', 'quarantined']
 export const MATCH_TYPES = ['simple', 'debate']
+
+/**
+ * The limitation record's sufficiency vocabulary is binary. A refinement appends
+ * a new limitation; it never rewrites or deletes an earlier one, and a
+ * verification never turns an `insufficient` reading into a pass by itself.
+ */
+export const LIMITATION_VERDICTS = ['sufficient', 'insufficient']
+export const DEFAULT_LIMITATION_ROUNDS = 16
 
 /**
  * A tournament defaults to five hypotheses — upstream's own cap, kept so a run
@@ -190,6 +201,7 @@ function newHypothesis(event) {
     strategy: event.strategy || null,
     round: event.round ?? null,
     parentIds: event.parent_ids || [],
+    limitationIds: event.limitation_ids || [],
     text: event.text || `${event.title || ''}. ${event.summary || ''}`,
     vector: event.vector,
     createdAt: event.ts,
@@ -198,6 +210,7 @@ function newHypothesis(event) {
     feedback: [],
     safety: null,
     citationCheck: null,
+    noveltyCheck: null,
     penaltyApplied: null,
     protocolPlan: null,
     statusReason: '',
@@ -219,6 +232,9 @@ export function deriveState(cwd, slug) {
 
   const byId = new Map()
   const dispatches = []
+  const limitations = []
+  const selections = []
+  let championId = null
   let critique = ''
   let overview = ''
 
@@ -234,6 +250,49 @@ export function deriveState(cwd, slug) {
     if (event.type === 'synthesis') {
       if (event.critique) critique = event.critique
       if (event.overview) overview = event.overview
+      continue
+    }
+    if (event.type === 'limitation_added') {
+      limitations.push({
+        id: event.limitationId,
+        flaw: event.flaw || '',
+        why: event.why || '',
+        opportunities: event.opportunities || [],
+        quote: event.quote || '',
+        source: event.source || '',
+        source_kind: event.source_kind || 'unverified',
+        quote_verified: Boolean(event.quote_verified),
+        verifications: [],
+        createdAt: event.ts,
+      })
+      continue
+    }
+    if (event.type === 'limitation_verified') {
+      const limitation = limitations.find((entry) => entry.id === event.limitationId)
+      if (limitation) {
+        limitation.verifications.push({
+          verdict: event.verdict,
+          reason: event.reason || '',
+          round: event.round,
+          max_rounds: event.max_rounds,
+          ts: event.ts,
+        })
+      }
+      continue
+    }
+    if (event.type === 'selected') {
+      const selection = {
+        id: event.selectionId || null,
+        hypothesisId: event.hypothesisId,
+        compared_ids: event.compared_ids || [],
+        rationale: event.rationale || '',
+        evidence: event.evidence || null,
+        evidence_digest: event.evidence_digest || null,
+        experiment: event.experiment || null,
+        ts: event.ts,
+      }
+      selections.push(selection)
+      championId = selection.hypothesisId
       continue
     }
 
@@ -280,6 +339,22 @@ export function deriveState(cwd, slug) {
         summary: event.summary,
         claims: event.claims || null,
         contradicted: (event.claims || []).filter((claim) => claim.support === 'contradicts').length,
+        ts: event.ts,
+      }
+      continue
+    }
+
+    if (event.type === 'novelty') {
+      hyp.noveltyCheck = {
+        state: event.state || 'checked',
+        score: event.score ?? null,
+        computed_score: event.computed_score ?? null,
+        score_source: event.score_source || null,
+        method: event.method || '',
+        query: event.query || '',
+        references: event.references || [],
+        quotes: event.quotes || [],
+        reason: event.reason || null,
         ts: event.ts,
       }
       continue
@@ -382,6 +457,8 @@ export function deriveState(cwd, slug) {
     rejected: hypotheses.filter((hyp) => hyp.status === 'rejected').length,
     quarantined: hypotheses.filter((hyp) => hyp.status === 'quarantined').length,
     totalMatches: matches.length,
+    limitations: limitations.length,
+    limitationsSufficient: limitations.filter((limitation) => limitation.verifications.at(-1)?.verdict === 'sufficient').length,
   }
 
   const ranked = hypotheses
@@ -405,6 +482,10 @@ export function deriveState(cwd, slug) {
     eloHistory: dispatches.map((event) => event.avg_top_elo).filter((value) => typeof value === 'number'),
     avgTopTenElo,
     topEloRating: topRatings[0] ?? GLICKO2_DEFAULTS.rating,
+    limitations,
+    selections,
+    championId,
+    champion: championId ? byId.get(championId) || null : null,
     critique,
     overview,
     derivedAt: nowIso(),
@@ -418,6 +499,13 @@ function refreshSnapshot(cwd, slug, state) {
     counts: state.counts,
     rounds: state.rounds,
     avgTopTenElo: Number(state.avgTopTenElo.toFixed(1)),
+    champion: state.championId,
+    limitations: state.limitations.map((limitation) => ({
+      id: limitation.id,
+      flaw: limitation.flaw,
+      verifications: limitation.verifications.length,
+      latest_verdict: limitation.verifications.at(-1)?.verdict ?? null,
+    })),
     hypotheses: state.ranked.concat(state.hypotheses.filter((hyp) => hyp.status === 'rejected')).map((hyp) => ({
       id: hyp.id,
       title: hyp.title,
@@ -472,10 +560,12 @@ export function publicHypothesis(hyp) {
     strategy: hyp.strategy,
     round: hyp.round,
     parent_ids: hyp.parentIds,
+    limitation_ids: hyp.limitationIds,
     reviews: hyp.reviews,
     feedback: hyp.feedback,
     safety: hyp.safety,
     citation_check: hyp.citationCheck,
+    novelty_check: hyp.noveltyCheck,
     citation_penalty: hyp.penaltyApplied,
     experiment_protocol: hyp.protocolPlan,
     created_at: hyp.createdAt,
@@ -566,7 +656,7 @@ function gateCandidates(state) {
  * the cap is checked at save time (not just at dispatch), and the near-duplicate
  * gate discards a converging idea before it can cost review or debate budget.
  */
-export async function addHypothesis({ cwd, slug, hypothesis = {}, strategy = 'generation:literature_exploration', round = null, parentIds = [] }) {
+export async function addHypothesis({ cwd, slug, hypothesis = {}, strategy = 'generation:literature_exploration', round = null, parentIds = [], limitationIds = [] }) {
   const dir = ensureSession(cwd, slug)
   const title = text(hypothesis.title)
   const summary = text(hypothesis.summary)
@@ -576,6 +666,7 @@ export async function addHypothesis({ cwd, slug, hypothesis = {}, strategy = 'ge
   if (!content) throw new Error('hypothesis.content is required')
 
   const parents = list(parentIds)
+  const addresses = list(limitationIds)
   const candidateText = `${title}. ${summary}`
   const vector = Array.isArray(hypothesis.vector) ? hypothesis.vector : undefined
 
@@ -590,6 +681,12 @@ export async function addHypothesis({ cwd, slug, hypothesis = {}, strategy = 'ge
 
     const missing = parents.filter((id) => !state.byId.has(id))
     if (missing.length) throw new Error(`unknown parent hypothesis id(s): ${missing.join(', ')}`)
+    // A limitation must be recorded before an idea can claim to address it, so
+    // the coupling is checkable against the ledger rather than asserted in prose.
+    const unknownLimitations = addresses.filter((id) => !state.limitations.some((limitation) => limitation.id === id))
+    if (unknownLimitations.length) {
+      throw new Error(`unknown limitation id(s): ${unknownLimitations.join(', ')} — record it with action "limitation" first`)
+    }
     // A withheld or rejected parent must not seed a child: its rating is not
     // something an idea should inherit, and evolving from it would launder an
     // idea the tournament already set aside.
@@ -639,6 +736,7 @@ export async function addHypothesis({ cwd, slug, hypothesis = {}, strategy = 'ge
       strategy,
       round,
       parent_ids: parents,
+      limitation_ids: addresses,
       text: candidateText,
       vector,
       rating: seed.rating,
@@ -649,6 +747,388 @@ export async function addHypothesis({ cwd, slug, hypothesis = {}, strategy = 'ge
     const next = deriveState(cwd, slug)
     refreshSnapshot(cwd, slug, next)
     return { hypothesis: publicHypothesis(next.byId.get(id)), state: next }
+  })
+}
+
+// ─── Limitations ──────────────────────────────────────────────────────────────
+
+function nextLimitationId(limitations) {
+  let max = 0
+  for (const limitation of limitations) {
+    const match = /^l(\d+)$/.exec(String(limitation.id || ''))
+    if (match) max = Math.max(max, Number(match[1]))
+  }
+  return `l${max + 1}`
+}
+
+function quoteText(value) {
+  return prose(value).replace(/\s+/g, ' ').trim()
+}
+
+function hypothesisQuoteText(hyp) {
+  return [hyp.title, hyp.summary, hyp.content, hyp.rationale, hyp.experimental_plan, hyp.novelty_assessment, ...(hyp.key_assumptions || [])].join('\n')
+}
+
+/**
+ * The source quote span must be checkable against something the workspace holds:
+ * a hypothesis in this ledger or a text file under the workspace. A limitation
+ * whose flaw cannot be pointed at is not a record, it is an opinion.
+ */
+function resolveQuoteSource(cwd, state, source, quote) {
+  const wanted = quoteText(quote)
+  const origin = text(source)
+  if (!origin) throw new Error('source is required (a hypothesis id or a workspace-relative text file holding the quote)')
+  if (state.byId.has(origin)) {
+    if (!quoteText(hypothesisQuoteText(state.byId.get(origin))).includes(wanted)) {
+      throw new Error(`quote is not a verbatim span of hypothesis ${origin}`)
+    }
+    return { source: origin, source_kind: 'hypothesis', quote_verified: true }
+  }
+  let abs
+  try {
+    abs = resolveWorkspacePath(cwd, origin)
+  } catch (error) {
+    throw new Error(`source must be a hypothesis id or a path inside the workspace: ${error instanceof Error ? error.message : String(error)}`)
+  }
+  if (!existsSync(abs)) throw new Error(`source not found: ${origin}`)
+  let body
+  try {
+    body = readFileSync(abs, 'utf8')
+  } catch (error) {
+    throw new Error(`source is not readable text: ${origin} (${error instanceof Error ? error.message : String(error)})`)
+  }
+  if (!quoteText(body).includes(wanted)) throw new Error(`quote is not a verbatim span of ${origin}`)
+  return { source: origin, source_kind: 'file', quote_verified: true }
+}
+
+/** Round-capped state of one limitation; a stored verification owns its cap. */
+function limitationState(limitation, fallbackMaxRounds = DEFAULT_LIMITATION_ROUNDS) {
+  const latest = limitation.verifications.at(-1) || null
+  const rounds = limitation.verifications.length
+  const capValue = Number(latest?.max_rounds)
+  const cap = Number.isFinite(capValue) && capValue > 0 ? capValue : fallbackMaxRounds
+  let state = 'open'
+  if (latest) {
+    if (latest.verdict === 'sufficient') state = 'sufficient'
+    else state = rounds >= cap ? 'exhausted' : 'insufficient'
+  }
+  return {
+    state,
+    rounds_used: rounds,
+    max_rounds: cap,
+    latest_verdict: latest?.verdict ?? null,
+    latest_reason: latest?.reason ?? null,
+    verified_at: latest?.ts ?? null,
+  }
+}
+
+/**
+ * Append one limitation. The paper's published artifact is a flat numbered list,
+ * so this is tournament-level rather than a field on one hypothesis. Opportunities
+ * are remedy *families* in the plural: choosing one fix belongs to the session,
+ * not to the record.
+ */
+export async function addLimitation({ cwd, slug, flaw, why, opportunities, quote, source }) {
+  const dir = ensureSession(cwd, slug)
+  const flawText = prose(flaw)
+  const whyText = prose(why)
+  const remedies = list(opportunities)
+  const quoteTextValue = prose(quote)
+  if (!flawText) throw new Error('flaw is required (the methodological flaw, quoting the offending equation or step)')
+  if (!whyText) throw new Error('why is required (why the flaw limits the method)')
+  if (remedies.length < 2) throw new Error('opportunities needs at least two remedy families — record generic options, not a single chosen fix')
+  if (!quoteTextValue) throw new Error('quote is required (the source span the flaw is anchored to)')
+
+  return withLedgerLock(dir, async () => {
+    const state = deriveState(cwd, slug)
+    const resolved = resolveQuoteSource(cwd, state, source, quoteTextValue)
+    const id = nextLimitationId(state.limitations)
+    appendEvents(dir, [{
+      id: `${id}:${Date.now()}:limitation_added`,
+      ts: nowIso(),
+      type: 'limitation_added',
+      limitationId: id,
+      flaw: flawText,
+      why: whyText,
+      opportunities: remedies,
+      quote: quoteTextValue,
+      ...resolved,
+    }])
+    const next = deriveState(cwd, slug)
+    refreshSnapshot(cwd, slug, next)
+    const limitation = next.limitations.find((entry) => entry.id === id)
+    return { limitation: { ...limitation, ...limitationState(limitation) }, state: next }
+  })
+}
+
+/**
+ * Record one sufficiency reading. `insufficient` is not a failure of the record —
+ * it is the loop asking for another remedy, added as a new limitation or a new
+ * idea that addresses it. Once the round cap is spent, the state is `exhausted`;
+ * the paper never says what happens there, so this tool says it plainly and
+ * leaves the decision with the scientist instead of accepting the method.
+ */
+export async function verifyLimitation({ cwd, slug, id, verdict, reason, maxRounds = DEFAULT_LIMITATION_ROUNDS }) {
+  const dir = ensureSession(cwd, slug)
+  if (!LIMITATION_VERDICTS.includes(verdict)) throw new Error(`limitation verdict must be one of ${LIMITATION_VERDICTS.join(', ')}`)
+  const note = prose(reason)
+  if (!note) throw new Error('reason is required for a limitation verification')
+  const cap = Number(maxRounds)
+  if (!Number.isInteger(cap) || cap < 1) throw new Error('max_rounds must be a positive integer')
+
+  return withLedgerLock(dir, async () => {
+    const state = deriveState(cwd, slug)
+    const limitation = state.limitations.find((entry) => entry.id === id)
+    if (!limitation) throw new Error(`unknown limitation id: ${id}`)
+    const current = limitationState(limitation, cap)
+    if (current.state === 'sufficient') throw new Error(`${id} is already sufficient; append a new limitation if the refinement revealed another flaw`)
+    if (current.rounds_used >= cap) {
+      throw new Error(`${id} has spent its ${cap} verification rounds without a sufficient verdict; record a narrower limitation instead of re-verifying`)
+    }
+    const round = current.rounds_used + 1
+    appendEvents(dir, [{
+      id: `${id}:${Date.now()}:limitation_verified`,
+      ts: nowIso(),
+      type: 'limitation_verified',
+      limitationId: id,
+      verdict,
+      reason: note,
+      round,
+      max_rounds: cap,
+    }])
+    const next = deriveState(cwd, slug)
+    refreshSnapshot(cwd, slug, next)
+    const updated = next.limitations.find((entry) => entry.id === id)
+    const view = limitationState(updated, cap)
+    return { limitation: { ...updated, ...view }, round, exhausted: view.state === 'exhausted', state: next }
+  })
+}
+
+/** The coverage view: which recorded limitations are answered by a live idea. */
+export function limitationStatus(cwd, slug, { maxRounds = DEFAULT_LIMITATION_ROUNDS } = {}) {
+  const state = deriveState(cwd, slug)
+  const live = state.hypotheses.filter((hyp) => hyp.status !== 'rejected')
+  const records = state.limitations.map((limitation) => {
+    const addressed = live.filter((hyp) => hyp.limitationIds.includes(limitation.id))
+    const active = addressed.filter((hyp) => hyp.status === 'active')
+    const view = limitationState(limitation, maxRounds)
+    return {
+      id: limitation.id,
+      flaw: limitation.flaw,
+      why: limitation.why,
+      opportunities: limitation.opportunities,
+      quote: limitation.quote,
+      source: limitation.source,
+      source_kind: limitation.source_kind,
+      quote_verified: limitation.quote_verified,
+      ...view,
+      addressed_by: addressed.map((hyp) => hyp.id),
+      addressed_by_active: active.map((hyp) => hyp.id),
+      covered: active.length > 0,
+    }
+  })
+  const coverage = {
+    limitations: records.length,
+    covered: records.filter((record) => record.covered).length,
+    uncovered: records.filter((record) => !record.covered).length,
+    sufficient: records.filter((record) => record.state === 'sufficient').length,
+    insufficient: records.filter((record) => record.state === 'insufficient').length,
+    exhausted: records.filter((record) => record.state === 'exhausted').length,
+    open: records.filter((record) => record.state === 'open').length,
+    ideas_without_limitation: live.filter((hyp) => !hyp.limitationIds.length).map((hyp) => hyp.id),
+    note: 'Coverage is a ledger join, not an acceptance decision: `sufficient` records a sufficiency reading, and `exhausted` means the round cap was spent without one.',
+  }
+  return { limitations: records, coverage }
+}
+
+// ─── Champion selection ───────────────────────────────────────────────────────
+
+function reviewBest(hyp, field) {
+  const values = hyp.reviews.map((review) => number(review[field])).filter((value) => value !== undefined)
+  return values.length ? Math.max(...values) : null
+}
+
+/**
+ * Freeze the champion with the evidence that produced the choice. The selection
+ * compares tournament readings (rating, review scores, citation and novelty
+ * checks) and whatever experiment traces name each candidate; the stored digest
+ * covers the compared evidence, so a later reading can tell what the selector
+ * actually saw.
+ */
+export async function selectChampion({ cwd, slug, id, comparedIds = [], rationale, experiment = null }) {
+  const dir = ensureSession(cwd, slug)
+  const why = prose(rationale)
+  if (!why) throw new Error('rationale is required (why this candidate is the champion)')
+
+  return withLedgerLock(dir, async () => {
+    const state = deriveState(cwd, slug)
+    const champion = state.byId.get(id)
+    if (!champion) throw new Error(`unknown hypothesis id: ${id}`)
+    if (champion.status !== 'active') throw new Error(`${id} is ${champion.status}; only an active survivor can be selected`)
+
+    const active = state.hypotheses.filter((hyp) => hyp.status === 'active')
+    const explicit = list(comparedIds)
+    const compared = (explicit.length ? explicit : active.filter((hyp) => hyp.id !== id).map((hyp) => hyp.id))
+      .filter((entry) => entry !== id)
+    const unknown = compared.filter((entry) => !state.byId.has(entry))
+    if (unknown.length) throw new Error(`unknown compared hypothesis id(s): ${unknown.join(', ')}`)
+    const notActive = compared.filter((entry) => state.byId.get(entry).status !== 'active')
+    if (notActive.length) throw new Error(`only active survivors can be compared (${notActive.map((entry) => `${entry}:${state.byId.get(entry).status}`).join(', ')})`)
+
+    const traces = traceExperiments({ cwd, experiment, limit: 200 })
+    const candidates = [champion, ...compared.map((entry) => state.byId.get(entry))].map((hyp) => {
+      const linked = traces.runs.filter((run) => paramsReference(run.params, hyp.id))
+      return {
+        id: hyp.id,
+        title: hyp.title,
+        status: hyp.status,
+        rating: hyp.rating,
+        rd: hyp.rd,
+        matches_played: hyp.matchesPlayed,
+        review_scores: {
+          novelty: reviewBest(hyp, 'novelty_score'),
+          correctness: reviewBest(hyp, 'correctness_score'),
+          testability: reviewBest(hyp, 'testability_score'),
+        },
+        citation_check: hyp.citationCheck?.summary ?? null,
+        novelty_check: hyp.noveltyCheck
+          ? { state: hyp.noveltyCheck.state, score: hyp.noveltyCheck.score, score_source: hyp.noveltyCheck.score_source, references: hyp.noveltyCheck.references.length }
+          : null,
+        limitation_ids: hyp.limitationIds,
+        traces: {
+          linked_runs: linked.length,
+          failed: linked.filter((run) => run.failed).length,
+          runs: linked.slice(0, 5).map((run) => ({ experiment: run.experiment, run_id: run.run_id, state: run.state, metrics: run.metrics })),
+        },
+      }
+    })
+
+    const evidence = {
+      champion: id,
+      compared,
+      candidates,
+      experiments: traces.experiments,
+      failed_traces: traces.failed.map((run) => ({ experiment: run.experiment, run_id: run.run_id, reason: run.verdict?.reason || run.state })),
+    }
+    const digest = `sha256:${sha256(stableStringify(evidence))}`
+    const selectionId = `s${state.selections.length + 1}`
+    const event = {
+      id: `${selectionId}:${Date.now()}:selected`,
+      ts: nowIso(),
+      type: 'selected',
+      selectionId,
+      hypothesisId: id,
+      compared_ids: compared,
+      rationale: why,
+      evidence,
+      evidence_digest: digest,
+      experiment: text(experiment) || null,
+    }
+    appendEvents(dir, [event])
+    const next = deriveState(cwd, slug)
+    refreshSnapshot(cwd, slug, next)
+    return {
+      selection: {
+        id: selectionId,
+        champion_id: id,
+        compared_ids: compared,
+        rationale: why,
+        evidence_digest: digest,
+        experiment: event.experiment,
+        ts: event.ts,
+        sole_survivor: compared.length === 0,
+      },
+      comparison: candidates,
+      traces: { experiments: traces.experiments, failed_total: traces.failed_total, pruned_total: traces.pruned_total },
+      champion: publicHypothesis(next.byId.get(id)),
+      state: next,
+    }
+  })
+}
+
+// ─── Grounded novelty ─────────────────────────────────────────────────────────
+
+/**
+ * Record the reference set behind a novelty reading. The score is deliberately
+ * stored next to the retrieved quotes: a novelty number that cannot point at
+ * prior art is not evidence. `not_checked` is a first-class outcome, so a failed
+ * retrieval is recorded as absent evidence rather than a score.
+ */
+export async function recordNovelty({
+  cwd, slug, id, state: noveltyState = 'checked', query, score, computedScore, scoreSource,
+  method, references = [], quotes = [], reason,
+}) {
+  const dir = ensureSession(cwd, slug)
+  const outcome = text(noveltyState) || 'checked'
+  if (!['checked', 'not_checked'].includes(outcome)) throw new Error('novelty state must be checked or not_checked')
+  const why = prose(reason)
+  if (outcome === 'not_checked' && !why) throw new Error('reason is required when novelty is not_checked')
+
+  const numeric = (value, label) => {
+    if (value === null || value === undefined || value === '') return null
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 10) throw new Error(`${label} must be between 0 and 10`)
+    return Number(parsed.toFixed(1))
+  }
+  const reading = numeric(score, 'score')
+  const computed = numeric(computedScore, 'computed_score')
+  const refs = Array.isArray(references) ? references.map((reference) => ({
+    doi: text(reference?.doi) || null,
+    title: text(reference?.title) || null,
+    year: reference?.year ?? null,
+    venue: text(reference?.venue) || null,
+    text_basis: text(reference?.text_basis) || 'title',
+    abstract: prose(reference?.abstract).slice(0, 4000) || null,
+    overlap: Number.isFinite(Number(reference?.overlap)) ? Number(Number(reference.overlap).toFixed(3)) : null,
+    url: text(reference?.url) || null,
+  })) : []
+  if (outcome === 'checked') {
+    if (reading === null) throw new Error('score is required for a checked novelty reading')
+    if (!refs.length) throw new Error('a checked novelty reading needs at least one retrieved reference')
+    if (!Array.isArray(quotes) || !quotes.length) throw new Error('a checked novelty reading needs at least one quote span')
+  }
+
+  const normalizedQuotes = []
+  for (const entry of Array.isArray(quotes) ? quotes : []) {
+    const span = prose(entry?.quote)
+    if (!span) throw new Error('each novelty quote needs a non-empty quote')
+    const wantedDoi = text(entry?.reference_doi) || null
+    const pool = wantedDoi ? refs.filter((reference) => reference.doi === wantedDoi) : refs
+    if (wantedDoi && !pool.length) throw new Error(`quote names reference ${wantedDoi}, which is not in the retrieved set`)
+    const match = pool.find((reference) => {
+      const textBody = [reference.title, reference.abstract].filter(Boolean).join('. ')
+      return quoteText(textBody).includes(quoteText(span))
+    })
+    if (!match) throw new Error('quote is not a verbatim span of any retrieved reference')
+    normalizedQuotes.push({
+      reference_doi: match.doi,
+      reference_title: match.title,
+      quote: span,
+      note: text(entry?.note) || null,
+    })
+  }
+
+  return withLedgerLock(dir, async () => {
+    const current = deriveState(cwd, slug)
+    if (!current.byId.get(id)) throw new Error(`unknown hypothesis id: ${id}`)
+    appendEvents(dir, [{
+      id: `${id}:${Date.now()}:novelty`,
+      ts: nowIso(),
+      type: 'novelty',
+      hypothesisId: id,
+      state: outcome,
+      query: text(query) || null,
+      score: reading,
+      computed_score: computed,
+      score_source: text(scoreSource) || null,
+      method: prose(method),
+      references: refs,
+      quotes: normalizedQuotes,
+      reason: why || null,
+    }])
+    const next = deriveState(cwd, slug)
+    refreshSnapshot(cwd, slug, next)
+    return { novelty: next.byId.get(id).noveltyCheck, hypothesis: publicHypothesis(next.byId.get(id)), state: next }
   })
 }
 
@@ -1439,6 +1919,26 @@ export function knowledgeGraph(cwd, slug) {
   const nodes = []
   const edges = []
 
+  const paperNode = (title, doi) => {
+    const known = nodes.find((node) => node.kind === 'paper'
+      && ((doi && node.doi === doi) || (!doi && node.title === title)))
+    if (known) return known
+    const node = { id: `p${nodes.length + edges.length}`, kind: 'paper', label: title, title, doi: doi || null }
+    nodes.push(node)
+    return node
+  }
+
+  for (const limitation of state.limitations) {
+    const view = limitationState(limitation)
+    nodes.push({
+      id: limitation.id,
+      kind: 'limitation',
+      label: `${limitation.id} — ${limitation.flaw}`,
+      detail: `${view.state} · ${view.rounds_used}/${view.max_rounds} rounds`,
+      status: view.state,
+    })
+  }
+
   for (const hyp of state.ranked.concat(state.hypotheses.filter((entry) => entry.status === 'rejected'))) {
     nodes.push({
       id: hyp.id,
@@ -1450,24 +1950,33 @@ export function knowledgeGraph(cwd, slug) {
       rd: hyp.rd,
       strategy: hyp.strategy,
     })
+    if (state.championId === hyp.id) {
+      nodes[nodes.length - 1].champion = true
+      nodes[nodes.length - 1].detail += ' · selected champion'
+    }
     for (const parentId of hyp.parentIds) {
       edges.push({ from: parentId, to: hyp.id, kind: 'evolved', label: 'evolved from' })
+    }
+    for (const limitationId of hyp.limitationIds) {
+      if (!state.limitations.some((limitation) => limitation.id === limitationId)) continue
+      edges.push({ from: hyp.id, to: limitationId, kind: 'addresses', label: 'addresses' })
     }
     const claims = hyp.citationCheck?.claims || []
     for (const claim of claims) {
       if (claim.support === 'unaddressed' || !claim.paper_title) continue
-      const paperId = `p${nodes.length + edges.length}`
-      const known = nodes.find((node) => node.kind === 'paper' && (node.doi === claim.paper_doi || node.title === claim.paper_title))
-      if (!known) {
-        nodes.push({ id: paperId, kind: 'paper', label: claim.paper_title, title: claim.paper_title, doi: claim.paper_doi || null })
-      }
+      const node = paperNode(claim.paper_title, claim.paper_doi)
       edges.push({
         from: hyp.id,
-        to: known ? known.id : paperId,
+        to: node.id,
         kind: claim.support,
         label: claim.support,
         confidence: claim.confidence,
       })
+    }
+    for (const reference of hyp.noveltyCheck?.references || []) {
+      if (!reference.title) continue
+      const node = paperNode(reference.title, reference.doi)
+      edges.push({ from: hyp.id, to: node.id, kind: 'prior_art', label: 'prior art' })
     }
   }
 
@@ -1504,7 +2013,7 @@ function mermaidDiagram(state, nodes, edges) {
     lines.push(`  ${node.id}["${text}"]`)
   }
   for (const edge of edges) {
-    const arrow = edge.kind === 'evolved' ? '-->' : (edge.kind === 'related' ? '-.->' : '-->')
+    const arrow = edge.kind === 'related' || edge.kind === 'addresses' || edge.kind === 'prior_art' ? '-.->' : '-->'
     lines.push(`  ${edge.from} ${arrow}|"${mermaidLabel(edge.label)}"| ${edge.to}`)
   }
   lines.push('  classDef active fill:#1f6f43,stroke:#0b3, color:#fff')
@@ -1512,9 +2021,16 @@ function mermaidDiagram(state, nodes, edges) {
   lines.push('  classDef rejected fill:#4a4a4a,stroke:#888, color:#fff,stroke-dasharray:3 3')
   lines.push('  classDef withheld fill:#7d2020,stroke:#f66, color:#fff')
   lines.push('  classDef paper fill:#274b6d,stroke:#69c, color:#fff')
+  lines.push('  classDef limitation fill:#3d2b56,stroke:#b8f, color:#fff')
+  lines.push('  classDef limitationSufficient fill:#245c46,stroke:#6f9, color:#fff')
+  lines.push('  classDef limitationExhausted fill:#5c2b24,stroke:#f96, color:#fff')
   const byClass = new Map()
   for (const node of nodes) {
-    const cls = node.kind === 'paper' ? 'paper' : STATUS_CLASS[node.status] || 'pending'
+    const cls = node.kind === 'paper'
+      ? 'paper'
+      : node.kind === 'limitation'
+        ? (node.status === 'sufficient' ? 'limitationSufficient' : node.status === 'exhausted' ? 'limitationExhausted' : 'limitation')
+        : STATUS_CLASS[node.status] || 'pending'
     if (!byClass.has(cls)) byClass.set(cls, [])
     byClass.get(cls).push(node.id)
   }
@@ -1601,6 +2117,21 @@ export function priorFeedback({ cwd, slug, query, limit = 5, minScore = 0.15 }) 
 export function leaderboard(cwd, slug) {
   const state = deriveState(cwd, slug)
   const stats = policyStats(state)
+  const live = state.hypotheses.filter((hyp) => hyp.status !== 'rejected')
+  const limitations = state.limitations.map((limitation) => {
+    const view = limitationState(limitation)
+    const addressed = live.filter((hyp) => hyp.limitationIds.includes(limitation.id))
+    return {
+      id: limitation.id,
+      flaw: limitation.flaw,
+      state: view.state,
+      rounds_used: view.rounds_used,
+      max_rounds: view.max_rounds,
+      addressed_by: addressed.map((hyp) => hyp.id),
+      covered: addressed.some((hyp) => hyp.status === 'active'),
+    }
+  })
+  const latestSelection = state.selections.at(-1) || null
   return {
     slug: state.protocol.slug,
     goal: state.protocol.goal,
@@ -1615,6 +2146,29 @@ export function leaderboard(cwd, slug) {
     top_elo: state.topEloRating,
     weights: computeWeights({ ...stats, currentRound: state.rounds + 1 }),
     termination: terminationCheck(stats, state.eloHistory),
+    limitations: {
+      records: limitations,
+      coverage: {
+        limitations: limitations.length,
+        covered: limitations.filter((entry) => entry.covered).length,
+        sufficient: limitations.filter((entry) => entry.state === 'sufficient').length,
+        exhausted: limitations.filter((entry) => entry.state === 'exhausted').length,
+        uncovered: limitations.filter((entry) => !entry.covered).length,
+        ideas_without_limitation: live.filter((hyp) => !hyp.limitationIds.length).map((hyp) => hyp.id),
+      },
+    },
+    champion: latestSelection
+      ? {
+          id: latestSelection.hypothesisId,
+          title: state.byId.get(latestSelection.hypothesisId)?.title || null,
+          selection_id: latestSelection.id,
+          compared_ids: latestSelection.compared_ids,
+          rationale: latestSelection.rationale,
+          evidence_digest: latestSelection.evidence_digest,
+          ts: latestSelection.ts,
+        }
+      : null,
+    selections: state.selections.length,
     critique: state.critique,
     overview: state.overview,
     ranked: state.ranked.map((hyp, index) => ({
@@ -1631,6 +2185,11 @@ export function leaderboard(cwd, slug) {
       citations: hyp.citations.length,
       embedded: Array.isArray(hyp.vector),
       citation_check: hyp.citationCheck ? hyp.citationCheck.summary : null,
+      novelty_check: hyp.noveltyCheck
+        ? { state: hyp.noveltyCheck.state, score: hyp.noveltyCheck.score, score_source: hyp.noveltyCheck.score_source, references: hyp.noveltyCheck.references.length }
+        : null,
+      limitation_ids: hyp.limitationIds,
+      champion: state.championId === hyp.id,
       quarantined: hyp.status === 'quarantined',
       has_protocol: Boolean(hyp.protocolPlan),
     })),
@@ -1643,7 +2202,7 @@ export function lineage(cwd, slug, id) {
   const hyp = state.byId.get(id)
   if (!hyp) throw new Error(`unknown hypothesis id: ${id}`)
 
-  const fields = ['title', 'summary', 'content', 'rationale', 'experimental_plan', 'key_assumptions', 'citations']
+  const fields = ['title', 'summary', 'content', 'rationale', 'experimental_plan', 'key_assumptions', 'citations', 'limitation_ids']
   return {
     id: hyp.id,
     title: hyp.title,
@@ -1693,6 +2252,9 @@ export function exportTournament({ cwd, slug, format = 'markdown', overwrite = f
       rounds: state.rounds,
       avgTopTenElo: state.avgTopTenElo,
       termination: terminationCheck(policyStats(state), state.eloHistory),
+      limitations: state.limitations.map((limitation) => ({ ...limitation, ...limitationState(limitation) })),
+      selections: state.selections,
+      champion: state.championId,
       hypotheses: state.ranked.map(publicHypothesis),
       matches: state.matches,
       critique: state.critique,
@@ -1742,6 +2304,43 @@ function markdownReport(state) {
     + 'ordering as preliminary. RD is the uncertainty in each rating (350 = never competed or reviewed, 200 = reviewed, '
     + 'lower as matches accumulate); a high rating with a high RD has not earned its position yet.', '')
 
+  if (state.limitations.length) {
+    const live = state.hypotheses.filter((hyp) => hyp.status !== 'rejected')
+    const covered = state.limitations.filter((limitation) => live.some((hyp) => hyp.status === 'active' && hyp.limitationIds.includes(limitation.id))).length
+    push('## Limitations', '')
+    push(`Recorded as an append-only set: ${state.limitations.length} limitation(s), ${covered} addressed by an active idea. `
+      + 'A refinement appends a new entry; nothing here is rewritten or deleted.', '')
+    push('| # | State | Rounds | Addressed by | Flaw |', '|---|---|---|---|---|')
+    for (const limitation of state.limitations) {
+      const view = limitationState(limitation)
+      const addressed = live.filter((hyp) => hyp.limitationIds.includes(limitation.id)).map((hyp) => hyp.id)
+      push(`| ${limitation.id} | ${view.state} | ${view.rounds_used}/${view.max_rounds} | ${addressed.join(', ') || '—'} | ${pipe(limitation.flaw)} |`)
+    }
+    push('')
+    for (const limitation of state.limitations) {
+      const view = limitationState(limitation)
+      push(`### ${limitation.id} — ${limitation.flaw}`, '')
+      push(`- **Methodological flaw (quote):** “${limitation.quote}” — source: ${limitation.source}${limitation.quote_verified ? ' (verified verbatim)' : ''}`)
+      push(`- **Why it limits the method:** ${limitation.why}`)
+      push(`- **Opportunity for improvement (remedy families):** ${limitation.opportunities.map((entry) => `*${entry}*`).join(' · ')}`)
+      push(`- **Sufficiency:** ${view.state} after ${view.rounds_used}/${view.max_rounds} round(s)${view.latest_reason ? ` — ${view.latest_reason}` : ''}`)
+      push('')
+    }
+  }
+
+  const latestSelection = state.selections.at(-1)
+  if (latestSelection) {
+    const champion = state.byId.get(latestSelection.hypothesisId)
+    push('## Selected champion', '')
+    push(`\`${latestSelection.hypothesisId}\`${champion ? ` — ${champion.title}` : ''} (selection ${latestSelection.id}${state.selections.length > 1 ? ` of ${state.selections.length}` : ''}).`, '')
+    push(`**Why:** ${latestSelection.rationale}`, '')
+    push(`Compared against: ${latestSelection.compared_ids.join(', ') || 'no other active candidate (sole survivor)'}.`, '')
+    push(`Evidence digest: \`${latestSelection.evidence_digest}\`. The digest covers the tournament readings and experiment traces the selector saw; the references behind it are in the ledger, not in this report.`, '')
+    const failed = latestSelection.evidence?.failed_traces || []
+    if (failed.length) push(`Failed or pruned traces considered: ${failed.map((trace) => `${trace.experiment}/${trace.run_id}`).join(', ')}.`, '')
+    push('')
+  }
+
   for (const [index, hyp] of state.ranked.entries()) {
     push(`## ${index + 1}. ${hyp.title} (\`${hyp.id}\`)`, '')
     push(`Rating ${hyp.rating} (RD ${hyp.rd}) · record ${hyp.wins}-${hyp.losses}-${hyp.draws} over ${hyp.matchesPlayed} matches · status \`${hyp.status}\` · from \`${hyp.strategy}\``, '')
@@ -1751,6 +2350,19 @@ function markdownReport(state) {
     if (hyp.rationale) push(`**Mechanism / rationale.** ${hyp.rationale}`, '')
     if (hyp.experimental_plan) push(`**Discriminating experiment.** ${hyp.experimental_plan}`, '')
     if (hyp.novelty_assessment) push(`**Novelty.** ${hyp.novelty_assessment}`, '')
+    if (hyp.limitationIds.length) push(`**Addresses limitations.** ${hyp.limitationIds.join(', ')}`, '')
+    if (hyp.noveltyCheck) {
+      const check = hyp.noveltyCheck
+      push(`**Grounded novelty (${check.state}).** ${check.score ?? '—'}/10${check.score_source ? ` (source: ${check.score_source})` : ''}${check.computed_score != null ? ` · lexical reading ${check.computed_score}/10` : ''}. ${check.method}`, '')
+      for (const reference of check.references) {
+        push(`- Prior art: ${reference.title}${reference.year ? ` (${reference.year})` : ''}${reference.doi ? ` · ${reference.doi}` : ''}${reference.overlap != null ? ` — overlap ${reference.overlap}` : ''}`)
+      }
+      for (const quote of check.quotes) {
+        push(`  > “${quote.quote}” — ${quote.reference_title || quote.reference_doi || 'retrieved reference'}`)
+      }
+      if (check.reason) push(`Novelty not checked: ${check.reason}`, '')
+      push('')
+    }
     if (hyp.key_assumptions.length) {
       push('**Key assumptions.**', '')
       for (const assumption of hyp.key_assumptions) push(`- ${assumption}`)

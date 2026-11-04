@@ -81,6 +81,43 @@ one. Verdicts are append-only; the latest per run is shown in `compare`,
 staged fields and verdicts. The tool records logged values and human
 decisions; none of it is a scientific claim.
 
+## `ablation`
+
+A component-attribution ledger under `<cwd>/.dsh/ablation/<slug>/`:
+`ablation.json` (method spec plus the champion idea id from `coscientist`),
+`plan.json` (the frozen grid), `records.jsonl`, `verdicts.jsonl`,
+`pruned.jsonl`, and `exports/`. It **never runs an experiment**.
+
+`start` binds the method and `idea_id`; `plan` freezes a grid of arms,
+datasets, metrics with directions, and replicates. One arm is the reference
+(typically `full`); every other arm names the `component` and `code_path` it
+removes, plus the metric changes it expects (`increase`, `decrease`, `tie`, or
+`any`).
+
+`record` links one `arm × dataset × replicate` cell to a run that already
+exists. An `experiment_log` link supplies the run's metrics directly; an
+`analysis_run` link must have hashed outputs or artifacts and the caller
+supplies the metric reading. The record stores the source ledger, run id, a
+digest of the source run, artifacts, and the metric values — a duplicate cell
+is refused.
+
+`report` pairs every removal arm with the reference on the same dataset and
+replicate. It reports each metric's reference value, arm value, delta, percent
+delta, observed change, expected change, and whether the expectation was met;
+ties and missing cells are listed rather than dropped. The advisory
+**attribution reading** marks a component `attributed` only when every paired
+expected metric moves in the declared direction, `unattributed` when none
+does, `partial` when coverage or expectations are mixed, and `not_checked`
+when there is no paired evidence. Pruned arms are excluded from that reading
+and listed separately.
+
+`verdict` records a human `good`, `refine`, or `unattributed` decision with a
+reason; `prune` appends an arm-pruning event rather than rewriting the plan.
+`show` reads a record, an arm, or the whole ledger; `status` summarizes the
+plan, records, missing cells, ties, pruning, and latest verdict; `export`
+writes Markdown, JSON, or CSV. The attribution reading and every number are
+advisory, and the export is the artifact a later attribution check can read.
+
 ## `dataset_get`
 
 The download layer under `data/<slug>/` with a manifest at

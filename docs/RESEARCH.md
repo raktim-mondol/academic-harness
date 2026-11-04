@@ -175,16 +175,19 @@ State lives under `<cwd>/.dsh/coscientist/<slug>/` as append-only `events.jsonl`
 | `add` | Add a hypothesis; a near-duplicate is discarded with its similarity score, and a cap-reached add is discarded. |
 | `review` | Five stages: `initial` → `full` → `deep_verification` → `simulation` → `observation`. Stages refuse to run out of order; a `fail` at `initial`/`full` rejects the hypothesis. |
 | `safety` | Record a dual-use classification; the tool withholds it when the severity meets the threshold. |
-| `status` | Ranked leaderboard. |
-| `next` | Which task the scheduling policy samples now; it never samples a task the ledger cannot run and stops at the match cap. |
+| `status` | Ranked leaderboard plus limitation coverage (recorded, addressed by an active idea, sufficient, exhausted) and the selected champion. |
+| `next` | Which task the scheduling policy samples now; it never samples a task the ledger cannot run and stops at the match cap. An `evolution` dispatch carries the failed and pruned `experiment_log` traces, so a mutation is constrained by what already failed. |
 | `set_status` | Reject or release a withholding, always with a reason. |
 | `lineage` | Hypothesis ancestry. |
 | `design_protocol` | A protocol for testing the leading hypothesis. |
 | `synthesize` | Combine compatible hypotheses. |
-| `export` | `markdown` / `json` / `mermaid`. |
-| `graph` | Mermaid diagram of lineage, similarity, and claim→paper support, written with `export format: mermaid` and rasterised by [`mermaid_render`](WRITING.md#mermaid-diagrams). |
+| `export` | `markdown` / `json` / `mermaid`, including the limitation set and the selected champion. |
+| `graph` | Mermaid diagram of lineage, similarity, claim→paper support, prior-art references, and limitation coupling, written with `export format: mermaid` and rasterised by [`mermaid_render`](WRITING.md#mermaid-diagrams). |
 | `priors` | Prior feedback, rejections, and withholdings from **other tournaments in this workspace**, ranked against the goal — read from their own logs, so nothing is duplicated and nothing can disagree with a ledger. |
 | `embed` | Opt-in Gemini embeddings that switch the duplicate gate and similarity from lexical overlap to cosine, at upstream's 0.92 / 0.70 thresholds. `embed` is the only tournament call that needs a key or the network, and it reuses `GEMINI_API_KEY` from [Image generation](WRITING.md#image-generation). |
+| `limitation` | Nested `limitation_action`: `add` (a numbered limitation record with the methodological flaw, the verbatim source quote span, why it limits the method, and at least two generic remedy families), `verify` (binary `sufficient` / `insufficient` reading under a round cap), or `status` (the coverage view). A refinement appends a new limitation; nothing is rewritten or deleted. |
+| `trace` | Read-only traces from `experiment_log` ledgers, including failed and pruned runs, as evidence for evolution. Optionally narrow to one `experiment` slug or runs whose params name a hypothesis `id`. |
+| `select` | Freeze an active champion for ablation and drafting. Compares tournament readings and recorded experiment traces across surviving candidates, stores its rationale, and pins the comparison with a SHA-256 evidence digest. |
 
 `zvec-grep` cannot supply embeddings: `zg query --vector` embeds a search query and never returns a vector. That is why `coscientist embed` uses the Gemini endpoint the plugin already uses for images.
 
@@ -215,7 +218,17 @@ The tools decide what the code decides:
 - a verdict that follows the presentation order counts as a draw,
 - `next` reports when to stop: step budget, no pair left to play, Elo plateau, or cap ranked.
 
-Neither tool calls a model — the session does the reasoning, normally through `subagent`, so the cost of a tournament is debate matches.
+### Limitations, traces, and grounded novelty
+
+The tournament is also the home of the paper's limitation and selection records. No second ideation ledger was added; these are actions on the same append-only `events.jsonl`.
+
+- **Limitation records** follow the paper's published artifact: a flat numbered list, each entry carrying the methodological flaw, the verbatim source quote span it is anchored to, why it limits the method, and **at least two remedy families** — generic options, not one chosen fix. The quote is checked against a hypothesis in the ledger or a workspace text file before the record is written, so a limitation cannot be a free-floating opinion. Sufficiency is binary `sufficient` / `insufficient`, and the loop is round-capped (default **16**, `CO_SCIENTIST_LIMITATION_ROUNDS`). The paper does not say what happens when the cap is spent; this implementation reports `exhausted` and leaves the decision with the scientist — it never converts an unfinished loop into an acceptance. A refinement is a **set append**: adding another limitation or another idea that addresses it, never editing or deleting an earlier entry.
+- **Coupling is machine-checkable.** `add` takes `addresses_limitation`, the limitation must already exist, and `status`, `graph`, and both exports join ideas to limitations. The paper's seed artifacts tag each idea component "(Addressing Limitation k)" one-to-one; here the link is a stored id, not a parenthetical.
+- **Traces read failures back into ideation.** `trace` reads `.dsh/experiments/*` — every run, with failed and pruned runs first — and an `evolution` dispatch from `next` carries the failed/pruned traces and their reasons. A run is **pruned** when its latest `experiment_log` verdict is `bad`; **failed** when it has neither metrics nor artifacts. Neither state is hidden.
+- **Selection is evidence-bound.** `select` requires an active champion, records the candidates compared, and stores an evidence digest over their ratings, review scores, citation and novelty checks, and any experiment traces whose params name them. A later reader can tell what the selector saw without trusting the rationale alone. Selection is historical, not a gate: a later selection appends another record, and only `ah_check` blocks a turn.
+- **Grounded novelty** is `coscientist_verify action=novelty`. It retrieves a small reference set (default **2**, the paper's only published number; maximum 10), stores each title/abstract, and pins the novelty reading to **verbatim quote spans** from those references. The formula is ours: `10 × (1 − max token coverage of the claim by any retrieved reference title/abstract)`. It is a lexical prior-art reading over a small retrieved set, not a literature verdict, and the paper specifies no formula, range, or threshold. A caller reading can be pinned instead; either way the lexical reading is stored beside it. When retrieval fails or returns no usable title, the record is `not_checked` with the reason and no score — never a guessed number.
+
+Neither tool calls a model — the session does the reasoning, normally through `subagent`, so the cost of a tournament is debate matches. `coscientist_verify novelty` and `citations` reach Crossref; no other tournament action needs the network.
 
 Hypotheses generated this way recombine published knowledge: they are not results, an unverified citation stays `[VERIFY]`, and a withheld dual-use idea stays withheld until the user releases it by name. The `co-scientist-tournament` skill carries the loop, the subagent briefs, and the budget defaults. For one round of ideation, use `generating-scientific-hypotheses` instead (see [Skills](SKILLS.md)).
 

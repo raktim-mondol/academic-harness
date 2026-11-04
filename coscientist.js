@@ -13,11 +13,14 @@
  */
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import {
-  DEFAULT_MAX_HYPOTHESES, DEFAULT_STEP_BUDGET, HYPOTHESIS_STATUSES, REVIEW_STAGES, VERDICTS,
-  addHypothesis, attachVectors, exportTournament, knowledgeGraph, leaderboard, lineage, nextTask,
-  priorFeedback, recordReview, recordSafety, saveExperimentProtocol, saveSynthesis, setStatus,
-  similarityNeighbours, startTournament, tournamentSlug,
+  DEFAULT_LIMITATION_ROUNDS, DEFAULT_MAX_HYPOTHESES, DEFAULT_STEP_BUDGET, HYPOTHESIS_STATUSES,
+  LIMITATION_VERDICTS, REVIEW_STAGES, VERDICTS,
+  addHypothesis, addLimitation, attachVectors, exportTournament, knowledgeGraph, leaderboard, lineage,
+  limitationStatus, nextTask, priorFeedback, recordReview, recordSafety, saveExperimentProtocol,
+  saveSynthesis, selectChampion, setStatus, similarityNeighbours, startTournament, tournamentSlug,
+  verifyLimitation,
 } from './coscientist-store.js'
+import { traceExperiments } from './coscientist-trace.js'
 import { selectEvolutionStrategy } from './coscientist-models.js'
 import { MAX_TEXTS_PER_BATCH, embedTexts, resolveEmbedModel } from './coscientist-embed.js'
 import { resolveEnv } from './credential-env.js'
@@ -25,14 +28,16 @@ import { resolveEnv } from './credential-env.js'
 const ACTIONS = [
   'start', 'add', 'review', 'safety', 'status', 'next', 'set_status',
   'lineage', 'embed', 'priors', 'graph', 'design_protocol', 'synthesize', 'export',
+  'limitation', 'trace', 'select',
 ]
+const LIMITATION_ACTIONS = ['add', 'verify', 'status']
 
 /** What each sampled task asks the session to do, in one line. */
 const DISPATCH = {
   generation: () => 'Generate one hypothesis: search the literature first, then run one of the four generation strategies (literature_exploration while fewer than 3 are active, then rotating scientific_debate → assumption_chaining → research_expansion by round) and `add` the result.',
   reflection: () => 'Review one pending hypothesis through the five stages in order (`review`); verify its citations as you go with crossref_lookup / paper_resolve, and record what could not be resolved as unverified.',
   ranking: () => 'Run one tournament match: `coscientist_rank propose`, judge both orientations with one subagent at a time (same brief, slots swapped), then `coscientist_rank record`.',
-  evolution: (round) => `Evolve a top hypothesis with the ${selectEvolutionStrategy(round)} mutation, then \`add\` it with parent_ids.`,
+  evolution: (round) => `Evolve a top hypothesis with the ${selectEvolutionStrategy(round)} mutation, then \`add\` it with parent_ids. Treat any failed or pruned experiment traces in this dispatch as constraints: do not re-propose an assumption they already refuted.`,
   proximity: () => 'Refresh similarity: `coscientist_rank similarity` on the live hypotheses; flag any duplicate pair for the scientist.',
   meta_review: () => 'Synthesize a cross-cutting critique of the current set, then `synthesize` it; it steers later generation.',
 }
@@ -113,6 +118,9 @@ function compactBoard(view) {
     avg_top_elo: view.avg_top_elo,
     top_elo: view.top_elo,
     termination: view.termination,
+    limitations: view.limitations,
+    champion: view.champion,
+    selections: view.selections,
     ranked: view.ranked,
   }
 }
@@ -148,7 +156,7 @@ function renderStatus(value) {
         return [{ type: 'text', text: `Discarded: the cap of ${value.discarded.cap} hypotheses is reached. Rank and evolve what you have.` }]
       }
       const hyp = value.hypothesis
-      return [{ type: 'text', text: `Added \`${hyp.id}\` (${hyp.status}, rating ${hyp.rating}, RD ${hyp.rd}): ${hyp.title}${hyp.parent_ids.length ? `\nLineage: evolved from ${hyp.parent_ids.join(', ')}.` : ''}` }]
+      return [{ type: 'text', text: `Added \`${hyp.id}\` (${hyp.status}, rating ${hyp.rating}, RD ${hyp.rd}): ${hyp.title}${hyp.parent_ids.length ? `\nLineage: evolved from ${hyp.parent_ids.join(', ')}.` : ''}${hyp.limitation_ids?.length ? `\nAddresses limitations: ${hyp.limitation_ids.join(', ')}.` : ''}` }]
     }
     case 'review': {
       const hyp = value.hypothesis
@@ -167,7 +175,10 @@ function renderStatus(value) {
           value.dispatch,
           `Weights in force: ${Object.entries(value.weights).map(([key, weight]) => `${key} ${weight}`).join(', ')}.`,
           `Steps ${value.steps_used}/${value.step_budget}.${value.max_matches ? ` Matches ${value.matches_used}/${value.max_matches}.` : ''}${value.budget_warning ? ' ⚠ approaching the step budget.' : ''}`,
-          value.terminate ? `STOP: ${value.reason}. Design the protocol for the top hypothesis, synthesize an overview, then export.` : '',
+          value.traces?.failed?.length
+            ? `Experiment traces to respect: ${value.traces.failed_total} failed/pruned run(s) — ${value.traces.notes.slice(0, 3).join('; ')}`
+            : (value.traces ? 'No failed or pruned experiment traces in this workspace yet.' : ''),
+          value.terminate ? `STOP: ${value.reason}. Run \`select\` to freeze the champion, design its protocol, then export.` : '',
         ].filter(Boolean).join('\n'),
       }]
     }
@@ -206,6 +217,62 @@ function renderStatus(value) {
       return [{ type: 'text', text: [`${value.priors.length} prior result(s) from ${value.scanned} other tournament(s) in this workspace:`, ...value.priors.map((p) => `- [${p.kind}${p.reward !== undefined ? `, reward ${p.reward}` : ''}] (${p.score}) ${p.session}/${p.hypothesis_id || '-'}: ${String(p.text).replace(/\n+/g, ' ').slice(0, 200)}`)].join('\n') }]
     case 'graph':
       return [{ type: 'text', text: [`${value.nodes} nodes / ${value.edges} edges (${value.measures.join(', ') || 'no similarity edges'}; ${value.paper_nodes} paper node(s)).`, 'Pass the mermaid block to mermaid_render for SVG, or export format:mermaid to write exports/tournament.mmd.', '', value.mermaid].join('\n') }]
+    case 'limitation': {
+      if (value.subaction === 'add') {
+        const limitation = value.limitation
+        return [{ type: 'text', text: [
+          `Recorded limitation \`${limitation.id}\`: ${limitation.flaw}`,
+          `Source quote verified in ${limitation.source} (${limitation.source_kind}).`,
+          `Remedy families: ${limitation.opportunities.join(' · ')}`,
+          `Address it with \`add addresses_limitation: ["${limitation.id}"]\`; verify sufficiency with \`limitation limitation_action: "verify"\`.`,
+        ].join('\n') }]
+      }
+      if (value.subaction === 'verify') {
+        const limitation = value.limitation
+        const lines = [`\`${limitation.id}\` → ${limitation.state} at round ${value.round}/${limitation.max_rounds}.`]
+        if (limitation.latest_reason) lines.push(limitation.latest_reason)
+        if (value.exhausted) lines.push('The round cap is spent without a sufficient reading. This is not an acceptance: record a narrower limitation or leave the flaw open for the scientist.')
+        return [{ type: 'text', text: lines.join('\n') }]
+      }
+      const coverage = value.coverage
+      const lines = [
+        `${coverage.limitations} limitation(s): ${coverage.sufficient} sufficient, ${coverage.insufficient} insufficient, ${coverage.exhausted} exhausted, ${coverage.open} open; ${coverage.covered} addressed by an active idea.`,
+      ]
+      if (coverage.ideas_without_limitation.length) lines.push(`Live ideas that address no limitation: ${coverage.ideas_without_limitation.join(', ')}.`)
+      if (value.limitations.length) {
+        lines.push('', '| id | state | rounds | addressed by | flaw |', '|---|---|---|---|---|')
+        for (const limitation of value.limitations) {
+          lines.push(`| ${limitation.id} | ${limitation.state} | ${limitation.rounds_used}/${limitation.max_rounds} | ${limitation.addressed_by.join(', ') || '—'} | ${String(limitation.flaw).replace(/\|/g, '\\|')} |`)
+        }
+        lines.push('', coverage.note)
+      }
+      return [{ type: 'text', text: lines.join('\n') }]
+    }
+    case 'trace': {
+      const lines = [`Read ${value.scanned} experiment ledger(s): ${value.total_runs} run(s), ${value.failed_total} failed/pruned (${value.pruned_total} with a bad verdict).`]
+      if (value.unreadable?.length) lines.push(`Skipped unreadable ledger(s): ${value.unreadable.map((entry) => entry.experiment).join(', ')}.`)
+      if (!value.runs.length) lines.push('No runs matched. Nothing to feed back into evolution yet.')
+      for (const run of value.runs) {
+        const verdict = run.verdict ? ` · verdict ${run.verdict.verdict}${run.verdict.forced ? ' (forced)' : ''}: ${run.verdict.reason}` : ''
+        lines.push(`- ${run.state.toUpperCase()} ${run.experiment}/${run.run_id}: ${Object.entries(run.metrics).map(([key, metric]) => `${key}=${metric}`).join(', ') || 'no metrics'}${verdict}`)
+      }
+      return [{ type: 'text', text: lines.join('\n') }]
+    }
+    case 'select': {
+      const selection = value.selection
+      const lines = [
+        `Selected \`${selection.champion_id}\` as champion${selection.sole_survivor ? ' (sole active survivor)' : ` over ${selection.compared_ids.join(', ')}`}.`,
+        `Evidence digest: ${selection.evidence_digest}`,
+        '',
+        '| candidate | rating | RD | novelty | correctness | testability | traces | failed |',
+        '|---|---|---|---|---|---|---|---|',
+        ...value.comparison.map((candidate) => `| ${candidate.id} | ${candidate.rating} | ${candidate.rd} | ${candidate.review_scores.novelty ?? '—'} | ${candidate.review_scores.correctness ?? '—'} | ${candidate.review_scores.testability ?? '—'} | ${candidate.traces.linked_runs} | ${candidate.traces.failed} |`),
+        '',
+        selection.rationale,
+      ]
+      if (value.traces.failed_total) lines.push(`${value.traces.failed_total} failed/pruned experiment trace(s) were part of the evidence.`)
+      return [{ type: 'text', text: lines.join('\n') }]
+    }
     case 'export':
       return [{ type: 'text', text: `Wrote ${value.path} (${value.bytes} bytes).${value.format === 'mermaid' ? ' Pass it to mermaid_render for SVG.' : ''}` }]
     default: {
@@ -213,6 +280,10 @@ function renderStatus(value) {
       const lines = [
         `Tournament \`${view.slug}\` — ${view.counts.total} hypotheses (${view.counts.active} active, ${view.counts.pendingReview} in review, ${view.counts.rejected} rejected, ${view.counts.quarantined} withheld), ${view.counts.totalMatches} matches, round ${view.rounds}/${view.step_budget}.`,
         view.termination.terminate ? `Terminated: ${view.termination.reason}.` : 'Rankings still moving — ask `next`.',
+        view.limitations?.coverage?.limitations
+          ? `Limitations: ${view.limitations.coverage.limitations} recorded, ${view.limitations.coverage.covered} addressed by an active idea, ${view.limitations.coverage.sufficient} sufficient, ${view.limitations.coverage.exhausted} exhausted.`
+          : '',
+        view.champion ? `Champion (frozen by \`select\`): \`${view.champion.id}\` — ${view.champion.title}.` : '',
         '',
         '| # | id | rating | RD | W-L-D | played | status | hypothesis |',
         '|---|---|---|---|---|---|---|---|',
@@ -261,6 +332,7 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
       strategy: String(args.strategy ?? 'generation:literature_exploration').trim(),
       round: args.round === undefined ? null : Number(args.round),
       parentIds: listParam(args.parent_ids),
+      limitationIds: listParam(args.addresses_limitation),
       hypothesis: {
         title: args.title,
         summary: args.summary,
@@ -273,6 +345,63 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
       },
     })
     return { action, slug, ...withoutState(added) }
+  }
+
+  if (action === 'limitation') {
+    const subaction = String(args.limitation_action ?? args.subaction ?? 'status').trim().toLowerCase()
+    if (!LIMITATION_ACTIONS.includes(subaction)) throw new Error(`limitation_action must be one of ${LIMITATION_ACTIONS.join(', ')}`)
+    const maxRounds = await settingOr('CO_SCIENTIST_LIMITATION_ROUNDS', args.max_rounds, DEFAULT_LIMITATION_ROUNDS)
+    if (subaction === 'add') {
+      const added = await addLimitation({
+        cwd,
+        slug,
+        flaw: args.flaw,
+        why: args.why ?? args.limitation_why,
+        opportunities: listParam(args.opportunities ?? args.opportunity),
+        quote: args.quote,
+        source: args.source ?? args.quote_source,
+      })
+      return { action, subaction, slug, ...withoutState(added) }
+    }
+    if (subaction === 'verify') {
+      const limitationId = String(args.limitation_id ?? '').trim()
+      if (!limitationId) throw new Error('limitation_id is required (e.g. l1)')
+      const verified = await verifyLimitation({
+        cwd,
+        slug,
+        id: limitationId,
+        verdict: String(args.limitation_verdict ?? '').trim(),
+        reason: args.limitation_reason ?? args.reason,
+        maxRounds,
+      })
+      return { action, subaction, slug, ...withoutState(verified) }
+    }
+    return { action, subaction, slug, max_rounds: maxRounds, ...limitationStatus(cwd, slug, { maxRounds }) }
+  }
+
+  if (action === 'trace') {
+    return {
+      action,
+      slug,
+      ...traceExperiments({
+        cwd,
+        experiment: args.experiment,
+        hypothesisId: args.id ? requireId(args) : null,
+        limit: args.limit,
+      }),
+    }
+  }
+
+  if (action === 'select') {
+    const selected = await selectChampion({
+      cwd,
+      slug,
+      id: requireId(args),
+      comparedIds: listParam(args.compared_ids),
+      rationale: args.rationale ?? args.selection_reason ?? args.reason,
+      experiment: args.experiment,
+    })
+    return { action, slug, ...withoutState(selected) }
   }
 
   if (action === 'review') {
@@ -313,6 +442,12 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
   if (action === 'next') {
     const dispatched = await nextTask({ cwd, slug })
     const guide = DISPATCH[dispatched.task] || (() => '')
+    // Evolution is the one task that should read the experiment record back into
+    // ideation. Failed and pruned runs are the constraints the mutation must not
+    // repeat, so they travel with the dispatch rather than in a separate lookup.
+    const traces = dispatched.task === 'evolution'
+      ? traceExperiments({ cwd, limit: 5 })
+      : null
     return {
       action,
       slug,
@@ -327,6 +462,16 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
       terminate: dispatched.terminate,
       reason: dispatched.reason,
       dispatch: guide(dispatched.round),
+      traces: traces
+        ? {
+            scanned: traces.scanned,
+            total_runs: traces.total_runs,
+            failed_total: traces.failed_total,
+            pruned_total: traces.pruned_total,
+            failed: traces.failed,
+            notes: traces.notes,
+          }
+        : null,
     }
   }
 
@@ -411,8 +556,8 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'coscientist',
     description: [
-      'Co-Scientist hypothesis tournament: generate, review, rank, and evolve candidate hypotheses with persistent state under `.dsh/coscientist/<slug>/`. Actions: `start` (goal, constraints, max_hypotheses, step_budget, max_matches, seed — defaults 5 ideas / 36 steps; `max_matches` enforces an explicit user stop bound), `add` (one hypothesis with title/summary/content plus rationale, experimental_plan, key_assumptions, citations, parent_ids), `review` (five stages in order: initial, full, deep_verification, simulation, observation), `safety` (record a dual-use classification and apply the withhold gate), `status` (ranked leaderboard), `next` (which task the scheduling policy samples now), `set_status` (reject or withhold; a reason is required), `lineage` (parentage and diff), `embed` (opt-in Gemini embeddings that switch the duplicate gate and similarity to cosine), `priors` (what sibling tournaments in this workspace already learned about similar ideas), `graph` (Mermaid knowledge graph of lineage, similarity, and claim support), `design_protocol` (steps for the chosen hypothesis), `synthesize` (meta-review critique and research overview), `export` (markdown, json, or mermaid report).',
-      'The tool decides, not the model: a near-duplicate `add` is discarded with its similarity score, a cap-reached `add` is discarded, review stages are refused out of order, a `fail` at initial or full rejects the hypothesis, a `safety` severity at or above the threshold withholds it, and `next` reports when the tournament should stop (step budget, match cap, no pair left to play, Elo plateau, cap ranked). `next` never samples a task the ledger cannot execute. Ratings are Glicko-2 with uncertainty (RD); see the co-scientist-tournament skill for the loop.',
+      'Co-Scientist hypothesis tournament: generate, review, rank, and evolve candidate hypotheses with persistent state under `.dsh/coscientist/<slug>/`. Actions: `start` (goal, constraints, max_hypotheses, step_budget, max_matches, seed — defaults 5 ideas / 36 steps; `max_matches` enforces an explicit user stop bound), `add` (one hypothesis with title/summary/content plus rationale, experimental_plan, key_assumptions, citations, parent_ids, and addresses_limitation), `review` (five stages in order: initial, full, deep_verification, simulation, observation), `safety` (record a dual-use classification and apply the withhold gate), `status` (ranked leaderboard plus limitation coverage and the selected champion), `next` (which task the scheduling policy samples now; an evolution dispatch carries failed/pruned experiment traces), `set_status` (reject or withhold; a reason is required), `lineage` (parentage and diff), `embed` (opt-in Gemini embeddings that switch the duplicate gate and similarity to cosine), `priors` (what sibling tournaments in this workspace already learned about similar ideas), `graph` (Mermaid knowledge graph of lineage, similarity, claim support, prior art, and limitations), `design_protocol` (steps for the chosen hypothesis), `synthesize` (meta-review critique and research overview), `export` (markdown, json, or mermaid report), `limitation` (limitation_action add/verify/status: an append-only numbered record with a verbatim source quote span, why it limits the method, and at least two remedy families; sufficiency is binary sufficient|insufficient under a round cap), `trace` (read experiment_log runs, including failed and pruned ones, as evidence for evolution), `select` (freeze an active champion with the compared candidates and an evidence digest).',
+      'The tool decides, not the model: a near-duplicate `add` is discarded with its similarity score, a cap-reached `add` is discarded, review stages are refused out of order, a `fail` at initial or full rejects the hypothesis, a `safety` severity at or above the threshold withholds it, and `next` reports when the tournament should stop (step budget, match cap, no pair left to play, Elo plateau, cap ranked). `next` never samples a task the ledger cannot execute. A limitation cannot be added without a verbatim source quote from a hypothesis or workspace file, and an `insufficient` verdict never becomes a pass; at the round cap it is reported `exhausted`. Ratings are Glicko-2 with uncertainty (RD); see the co-scientist-tournament skill for the loop.',
       'This is for a persistent, ranked, multi-round hypothesis set. For one pass of ideation use generating-scientific-hypotheses. Generated hypotheses recombine published knowledge — they are not results, and citations must be verified before use. Matches are judged with `coscientist_rank`.',
     ].join(' '),
     parameters: {
@@ -443,9 +588,10 @@ export function apply(ctx) {
       key_assumptions: { type: 'array', items: { type: 'string' }, description: 'Load-bearing assumptions (add). Verified one by one in deep_verification.' },
       citations: { type: 'array', items: { type: 'string' }, description: 'References the hypothesis rests on (add). Unverified ones must be marked, never invented.' },
       parent_ids: { type: 'array', items: { type: 'string' }, description: 'For an evolved child: the parent hypothesis ids (add).' },
+      addresses_limitation: { type: 'array', items: { type: 'string' }, description: 'Limitation ids this hypothesis addresses, e.g. ["l1"]. The limitation must already be recorded (add).' },
       strategy: { type: 'string', description: 'What produced it, e.g. generation:scientific_debate or evolution:coherence (add).' },
       round: { type: 'number', description: 'Dispatch round that produced it (add).' },
-      id: { type: 'string', description: 'Hypothesis id such as h1 (review/safety/set_status/lineage/design_protocol).' },
+      id: { type: 'string', description: 'Hypothesis id such as h1 (review/safety/set_status/lineage/design_protocol/select). For trace, an optional filter on run params.' },
       severity: { type: 'string', enum: ['none', 'low', 'moderate', 'high'], description: 'Dual-use severity from the safety-classifier subagent (safety).' },
       category: { type: 'string', description: 'Risk label, e.g. bioweapon, chem_weapon, human_harm, dual_use, none (safety).' },
       reasoning: { type: 'string', description: 'Why that severity, about the specific idea rather than the field (safety).' },
@@ -461,13 +607,26 @@ export function apply(ctx) {
       status: { type: 'string', enum: HYPOTHESIS_STATUSES, description: 'Target status (set_status).' },
       reason: { type: 'string', description: 'Why the status changed (set_status). Required.' },
       overridden_by: { type: 'string', description: 'Who released a withheld hypothesis (set_status). Required to activate one.' },
+      limitation_action: { type: 'string', enum: LIMITATION_ACTIONS, description: 'add, verify, or status for the limitation action. Default status.' },
+      limitation_id: { type: 'string', description: 'Limitation id such as l1 (limitation verify).' },
+      flaw: { type: 'string', description: 'The methodological flaw, quoting the offending equation or step (limitation add).' },
+      why: { type: 'string', description: 'Why the flaw limits the method (limitation add).' },
+      opportunities: { type: 'array', items: { type: 'string' }, description: 'At least two generic remedy families; not one chosen fix (limitation add).' },
+      quote: { type: 'string', description: 'The verbatim source span the flaw is anchored to (limitation add).' },
+      source: { type: 'string', description: 'Hypothesis id or workspace-relative text file containing the quote (limitation add). Verified before recording.' },
+      limitation_verdict: { type: 'string', enum: LIMITATION_VERDICTS, description: 'sufficient or insufficient (limitation verify). Binary by design.' },
+      limitation_reason: { type: 'string', description: 'Why this sufficiency reading (limitation verify). Required.' },
+      max_rounds: { type: 'number', description: `Verification rounds one limitation may spend. Default ${DEFAULT_LIMITATION_ROUNDS} (or CO_SCIENTIST_LIMITATION_ROUNDS).` },
+      compared_ids: { type: 'array', items: { type: 'string' }, description: 'Surviving candidates the champion was compared against (select). Defaults to every other active idea.' },
+      rationale: { type: 'string', description: 'Why this candidate is the champion (select). Required; stored with the evidence digest.' },
+      experiment: { type: 'string', description: 'Restrict traces or selection evidence to one experiment_log slug (trace/select).' },
       steps: { type: 'array', items: { type: 'string' }, description: 'Ordered protocol steps (design_protocol).' },
       meta_critique: { type: 'string', description: 'Cross-cutting critique of the set, injected into later generation (synthesize).' },
       overview: { type: 'string', description: 'Final research overview (synthesize).' },
       format: { type: 'string', enum: ['markdown', 'json', 'mermaid'], description: 'Export format (export). Default markdown. mermaid writes the tournament graph for mermaid_render.' },
       overwrite: { type: 'boolean', description: 'Replace an existing export file (export). Default false.' },
       query: { type: 'string', description: 'Text to match prior feedback against (priors). Defaults to this tournament\'s goal.' },
-      limit: { type: 'number', description: 'How many priors to return (priors). Default 5.' },
+      limit: { type: 'number', description: 'How many priors or traces to return (priors/trace). Default 5 priors, 50 traces.' },
       min_score: { type: 'number', description: 'Minimum similarity for a prior to be worth showing (priors). Default 0.15.' },
     },
     output: {

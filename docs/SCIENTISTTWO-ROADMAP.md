@@ -1,6 +1,6 @@
 # ScientistTwo → Academic Harness: implementation roadmap
 
-Status: **Phases 0–4 implemented; Phases 5–10 are plan.** See §3 for what shipped and what is still proposed.
+Status: **Phases 0–6 implemented; Phases 7–10 are plan.** See §3 for what shipped and what is still proposed.
 Source paper: *ScientistTwo: Pioneering the Human Knowledge Frontier with Autonomous AI* (Google Cloud AI Research — J. Nam, J. Yoon, et al.), LaTeX bundle reviewed locally.
 Shaping decision: the plugin stays **advisory**. ScientistTwo's contribution we keep is its *control structure* — critic verdicts, per-stage round budgets, attribution-before-acceptance, staged compute, and post-hoc integrity audits. Its autonomy we do not keep.
 
@@ -54,7 +54,7 @@ Code-grounded facts the plan builds on.
 5. **Ablation and attribution.** The word "ablation" appears in tool code only inside `rsi-core.js`; no planner, no component arms, no attribution veto.
 6. **Baseline reference identity.** The paper compares the *subset* stage against the reproduced baseline and the *full-set* stage against the **original reported SOTA** (`tables/overview.tex:15-16`). Nothing in the plugin distinguishes the two references, so a run can silently compare against the wrong one.
 7. **Score verification by re-execution** (reported vs recomputed), **spec-compliance with discard**, **method–code alignment anchors**, **citation repair**.
-8. **Limitation records** as first-class, quotable, coupled-to-ideas artifacts.
+8. ~~**Limitation records** as first-class, quotable, coupled-to-ideas artifacts.~~ — **closed by Phase 6.** Limitations are append-only records with a verified source quote span, remedy families, a round-capped sufficiency reading, and checkable idea coupling; `trace` reads failed/pruned experiments back into evolution, `select` freezes a champion with an evidence digest, and `coscientist_verify novelty` grounds the novelty score in a retrieved reference set and verbatim quote spans.
 
 ---
 
@@ -152,7 +152,7 @@ All of this lands on `experiment_log` + `experiment-store.js` — no parallel st
 
 **Exit:** a staged run cannot silently compare against a different reference or a changed evaluator; the contract, drift, verdict, and Pareto front are stored and visible. ✅
 
-### Phase 5 — New tool `ablation` · L
+### Phase 5 — New tool `ablation` · L · ✅ implemented
 
 The paper's most distinctive mechanism and the plugin's largest hole.
 
@@ -167,7 +167,16 @@ The paper's most distinctive mechanism and the plugin's largest hole.
 **Effort anchor:** the paper reports 5–6 component ablations per accepted paper and `N_abl = 1` refinement in practice — plan for a handful of arms, not a grid explosion.
 **Tests/docs:** new `scripts/test-ablation-tool.mjs` + `scripts/test-ablation-store.mjs`; `docs/ANALYSIS.md` section; TOOLS row; skill in Phase 10.
 
-### Phase 6 — Limitation records and grounded novelty on `coscientist` · M
+**Shipped as `ablation.js` + `ablation-store.js`** under `.dsh/ablation/<slug>/`: `ablation.json` (method spec + champion idea id), `plan.json` (frozen reference + removal arms, each naming component, code path, removal, and expected metric changes; datasets; metric directions; replicates), `records.jsonl`, `verdicts.jsonl`, `pruned.jsonl`, and exports.
+
+- `record` runs nothing. An `experiment_log` link supplies the run's metrics directly; an `analysis_run` link must have hashed outputs or artifacts and the caller supplies the metric reading. Each record stores the source ledger, run id, a digest of the source run, artifacts, and metrics; a duplicate arm/dataset/replicate cell is refused.
+- `report` pairs removal arms with the reference on dataset and replicate, reporting reference/arm values, delta, percent delta, observed versus expected change, and ties. Missing cells are listed, not dropped. The advisory reading marks a component `attributed` only when every paired expected metric moves in the declared direction, `unattributed` when none does, `partial` for mixed coverage/expectations, and `not_checked` without paired evidence.
+- `verdict` records a human `good|refine|unattributed` with a reason; `prune` is append-only and excludes an arm from the attribution reading. `show`, `status`, and `export` (Markdown/JSON/CSV) expose the plan, deltas, ties, missing cells, pruning, and verdicts.
+- Tests are `scripts/test-ablation-store.mjs` and `scripts/test-ablation-tool.mjs`; docs are in [Analysis](ANALYSIS.md#ablation), TOOLS, the CHANGELOG, and the `ablation-attribution` skill.
+
+**Exit:** per-component removal deltas are paired against a frozen reference, ties and missing cells are explicit, and an unattributed gain can be recorded without any automatic acceptance decision. ✅
+
+### Phase 6 — Limitation records and grounded novelty on `coscientist` · M · ✅ implemented
 
 Extend the tournament; do not add a competing ideation ledger (it already scores novelty 0–10 in its five-stage review and controls duplicates).
 
@@ -178,6 +187,19 @@ Extend the tournament; do not add a competing ideation ledger (it already scores
 - **`select`**: an evidence-bound Selector step that freezes the champion idea id for ablation and drafting, comparing metrics *and* recorded logs across surviving candidates.
 
 **Tests:** extend `scripts/test-coscientist-tool.mjs`, `test-coscientist-store.mjs`, `test-coscientist-verify.mjs`. **Docs:** `docs/RESEARCH.md#hypothesis-tournaments`, TOOLS rows, `skills/co-scientist-tournament/references/briefs.md`.
+
+**Shipped, all on the existing `events.jsonl` — no second ideation ledger:**
+
+- `limitation` (`add`/`verify`/`status`). `add` records the flaw, why it limits the method, at least two remedy families, and a **verbatim source quote span** checked against a named hypothesis or workspace text file; an unverifiable quote is refused. `verify` records the binary `sufficient`/`insufficient` reading with a reason and a round number, capped by `CO_SCIENTIST_LIMITATION_ROUNDS` (default 16) or an explicit `max_rounds`. A spent cap is reported `exhausted`; since the paper is silent on that state, it is never treated as acceptance. Refinement is set-append only. `status` is the coverage view: per-limitation state and rounds, addressed-by ids, and live ideas that address nothing.
+- `addresses_limitation` on `add` is validated against the stored limitations, so coupling is a ledger join rather than a prose claim. `status`, `graph` (limitation nodes plus dotted `addresses` edges), and both exports show it.
+- `trace` reads `.dsh/experiments/*` without writing: every run, with failed and pruned first. A run is **pruned** when its latest `experiment_log` verdict is `bad`, **failed** when it has no metrics and no artifacts. An `evolution` dispatch from `next` carries those traces and their reasons as constraints; `coscientist trace` exposes the full record with an optional `experiment` slug or hypothesis `id` filter.
+- `select` requires an active champion and a rationale, defaults `compared_ids` to the other active survivors, compares rating/RD/matches, best review scores, citation and novelty checks, and experiment traces whose params name each candidate, and appends a selection event with a SHA-256 `evidence_digest`. Re-selection appends history; it never edits the earlier record and never gates a turn.
+- `coscientist_verify novelty` retrieves a reference set (default **2** — the paper's only published number; max 10), stores title/abstract/DOI/year/venue with a coverage reading, and pins the novelty score to **verbatim quote spans** from those references. The formula is ours and documented as ours: `10 × (1 − max token coverage of the claim by any retrieved reference title/abstract)`; the paper gives no formula, range, or threshold. A caller score can be pinned instead, with the lexical reading stored beside it. Retrieval failure or an untitled result stores `not_checked` with the reason and no score, never a guess.
+- Graph and exports gained limitation nodes/edges, prior-art paper nodes, the selected champion, and grounded-novelty references without changing the existing store schema.
+- Tests: `scripts/test-coscientist-store.mjs` covers the quote gate, coverage, the insufficiency/exhaustion loop, sufficiency closure, selection validation and digests, novelty grounding, graph/export surfaces, and trace-informed reselection; `test-coscientist-tool.mjs` covers the three new actions, the readiness of limitation coverage in `status`, trace filtering/order, and traces carried by an evolution dispatch; `test-coscientist-verify.mjs` covers the retrieval, the documented score, caller pinning, verbatim quote validation, and the `not_checked` paths; `test-nonsearch-tools.mjs` pins the action surface and the "formula is ours" marker.
+- Docs: [Research](RESEARCH.md#hypothesis-tournaments), TOOLS, CONFIGURATION (the new setting), ARCHITECTURE, CHANGELOG, `prompt.js`, and the `co-scientist-tournament` skill (loop, a limitation/trace/selection section, and briefs §13).
+
+**Exit:** a limitation cannot exist without a checkable quote, cannot be silently rewritten, cannot pass by exhaustion, and its coverage is a ledger join; selection and novelty both carry their evidence. ✅
 
 ### Phase 7 — New tool `rebuttal` · M–L · depends on 1 and 4/5
 
@@ -218,7 +240,7 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 - `workflows.json` rows (zero code, ship any week): `limitation-mining`, `subset-first-eval`, `ablation-plan`, `rebuttal-plan`, `review-round-diff`. Format: `{id, name, description, category, icon, prompt, requiresFiles, placeholders[]}`.
 - New skills — each `skills/<kebab>/SKILL.md`, dir name == `name`, description begins "Use when…" and lists **only** triggers, ≤1024 chars, plus `license: MIT`, `metadata.version`, `metadata.skill-author: Academic Harness`:
   `subset-first-eval`, `ablation-attribution`, `rebuttal-experiments`, `limitation-mining`, `novelty-triage`, `method-code-alignment`, `integrity-audit`.
-- Updated skills: `deep-review` (rounds/compare — ✅ with Phase 1, and the `validity` step — ✅ with Phase 2 — as §7; `score` still owed by Phase 3), `co-scientist-tournament` (+ `references/briefs.md`), `agentic-data-science-pipeline`, `ah-revise-from-review`, `numbers-audit`.
+- Updated skills: `deep-review` (rounds/compare — ✅ with Phase 1, `validity` — ✅ with Phase 2, `score`/evaluator provenance — ✅ with Phase 3), `co-scientist-tournament` (+ `references/briefs.md`), `agentic-data-science-pipeline`, `ah-revise-from-review`, `numbers-audit`. `ablation-attribution` ships with Phase 5.
 - `prompt.js` sections for the new actions, and the two habits the paper insists on: reproduce before you compare, and never mix the reproduced and reported references.
 - Docs: `docs/TOOLS.md` rows with correct scope (preset-only), new sections in PAPERS / ANALYSIS / RESEARCH / WRITING / PROVENANCE, `docs/SKILLS.md`, `docs/CHANGELOG.md`, `NOTICE` for any vendored diff or adapted paper material. Phase 2 shipped its share: the validity clause in the `deep_review` row, an *Evaluation-validity checks* subsection in PAPERS, a `deep-review` row in the `docs/SKILLS.md` workflow-and-tool table (that table listed every other first-party tool skill and was missing this one), the `docs/README.md` index blurb, and an *Unreleased* changelog entry; `NOTICE` gained nothing, because no vendor file moved and no paper text was copied — the four criteria are paraphrased.
 - Tests wired into `scripts/run-tests.mjs` + `package.json` `test:*`; CI `verify.yml` boots the profile and imports every module.
@@ -235,7 +257,7 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 | 3 Score + provenance | 0, 1 | yes | M |
 | 4 Staged experiment contract | — | yes; unblocks 5/7/8 | M–L |
 | 5 `ablation` | 4 | no | L |
-| 6 Limitations + novelty + traces | PaperMemory anchors | yes | M |
+| 6 Limitations + novelty + traces | PaperMemory anchors | ✅ shipped (`limitation`, `trace`, `select`, grounded novelty) | M |
 | 7 `rebuttal` | 1, 4, 5 | no | M–L |
 | 8 Re-execution / compliance / align | 4, 5 | partial | L |
 | 9 Loop roll-up | 4–8 | last, maybe never as a store | S–M |
@@ -243,7 +265,7 @@ A dedicated `frontier` ledger is only justified if that roll-up proves too slow 
 
 Recommended cut: **0 → 1 → 4 → 2 → 5 → 3 → 6 → 7 → 8 → decide 9.**
 Phases 1 and 4 are the two structural holes — review history and a staged, verdicted, reference-named experiment record — and everything else composes on them.
-Phase 2 was taken before 4, so what has actually shipped is 0 → 1 → 2; `validity` needed only a stored round, not the experiment contract, and 4 still unblocks 5/7/8.
+Phase 2 was taken before 4, so what has actually shipped is 0 → 1 → 2 → 3 → 4 → 5 → 6; 4 unblocked 5 and still unblocks 7/8.
 
 ---
 

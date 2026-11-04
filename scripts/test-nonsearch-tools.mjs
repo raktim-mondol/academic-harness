@@ -265,10 +265,10 @@ for (const modulePath of ['../clinicaltrials.js', '../openfda.js', '../dataset-s
 }
 
 // ── hypothesis tournament ────────────
-for (const modulePath of ['./coscientist', './coscientist-rank', './coscientist-verify', './coscientist-embed', './coscientist-store', './coscientist-models', './store-lock']) {
+for (const modulePath of ['./coscientist', './coscientist-rank', './coscientist-verify', './coscientist-embed', './coscientist-store', './coscientist-models', './coscientist-trace', './store-lock']) {
   assert.ok(pkg.exports?.[modulePath], `package exports missing ${modulePath}`)
 }
-for (const file of ['coscientist.js', 'coscientist-rank.js', 'coscientist-verify.js', 'coscientist-embed.js', 'coscientist-store.js', 'coscientist-models.js', 'store-lock.js']) {
+for (const file of ['coscientist.js', 'coscientist-rank.js', 'coscientist-verify.js', 'coscientist-embed.js', 'coscientist-store.js', 'coscientist-models.js', 'coscientist-trace.js', 'store-lock.js']) {
   assert.ok(pkg.files?.includes(file), `package files missing ${file}`)
   assert.ok(existsSync(join(root, file)), `missing ${file}`)
 }
@@ -342,10 +342,14 @@ const tournamentRegistrations = []
 coscientistTool.apply({ tools: { register: (tool) => tournamentRegistrations.push(tool) } })
 assert.deepEqual(tournamentRegistrations.map((tool) => tool.name), ['coscientist'])
 const tournamentParams = tournamentRegistrations[0].parameters.properties
-assert.equal(tournamentParams.action.enum.length, 14)
-for (const action of ['embed', 'priors', 'graph']) {
+assert.equal(tournamentParams.action.enum.length, 17)
+for (const action of ['embed', 'priors', 'graph', 'limitation', 'trace', 'select']) {
   assert.ok(tournamentParams.action.enum.includes(action), `coscientist must expose ${action}`)
 }
+assert.deepEqual(tournamentParams.limitation_action.enum, ['add', 'verify', 'status'])
+assert.deepEqual(tournamentParams.limitation_verdict.enum, ['sufficient', 'insufficient'])
+assert.ok(tournamentParams.addresses_limitation, 'add must be able to couple an idea to a limitation')
+assert.ok(tournamentParams.compared_ids && tournamentParams.rationale, 'select must be evidence-bound')
 assert.ok(tournamentParams.format.enum.includes('mermaid'), 'export must accept mermaid')
 assert.ok(tournamentParams.query && tournamentParams.min_score, 'priors must be tunable from the tool')
 assert.match(read('coscientist-embed.js'), /x-goog-api-key/, 'the embedding key travels in a header, never a URL')
@@ -368,5 +372,9 @@ const verifyTool = await import('../coscientist-verify.js')
 assert.equal(typeof verifyTool.apply, 'function')
 assert.equal(typeof verifyTool.runCoscVerify, 'function')
 assert.equal(verifyTool.TITLE_MATCH_THRESHOLD, 0.7, 'the title-match rule stays upstream\'s')
+assert.equal(verifyTool.NOVELTY_DEFAULT_REFERENCES, 2, 'the paper retrieves two references')
+assert.match(verifyTool.NOVELTY_METHOD, /invented by this plugin/, 'the novelty formula is documented as ours')
+assert.match(read('coscientist-store.js'), /DEFAULT_LIMITATION_ROUNDS = 16/, 'the sufficiency loop is round-capped')
+assert.match(read('coscientist-trace.js'), /failed.*pruned|pruned.*failed/i, 'traces carry failed and pruned runs')
 
 console.log('nonsearch surface OK')

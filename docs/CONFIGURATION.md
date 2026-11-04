@@ -89,6 +89,7 @@ These are optional numbers, not credentials. An explicit argument to `coscientis
 | `CO_SCIENTIST_DUP_THRESHOLD` | auto: `0.70` lexical, `0.92` cosine | Similarity at which `coscientist add` discards a near-duplicate. An explicit value overrides the measure's default; `1` turns the gate off. |
 | `CO_SCIENTIST_SEED` | unset | Makes a tournament's sampled task schedule reproducible. |
 | `CO_SCIENTIST_EMBED_MODEL` | `text-embedding-004` | Model used by `coscientist embed`; reuses `GEMINI_API_KEY`. |
+| `CO_SCIENTIST_LIMITATION_ROUNDS` | `16` | Verification rounds one limitation may spend before it is reported `exhausted`. The cap in force is stored with each verification; an explicit `max_rounds` argument wins. |
 
 ### Deep review
 

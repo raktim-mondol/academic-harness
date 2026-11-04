@@ -109,6 +109,11 @@ and termination rules are in `references/tournament.md`.
      `coscientist_verify citations`, or by hand with
      `paper_resolve` / `crossref_lookup`, plus `integrity_check` for retraction.
      Anything you could not resolve is unverified — never counted as verified.
+     For the novelty claim, `coscientist_verify novelty` retrieves a small prior-art
+     set (two by default), stores it, and pins the reading to verbatim quote spans.
+     The score is a lexical reading over that set, not a literature verdict; report
+     `not_checked` when retrieval fails. Pass your own `novelty_score` only when a
+     subagent actually read the retrieved references, and still keep the stored quotes.
    - `ranking` → `coscientist_rank propose`, then **two judge subagents, one at
      a time**, one per presentation order, then `record` with both verdicts.
      Use the **same brief** for both, swapping only the A/B slots. Report
@@ -118,23 +123,26 @@ and termination rules are in `references/tournament.md`.
      brief (see Delegation); never shorten or rephrase one orientation relative
      to the other, because that is what makes the two verdicts comparable.
    - `evolution` → run the named mutation brief on a top hypothesis, then `add`
-     with `parent_ids` and `strategy: evolution:<name>`.
+     with `parent_ids` and `strategy: evolution:<name>`. Read the failed/pruned
+     experiment traces the dispatch carries first — a mutation that re-proposes an
+     assumption the record already refuted is not a new candidate.
    - `proximity` → `coscientist_rank similarity`; surface any duplicate pair to
      the scientist rather than quietly deleting one.
    - `meta_review` → synthesize a cross-cutting critique and `synthesize` it; it
      steers later generation.
 3. **Stop when the tools say stop.** `next` returns `terminate` with a reason.
-   Then: design the protocol for the top hypothesis, write the research overview,
-   export, and report. An explicit stop bound in the user's request is binding:
-   translate it to `max_matches` when you `start` — "first ranking" means one
-   match for every active pair, `C(n,2)` — and stop as soon as `next` reports
-   `match_cap_reached`. Do not continue into evolution, meta-review, or extra
-   matches because the step budget still has room.
+   Then: record any open limitations, run `select` to freeze the champion, design
+   its protocol, write the research overview, export, and report. An explicit stop
+   bound in the user's request is binding: translate it to `max_matches` when you
+   `start` — "first ranking" means one match for every active pair, `C(n,2)` — and
+   stop as soon as `next` reports `match_cap_reached`. Do not continue into
+   evolution, meta-review, or extra matches because the step budget still has room.
 4. **Show the structure.** `coscientist graph` builds a Mermaid diagram from the
-   ledger alone — solid arrows are parentage, dotted ones are similarity pairs, and
-   a paper node exists only because a recorded claim judgement named it. Write it
-   with `export format: "mermaid"` and hand the file to `mermaid_render` for SVG.
-   Explain the edges you show; a diagram the scientist cannot read is decoration.
+   ledger alone — solid arrows are parentage, dotted ones are similarity, limitation
+   coupling, or prior art, and a paper node exists only because a recorded claim or
+   novelty reference named it. Write it with `export format: "mermaid"` and hand the
+   file to `mermaid_render` for SVG. Explain the edges you show; a diagram the
+   scientist cannot read is decoration.
 5. **Cosine is opt-in.** `coscientist embed` is the only tournament call that
    needs `GEMINI_API_KEY` and the network, so it is never automatic. Reach for it
    when the pool is large or the user suspects paraphrases are passing the lexical
@@ -147,6 +155,38 @@ and termination rules are in `references/tournament.md`.
 7. **Log it.** `notebook` with `kind: "hypothesis"` per kept hypothesis, and
    later results with `relatesTo` and `stance`. The tournament ledger holds the
    detail; the notebook holds the thread.
+
+## Limitations, traces, and selection
+
+The tournament records the method's weaknesses and freezes the chosen idea; it does
+not repair the method and does not accept it.
+
+- **Record a limitation, do not edit one.** `coscientist limitation limitation_action: "add"`
+  takes the methodological flaw, the verbatim source quote span, why it limits the
+  method, and **at least two remedy families**. The quote is checked against the
+  named hypothesis or workspace text file before the record exists. A refinement is
+  a new record: never rewrite, renumber, or delete an earlier limitation.
+- **Sufficiency is binary and round-capped.** `limitation_action: "verify"` records
+  `sufficient` or `insufficient` with a reason. The cap is `CO_SCIENTIST_LIMITATION_ROUNDS`
+  (default 16) or an explicit `max_rounds`; a spent cap is reported `exhausted`, not
+  accepted. `limitation_action: "status"` is the coverage view — what is covered by an
+  active idea, what is open, and which ideas address nothing.
+- **Couple ideas to limitations.** Pass `addresses_limitation: ["l1"]` on `add`; the
+  limitation must already be recorded. The join appears in `status`, `graph`, and the
+  exports, so a claim of coverage is checkable.
+- **Read failure logs before evolving.** `coscientist trace` reads `experiment_log`
+  runs, failed and pruned first. An `evolution` dispatch carries the same evidence;
+  state the constraint you are carrying forward in one line.
+- **Select on evidence, not preference.** `coscientist select` needs an active
+  champion, a rationale, and the surviving candidates it was compared against. It
+  stores the tournament readings, review scores, citation/novelty checks, and any
+  experiment traces, plus a digest. The result is a frozen choice for drafting and
+  ablation, not an acceptance decision; a later cycle can append another selection.
+- **A novelty number is only as good as its quotes.** `coscientist_verify novelty`
+  retrieves the reference set and pins the score to verbatim spans. The formula is
+  this plugin's lexical reading (`10 × (1 − max token coverage)`), not the paper's;
+  the paper specifies only that two references are retrieved. Say "lexical prior-art
+  reading" and keep `not_checked` when retrieval fails.
 
 ## Resuming
 

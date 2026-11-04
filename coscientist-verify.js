@@ -19,7 +19,7 @@ import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi } from './search-normalize.js'
 import { contentTokens } from './coscientist-models.js'
-import { deriveState, recordProvenance } from './coscientist-store.js'
+import { deriveState, recordNovelty, recordProvenance } from './coscientist-store.js'
 import { runIntegrityCheck } from './integrity-check.js'
 
 const CROSSREF_WORKS = 'https://api.crossref.org/works'
@@ -33,10 +33,22 @@ export const MIN_SHARED_TOKENS = 3
 /** A citation list longer than this is refused rather than hammered at the registry. */
 export const MAX_CITATIONS_PER_CALL = 30
 
+/** The paper's published spec is only "retrieves two reference papers". */
+export const NOVELTY_DEFAULT_REFERENCES = 2
+export const NOVELTY_MAX_REFERENCES = 10
+
+/**
+ * The novelty formula is ours, not the paper's. The paper specifies a retrieval
+ * of two references, an ordering invariant, and nothing else — no formula, range,
+ * or threshold. This reading is a lexical coverage measure over the retrieved
+ * title/abstract set, stated here so no caller mistakes it for a literature verdict.
+ */
+export const NOVELTY_METHOD = '10 × (1 − max token coverage of the claim by any retrieved reference title/abstract); lexical coverage invented by this plugin, not a formula from the paper'
+
 export const CITATION_STATUSES = ['verified', 'unverified', 'fabricated']
 export const CLAIM_SUPPORTS = ['supports', 'contradicts', 'unaddressed']
 
-const ACTIONS = ['citations', 'claims', 'status']
+const ACTIONS = ['citations', 'claims', 'novelty', 'status']
 
 function workspaceRoot(exec) {
   const cwd = exec.agent?.session?.header?.cwd
@@ -95,6 +107,81 @@ function crossrefMeta(item) {
     year: item?.issued?.['date-parts']?.[0]?.[0] ?? null,
     venue: (Array.isArray(item?.['container-title']) ? item['container-title'][0] : item?.['container-title']) || null,
   }
+}
+
+/** Crossref abstracts are JATS fragments; strip markup before storing or matching. */
+export function cleanAbstract(value) {
+  if (!value) return ''
+  return String(value)
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** One Crossref item as a reference record; a missing title cannot be prior art. */
+export function referenceFromCrossref(item) {
+  const meta = crossrefMeta(item)
+  if (!meta.title) return null
+  const title = cleanAbstract(meta.title)
+  const abstract = cleanAbstract(item?.abstract)
+  return {
+    ...meta,
+    title,
+    abstract: abstract || null,
+    text_basis: abstract ? 'title_abstract' : 'title',
+  }
+}
+
+/**
+ * Token coverage of the claim by one reference: shared significant tokens over the
+ * claim's own tokens. A reference that covers every claim token scores 1; a
+ * title-only reference is a weaker basis and is labeled as such in the record.
+ */
+export function referenceOverlap(claim, reference) {
+  const claimTokens = new Set(contentTokens(claim))
+  if (!claimTokens.size) return 0
+  const referenceTokens = new Set(contentTokens([reference.title, reference.abstract].filter(Boolean).join('. ')))
+  let shared = 0
+  for (const token of claimTokens) if (referenceTokens.has(token)) shared += 1
+  return Number((shared / claimTokens.size).toFixed(3))
+}
+
+/** Best verbatim sentence from a reference, by overlap with the claim. */
+export function bestQuoteSpan(claim, reference) {
+  const body = [reference.title, reference.abstract].filter(Boolean).join('. ')
+  if (!body) return { quote: '', overlap: 0 }
+  if (!reference.abstract) return { quote: reference.title, overlap: referenceOverlap(claim, reference) }
+  const claimTokens = new Set(contentTokens(claim))
+  const sentences = body.split(/(?<=[.!?])\s+/).map((sentence) => sentence.trim()).filter(Boolean)
+  let best = { quote: sentences[0] || body.slice(0, 240), overlap: 0 }
+  for (const sentence of sentences) {
+    const overlap = referenceOverlap(claim, { title: sentence, abstract: null })
+    if (overlap > best.overlap) best = { quote: sentence, overlap }
+  }
+  return best
+}
+
+/** Retrieval for novelty: Crossref's bibliographic search, rows capped by `limit`. */
+async function searchReferenceSet({ query, limit, signal, mailto, deps }) {
+  const params = new URLSearchParams({
+    'query.bibliographic': query,
+    rows: String(limit),
+    select: 'DOI,title,issued,container-title,abstract',
+  })
+  if (mailto) params.set('mailto', mailto)
+  const result = await crossrefGet(`${CROSSREF_WORKS}?${params}`, { signal, mailto, bucket: 'crossref-list', deps })
+  if (!result.ok) {
+    return {
+      ok: false,
+      reason: result.error === 'aborted' ? 'reference retrieval was cancelled' : `Crossref reference search failed (${result.status})`,
+    }
+  }
+  return { ok: true, items: result.data?.message?.items || [] }
 }
 
 // The limiter is process-wide and keyed by name, so these are the exact
@@ -216,6 +303,7 @@ export async function runCoscVerify(args = {}, exec = {}, deps = {}) {
   if (action === 'status') {
     const check = hyp.citationCheck
     const claims = check?.claims || []
+    const novelty = hyp.noveltyCheck
     return {
       action,
       slug,
@@ -226,6 +314,18 @@ export async function runCoscVerify(args = {}, exec = {}, deps = {}) {
       counts: check ? { total: check.total, verified: check.verified, unverified: check.unverified, fabricated: check.fabricated } : null,
       penalty: check ? { ratingDelta: check.ratingDelta, rdDelta: check.rdDelta } : null,
       claims: { recorded: claims.length, supports: claims.filter((c) => c.support === 'supports').length, contradicts: claims.filter((c) => c.support === 'contradicts').length, unaddressed: claims.filter((c) => c.support === 'unaddressed').length },
+      novelty: novelty
+        ? {
+            state: novelty.state,
+            score: novelty.score,
+            computed_score: novelty.computed_score,
+            score_source: novelty.score_source,
+            references: novelty.references.length,
+            quotes: novelty.quotes.length,
+            checked_at: novelty.ts,
+            reason: novelty.reason,
+          }
+        : null,
     }
   }
 
@@ -243,6 +343,82 @@ export async function runCoscVerify(args = {}, exec = {}, deps = {}) {
       contradicted: claims.filter((claim) => claim.support === 'contradicts').length,
       penalty: stored.penalty,
       hypothesis: stored.hypothesis,
+    }
+  }
+
+  if (action === 'novelty') {
+    const requested = args.limit == null || args.limit === '' ? NOVELTY_DEFAULT_REFERENCES : Number(args.limit)
+    const limit = Number.isInteger(requested) && requested > 0
+      ? Math.min(requested, NOVELTY_MAX_REFERENCES)
+      : NOVELTY_DEFAULT_REFERENCES
+    const query = String(args.query ?? '').trim() || `${hyp.title}. ${hyp.summary}`.trim()
+    if (!query) throw new Error('novelty needs a title/summary or an explicit query to retrieve against')
+    const mailto = await readEnv('CROSSREF_MAILTO') || await readEnv('UNPAYWALL_EMAIL')
+    const found = await searchReferenceSet({ query, limit, signal: exec.signal, mailto, deps })
+
+    if (!found.ok) {
+      const stored = await recordNovelty({ cwd, slug, id: hyp.id, state: 'not_checked', query, reason: found.reason })
+      return {
+        action, slug, id: hyp.id, state: 'not_checked', query, reason: found.reason,
+        novelty: stored.novelty, note: 'No reference set was retrieved; no score was invented.',
+      }
+    }
+
+    const claim = [hyp.title, hyp.summary, hyp.content].join('. ')
+    const references = found.items
+      .map(referenceFromCrossref)
+      .filter(Boolean)
+      .map((reference) => ({ ...reference, overlap: referenceOverlap(claim, reference) }))
+      .sort((a, b) => b.overlap - a.overlap || String(a.title).localeCompare(String(b.title)))
+    if (!references.length) {
+      const reason = 'Crossref returned no reference with a usable title'
+      const stored = await recordNovelty({ cwd, slug, id: hyp.id, state: 'not_checked', query, reason })
+      return { action, slug, id: hyp.id, state: 'not_checked', query, reason, novelty: stored.novelty, note: 'No reference set was retrieved; no score was invented.' }
+    }
+
+    const computedScore = Number(((1 - Math.max(...references.map((reference) => reference.overlap))) * 10).toFixed(1))
+    const rawScore = args.novelty_score
+    const callerScore = rawScore === undefined || rawScore === null || rawScore === '' ? null : Number(rawScore)
+    if (callerScore !== null && (!Number.isFinite(callerScore) || callerScore < 0 || callerScore > 10)) {
+      throw new Error('novelty_score must be between 0 and 10')
+    }
+    const quotes = Array.isArray(args.quotes) && args.quotes.length
+      ? args.quotes.map((entry) => ({
+          quote: String(entry?.quote ?? ''),
+          reference_doi: String(entry?.reference_doi ?? '').trim() || null,
+          note: String(entry?.note ?? '').trim() || null,
+        }))
+      : references.slice(0, Math.min(NOVELTY_DEFAULT_REFERENCES, references.length)).map((reference) => {
+          const span = bestQuoteSpan(claim, reference)
+          return { reference_doi: reference.doi, quote: span.quote, note: `overlap ${reference.overlap}` }
+        })
+    const score = callerScore ?? computedScore
+    const stored = await recordNovelty({
+      cwd,
+      slug,
+      id: hyp.id,
+      state: 'checked',
+      query,
+      score,
+      computedScore,
+      scoreSource: callerScore === null ? 'lexical_overlap' : 'caller',
+      method: NOVELTY_METHOD,
+      references,
+      quotes,
+    })
+    return {
+      action,
+      slug,
+      id: hyp.id,
+      state: 'checked',
+      query,
+      references,
+      quotes,
+      score,
+      computed_score: computedScore,
+      score_source: callerScore === null ? 'lexical_overlap' : 'caller',
+      novelty: stored.novelty,
+      note: 'The score is pinned to the stored quotes, but it is a lexical prior-art reading over the retrieved set, not a literature verdict.',
     }
   }
 
@@ -331,12 +507,35 @@ function render(value) {
       if (value.contradicted) lines.push('', 'Contradicted claims are a weakness the debate should see; brief the judges with this line.')
       return [{ type: 'text', text: lines.join('\n') }]
     }
+    case 'novelty': {
+      if (value.state === 'not_checked') {
+        return [{ type: 'text', text: `Novelty evidence for \`${value.id}\`: not_checked — ${value.reason}. No score was recorded.` }]
+      }
+      const lines = [
+        `Novelty evidence for \`${value.id}\`: ${value.score}/10 (${value.score_source}) over ${value.references.length} retrieved reference(s); lexical reading ${value.computed_score}/10.`,
+        value.note,
+        '',
+      ]
+      for (const reference of value.references) {
+        lines.push(`- ${reference.title}${reference.year ? ` (${reference.year})` : ''}${reference.doi ? ` · ${reference.doi}` : ''} — coverage ${reference.overlap} (${reference.text_basis})`)
+      }
+      lines.push('')
+      for (const quote of value.quotes) {
+        lines.push(`> “${quote.quote}” — ${quote.reference_title || quote.reference_doi || 'retrieved reference'}`)
+      }
+      return [{ type: 'text', text: lines.join('\n') }]
+    }
     default: {
       const lines = [value.checked
         ? `\`${value.id}\`: ${value.citations} citations, checked ${value.checked_at}${value.counts ? ` — ${value.counts.verified} verified / ${value.counts.unverified} unverified / ${value.counts.fabricated} fabricated` : ''}`
         : `\`${value.id}\`: ${value.citations} citations, not yet checked.`]
       if (value.penalty && (value.penalty.ratingDelta || value.penalty.rdDelta)) lines.push(`Penalty on record: rating ${value.penalty.ratingDelta}, RD +${value.penalty.rdDelta}.`)
       if (value.claims.recorded) lines.push(`Claims: ${value.claims.supports} supported, ${value.claims.contradicts} contradicted, ${value.claims.unaddressed} unaddressed.`)
+      if (value.novelty) {
+        lines.push(value.novelty.state === 'checked'
+          ? `Grounded novelty: ${value.novelty.score}/10 (${value.novelty.score_source}) over ${value.novelty.references} reference(s), ${value.novelty.quotes} quote span(s).`
+          : `Grounded novelty: not_checked — ${value.novelty.reason}`)
+      }
       return [{ type: 'text', text: lines.join('\n') }]
     }
   }
@@ -349,12 +548,12 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'coscientist_verify',
     description: [
-      'Citation integrity and claim support for the Co-Scientist hypothesis tournament. Actions: `citations` (check that every work a hypothesis cites actually exists, via Crossref, and record the result so the rating penalty applies), `claims` (record the supports/contradicts/unaddressed judgements a subagent reached about each load-bearing claim), `status` (whether this hypothesis has been checked, and what the ledger holds).',
+      'Citation integrity, claim support, and grounded novelty for the Co-Scientist hypothesis tournament. Actions: `citations` (check that every work a hypothesis cites actually exists, via Crossref, and record the result so the rating penalty applies), `claims` (record the supports/contradicts/unaddressed judgements a subagent reached about each load-bearing claim), `novelty` (retrieve a reference set for the hypothesis, store it, compute the documented lexical novelty reading, and pin the score to verbatim quote spans from those references), `status` (whether this hypothesis has been checked, and what the ledger holds).',
       'Classifications: `verified` — a DOI that resolves, or a title Crossref matches at 0.7 token overlap; `fabricated` — a DOI the caller asserted that Crossref does not list, and nothing else; `unverified` — everything inconclusive, including a title nobody matched and any registry error. A registry that could not be queried is never reported as verified.',
-      'Counts drive a soft penalty (up to −150 rating, +100 RD at a 100% weighted fabrication rate), never a veto. This tool does not judge whether a paper supports a claim — that is a subagent reading real sources; `claims` only records those judgements so the ledger, not the transcript, holds them.',
+      'The novelty score is ours, not the paper\'s: 10 × (1 − max token coverage of the claim by any retrieved reference title/abstract). It is a lexical prior-art reading over a small retrieved set, not a literature verdict, and `not_checked` is recorded when retrieval fails rather than inventing a number. Counts drive a soft citation penalty (up to −150 rating, +100 RD at a 100% weighted fabrication rate), never a veto. This tool does not judge whether a paper supports a claim — that is a subagent reading real sources; `claims` only records those judgements so the ledger, not the transcript, holds them.',
     ].join(' '),
     parameters: {
-      action: { type: 'string', enum: ACTIONS, description: 'citations, claims, or status. Default status.' },
+      action: { type: 'string', enum: ACTIONS, description: 'citations, claims, novelty, or status. Default status.' },
       slug: { type: 'string', description: 'Tournament slug. Required.' },
       id: { type: 'string', description: 'Hypothesis id such as h1. Required.' },
       check_integrity: { type: 'boolean', description: 'Also report retraction / expression-of-concern status for verified DOIs (citations). Costs one more registry round per citation.' },
@@ -362,6 +561,14 @@ export function apply(ctx) {
         type: 'array',
         items: { type: 'object', additionalProperties: true },
         description: 'Per-claim judgements (claims): [{ claim, support: supports|contradicts|unaddressed, confidence: 0-1, paper_title, paper_doi }].',
+      },
+      limit: { type: 'number', description: `How many references to retrieve for novelty. Default ${NOVELTY_DEFAULT_REFERENCES} (the paper's "two reference papers"), maximum ${NOVELTY_MAX_REFERENCES}.` },
+      query: { type: 'string', description: 'Retrieval query for novelty. Defaults to the hypothesis title and summary.' },
+      novelty_score: { type: 'number', description: 'Optional caller reading (0-10) to pin; when omitted the documented lexical reading is used. Either way it is stored with the quote spans.' },
+      quotes: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: true },
+        description: 'Optional quote spans to pin (novelty): [{ quote, reference_doi, note }]. Each must be a verbatim span of a retrieved reference; otherwise the call is refused.',
       },
     },
     output: {

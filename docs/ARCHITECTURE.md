@@ -65,7 +65,8 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/review/<slug>/` | `review` | Write-once `protocol.json`, `extraction_template.json`, and `grade.json`; append-only screening, evidence, extraction, appraisal, and GRADE logs; frozen `instruments.json`; exports |
 | `<cwd>/.dsh/meta/<slug>/` | `meta_analysis` | Write-once `protocol.json`; append-only studies and analyses; forest/funnel/SROC plots; exports |
 | `<cwd>/.dsh/analysis/<slug>/` | `analysis_run` | Append-only plan versions and run manifests; per-run logs, artifacts, and environment captures |
-| `<cwd>/.dsh/experiments/<slug>/` | `experiment_log` | Write-once experiment definition; append-only runs and links; exports |
+| `<cwd>/.dsh/experiments/<slug>/` | `experiment_log` | Write-once experiment definition; append-only runs and links; verdicts; exports |
+| `<cwd>/.dsh/ablation/<slug>/` | `ablation` | Write-once method spec and frozen plan; records linked to experiment/analysis runs, verdicts, pruning events; exports |
 | `<cwd>/.dsh/data/<slug>/` + `data/<slug>/` | `dataset_get` | Download manifest with licenses and checksums; downloaded files under the workspace `data/` tree |
 | `<cwd>/.dsh/repro/<slug>/` + `package/<slug>/` | `repro_package` | Frozen inventory; built package with manifest, environment, Dockerfile, citation metadata, and checksums |
 | `<cwd>/.dsh/watch/<slug>/` | `literature_watch` | Append-only saved-search ledger and seen-record state; digests |
@@ -80,7 +81,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/dmp/<slug>/` | `dmp` | Append-only plan inputs and sections; exports |
 | `<cwd>/.dsh/budget/<slug>/` | `grant_budget` | Append-only budget inputs and stored computations; exports |
 | `<cwd>/.dsh/deep-review/<key>/` | `deep_review` | `review.json`, `review.md`, parsed `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `extra_checks.json` (the `validity` checks), `score.json` (the advisory dimension score), `meta.json`, `rounds/<run_id>.json` and `rounds/<run_id>.md` for every kept round, append-only `runs.jsonl` |
-| `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl` |
+| `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl`; limitation, selection, and grounded-novelty records also live in `events.jsonl` (no second ledger), and `.dsh/experiments` is read-only input to `trace` |
 | `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
 | `<cwd>/.zvec-grep/` | zvec-grep | Workspace index |
 | `~/.local/share/papermemory/papermemory.db` | PaperMemory | Shared SQLite store (Academic Harness, standalone `papermemory`, Grok) |
@@ -103,7 +104,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Papers and memory | `paper-resolve.js`, `paper-download.js`, `paper-fold.js`, `textfold-runtime.js`, `pdf-to-markdown.js`, `papermemory.js`, `paper-mcp.js`, `paper-get.js`, `paper-context.js`, `papermemory-cli.js`, `papermemory-library.js`, `reference-library.js`, `paper-recommend.js`, `paper-artifacts.js`, `pdf-references.js` |
 | Citation and writing | `citation.js`, `citation-format.js`, `manuscript-citations.js`, `integrity-check.js`, `academic-harness.js`, `academic-harness-hooks.js`, `academic-harness-cli.js`, `vendor/academic-harness/`, `citation-audit.js`, `citation-network.js`, `citation-graph-algos.js`, `literature-watch.js`, `literature-watch-store.js` |
 | Submission and communication | `submission-pack.js`, `submission-store.js`, `manuscript-diff.js`, `numbers-audit.js`, `presentation-build.js`, `authorship.js`, `authorship-store.js`, `python-helpers/stat_audit.py`, `python-helpers/presentation_helper.py` |
-| Reviews and hypotheses | `review.js`, `review-store.js`, `grade-store.js`, `meta-analysis.js`, `meta-analysis-store.js`, `deep-review.js`, `vendor/open-deepreview/`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `store-lock.js`, `ledger-kit.js`, `provenance.js`, `reporting-check.js`, `reporting-store.js`, `deep-research.js`, `deep-research-steps.js`, `deep-research-store.js`, `deep-research-effort.js`, `independence-cluster.js`, `untrusted-fence.js`, `author-lookup.js`, `openreview.js` |
+| Reviews and hypotheses | `review.js`, `review-store.js`, `grade-store.js`, `meta-analysis.js`, `meta-analysis-store.js`, `deep-review.js`, `vendor/open-deepreview/`, `agreement.js`, `appraisal.js`, `appraisal/`, `papermemory-mcp.js`, `coscientist.js`, `coscientist-rank.js`, `coscientist-store.js`, `coscientist-models.js`, `coscientist-verify.js`, `coscientist-embed.js`, `coscientist-trace.js`, `store-lock.js`, `ledger-kit.js`, `provenance.js`, `reporting-check.js`, `reporting-store.js`, `deep-research.js`, `deep-research-steps.js`, `deep-research-store.js`, `deep-research-effort.js`, `independence-cluster.js`, `untrusted-fence.js`, `author-lookup.js`, `openreview.js` |
 | Reproducible analysis and data | `analysis-run.js`, `analysis-store.js`, `experiment-log.js`, `experiment-store.js`, `dataset-get.js`, `data-profile.js`, `repro-package.js`, `repro-package-store.js`, `python-helpers/data_profile.py` |
 | Cross-ledger provenance | `provenance-audit.js`, `provenance-store.js` (read-only; joins the ledgers above and the AH claim sidecars) |
 | Study conduct, ethics, and grants | `preregister.js`, `preregister-store.js`, `causal-dag.js`, `causal-dag-store.js`, `causal-graph.js`, `design.js`, `design-store.js`, `ethics-protocol.js`, `ethics-protocol-store.js`, `deidentify.js`, `deidentify-store.js`, `dmp.js`, `dmp-store.js`, `grant-budget.js`, `grant-budget-store.js`, `python-helpers/grant_budget.py` |
@@ -116,7 +117,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Subagents | `subagent-models.js` + the preset's delegation rows |
 | RSI | `rsi.js`, `rsi-hooks.js`, `rsi-store.js`, `rsi-core.js`, `rsi-benchmark.js`, `academic-harness-rsi-cli.js`, [RSI.md](RSI.md) |
 | Web UI | `client/`, built to `lib/client.js` |
-| Skills | `skills/` (766 skills); see [Skills](SKILLS.md) |
+| Skills | `skills/` (767 skills); see [Skills](SKILLS.md) |
 
 Every server-side file is plain ESM JS — no build step. Only the Settings page (`client/`) is a browser bundle; see [Development](DEVELOPMENT.md).
 
