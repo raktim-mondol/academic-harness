@@ -118,7 +118,8 @@ export function listRuns(cwd) {
     .filter((entry) => entry.isDirectory() && /^dr-\d+$/.test(entry.name))
     .map((entry) => readManifest(cwd, entry.name))
     .filter(Boolean)
-    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)))
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))
+      || String(b.run_id).localeCompare(String(a.run_id), undefined, { numeric: true }))
     .map((manifest) => ({
       run_id: manifest.run_id,
       topic: manifest.brief.topic,

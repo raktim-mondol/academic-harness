@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeWorkspace } from './helpers/test-workspace.mjs'
 import { accounting, appendClaims, appendFindings, appendRecords, appendRetrieval, applyHunks, assertGospel, budgetState, displayHash, latestVerdict, listRuns, markFindingApplied, markStep, nextPendingStep, readArtifact, readCorpus, readFindings, readQuery, readRetrieval, readRun, recordUsage, recordVerdict, shipGate, startRun, stepView, supersedeFindings, writeArtifact } from '../deep-research-store.js'
@@ -57,6 +57,16 @@ try {
   ok('the next run gets the next id', second.run_id === 'dr-0002', second.run_id)
   ok('listRuns returns newest first', listRuns(cwd)[0].run_id === 'dr-0002')
   ok('listRuns carries step state', listRuns(cwd)[0].steps.length === PLAN.length)
+
+  // Two runs can share a millisecond; the tie must not fall back to readdir order.
+  const sameStamp = '2026-01-01T00:00:00.000Z'
+  for (const runId of ['dr-0001', 'dr-0002']) {
+    const file = join(cwd, '.dsh', 'deep-research', runId, 'manifest.json')
+    const manifest = JSON.parse(readFileSync(file, 'utf8'))
+    manifest.created_at = sameStamp
+    writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`)
+  }
+  ok('listRuns breaks an identical timestamp by run id', listRuns(cwd)[0].run_id === 'dr-0002')
 
   // ------------------------------------------------------------ step state, resume
   ok('every step starts pending', stepView(cwd, 'dr-0001').every((step) => step.status === 'pending'))
