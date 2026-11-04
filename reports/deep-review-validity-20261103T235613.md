@@ -4,7 +4,7 @@ Generated 2026-11-03T23:56:13.531Z. measured. Advisory readings; the labels are 
 
 ## Corpus
 
-- manifest: reports/deep-review-validity-corpus.json (local corpus; not packaged)
+- manifest: local 14-paper manifest (not packaged)
 - papers: 14; evaluable: 14; labels complete: 14; verdict floor: 6 evaluable papers
 - PDFs converted with the simple text converter: 14/14; conversion/read failures: 0; pages flagged for OCR, not OCR'd: 1
 - references excluded from counting: 11 paper(s); leading PDF line numbers stripped: 6 paper(s)
