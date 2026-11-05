@@ -2,7 +2,7 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
-## Unreleased
+## 0.45.1
 
 - **DSH 0.2.2-rc.1 compatibility.** The plugin's DSH runtime libraries are now vendored under scoped `ah-dsh-*` npm aliases instead of bare `@deepseek-ai/*` names: a 0.2.2 host previously enumerated the plugin's pinned 0.2.1 copies (`dsh-settings`, its `dsh-config-editor` chain, `dsh-tools`, `dsh-tool-subagent`, `dsh-mcp-client`) as incompatible plugin rows and disabled them, leaving the preset pending on `settings`/`agentPresets`. `@deepseek-ai/dsh-settings` is no longer bundled at all — the host already ships it. The plugin-facing APIs (`defineTool`, `McpClient`, `ToolSubagent.agentOptions`) are unchanged, so both 0.2.1 and 0.2.2 hosts load identical plugins.
 - Version-aware `list_agents` registration: DSH 0.2.1 exposes a separate `list_agents` plugin, while 0.2.2 registers it from the control plugin. Registration now goes through `academic-harness/subagent-list-compat`, a loader shim that probes the host export (`dsh-tool-subagent-control/list-agents`) and only mounts the legacy plugin when it still exists, replacing the version-string check.
