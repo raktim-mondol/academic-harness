@@ -7,7 +7,7 @@
  * and nothing is ingested into PaperMemory; paper_download/pdf_to_markdown own
  * persistence.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, fetchText, searchUserAgent } from './search-http.js'
 import { fetchPdf } from './paper-download.js'

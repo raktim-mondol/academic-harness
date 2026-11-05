@@ -5,7 +5,7 @@
  * OpenFDA's search syntax is passed through unchanged after the endpoint is
  * allowlisted. A 404 means "no matches", not an error.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 

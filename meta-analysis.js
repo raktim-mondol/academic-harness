@@ -7,7 +7,7 @@
  * recommendation.
  */
 import { relative } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   META_CI_METHODS, META_EFFECT_MEASURES, META_EXPORT_FORMATS, META_MODELS,
   META_TAU2_METHODS, addMetaStudies, deriveMetaStatus, exportMetaAnalysis,

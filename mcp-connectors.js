@@ -34,7 +34,7 @@
  * Settings-changed CONSENSUS_API_KEY takes effect on the next call rather
  * than needing a restart. See presets/academic-harness/agent.cordis.yml.
  */
-import * as McpClient from '@deepseek-ai/dsh-mcp-client'
+import * as McpClient from 'ah-dsh-mcp-client'
 import { resolveEnv } from './credential-env.js'
 
 export const name = 'academic-harness-mcp-connectors'

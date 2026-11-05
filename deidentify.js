@@ -3,7 +3,7 @@
  * delimited tables. Regex/heuristic detection only; no network, no model call,
  * no compliance certification, and no reversible mapping.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DEIDENTIFY_ACTIONS, DEIDENTIFY_REPORT_FORMATS,
   deidentifyStatus, exportDeidentifyReport, redactFile, scanFile, verifyFile,

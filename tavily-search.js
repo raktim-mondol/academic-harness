@@ -4,7 +4,7 @@
  * AI-native web search with pre-chunked results, topic modes, and domain
  * filters. A general web tool, not a literature index. Requires TAVILY_API_KEY.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { capText, fromTavilyResult, renderPapers } from './search-normalize.js'

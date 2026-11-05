@@ -5,7 +5,7 @@
  * rate to 30 RPS and enables cursor paging beyond the first page. Semantic
  * `search` queries are capped at 1 RPS, so they use their own limiter.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { fromOpenAlexWork, renderPapers } from './search-normalize.js'

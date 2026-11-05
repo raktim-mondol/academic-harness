@@ -8,7 +8,7 @@
  */
 import { existsSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { csvCell, ensureDir, exportText, slug as slugify } from './ledger-kit.js'
 import { runHelper } from './python-runtime.js'
 import { resolveWorkspacePath } from './workspace-path.js'

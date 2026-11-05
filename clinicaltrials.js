@@ -4,7 +4,7 @@
  * Trials and posted results, not literature search: use it for protocols,
  * eligibility, endpoints, results, and adverse events. No key.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const API = 'https://clinicaltrials.gov/api/v2/studies'

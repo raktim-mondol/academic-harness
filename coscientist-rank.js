@@ -8,7 +8,7 @@
  * pair in opposite orders); this tool reconciles those verdicts and applies one
  * Glicko-2 period to both hypotheses from a single pre-match read.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   MATCH_TYPES, deriveState, matchHistory, proposeMatch, publicHypothesis,
   recordFeedback, recordMatch, similarityNeighbours,

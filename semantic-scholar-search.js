@@ -5,7 +5,7 @@
  * call), and snippet (~500-word full-text excerpts). Free; S2_API_KEY gets a
  * dedicated 1 RPS bucket, so every request is serialized at 1 RPS.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {

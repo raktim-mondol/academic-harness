@@ -4,7 +4,7 @@
  *
  * Informational only — no legal-status, validity, or freedom-to-operate conclusions.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 

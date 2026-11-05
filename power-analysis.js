@@ -6,7 +6,7 @@
  * integrity rules the numbers depend on: an assumed effect size must say where it came from,
  * and a power calculation from the effect observed in the same study is refused.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { runHelper } from './python-runtime.js'
 
 export const EFFECT_SOURCES = ['pilot', 'literature', 'smallest_effect_of_interest', 'convention']

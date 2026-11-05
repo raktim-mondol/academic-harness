@@ -4,7 +4,7 @@
  * ligands, distance contacts, and C-alpha/backbone superposition. No network:
  * use science_source `fetch` with `save_to` to bring a file into the workspace.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { errorText, fileInput, provenanceLine, runToolkit, table, text, workspaceRoot } from './science-toolkit-kit.js'
 
 const ACTIONS = ['chains', 'ligands', 'contacts', 'superpose']

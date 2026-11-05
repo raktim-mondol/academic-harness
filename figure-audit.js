@@ -5,7 +5,7 @@
  */
 import { existsSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { runHelper } from './python-runtime.js'
 
 function workspaceRoot(exec) {

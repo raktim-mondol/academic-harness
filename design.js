@@ -6,7 +6,7 @@
  * realized, never guaranteed. DOE output states the assumed model and aliasing;
  * no response is analysed.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DESIGN_ACTIONS, DESIGN_EXPORT_FORMATS, DOE_METHODS, RANDOMIZATION_METHODS,
   balanceReport, designStatus, doeSchedule, exportDesign, listDesignSchedules,

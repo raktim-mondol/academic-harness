@@ -5,7 +5,7 @@
  * LLM-ready excerpts, or full content when requested. Use it after search has
  * produced URLs; it is not a search tool. Requires PARALLEL_API_KEY.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 

@@ -25,6 +25,8 @@ Some suites have a per-area alias in `package.json` (for example `npm run test:p
 
 The full CI matrix also runs the search-provider tests, the PaperMemory test suite, and a real DSH boot; see [`.github/workflows/verify.yml`](../.github/workflows/verify.yml).
 
+The separate [DSH compatibility canary](../.github/workflows/dsh-compat.yml) runs against npm's `latest` and `next` channels with npm and pnpm on pushes, pull requests, and a daily schedule. It installs the packed plugin in a throwaway profile, grants an exact-version exemption **only in that profile** when `next` falls outside the declared engine range, boots DSH, creates an Academic Harness session, and writes a non-secret test setting through the local API. A fake loopback model checks that core tools are advertised, runs `research_template` and `list_agents`, starts a `subagent_pro` child, and confirms the direct-image guard. Server startup alone is insufficient: a preset can fail only when a session mounts it. The check mutates settings, so run it only against an isolated profile. The pnpm lanes also get a channel-matched `@deepseek-ai/dsh-ptc-runtime` profile dependency, because pnpm omits that peer of `dsh-ptc-runtime-node` and DSH's workflow service would then stay pending (`workflow-ptc ... waiting for ptcRuntime`) and block preset sessions; npm resolves peers natively. All four lanes (`latest`/`next` × npm/pnpm) are required. The `next` job is complementary to the engines range: `latest` is the shipping target, `next` warns about upcoming changes while the engine range still adapts.
+
 ### `paper_fold` live integration
 
 `paper_fold` also has a live integration test. It installs nothing and uses an existing TextFold:

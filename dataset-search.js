@@ -7,7 +7,7 @@
  * File listing is best-effort for the two repositories with public file APIs;
  * other repositories return the landing URL instead.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi } from './search-normalize.js'

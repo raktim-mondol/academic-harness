@@ -6,7 +6,7 @@
  * small: arXiv's schema is stable and adding an XML dependency for four fields
  * is not worth the install footprint.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchText, getLimiter, searchUserAgent } from './search-http.js'
 import { fromArxivEntry, renderPapers } from './search-normalize.js'

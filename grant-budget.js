@@ -6,7 +6,7 @@
  * salary, fringe rate, indirect rate, cap, or eligibility rule, and it does not
  * submit anything.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   BUDGET_ACTIONS, BUDGET_EXPORT_FORMATS,
   budgetStatus, computeBudgetStore, exportBudget, startBudget,

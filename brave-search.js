@@ -5,7 +5,7 @@
  * web-search fallback or for independent coverage, never as a paper index.
  * Requires BRAVE_API_KEY (x-subscription-token).
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { capText, fromBraveResult, renderPapers } from './search-normalize.js'

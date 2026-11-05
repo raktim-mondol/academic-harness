@@ -6,7 +6,7 @@
  * not exercised by the automated test suite; they are skipped silently when
  * their key is unset.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { PUBLISHER_MEMBERS } from './publisher-members.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'

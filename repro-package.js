@@ -4,7 +4,7 @@
  * analysis, experiment, and dataset ledgers. Building never uploads; deposit
  * to Zenodo is confirm-gated and creates a draft only.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import {
   buildReproPackage, depositReproPackage, readReproPlan, reproDepositPreview,

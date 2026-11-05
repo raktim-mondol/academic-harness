@@ -8,7 +8,7 @@ import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpath
 import { tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
 import vm from 'node:vm'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { fetchJson, searchUserAgent } from './search-http.js'
 
 const SKIP_DIRS = new Set(['.git', 'node_modules', '.venv', 'venv', 'dist', 'build', '__pycache__', '.mypy_cache', '.pytest_cache', 'target', 'vendor'])

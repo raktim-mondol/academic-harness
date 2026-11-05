@@ -8,7 +8,7 @@
 import { copyFileSync, existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, dirname, extname, join, relative } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { convertPdfMarkdown } from './pdf-to-markdown.js'
 import { compileLatex } from './latex-compile.js'
 import {

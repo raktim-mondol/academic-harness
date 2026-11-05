@@ -4,7 +4,7 @@
  * pairwise alignment. No network and no BLAST: a database search is a
  * different claim and belongs to a source that states its own statistics.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { errorText, fileInput, inlineInput, provenanceLine, runToolkit, table, text, workspaceRoot } from './science-toolkit-kit.js'
 
 const ACTIONS = ['stats', 'translate', 'orfs', 'primer_tm', 'align']

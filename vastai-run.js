@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, posix } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DEFAULT_VASTAI_INSTANCE_ID,
   VASTAI_INSTANCE_IDS,

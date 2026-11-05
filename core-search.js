@@ -6,7 +6,7 @@
  * key gets ~10 requests/minute. Full text is only fetched when explicitly
  * requested because it is large.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { capText, fromCoreResult, renderPapers } from './search-normalize.js'

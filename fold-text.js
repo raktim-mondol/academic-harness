@@ -6,7 +6,7 @@
  */
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { LEVELS, foldReply, foldStats, normalizeLevel, worthFolding } from './fold-core.js'
 
 export const MAX_CHARS = 200_000

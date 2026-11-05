@@ -7,7 +7,7 @@
  * E-values. It never estimates a causal effect, fits a model, or claims the
  * assumptions are true.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   CAUSAL_ACTIONS, CAUSAL_EXPORT_FORMATS, EVALUE_MEASURES,
   analyzeCausalDagStore, causalStatus, createCausalDag, editCausalDag,

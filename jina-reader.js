@@ -5,7 +5,7 @@
  * at 20 RPM; JINA_API_KEY raises it and is optional. A general web tool, not a
  * literature index.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchText, getLimiter, searchUserAgent } from './search-http.js'
 

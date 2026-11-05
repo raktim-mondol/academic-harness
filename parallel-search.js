@@ -7,7 +7,7 @@
  * PARALLEL_API_KEY via resolveEnv() per call, so a key saved in Settings
  * takes effect on the next call — no restart needed.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 

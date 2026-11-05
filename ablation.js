@@ -3,7 +3,7 @@
  * cell to an existing experiment/analysis run, reports paired deltas, and records
  * an advisory human verdict. It never runs an experiment.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   ABLATION_EXPORT_FORMATS, ABLATION_VERDICTS,
   exportAblation, planAblation, pruneAblation, recordAblation,

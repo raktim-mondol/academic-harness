@@ -5,7 +5,7 @@
  * snapshots and never fetches live pages. A general web tool, not a literature
  * index. Requires EXA_API_KEY.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { capText, fromExaResult, renderPapers } from './search-normalize.js'

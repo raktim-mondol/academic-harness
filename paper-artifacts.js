@@ -12,7 +12,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { lookup } from 'node:dns/promises'
 import { getDefaultAutoSelectFamilyAttemptTimeout, isIP, setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { privateAddress, privateHostname } from './citation.js'
 import { exportText, nowIso } from './ledger-kit.js'
 import { canonicalDoi } from './search-normalize.js'

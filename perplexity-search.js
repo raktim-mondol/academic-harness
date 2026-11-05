@@ -4,7 +4,7 @@
  * Raw ranked web results, not a synthesized answer (that is the Agent/Sonar
  * API). Requires PERPLEXITY_API_KEY. A general web tool, not a literature index.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { capText, fromPerplexityResult, renderPapers } from './search-normalize.js'

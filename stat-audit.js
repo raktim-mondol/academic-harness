@@ -5,7 +5,7 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { runHelper } from './python-runtime.js'
 
 const MAX_BYTES = 50 * 1024 * 1024

@@ -7,7 +7,7 @@
  * the hits as Markdown. Scheduling is manual: nothing here runs on a timer,
  * emails anyone, or ingests into PaperMemory.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { exportText, mdCell, nowIso, shortHash } from './ledger-kit.js'
 import { chooseSources, runSource } from './literature-search.js'
 import { mergePapers } from './search-normalize.js'

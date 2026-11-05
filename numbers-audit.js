@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { extname, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { convertPdfMarkdown } from './pdf-to-markdown.js'
 import { runHelper } from './python-runtime.js'
 import { resolveWorkspacePath } from './workspace-path.js'

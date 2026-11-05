@@ -17,7 +17,7 @@
  * if the copy under $DSH_HOME/zvec-grep is older).
  */
 import { isAbsolute } from 'node:path'
-import * as McpClient from '@deepseek-ai/dsh-mcp-client'
+import * as McpClient from 'ah-dsh-mcp-client'
 import { resolveEnv } from './credential-env.js'
 import { isPluginPreset } from './preset-ids.js'
 import {

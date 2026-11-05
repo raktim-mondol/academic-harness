@@ -7,7 +7,7 @@
  * explicit `key_not_set` note. This is compliance information, not legal
  * advice, and a missing source is reported, never guessed.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { normalizeTitle } from './search-normalize.js'

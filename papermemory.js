@@ -14,7 +14,7 @@
  * missing/broken memory server surfaces instead of looking like an empty store.
  */
 import { homedir } from 'node:os'
-import * as McpClient from '@deepseek-ai/dsh-mcp-client'
+import * as McpClient from 'ah-dsh-mcp-client'
 import {
   bundledInstallDir,
   cliArgs,

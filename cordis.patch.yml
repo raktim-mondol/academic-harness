@@ -224,8 +224,10 @@
               - id: tool-subagent-control
                 name: '@deepseek-ai/dsh-tool-subagent-control'
 
-              - id: tool-subagent-list-agents
-                name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+              # 0.2.1 provides a separate list-agents subpath; 0.2.2 registers the
+              # same tool in tool-subagent-control and no longer exports that subpath.
+              - id: tool-subagent-list-agents-compat
+                name: academic-harness/subagent-list-compat
 
               # Every delegation is a managed activation: the tool returns
               # `{ kind: 'activation', subagentId }` immediately and the runtime delivers

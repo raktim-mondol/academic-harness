@@ -3,7 +3,7 @@
  * backward (works an ID references). Accepts any identifier that OpenAlex can
  * resolve (DOI, PMID, OpenAlex ID) via paper-resolve.js.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, emptyPaper, fromOpenAlexWork, renderPapers, yearOf } from './search-normalize.js'

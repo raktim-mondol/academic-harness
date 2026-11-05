@@ -6,7 +6,7 @@
  * missing or disputed and never resolves it.
  */
 import { join } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { exportText } from './ledger-kit.js'
 import {
   AUTHORSHIP_ACTIONS, AUTHORSHIP_EXPORT_FORMATS, CREDIT_ROLES, ICMJE_CRITERIA,

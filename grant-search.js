@@ -3,7 +3,7 @@
  * Search, and Grants.gov. Informational only — not grant-writing or legal
  * advice, and not a substitute for a literature review.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const FUNDERS = ['nih', 'nsf', 'grantsgov']

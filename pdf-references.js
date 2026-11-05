@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, fetchText, getLimiter, searchUserAgent } from './search-http.js'
 import { normalizeTitle } from './search-normalize.js'

@@ -9,7 +9,7 @@ import {
   existsSync, mkdirSync, readFileSync, statSync, writeFileSync,
 } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   addEvidence, addExtraction, addRecords, appraiseRecord, deriveAppraisalStatus,
   deriveExtractionStatus, deriveStatus, exportReview, frozenInstrument, readJsonl,

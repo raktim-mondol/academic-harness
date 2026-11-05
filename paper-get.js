@@ -6,7 +6,7 @@
  * merged record is enriched with an open-access URL and a canonical BibTeX
  * entry. This tool does not download files or write to PaperMemory.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import {
   canonicalArxivId,

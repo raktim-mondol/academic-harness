@@ -3,7 +3,7 @@
  * search cannot express. Router adapters add no tool schema; this is the one
  * new tool. Keyed sources return key_missing without making a network call.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   renderBiorxivDomain,
   runBiorxivDomain,

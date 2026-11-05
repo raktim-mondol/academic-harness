@@ -6,7 +6,7 @@
  * resolveEnv() per call (like image_generate/modal_run/runpod_run), so a key
  * saved in Settings takes effect on the very next call — no restart needed.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 
 const STUDY_TYPES = [

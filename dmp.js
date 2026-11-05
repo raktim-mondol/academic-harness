@@ -3,7 +3,7 @@
  * `.dsh/dmp/<slug>/` with a concept checklist. Templates are paraphrased, not
  * official requirements; no repository, embargo, or cost is invented.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DMP_ACTIONS, DMP_EXPORT_FORMATS, DMP_TEMPLATES,
   dmpStatus, exportDmp, recordDmpSection, startDmp,

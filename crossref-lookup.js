@@ -5,7 +5,7 @@
  * Supplying CROSSREF_MAILTO (or UNPAYWALL_EMAIL) moves requests into the polite
  * pool and raises both budgets.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, fromCrossrefWork, renderPapers } from './search-normalize.js'

@@ -6,7 +6,7 @@
  */
 import { existsSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { ensureDir, hashFile } from './ledger-kit.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 import { errorText, fileInput, inlineInput, provenanceLine, runToolkit, table, text, workspaceRoot } from './science-toolkit-kit.js'

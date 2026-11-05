@@ -9,7 +9,7 @@
 import { createHash } from 'node:crypto'
 import { writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { appendJsonl, ensureDir, nowIso } from './ledger-kit.js'
 import { fetchText } from './search-http.js'
 import { ADAPTERS, getAdapter } from './science-sources/index.js'

@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 
 const execFileAsync = promisify(execFile)
 const ENGINES = ['pdflatex', 'xelatex', 'lualatex']

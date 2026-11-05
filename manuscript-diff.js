@@ -10,7 +10,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs'
 import { basename, extname, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import AdmZip from 'adm-zip'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { findAhRoot, runAh } from './academic-harness.js'
 import { compileLatex } from './latex-compile.js'
 import {

@@ -5,7 +5,7 @@
  * invents a hypothesis or outcome, never claims registry acceptance, and never
  * contacts OSF: `submit` is explicit about being unimplemented.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DIRECTIONS, IMPORT_SOURCES, PREREGISTER_ACTIONS, PREREGISTER_EXPORT_FORMATS,
   exportPreregistration, freezePreregistration, importPreregistration,

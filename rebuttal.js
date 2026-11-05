@@ -9,7 +9,7 @@
  * planned stubs with REBUTTAL_MAX_TASKS in Settings instead.
  */
 import { relative } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { EXPERIMENT_BASELINE_REFS } from './experiment-store.js'
 import {

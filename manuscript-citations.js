@@ -8,7 +8,7 @@
  */
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { parseBibtex } from './citation-format.js'
 import { libraryResolve } from './papermemory-library.js'
 

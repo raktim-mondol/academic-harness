@@ -58,7 +58,7 @@
  * returns a subagent id immediately, with the final answer delivered as a
  * completion notice.
  */
-import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
+import * as ToolSubagent from 'ah-dsh-tool-subagent'
 import { appendNotebookEntryAt, notebookFile } from './notebook.js'
 import { getStoredKey } from './settings-keys.js'
 

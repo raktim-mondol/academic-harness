@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { dirname, posix } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DEFAULT_RUNPOD_INSTANCE_ID,
   RUNPOD_INSTANCE_IDS,

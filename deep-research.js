@@ -18,7 +18,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { GEARS, createLlmRunner, parseJsonResponse, planFor, runSteps } from './deep-research-steps.js'
 import { EFFORT_LEVELS, EFFORT_PRESETS, resolveEffort } from './deep-research-effort.js'
 import {

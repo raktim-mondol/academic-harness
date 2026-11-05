@@ -5,7 +5,7 @@
  * (command, environment, input/output hashes, exit status, logs). The tool
  * records what happened and never interprets the science.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   ANALYSIS_EXPORT_FORMATS, ANALYSIS_KINDS, ANALYSIS_METRIC_FORMATS, ANALYSIS_REFERENCES,
   ANALYSIS_RULE_OPS, analysisStatus, complianceAnalysisRun, currentPlan,

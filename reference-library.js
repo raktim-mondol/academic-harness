@@ -12,7 +12,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { libraryCli } from './papermemory-library.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 

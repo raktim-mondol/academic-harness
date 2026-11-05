@@ -6,7 +6,7 @@
  * and needs SHERPA_ROMERO_API_KEY; without it the answer is OpenAlex-only with
  * an explicit `key_not_set` note. Compliance information, not legal advice.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { versionInfo } from './journal-policy.js'

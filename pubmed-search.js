@@ -6,7 +6,7 @@
  * open-access full-text links. The NCBI path is two-step (esearch then
  * esummary) and honors NCBI_API_KEY (10 RPS vs 3 RPS).
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {

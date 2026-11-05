@@ -6,7 +6,7 @@
  * not be queried yields `unknown`, never `clean`. PubPeer has no stable public
  * API, so it is returned as a URL rather than scraped.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'

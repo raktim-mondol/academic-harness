@@ -10,7 +10,7 @@
  * Exports `fetchOpenAlexWork` for openalex-cite.js so both tools share the
  * same identifier-to-work path.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {

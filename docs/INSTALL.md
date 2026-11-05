@@ -6,18 +6,18 @@ Academic Harness is a **DeepSeek Harness (DSH) profile**: the DSH web UI and DSH
 
 ## Requirements
 
-- **DeepSeek Harness 0.2.1–0.2.x** (`dsh --version` should report 0.2.1 to 0.2.x; the plugin's engine range is `>=0.2.1-rc.5 <0.3.0`).
+- **DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`**; the validated versions are `0.2.1-rc.5` (npm's `latest`) and `0.2.2-rc.1` (npm's `next`). Isolated tests cover preset sessions, a non-secret Settings write, selected tools, and delegation on both channels under npm and pnpm; a [daily canary](../.github/workflows/dsh-compat.yml) re-runs them. Newer DSH releases are adopted after the canary passes, not before. One DSH packaging quirk is documented by this repo's canary: pnpm omits the `@deepseek-ai/dsh-ptc-runtime` peer of `dsh-ptc-runtime-node`, which blocks preset sessions on 0.2.2-rc.1 with `workflow-ptc ... waiting for ptcRuntime`; npm resolves it natively, and a channel-matched profile dependency fixes pnpm.
 - Optional Python runtimes are installed automatically on first use, with one exception: the `sci_inspect`/`power_analysis` helpers and the `rob-figure` appraisal export need a one-time `cd python-helpers && uv sync` (matplotlib). See [Architecture](ARCHITECTURE.md#runtime-installs).
 - `modal_run` needs the Modal SDK, which the plugin installs into `$DSH_HOME/modal-sdk` on first use (no restart; set `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` to manage it yourself). `runpod_run` and `vastai_run` need only their API key plus OpenSSH client tools; see [Remote compute](COMPUTE.md).
 
 ## 1. Install DSH
 
 ```sh
-npm install -g @deepseek-ai/dsh
-dsh --version   # should report 0.2.1 to 0.2.x
+npm install -g @deepseek-ai/dsh@0.2.1-rc.5
+dsh --version   # 0.2.1-rc.5 — or 0.2.2-rc.1 with `npm install -g @deepseek-ai/dsh@next`
 ```
 
-Without a global install, `npx @deepseek-ai/dsh web` also works. You need a working `dsh` CLI for either installation option below.
+The explicit version avoids silently switching to a newer, unverified DSH release when npm's `latest` tag changes. All plugin examples below work the same under both versions. Without a global install, `npx @deepseek-ai/dsh@0.2.1-rc.5 web` also works. You need a working `dsh` CLI for either installation option below.
 
 ## 2. Install Academic Harness
 
@@ -44,7 +44,15 @@ The bundle patches the web-app layer, so the profile must already include `@deep
 dsh plugin --profile academic-harness add github:raktim-mondol/academic-harness
 ```
 
-This creates the `academic-harness` profile if it does not exist yet and adds Academic Harness to it. Start it with:
+This creates the `academic-harness` profile if it does not exist yet and adds Academic Harness to it. DSH's freshly-created profile templates omit the web-app bundle the preset selector needs, so add it once:
+
+```sh
+dsh plugin --profile academic-harness add github:raktim-mondol/academic-harness
+f="${DSH_HOME:-$HOME/.dsh}/profiles/academic-harness/package.json"
+node -e 'const fs=require("fs"),f=process.argv[1],j=JSON.parse(fs.readFileSync(f));const b=j.dsh.profile.bundles;if(!b.includes("@deepseek-ai/dsh-web-app"))b.splice(1,0,"@deepseek-ai/dsh-web-app");fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$f"
+```
+
+Start it with:
 
 ```sh
 dsh --profile academic-harness

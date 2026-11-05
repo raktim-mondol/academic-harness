@@ -9,7 +9,7 @@
  * published to Settings and the session header; Cancel is always available.
  */
 import { isAbsolute, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import {
   DEFAULT_EMBEDDING,

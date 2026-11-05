@@ -1,0 +1,98 @@
+name: DSH compatibility
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [latest, next]
+        packageManager: [npm, pnpm]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: pnpm/action-setup@v4
+        if: matrix.packageManager == 'pnpm'
+        with:
+          version: 11.23.0
+      - name: Prepare isolated profile
+        env:
+          CHANNEL: ${{ matrix.channel }}
+          PACKAGE_MANAGER: ${{ matrix.packageManager }}
+          IS_PNPM: ${{ matrix.packageManager == 'pnpm' && '1' || '0' }}
+          DSH_HOME: ${{ runner.temp }}/dsh-compat
+        run: |
+          version=$(npm view "@deepseek-ai/dsh@$CHANNEL" version)
+          echo "Checking DSH $version ($CHANNEL, $PACKAGE_MANAGER)"
+          archive=$(npm pack --pack-destination "$RUNNER_TEMP" --silent)
+          mkdir -p "$DSH_HOME/profiles/ci"
+          DSH_VERSION="$version" AH_ARCHIVE="$RUNNER_TEMP/$archive" IS_PNPM="$IS_PNPM" node --input-type=module -e '
+            import { writeFileSync } from "node:fs";
+            const v = process.env.DSH_VERSION;
+            const deps = {
+              "@deepseek-ai/dsh": v, "@deepseek-ai/dsh-base": v,
+              "@deepseek-ai/dsh-web-app": v, "academic-harness": `file:${process.env.AH_ARCHIVE}`,
+            };
+            // pnpm omits dsh-ptc-runtime (peer of dsh-ptc-runtime-node), which
+            // leaves the workflow service pending and blocks preset sessions;
+            // npm resolves that peer natively, so only pnpm lanes need this.
+            if (process.env.IS_PNPM === "1") deps["@deepseek-ai/dsh-ptc-runtime"] = v;
+            const profile = { name: "dsh-compat-ci", private: true, dependencies: deps,
+              dsh: { profile: { bundles: ["@deepseek-ai/dsh-base", "@deepseek-ai/dsh-web-app", "academic-harness"] } } };
+            writeFileSync(`${process.env.DSH_HOME}/profiles/ci/package.json`, JSON.stringify(profile, null, 2));
+            writeFileSync(`${process.env.DSH_HOME}/profiles/ci/cordis.yml`, "[]\n");'
+          rm -f "$DSH_HOME/profiles/ci/pnpm-lock.yaml"
+          if [ "$PACKAGE_MANAGER" = pnpm ]; then
+            pnpm --dir "$DSH_HOME/profiles/ci" install --ignore-scripts
+          else
+            npm install --prefix "$DSH_HOME/profiles/ci" --no-audit --no-fund
+          fi
+          if [ "$CHANNEL" = next ]; then
+            # Only needed when `next` has moved outside the declared engines
+            # range again. The exemption is for this disposable profile alone.
+            plugin_version=$(node -p 'require(process.cwd() + "/package.json").version')
+            "$DSH_HOME/profiles/ci/node_modules/.bin/dsh" plugin --profile ci allow-version "academic-harness@$plugin_version" --dsh-version "$version" --accept-risk
+          fi
+      - name: Boot and create a preset session
+        env:
+          DSH_HOME: ${{ runner.temp }}/dsh-compat
+          TEXTFOLD_SKIP_INSTALL: '1'
+          ZVEC_GREP_SKIP_INSTALL: '1'
+        run: |
+          node "$GITHUB_WORKSPACE/scripts/dsh-compat-provider.mjs" "$RUNNER_TEMP/provider-port" "$RUNNER_TEMP/provider-receipt.json" &
+          provider_pid=$!
+          trap 'kill "${pid:-}" "$provider_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 50); do
+            if [ -s "$RUNNER_TEMP/provider-port" ]; then break; fi
+            if ! kill -0 "$provider_pid" 2>/dev/null; then exit 1; fi
+            sleep 0.1
+          done
+          test -s "$RUNNER_TEMP/provider-port"
+          export DEEPSEEK_BASE_URL="http://127.0.0.1:$(cat "$RUNNER_TEMP/provider-port")"
+          export DEEPSEEK_API_KEY='local-compatibility-test'
+          export DSH_COMPAT_RECEIPT="$RUNNER_TEMP/provider-receipt.json"
+          cd "$DSH_HOME/profiles/ci"
+          ./node_modules/.bin/dsh --profile ci --no-open --port 0 > "$RUNNER_TEMP/dsh-compat.log" 2>&1 &
+          pid=$!
+          for i in $(seq 1 60); do
+            if grep -q 'dsh web:' "$RUNNER_TEMP/dsh-compat.log"; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then break; fi
+            sleep 2
+          done
+          sed -E 's|(dsh web: )http://[^ ]+|\1[bootstrap URL redacted]|' "$RUNNER_TEMP/dsh-compat.log"
+          node "$GITHUB_WORKSPACE/scripts/check-dsh-session.mjs" "$RUNNER_TEMP/dsh-compat.log" "$RUNNER_TEMP"

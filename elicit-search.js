@@ -6,7 +6,7 @@
  * above). The API allows 100 requests/minute per IP, then blocks the IP for
  * five minutes, so calls are serialized and never retried automatically.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {

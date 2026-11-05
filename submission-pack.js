@@ -4,7 +4,7 @@
  * The tool never submits, emails, logs into a portal, or fabricates a claim.
  * Unknown requirements stay manual_check and drafts stay drafts.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   SUBMISSION_ACTIONS, analyzeSubmission, buildSubmissionPack, exportSubmissionPack,
   recordPlan, submissionStatus,

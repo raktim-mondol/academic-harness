@@ -5,7 +5,7 @@
  * State lives under `<cwd>/.dsh/experiments/<slug>/` (experiment-store.js).
  * The tool records what was logged and never claims a scientific result.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   EXPERIMENT_BASELINE_REFS, EXPERIMENT_DIRECTIONS, EXPERIMENT_EXPORT_FORMATS,
   EXPERIMENT_ROLES, EXPERIMENT_STAGES, EXPERIMENT_VERDICTS, LINK_TARGET_KINDS,

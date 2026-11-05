@@ -5,7 +5,7 @@
  * ROR is keyless. Ambiguous names return ranked candidates — identities are
  * never merged automatically.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 

@@ -17,8 +17,8 @@
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
-import * as McpClient from '@deepseek-ai/dsh-mcp-client'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import * as McpClient from 'ah-dsh-mcp-client'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { isPluginPreset } from './preset-ids.js'
 

@@ -2,7 +2,7 @@
  * `ah_rsi` — inspect and steer the local RSI loop from inside a DSH session.
  * The loop itself runs in rsi-hooks.js; this tool is the visible control surface.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { defaultStoreDir, effectiveConfig, ensureStore } from './rsi-store.js'
 import {
   diagnoseAndAdmit, formatLessonMessage, retireSimilarLessons, rsiInjectPreview, rsiLessons,

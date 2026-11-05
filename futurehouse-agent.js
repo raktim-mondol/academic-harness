@@ -11,7 +11,7 @@
  * use the returned bearer token. Tokens are cached for five minutes and
  * refreshed once on a 401/403.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { capText } from './search-normalize.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'

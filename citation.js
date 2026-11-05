@@ -9,7 +9,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:pat
 import { createHash } from 'node:crypto'
 import { lookup } from 'node:dns/promises'
 import { isIP } from 'node:net'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './paper-download.js'
 import { libraryRecords } from './papermemory-library.js'

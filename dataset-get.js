@@ -10,7 +10,7 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { canonicalDoi } from './search-normalize.js'
 import { runDatasetSearch } from './dataset-search.js'
 import { appendJsonl, ensureDir, hashFile, nowIso, readJsonl, slug as slugify } from './ledger-kit.js'

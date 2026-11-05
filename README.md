@@ -1,7 +1,7 @@
 # Academic Harness
 
 [![verify](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml/badge.svg)](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml)
-![DeepSeek Harness 0.2.1–0.2.x](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1--0.2.x-5b7bd5)
+![DeepSeek Harness 0.2.1](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1-5b7bd5)
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
 **A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 774 bundled skills, and local self-improvement, all inside the DSH web UI.
@@ -24,10 +24,12 @@ Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset wi
 
 ## Install
 
-Requires **DeepSeek Harness 0.2.1–0.2.x** (`>=0.2.1-rc.5 <0.3.0`, the range in `package.json`) and **Linux** (the only platform tested so far; see [Requirements](#requirements-and-scope)).
+Requires **DeepSeek Harness >=0.2.1-rc.5 <0.3.0** (`engines.dsh`; validated against `0.2.1-rc.5` and `0.2.2-rc.1` and watched daily by a [DSH compatibility canary](docs/DEVELOPMENT.md)) and **Linux** (the only platform tested so far; see [Requirements](#requirements-and-scope)). DSH fixes beyond `0.2.2-rc.1` are adopted after the canary passes; see [Install and run](docs/INSTALL.md#requirements).
 
 ```sh
-npm install -g @deepseek-ai/dsh
+npm install -g @deepseek-ai/dsh@0.2.1-rc.5
+# or the validated 0.2.2 prerelease, currently on npm's `next` channel:
+#   npm install -g @deepseek-ai/dsh@next
 ```
 
 Then either:
@@ -38,6 +40,9 @@ Then either:
 
 ```sh
 dsh plugin --profile academic-harness add github:raktim-mondol/academic-harness
+# DSH creates fresh profiles without the web-app bundle the preset needs:
+f="${DSH_HOME:-$HOME/.dsh}/profiles/academic-harness/package.json"
+node -e 'const fs=require("fs"),f=process.argv[1],j=JSON.parse(fs.readFileSync(f));const b=j.dsh.profile.bundles;if(!b.includes("@deepseek-ai/dsh-web-app"))b.splice(1,0,"@deepseek-ai/dsh-web-app");fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$f"
 dsh --profile academic-harness
 ```
 
@@ -187,7 +192,7 @@ vendored, and [NOTICE](NOTICE) records the attribution.
 ## Requirements and scope
 
 - **Tested on Linux only.** The plugin, its runtime installs (PaperMemory, zvec-grep, TextFold), and the end-to-end browser tests have been run on Linux (Python 3.13, Node 24). macOS and Windows have not been tested and may not work; Python is needed for PaperMemory, `power_analysis`, the `sci_inspect` helpers, and the managed Modal SDK.
-- **DSH 0.2.1–0.2.x.** The plugin's bundle patches the web-app layer, so the profile must include `@deepseek-ai/dsh-web-app`; the standard `web` profile does.
+- **DSH 0.2.1.** The plugin's bundle patches the web-app layer, so the profile must include `@deepseek-ai/dsh-web-app`; the standard `web` profile does. Newer DSH releases need compatibility testing before support is claimed.
 - **A preset check matters.** The research persona, search connectors, PaperMemory, zvec-grep, paper tools, citation/review/tournament tools, and the `subagent_pro`/`subagent_vision` routes are scoped to the Academic Harness preset. Both routes inherit the session model unless you configure a provider/model. Only the general-purpose tools (`notebook`, `fold_text`, `scientific_result`, `sci_inspect`, images, LaTeX, PDF, Mermaid, compute, templates) are on every preset.
 - **Keys are optional.** No credential is needed to install or start; each connector stays disabled until its key is present. Some runtimes install in the background on first use — see [Architecture](docs/ARCHITECTURE.md#runtime-installs).
 - **One DSH surface at a time.** `dsh-web`, `dsh-tui`, `dsh-martty`, and `academic-harness` share `$DSH_HOME`, port `3080`, and the zvec-grep daemon. Stop the previous one before starting another; see [Install](docs/INSTALL.md#one-dsh-surface-at-a-time).

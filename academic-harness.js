@@ -6,7 +6,7 @@
  * `ah_migrate` which create one. Author-only acts go through `ah_author`
  * and are gated by DSH approval (see academic-harness-hooks.js).
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   ahEnv,
   cliArgs,

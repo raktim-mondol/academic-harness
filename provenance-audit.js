@@ -7,7 +7,7 @@
  * truth — it joins the ledgers that already exist by the ids and hashes they
  * already store, and writes only its own cache under `.dsh/provenance/<slug>/`.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { slug as slugify } from './ledger-kit.js'
 import {
   AUDIT_STATES, PROVENANCE_ACTIONS, PROVENANCE_EXPORT_FORMATS, UNSUPPORTED_STATES,

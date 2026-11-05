@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { generateImages } from './image-gen-client.js'
 import { getImageGenConfig, imageGenConfigured } from './image-gen-config.js'
 import { resolveEnv } from './credential-env.js'

@@ -3,7 +3,7 @@
  * structured inputs, with a concept checklist. This is not legal advice and
  * never records an invented approval.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   ETHICS_ACTIONS, ETHICS_EXPORT_FORMATS, JURISDICTIONS, STUDY_TYPES,
   ethicsStatus, exportEthicsProtocol, generateConsent,

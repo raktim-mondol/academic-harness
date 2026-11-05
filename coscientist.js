@@ -11,7 +11,7 @@
  * samples, the session does it (usually with a subagent), and the result is
  * recorded back here. There is no background loop to wait on.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import {
   DEFAULT_LIMITATION_ROUNDS, DEFAULT_MAX_HYPOTHESES, DEFAULT_STEP_BUDGET, HYPOTHESIS_STATUSES,
   LIMITATION_VERDICTS, REVIEW_STAGES, VERDICTS,

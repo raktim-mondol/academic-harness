@@ -9,7 +9,7 @@
  * and citation counts are shown for orientation, not as a quality signal.
  * Nothing is ingested into PaperMemory.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { markInLibrary } from './literature-search.js'

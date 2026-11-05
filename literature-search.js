@@ -7,7 +7,7 @@
  * fused with reciprocal-rank fusion, so a paper found high in two indexes
  * outranks a paper found once.
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { capText, mergeRanked, renderPapers } from './search-normalize.js'
 import { runOpenAlexSearch } from './openalex-search.js'

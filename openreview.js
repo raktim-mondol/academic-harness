@@ -3,7 +3,7 @@
  *
  * Read-only; schemas vary by venue, so missing fields stay missing (never inferred).
  */
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 
 const API = 'https://api2.openreview.net'

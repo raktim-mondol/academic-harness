@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 import { helpersDir, pythonBin } from './python-runtime.js'
 
 const KINDS = ['chem', 'structure', 'massspec', 'arrays', 'imaging', 'anndata']

@@ -1,4 +1,4 @@
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool } from 'ah-dsh-tools'
 
 const KINDS = ['table', 'statistical_test']
 const ARTIFACT_ROLES = ['figure', 'table', 'script', 'report', 'data', 'log']
