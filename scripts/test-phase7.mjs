@@ -178,7 +178,7 @@ for (const marker of ['paper_get', 'paper_context', 'deep_review', '774 skills']
 }
 
 const settingsSource = readFileSync(join(root, 'settings-keys.js'), 'utf8')
-for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY', 'CORE_API_KEY', 'ELICIT_API_KEY', 'FUTUREHOUSE_API_KEY', 'ELSEVIER_INSTTOKEN', 'WILEY_TDM_TOKEN', 'SPRINGER_API_KEY', 'IEEE_API_KEY']) {
+for (const key of ['OPENALEX_API_KEY', 'S2_API_KEY', 'CROSSREF_MAILTO', 'NCBI_API_KEY', 'NCBI_EMAIL', 'BRAVE_API_KEY', 'TAVILY_API_KEY', 'EXA_API_KEY', 'PERPLEXITY_API_KEY', 'JINA_API_KEY', 'CORE_API_KEY', 'ELICIT_API_KEY', 'FUTUREHOUSE_API_KEY', 'TYPESAFE_API_KEY', 'ELSEVIER_INSTTOKEN', 'WILEY_TDM_TOKEN', 'SPRINGER_API_KEY', 'IEEE_API_KEY']) {
   check(settingsSource.includes(key), `settings-keys.js missing ${key}`)
 }
 

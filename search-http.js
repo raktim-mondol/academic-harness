@@ -9,8 +9,16 @@
  * request; a single limiter instance is shared for the process lifetime.
  */
 
+import { createHash } from 'node:crypto'
+
 const limiters = new Map()
 const warned = new Set()
+// A provider that said "come back in N seconds" with N longer than we are willing to wait
+// (a daily quota, typically) is not asked again until then. Retrying inside the wait cap
+// cannot succeed, and every later search would repeat the same doomed call.
+const cooldowns = new Map()
+const MAX_RETRY_WAIT_MS = 30_000
+const MAX_COOLDOWN_MS = 24 * 60 * 60_000
 const TRANSIENT_NETWORK_CODES = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE'])
 const TRANSIENT_NETWORK_PHRASES = ['socket hang up', 'fetch failed', ...[...TRANSIENT_NETWORK_CODES].map((code) => code.toLowerCase())]
 
@@ -22,6 +30,53 @@ export function getLimiter(name, options = {}) {
 export function resetLimitersForTests() {
   limiters.clear()
   warned.clear()
+  cooldowns.clear()
+  streaks.clear()
+}
+
+/**
+ * Cooldown identity: the provider origin plus the credential on the request, so entering
+ * a key in Settings is not blocked by the keyless quota running out. Hashed so no secret
+ * is held as a map key.
+ */
+function cooldownKey(url, headers) {
+  let origin = ''
+  let credential = ''
+  try {
+    const parsed = new URL(url)
+    origin = parsed.origin
+    credential = parsed.searchParams.get('api_key') || parsed.searchParams.get('apiKey') || ''
+  } catch {
+    return null
+  }
+  const header = (name) => {
+    if (!headers) return ''
+    if (typeof headers.get === 'function') return headers.get(name) || ''
+    const hit = Object.entries(headers).find(([key]) => key.toLowerCase() === name)
+    return hit ? String(hit[1]) : ''
+  }
+  credential ||= header('authorization') || header('x-api-key')
+  return `${origin}|${createHash('sha1').update(credential).digest('hex').slice(0, 12)}`
+}
+
+/** Failure fields for an adapter whose provider is in cooldown, or null. */
+export function cooldownFailure(label, result) {
+  if (!result?.cooldown) return null
+  const seconds = Math.round(result.retryAfterMs / 1000)
+  return { error: `${label} is rate limiting or unavailable; not called again for ${seconds >= 3600 ? `${(seconds / 3600).toFixed(1)} h` : `${seconds} s`}`, status: result.status, code: 'rate_limited', retry_after_s: seconds }
+}
+
+/** Milliseconds until a provider may be called again, or 0. */
+export function cooldownRemainingMs(url, headers) {
+  const key = cooldownKey(url, headers)
+  const until = key ? cooldowns.get(key) : null
+  if (!until) return 0
+  const left = until - Date.now()
+  if (left <= 0) {
+    cooldowns.delete(key)
+    return 0
+  }
+  return left
 }
 
 export class RateLimiter {
@@ -188,17 +243,55 @@ function safeUrl(url) {
   }
 }
 
+// Two requests in a row that fail with a transient error (after their retries) open a short
+// cooldown for that provider: a source that is down or throttling this address would otherwise
+// cost the full timeout and retries on every search. One success closes it. Occasional single
+// failures (a burst over a 1 RPS limit) never trip it.
+const streaks = new Map()
+const STREAK_LIMIT = 2
+const STREAK_COOLDOWN_MS = 120_000
+
+function transientFailure(result) {
+  if (result.ok || result.cooldown || result.error === 'aborted') return false
+  return result.status === 0 || isTransientStatus(result.status)
+}
+
 async function request(url, options, parse) {
+  const result = await attemptRequest(url, options, parse)
+  const key = cooldownKey(url, options.headers)
+  if (!key) return result
+  if (result.ok) {
+    streaks.delete(key)
+  } else if (transientFailure(result)) {
+    // A 429 means "slow down" and heals once calls are spaced (a key's 1 request per second), so
+    // it counts for half; timeouts, network errors and 5xx mean the provider is not answering.
+    const streak = (streaks.get(key) || 0) + (result.status === 429 ? 0.5 : 1)
+    streaks.set(key, streak)
+    if (streak >= STREAK_LIMIT && !cooldowns.has(key)) {
+      cooldowns.set(key, Date.now() + STREAK_COOLDOWN_MS)
+      warnOnce(`streak:${key}`, `[academic-harness] search provider ${safeUrl(url)} failed ${streak} times in a row; skipping it for ${STREAK_COOLDOWN_MS / 1000}s`)
+    }
+  }
+  return result
+}
+
+async function attemptRequest(url, options, parse) {
   const {
     signal,
     timeoutMs = 15_000,
     retries = 2,
+    minRetryDelayMs = 0,
     maxBytes = 20 * 1024 * 1024,
     headers,
     ...init
   } = options
   const urlLabel = safeUrl(url)
   let attempt = 0
+
+  const waiting = cooldownRemainingMs(url, headers)
+  if (waiting > 0) {
+    return { ok: false, status: 429, error: 'HTTP 429', detail: 'rate limit in effect; not retried', cooldown: true, retryAfterMs: waiting }
+  }
 
   for (;;) {
     if (signal?.aborted) return { ok: false, status: 0, error: 'aborted' }
@@ -267,8 +360,26 @@ async function request(url, options, parse) {
       return { ok: true, status: response.status, data, headers: response.headers }
     }
 
+    const asked = isTransientStatus(response.status) ? retryAfterMs(response.headers.get('retry-after')) : null
+    if (asked != null && asked > MAX_RETRY_WAIT_MS) {
+      // The provider wants longer than we would wait: retrying is a guaranteed second failure.
+      const key = cooldownKey(url, headers)
+      if (key) cooldowns.set(key, Date.now() + Math.min(asked, MAX_COOLDOWN_MS))
+      warnOnce(`cooldown:${urlLabel}`, `[academic-harness] search provider ${urlLabel} asked to wait ${Math.round(asked / 1000)}s; skipping it until then`)
+      return {
+        ok: false,
+        status: response.status,
+        data,
+        headers: response.headers,
+        error: `HTTP ${response.status}`,
+        detail: detailFrom(data),
+        cooldown: true,
+        retryAfterMs: asked,
+      }
+    }
+
     if (isTransientStatus(response.status) && attempt < retries) {
-      const waitMs = Math.min(retryAfterMs(response.headers.get('retry-after')) ?? backoffMs(attempt), 30_000)
+      const waitMs = Math.min(asked ?? Math.max(backoffMs(attempt), minRetryDelayMs), MAX_RETRY_WAIT_MS)
       warnOnce(`retry:${urlLabel}`, `[academic-harness] search provider ${urlLabel} returned HTTP ${response.status}; retrying in ${waitMs}ms`)
       await sleep(waitMs, signal)
       attempt += 1

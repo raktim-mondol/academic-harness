@@ -675,13 +675,177 @@ export function fromWosHit(hit) {
   return paper
 }
 
+/* ------------------------------------------------------------------ DOI helpers */
+
+/** Prefixes of preprint servers: a DOI here names a preprint, not the published version. */
+const PREPRINT_DOI_PREFIXES = [
+  '10.1101/',   // bioRxiv, medRxiv
+  '10.48550/',  // arXiv
+  '10.21203/',  // Research Square
+  '10.2139/',   // SSRN
+  '10.20944/',  // Preprints.org
+  '10.31219/',  // OSF Preprints
+  '10.26434/',  // ChemRxiv
+  '10.31234/',  // PsyArXiv
+  '10.31235/',  // SocArXiv
+  '10.64898/',  // openRxiv
+]
+export function isPreprintDoi(doi) {
+  const d = canonicalDoi(doi)
+  return Boolean(d) && PREPRINT_DOI_PREFIXES.some((prefix) => d.startsWith(prefix))
+}
+
+/** arXiv assigns every paper a DOI of this form. Deterministic, not a guess. */
+export function arxivDoi(arxivId) {
+  const id = canonicalArxivId(arxivId)
+  return id ? `10.48550/arxiv.${id}`.toLowerCase() : null
+}
+
+/**
+ * A DOI written in a URL. Only the URL is trusted: a DOI in page text is often one the
+ * page cites, not the page's own. Handles doi.org links, publisher /doi/ paths, query
+ * strings such as aeaweb's `?id=10.1257%2Fpol...`, and percent-encoded slashes.
+ */
+export function doiFromUrl(url) {
+  let text = String(url || '')
+  try { text = decodeURIComponent(text) } catch { /* keep the raw string */ }
+  const match = text.match(/10\.\d{4,9}\/[^\s"'<>?#&]+/)
+  if (!match) return null
+  let doi = match[0].replace(/[.,;:]+$/, '')
+  // drop an unbalanced trailing ")" left over from markdown or prose
+  while (doi.endsWith(')') && (doi.match(/\)/g) || []).length > (doi.match(/\(/g) || []).length) doi = doi.slice(0, -1)
+  return canonicalDoi(doi)
+}
+
+const SCHOLARLY_HOST = /(^|\.)(pubmed\.ncbi\.nlm\.nih\.gov|ncbi\.nlm\.nih\.gov|europepmc\.org|arxiv\.org|biorxiv\.org|medrxiv\.org|doi\.org|nature\.com|science\.org|sciencedirect\.com|springer\.com|springernature\.com|wiley\.com|onlinelibrary\.wiley\.com|tandfonline\.com|sagepub\.com|jstor\.org|ieee\.org|acm\.org|aps\.org|iop\.org|rsc\.org|acs\.org|oup\.com|academic\.oup\.com|cambridge\.org|mdpi\.com|frontiersin\.org|plos\.org|plosone\.org|biomedcentral\.com|elifesciences\.org|cell\.com|thelancet\.com|nejm\.org|jamanetwork\.com|bmj\.com|jacc\.org|ahajournals\.org|aeaweb\.org|nber\.org|ssrn\.com|researchgate\.net|semanticscholar\.org|openreview\.net|aclanthology\.org|aaai\.org|neurips\.cc|mlr\.press|jmlr\.org|pnas\.org|annualreviews\.org|karger\.com|thieme-connect\.com|osf\.io)$/i
+
+/** A page that is plausibly a paper: it names a DOI in its URL, or sits on a scholarly host. */
+export function isScholarlyUrl(url) {
+  if (doiFromUrl(url)) return true
+  try { return SCHOLARLY_HOST.test(new URL(String(url)).hostname) } catch { return false }
+}
+
+/* ------------------------------------------------------- premium-source normalisers */
+
+function cleanText(value) {
+  const text = stripMarkup(String(value ?? ''))
+  return text ? text.replace(/\s+/g, ' ').trim() || null : null
+}
+
+/** Consensus `/v1/search` result. */
+export function fromConsensusResult(r) {
+  if (!r || typeof r !== 'object') return null
+  const paper = emptyPaper('consensus')
+  paper.doi = canonicalDoi(r.doi)
+  paper.title = cleanText(r.title) || ''
+  paper.authors = (Array.isArray(r.authors) ? r.authors : [])
+    .map((author) => ({ name: typeof author === 'string' ? author : (author?.name || '') }))
+    .filter((author) => author.name)
+  paper.year = yearOf(r.publish_year ?? r.publish_date)
+  paper.venue = r.journal_name || null
+  paper.publisher = r.publisher_name || null
+  paper.volume = r.volume != null ? String(r.volume) : null
+  paper.pages = r.pages != null ? String(r.pages) : null
+  paper.abstract = cleanText(r.abstract)
+  paper.citation_count = Number.isFinite(r.citation_count) ? r.citation_count : null
+  paper.influential_citation_count = Number.isFinite(r.influential_citation_count) ? r.influential_citation_count : null
+  paper.journal_quartile = r.sjr_best_quartile != null ? `Q${r.sjr_best_quartile}`.replace(/^QQ/, 'Q') : null
+  paper.type = r.is_preprint ? 'preprint' : (r.study_type ? 'article' : null)
+  paper.url = r.url || (paper.doi ? `https://doi.org/${paper.doi}` : null)
+  if (r.takeaway) paper.takeaway = cleanText(r.takeaway)
+  if (r.study_type) paper.study_type = String(r.study_type)
+  return paper
+}
+
+/** One hit of Scite's `search_literature`. `tally` is its citation-statement count. */
+export function fromSciteHit(hit) {
+  if (!hit || typeof hit !== 'object') return null
+  const paper = emptyPaper('scite')
+  paper.doi = canonicalDoi(hit.doi)
+  paper.title = cleanText(hit.title) || ''
+  paper.authors = (Array.isArray(hit.authors) ? hit.authors : [])
+    .map((author) => ({ name: typeof author === 'string' ? author : (author?.authorName || author?.name || '') }))
+    .filter((author) => author.name)
+  paper.year = yearOf(hit.year ?? hit.date)
+  paper.venue = cleanText(hit.journal)
+  paper.publisher = hit.publisher || null
+  paper.volume = hit.volume != null ? String(hit.volume) : null
+  paper.issue = hit.issue != null ? String(hit.issue) : null
+  paper.pages = hit.page != null ? String(hit.page) : null
+  paper.abstract = cleanText(hit.abstract)
+  const tally = hit.tally && typeof hit.tally === 'object' ? hit.tally : null
+  if (tally) {
+    paper.citation_count = Number.isFinite(tally.citingPublications) ? tally.citingPublications : null
+    paper.scite = {
+      supporting: tally.supporting ?? 0,
+      contrasting: tally.contrasting ?? 0,
+      mentioning: tally.mentioning ?? 0,
+      total: tally.total ?? 0,
+      citing_publications: tally.citingPublications ?? null,
+    }
+  }
+  if (hit.isOa === true) paper.oa_status = String(hit.oaStatus || 'open').toLowerCase()
+  paper.url = hit.url || (paper.doi ? `https://doi.org/${paper.doi}` : null)
+  return paper
+}
+
+/** One result of Firecrawl's `firecrawl_research_search_papers` (its structuredContent). */
+export function fromFirecrawlPaper(r) {
+  if (!r || typeof r !== 'object') return null
+  const paper = emptyPaper('firecrawl')
+  const ids = r.ids && typeof r.ids === 'object' ? r.ids : {}
+  const first = (v) => (Array.isArray(v) ? v[0] : v)
+  paper.source_id = r.primaryId || r.paperId || null
+  paper.arxiv_id = canonicalArxivId(first(ids.arxiv))
+  paper.pmid = stripPmid(first(ids.pmid))
+  paper.pmcid = stripPmcid(first(ids.pmcid))
+  // a journal/preprint DOI when the index has one; otherwise arXiv's own, which is deterministic
+  paper.doi = canonicalDoi(first(ids.doi)) || arxivDoi(paper.arxiv_id)
+  paper.title = cleanText(r.title) || ''
+  paper.authors = (Array.isArray(r.authors) ? r.authors : []).map((name) => ({ name: String(name) })).filter((author) => author.name)
+  paper.year = yearOf(r.createdDate)
+  paper.abstract = cleanText(r.abstract)
+  paper.url = paper.doi && !isPreprintDoi(paper.doi) ? `https://doi.org/${paper.doi}`
+    : paper.arxiv_id ? `https://arxiv.org/abs/${paper.arxiv_id}`
+      : paper.pmid ? `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`
+        : (paper.doi ? `https://doi.org/${paper.doi}` : null)
+  return paper
+}
+
+/**
+ * One Parallel web-search row, kept only if it is plausibly a paper. Parallel returns
+ * no DOI field, so identity comes from the URL: an explicit DOI, an arXiv or PubMed
+ * id. A page with none of these and on no scholarly host is news or a blog and is dropped.
+ */
+export function fromParallelResult(row) {
+  if (!row || typeof row !== 'object') return null
+  const url = String(row.url || '').trim()
+  if (!url || !isScholarlyUrl(url)) return null
+  const paper = emptyPaper('parallel')
+  paper.source_id = url
+  paper.url = url
+  paper.doi = doiFromUrl(url)
+  const arxiv = url.match(/arxiv\.org\/(?:abs|pdf)\/([^\s?#]+?)(?:\.pdf)?(?:v\d+)?(?:[?#]|$)/i)
+  if (arxiv) paper.arxiv_id = canonicalArxivId(arxiv[1])
+  const pubmed = url.match(/pubmed\.ncbi\.nlm\.nih\.gov\/(\d{5,9})/i)
+  if (pubmed) paper.pmid = pubmed[1]
+  const pmc = url.match(/\/(PMC\d+)/i)
+  if (pmc) paper.pmcid = canonicalPmcid(pmc[1])
+  paper.title = cleanText(row.title) || url
+  const publish = String(row.publish_date || '').match(/^(\d{4})/)
+  paper.year = publish ? Number(publish[1]) : null
+  const excerpts = Array.isArray(row.excerpts) ? row.excerpts.filter(Boolean).join(' ') : ''
+  paper.abstract = excerpts ? cleanText(excerpts).slice(0, 1500) : null
+  return paper
+}
+
 const SCALAR_FIELDS = [
-  'source_id', 'doi', 'pmid', 'pmcid', 'arxiv_id', 'openalex_id', 's2_id',
+  'source_id', 'pmid', 'pmcid', 'arxiv_id', 'openalex_id', 's2_id',
   'bibcode', 'inspire_id', 'acl_id', 'scopus_id', 'wos_uid',
   'wikidata_qid', 'texkey',
   'title', 'year', 'venue', 'tldr', 'journal_quartile', 'oa_status', 'oa_url',
   'pdf_url', 'html_url', 'url', 'type', 'full_text', 'bibtex', 'publisher',
-  'volume', 'issue', 'pages',
+  'volume', 'issue', 'pages', 'takeaway', 'study_type',
 ]
 
 function mergeJournalFields(target, source) {
@@ -711,25 +875,106 @@ function mergeJournalFields(target, source) {
   }
 }
 
-function paperKeys(paper) {
+/**
+ * Identity keys for a record, as [key, weak] pairs. Strong keys are identifiers: two
+ * records sharing one are the same work. Weak keys are title-based and only count when
+ * `weakCompatible` agrees, so a shared title never merges two papers that carry
+ * different DOIs.
+ */
+function identityKeys(paper) {
   const keys = []
-  if (paper.doi) keys.push(`doi:${paper.doi}`)
-  if (paper.pmid) keys.push(`pmid:${paper.pmid}`)
-  if (paper.pmcid) keys.push(`pmcid:${paper.pmcid}`)
-  if (paper.arxiv_id) keys.push(`arxiv:${paper.arxiv_id}`)
-  if (paper.openalex_id) keys.push(`openalex:${paper.openalex_id}`)
-  if (paper.s2_id) keys.push(`s2:${paper.s2_id}`)
-  if (paper.bibcode) keys.push(`bibcode:${paper.bibcode}`)
-  if (paper.inspire_id) keys.push(`inspire:${paper.inspire_id}`)
-  if (paper.acl_id) keys.push(`acl:${paper.acl_id}`)
-  if (paper.scopus_id) keys.push(`scopus:${paper.scopus_id}`)
-  if (paper.wos_uid) keys.push(`wos:${paper.wos_uid}`)
-  if (paper.wikidata_qid) keys.push(`wikidata:${paper.wikidata_qid}`)
-  if (paper.title && paper.year != null) keys.push(`title:${normalizeTitle(paper.title)}:${paper.year}`)
+  const strong = (name, value) => { if (value) keys.push([`${name}:${value}`, false]) }
+  strong('doi', paper.doi)
+  for (const doi of paper.preprint_dois || []) strong('doi', doi)
+  for (const doi of paper.other_dois || []) strong('doi', doi)
+  strong('pmid', paper.pmid)
+  strong('pmcid', paper.pmcid)
+  strong('arxiv', paper.arxiv_id)
+  strong('openalex', paper.openalex_id)
+  strong('s2', paper.s2_id)
+  strong('bibcode', paper.bibcode)
+  strong('inspire', paper.inspire_id)
+  strong('acl', paper.acl_id)
+  strong('scopus', paper.scopus_id)
+  strong('wos', paper.wos_uid)
+  strong('wikidata', paper.wikidata_qid)
+  const title = normalizeTitle(paper.title)
+  if (title && paper.year != null) keys.push([`title:${title}:${paper.year}`, true])
+  // A long exact title is identifying even when a source gives no year (Parallel, Scite).
+  if (title && title.split(' ').length >= 6) keys.push([`titlelong:${title}`, true])
   return keys
 }
 
+/**
+ * May a title match stand? Not when both records carry published DOIs that differ
+ * ("Editorial" in two journals). A preprint DOI and a published DOI are one work.
+ */
+function weakCompatible(existing, paper) {
+  if (existing.doi && paper.doi && existing.doi !== paper.doi) {
+    const known = [existing.doi, ...(existing.preprint_dois || []), ...(existing.other_dois || [])]
+    if (!known.includes(paper.doi) && !isPreprintDoi(existing.doi) && !isPreprintDoi(paper.doi)) return false
+  }
+  if (existing.year != null && paper.year != null && Math.abs(existing.year - paper.year) > 1) return false
+  return true
+}
+
+function findMatch(index, merged, paper) {
+  let rejected = null
+  for (const [key, weak] of identityKeys(paper)) {
+    const position = index.get(key)
+    if (position == null) continue
+    if (weak && !weakCompatible(merged[position], paper)) {
+      if (rejected == null) rejected = position
+      continue
+    }
+    return { position, rejected: null }
+  }
+  return { position: -1, rejected }
+}
+
+function register(index, record, position) {
+  for (const [key, weak] of identityKeys(record)) {
+    if (!weak || !index.has(key)) index.set(key, position)
+  }
+}
+
+function addUnique(list, value) {
+  if (value && !list.includes(value)) list.push(value)
+}
+
+/** Two records with one title and two published DOIs stay apart but point at each other. */
+function linkSameTitle(a, b) {
+  if (!a || !b || !a.doi || !b.doi) return
+  addUnique((a.same_title_dois ||= []), b.doi)
+  addUnique((b.same_title_dois ||= []), a.doi)
+}
+
+/**
+ * DOI policy when records merge. A published DOI beats a preprint DOI and the preprint
+ * DOI is kept in `preprint_dois`; two published DOIs on one record (merged through a
+ * shared PMID, say) keep the first and list the other in `other_dois`. No DOI is dropped.
+ */
+function mergeDoi(target, source) {
+  if (!source.doi || source.doi === target.doi) return
+  if (!target.doi) { target.doi = source.doi; return }
+  const targetPre = isPreprintDoi(target.doi)
+  const sourcePre = isPreprintDoi(source.doi)
+  if (targetPre && !sourcePre) {
+    addUnique((target.preprint_dois ||= []), target.doi)
+    target.doi = source.doi
+  } else if (sourcePre && !targetPre) {
+    addUnique((target.preprint_dois ||= []), source.doi)
+  } else if (sourcePre && targetPre) {
+    addUnique((target.preprint_dois ||= []), source.doi)
+  } else {
+    addUnique((target.other_dois ||= []), source.doi)
+  }
+}
+
 function mergeInto(target, source) {
+  mergeDoi(target, source)
+  for (const doi of source.preprint_dois || []) { if (doi !== target.doi) addUnique((target.preprint_dois ||= []), doi) }
+  if (source.scite && !target.scite) target.scite = source.scite
   for (const field of SCALAR_FIELDS) {
     if (!target[field] && source[field]) target[field] = source[field]
   }
@@ -774,6 +1019,8 @@ const SOURCE_PRIORITY = {
   wos: 13,
   acl: 14,
   wikidata: 15,
+  scite: 16,
+  firecrawl: 17,
 }
 
 /** Deterministic order for a merged multi-source list. */
@@ -793,17 +1040,10 @@ export function mergePapers(papers) {
   const index = new Map()
   for (const paper of papers) {
     if (!paper || !paper.title) continue
-    const keys = paperKeys(paper)
-    let position = -1
-    for (const key of keys) {
-      if (index.has(key)) {
-        position = index.get(key)
-        break
-      }
-    }
+    const { position, rejected } = findMatch(index, merged, paper)
     if (position >= 0) {
       mergeInto(merged[position], paper)
-      for (const key of paperKeys(merged[position])) index.set(key, position)
+      register(index, merged[position], position)
     } else {
       const copy = {
         ...paper,
@@ -813,50 +1053,61 @@ export function mergePapers(papers) {
         snippets: [...(paper.snippets || [])],
       }
       merged.push(copy)
-      for (const key of keys) index.set(key, merged.length - 1)
+      if (rejected != null) linkSameTitle(merged[rejected], copy)
+      register(index, copy, merged.length - 1)
     }
   }
   return sortPapers(merged)
 }
 
 /**
- * Reciprocal-rank fusion for multi-source results.
- * `groups` is [{ source, results }] in provider-relevance order.
+ * Sources that are one index seen through different doors vote once. Crossref and its
+ * publisher-member searches are the same deposits, so a paper found by both is not
+ * twice as relevant. Every other source is its own family.
  */
-export function mergeRanked(groups, { k = 60 } = {}) {
+export function defaultFamily(source) {
+  const name = String(source || '')
+  return name === 'crossref' || name.startsWith('publisher:') ? 'crossref' : name
+}
+
+/**
+ * Reciprocal-rank fusion for multi-source results.
+ * `groups` is [{ source, results }] in provider-relevance order. A paper's score is the
+ * sum over source families of the best 1/(k+rank) any member of that family gave it.
+ */
+export function mergeRanked(groups, { k = 60, family = defaultFamily } = {}) {
   const merged = []
   const index = new Map()
+  const votes = new Map()
   for (const group of groups) {
     const results = Array.isArray(group?.results) ? group.results : []
+    const familyName = family(group?.source)
     results.forEach((paper, rank) => {
       if (!paper || !paper.title) return
       const score = 1 / (k + rank + 1)
-      const keys = paperKeys(paper)
-      let position = -1
-      for (const key of keys) {
-        if (index.has(key)) {
-          position = index.get(key)
-          break
-        }
-      }
+      const { position, rejected } = findMatch(index, merged, paper)
+      let target
       if (position >= 0) {
-        mergeInto(merged[position], paper)
-        merged[position].rrf_score += score
-        for (const key of paperKeys(merged[position])) index.set(key, position)
+        target = merged[position]
+        mergeInto(target, paper)
       } else {
-        const copy = {
+        target = {
           ...paper,
           sources: [...(paper.sources || [paper.source])],
           authors: [...(paper.authors || [])],
           fields: [...(paper.fields || [])],
           snippets: [...(paper.snippets || [])],
-          rrf_score: score,
+          rrf_score: 0,
         }
-        merged.push(copy)
-        for (const key of keys) index.set(key, merged.length - 1)
+        merged.push(target)
+        if (rejected != null) linkSameTitle(merged[rejected], target)
       }
+      register(index, target, merged.indexOf(target))
+      const best = votes.get(target) || votes.set(target, new Map()).get(target)
+      best.set(familyName, Math.max(best.get(familyName) ?? 0, score))
     })
   }
+  for (const [record, best] of votes) record.rrf_score = [...best.values()].reduce((sum, value) => sum + value, 0)
   return merged.sort((a, b) => b.rrf_score - a.rrf_score)
 }
 
@@ -881,6 +1132,8 @@ export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSo
     if (meta) bits.push(meta)
     const ids = []
     if (paper.doi) ids.push(`doi: ${paper.doi}`)
+    if (paper.preprint_dois?.length) ids.push(`preprint: ${paper.preprint_dois.join(', ')}`)
+    if (paper.other_dois?.length) ids.push(`also doi: ${paper.other_dois.join(', ')}`)
     if (paper.pmid) ids.push(`pmid: ${paper.pmid}`)
     if (paper.arxiv_id) ids.push(`arXiv: ${paper.arxiv_id}`)
     if (paper.openalex_id) ids.push(`openalex: ${paper.openalex_id}`)
@@ -894,6 +1147,9 @@ export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSo
     if (paper.licence) ids.push(`licence: ${paper.licence}`)
     if (paper.oa_url) ids.push(`oa: ${paper.oa_url}`)
     if (ids.length) bits.push(ids.join(' · '))
+    if (paper.scite) bits.push(`scite: ${paper.scite.supporting} supporting · ${paper.scite.contrasting} contrasting · ${paper.scite.mentioning} mentioning`)
+    if (paper.takeaway) bits.push(`takeaway: ${paper.takeaway}`)
+    if (paper.same_title_dois?.length) bits.push(`same title, different DOI (distinct work): ${paper.same_title_dois.join(', ')}`)
     if (paper.tldr) bits.push(paper.tldr)
     if (paper.url) bits.push(paper.url)
     if (showSources && paper.sources?.length) bits.push(`sources: ${paper.sources.join(', ')}`)

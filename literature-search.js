@@ -24,10 +24,18 @@ import { runDoajArticles } from './journal-search.js'
 import { normalizePublisherAliases, PUBLISHER_ALIASES, runPublisherSearch } from './publisher-members.js'
 import { runIeeeSearch, runSpringerSearch } from './publisher-search.js'
 import { libraryLaunch, libraryResolve } from './papermemory-library.js'
+import { runConsensusPapers } from './consensus-search.js'
+import { runFirecrawlPapers } from './firecrawl-papers.js'
+import { runParallelPapers } from './parallel-search.js'
+import { runSciteSearch } from './scite-search.js'
+import { rankWithBm25 } from './bm25-rank.js'
+import { rerankWithCohere } from './cohere-rerank.js'
+import { askJev, borderlineSources, decideSources, gatingIntents, HINT_KEYS, orderByRelevance, RERANK_POOL, rerankWithJev, suggestTools } from './jev-router.js'
 
 const ALLOWED = [
   'openalex', 's2', 'pubmed', 'arxiv', 'crossref', 'preprints', 'biorxiv',
   'inspire', 'ads', 'scopus', 'wos', 'doaj', 'publishers', 'springer', 'ieee',
+  'consensus', 'scite', 'firecrawl', 'parallel',
 ]
 const BIOMEDICAL = /\b(clinic|clinical|patient|patients|trial|trials|disease|therapy|therapies|treatment|cancer|tumou?r|gene|genes|genetic|protein|proteins|cell|cells|drug|drugs|medical|medicine|health|epidemi\w*|cohort|rct|surgery|surgical|diagnos\w*|psychiatr\w*|neuron\w*|biolog\w*|immun\w*|infect\w*|virus|viral|vaccine|malaria|diabetes|alzheimer|parkinson|cardio\w*|oncology)\b/i
 const PREPRINT = /\b(arxiv|preprints?|neural|machine learning|deep learning|transformer|transformers|llm|llms|language model|computer vision|algorithm|algorithms|quantum|physics|astrophysic\w*|cosmolog\w*|particle|mathematic\w*|theorem|robot\w*|reinforcement learning|dataset|benchmark|computational)\b/i
@@ -76,6 +84,65 @@ export function chooseSources(query, requested, { adsToken = false } = {}) {
   return sources
 }
 
+/**
+ * Choose sources for a query. Explicit `requested` sources always win. In auto
+ * mode, Jev (when TYPESAFE_API_KEY is set) picks the domain sources and flags
+ * queries that really want another tool; with no key, or on any Jev failure, the
+ * keyword rules in `chooseSources` decide and `routing.reason` says why.
+ * Throws on an unknown source, exactly like `chooseSources`.
+ */
+export async function routeSources(query, requested, { adsToken = false, mode = 'auto', signal, hierarchy = true } = {}) {
+  const explicit = parseSources(requested)
+  if (explicit) return { sources: explicit, routing: { engine: 'manual' }, suggested_tools: [] }
+  const rules = chooseSources(query, null, { adsToken })
+  if (mode === 'rules') return { sources: rules, routing: { engine: 'rules', reason: 'rules_requested' }, suggested_tools: [] }
+  const apiKey = await resolveEnv('TYPESAFE_API_KEY')
+  const jev = await askJev(query, { apiKey, ads: Boolean(adsToken), signal })
+  if (!jev.ok) {
+    return {
+      sources: rules,
+      routing: { engine: 'rules', reason: jev.reason, ...(jev.ms != null ? { ms: jev.ms } : {}) },
+      suggested_tools: [],
+    }
+  }
+  const keys = new Set()
+  for (const name of HINT_KEYS) if (await resolveEnv(name)) keys.add(name)
+  const sourceP = Object.fromEntries(Object.entries(jev.p).filter(([k]) => !k.startsWith('intent::')).map(([k, v]) => [k, Number(v.toFixed(2))]))
+  const borderline = borderlineSources(jev.p, { ads: Boolean(adsToken) })
+  const flat = decideSources(jev.p, { ads: Boolean(adsToken) })
+  // Hierarchy: if the query is really a non-paper ask (retraction, one named paper, trials,
+  // news ...), search only the always-on core and let the hint do the work.
+  const gatedBy = hierarchy ? gatingIntents(jev.p) : []
+  const core = ['openalex', 's2']
+  return {
+    sources: gatedBy.length ? core : flat,
+    routing: {
+      engine: 'jev',
+      ...(gatedBy.length ? { mode: 'hint_only', gated_by: gatedBy, skipped: flat.filter((source) => !core.includes(source)) } : {}),
+      model: jev.model,
+      ms: jev.ms,
+      ...(jev.cached ? { cached: true } : {}),
+      probabilities: sourceP,
+      ...(borderline.length ? { borderline } : {}),
+    },
+    suggested_tools: suggestTools(jev.p, (name) => keys.has(name)),
+  }
+}
+
+/**
+ * Preprint servers match keywords, so "recent preprints on H5N1 in dairy cattle"
+ * finds nothing while "H5N1 dairy cattle" finds five. The request for preprints
+ * already did its work by choosing the source; strip that wording for it.
+ * Returns the original query if stripping would leave nothing.
+ */
+export function preprintTopic(query) {
+  const text = String(query || '').trim()
+  const lead = /^(?:(?:the\s+)?(?:most\s+)?(?:recent|new|latest)\s+)?(?:(?:bio|med)rxiv\s+)?preprints?\s+(?:on|about|regarding|of|for)\s+/i
+  const tail = /\s+(?:(?:bio|med)rxiv\s+)?preprints?$/i
+  const stripped = text.replace(lead, '').replace(tail, '').trim()
+  return stripped || text
+}
+
 /** Run one source. Exported for `deep_research`, which sweeps many queries. */
 export async function runSource(source, { query, perSource, yearMin, yearMax, openAccessOnly, signal }) {
   switch (source) {
@@ -112,14 +179,14 @@ export async function runSource(source, { query, perSource, yearMin, yearMax, op
       }, { signal })
     case 'preprints':
       return runPubMedSearch({
-        query: openAccessOnly ? `(${query}) AND OPEN_ACCESS:y` : query,
+        query: openAccessOnly ? `(${preprintTopic(query)}) AND OPEN_ACCESS:y` : preprintTopic(query),
         source: 'europepmc',
         preprints: true,
         max_results: Math.min(perSource, 100),
       }, { signal })
     case 'biorxiv':
       return runBiorxivSearch({
-        query: openAccessOnly ? `(${query}) AND OPEN_ACCESS:y` : query,
+        query: openAccessOnly ? `(${preprintTopic(query)}) AND OPEN_ACCESS:y` : preprintTopic(query),
         limit: Math.min(perSource, 100),
       }, { signal })
     case 'inspire':
@@ -140,6 +207,14 @@ export async function runSource(source, { query, perSource, yearMin, yearMax, op
         filter: filters.length ? filters.join(',') : undefined,
       }, { signal })
     }
+    case 'consensus':
+      return runConsensusPapers({ query, limit: Math.min(perSource, 50), yearMin, yearMax, openAccessOnly }, { signal })
+    case 'scite':
+      return runSciteSearch({ query, limit: Math.min(perSource, 50), yearMin, yearMax }, { signal })
+    case 'firecrawl':
+      return runFirecrawlPapers({ query, limit: Math.min(perSource, 100) }, { signal })
+    case 'parallel':
+      return runParallelPapers({ query, limit: Math.min(perSource, 20) }, { signal })
     case 'doaj':
       return runDoajArticles({ query, limit: Math.min(perSource, 50) }, { signal })
     case 'springer':
@@ -203,6 +278,22 @@ function render(value) {
   ]
   const counts = Object.entries(value.counts || {}).map(([source, count]) => `${source} ${count}`).join(', ')
   if (counts) bits.push(`per source: ${counts}`)
+  if (value.routing && value.routing.engine !== 'manual') {
+    const r = value.routing
+    const detail = r.engine === 'jev'
+      ? `jev ${r.model}${r.ms != null ? `, ${r.ms} ms` : ''}${r.mode === 'hint_only' ? `; hint mode, searched only OpenAlex and Semantic Scholar (skipped ${r.skipped.length ? r.skipped.join(', ') : 'nothing extra'}) because the query asks for ${r.gated_by.join(', ')}` : ''}${r.borderline?.length ? `; borderline ${r.borderline.map((b) => `${b.source} ${b.p}`).join(', ')}` : ''}`
+      : `keyword rules (${r.reason})`
+    bits.push(`routing: ${detail}`)
+  }
+  if (value.routing?.rerank) {
+    const k = value.routing.rerank
+    bits.push(k.engine !== 'rrf'
+      ? `ranking: ${k.engine === 'bm25' ? 'local BM25 fused with the source order' : `${k.engine === 'cohere' ? 'Cohere' : 'Jev'} relevance`} over the top ${k.candidates} merged candidates (${k.ms} ms)${k.fallback_from ? `; ${Object.entries(k.fallback_from).map(([name, why]) => `${name} skipped: ${why}`).join(', ')}` : ''}`
+      : `ranking: fused source ranking (rerank skipped: ${k.reason})`)
+  }
+  if (value.suggested_tools?.length) {
+    bits.push(`this query may be better served by: ${value.suggested_tools.map((s) => `${s.tool} (${s.reason})`).join('; ')}`)
+  }
   if (value.warnings?.length) bits.push(`warnings: ${value.warnings.join('; ')}`)
   if (value.failures?.length) {
     bits.push(`failed: ${value.failures.map((failure) => `${failure.source} (${failure.error})`).join('; ')}`)
@@ -218,6 +309,89 @@ function render(value) {
   return [{ type: 'text', text: capText(bits.join('\n\n')) }]
 }
 
+/**
+ * Longest a source may take before the search carries on without it. One stalled provider
+ * (a throttled arXiv answers 429 only after ~15 s) must not hold back the rest. Tests may
+ * lower these. The metered semantic APIs get longer because they are slower when healthy.
+ */
+export const SOURCE_DEADLINES_MS = { default: 12_000, s2: 20_000, firecrawl: 30_000, parallel: 30_000, scite: 30_000, consensus: 20_000 }
+
+async function runWithDeadline(source, parentSignal, run) {
+  const ms = SOURCE_DEADLINES_MS[source] ?? SOURCE_DEADLINES_MS.default
+  const timer = AbortSignal.timeout(ms)
+  const signal = parentSignal ? AbortSignal.any([parentSignal, timer]) : timer
+  let outcome
+  try {
+    outcome = await run(signal)
+  } catch (error) {
+    if (!(timer.aborted && !parentSignal?.aborted)) throw error
+    outcome = { error: 'aborted' }
+  }
+  if (timer.aborted && !parentSignal?.aborted && (!outcome || outcome.error)) {
+    return { error: `${source} did not answer within ${Math.round(ms / 1000)} s; the search continued without it`, code: 'timeout' }
+  }
+  return outcome
+}
+
+/**
+ * What `rerank: "auto"` may use: Jev when a TypeSafe key is set. With no key, or if Jev fails, the
+ * local fallback (BM25 fused with the source order, no network) runs instead. Cohere is opt-in only
+ * (`rerank: "cohere"`), never an automatic fallback.
+ */
+export const RERANK_PREFERENCE = ['jev']
+const RRF_K = 60
+
+/**
+ * Local fallback: rank the candidates with BM25 over title + abstract, then fuse that ranking with
+ * the existing source order by reciprocal rank (k = 60). On 36 live merged lists rated blind this
+ * beat the plain source order; BM25 on its own did not, so the fusion is the whole point.
+ * Returns `{ ok, ordered }` (candidates in the new order) or `{ ok: false, reason }`.
+ */
+export function orderLocally(query, pool) {
+  const started = Date.now()
+  const lexical = rankWithBm25(query, pool)
+  if (!lexical.ok) return { ok: false, reason: lexical.reason }
+  const byBm25 = pool.map((_, i) => i).sort((a, b) => lexical.scores[b] - lexical.scores[a] || a - b)
+  const bm25Rank = new Map(byBm25.map((index, rank) => [index, rank]))
+  const fused = pool.map((paper, index) => ({ paper, index, score: 1 / (RRF_K + index) + 1 / (RRF_K + bm25Rank.get(index)) }))
+  fused.sort((a, b) => b.score - a.score || a.index - b.index)
+  return { ok: true, ordered: fused.map((entry) => entry.paper), ms: Date.now() - started }
+}
+const RERANK_KEYS = { jev: 'TYPESAFE_API_KEY', cohere: 'COHERE_API_KEY' }
+
+async function rerankCandidates(query, pool, { mode, signal, localOnly = false }) {
+  if (mode === 'bm25') return localOutcome(query, pool, {}, false)
+  const engines = localOnly ? [] : RERANK_KEYS[mode] ? [mode] : RERANK_PREFERENCE
+  const skipped = {}
+  let attempted = false
+  for (const engine of engines) {
+    const apiKey = await resolveEnv(RERANK_KEYS[engine])
+    if (!apiKey) {
+      // an explicitly requested engine without a key is worth reporting; in auto it is just not available
+      if (RERANK_KEYS[mode]) return { ok: false, attempted: true, reason: 'no_key', skipped }
+      continue
+    }
+    attempted = true
+    const ranked = engine === 'jev'
+      ? await rerankWithJev(query, pool, { apiKey, signal })
+      : await rerankWithCohere(query, pool, { apiKey, signal })
+    if (ranked.ok) return { ok: true, engine, ranked, skipped }
+    skipped[engine] = ranked.reason
+  }
+  // a forced engine never swaps; only auto falls back to the local ranking
+  if (RERANK_KEYS[mode]) return { ok: false, attempted, reason: Object.values(skipped).at(-1), skipped }
+  return localOutcome(query, pool, skipped, attempted)
+}
+
+function localOutcome(query, pool, skipped, attempted) {
+  const local = orderLocally(query, pool)
+  if (local.ok) return { ok: true, engine: 'bm25', ordered: local.ordered, ms: local.ms, skipped }
+  return { ok: false, attempted, reason: Object.values(skipped).at(-1) ?? local.reason, skipped }
+}
+
+/** Below this many merged candidates there is nothing worth reordering. */
+const MIN_RERANK = 5
+
 export const name = 'academic-harness-literature-search'
 export const inject = ['tools']
 
@@ -225,7 +399,7 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'literature_search',
     description: [
-      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar, adding PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, DOAJ, publisher Crossref members, Scopus, Web of Science, Springer, and IEEE are also available explicitly.',
+      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar and adds domain sources: with a TypeSafe key (TYPESAFE_API_KEY) Jev picks them from the query (non-English queries work) and the result lists `routing` and, when the query really asks for trials, datasets, patents, grants, a venue, one specific paper, news/product/regulation material, whether a claim is supported, or a retraction check, `suggested_tools`; without a key, or if Jev is slow or down, keyword rules pick them. The rules add PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, DOAJ, publisher Crossref members, Scopus, Web of Science, Springer, and IEEE are also available explicitly, as are the keyed `consensus` (CONSENSUS_API_KEY), `scite` (SCITE_API_KEY; adds supporting/contrasting citation counts), `firecrawl` (FIRECRAWL_API_KEY; semantic search over PubMed, bioRxiv, medRxiv and arXiv) and `parallel` (PARALLEL_API_KEY; web results filtered to papers, with the DOI read from the URL when it has one). Results from every source are merged by identifier, so a paper found by several appears once. With a TypeSafe key (Jev) the top 30 merged candidates are then scored for relevance to the query in one request and listed in that order (each paper carries `relevance`); without a key, or if Jev is down, a local BM25 ranking fused with the source order is used instead (no key, no network). `rerank: "off"` keeps the plain fused order; `rerank: "cohere"` uses Cohere Rerank instead (COHERE_API_KEY).',
       'Results are deduplicated and rank-fused across sources (reciprocal-rank fusion), so use this when you want one clean discovery list instead of issuing the same query to several tools. Coverage is the top-N relevance slice per source, not exhaustive; use source-specific tools for filters, citation trails, or pagination.',
       'The `publishers` source searches publisher Crossref deposits keylessly; pass `publishers` aliases such as wiley, elsevier, springer, ieee, taylor_francis, sage, oup, cup, acm, acs, aps, iop, rsc, mdpi, frontiers, or plos. The keyed `springer`/`ieee` sources need SPRINGER_API_KEY/IEEE_API_KEY. Scopus and Web of Science are never auto-selected and need SCOPUS_API_KEY/WOS_API_KEY; without a key they return key_missing and make no request. Scopus/WoS records are metadata-only. Source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
     ].join(' '),
@@ -236,7 +410,7 @@ export function apply(ctx) {
           { type: 'string' },
           { type: 'array', items: { type: 'string' } },
         ],
-        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints, biorxiv, inspire, ads, scopus, wos, doaj, publishers, springer, ieee. Accepts an array or comma-separated string. Scopus/WoS/Springer/IEEE are explicit-only and keyed; publishers is keyless.',
+        description: 'auto (default), or one/more of openalex, s2, pubmed, arxiv, crossref, preprints, biorxiv, inspire, ads, scopus, wos, doaj, publishers, springer, ieee, consensus, scite, firecrawl, parallel. Accepts an array or comma-separated string. Scopus/WoS/Springer/IEEE/consensus/scite/firecrawl/parallel are explicit-only and keyed; publishers is keyless.',
       },
       publishers: {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
@@ -247,6 +421,8 @@ export function apply(ctx) {
       year_max: { type: 'number', description: 'Latest publication year. Records with unknown years are kept.' },
       open_access_only: { type: 'boolean', description: 'Only return records with an open-access link.' },
       include_abstracts: { type: 'boolean', description: 'Render abstract text in the result view. Default false.' },
+      rerank: { type: 'string', description: 'auto (default), off, jev, cohere or bm25. Reorders the top merged candidates by relevance to the query. auto uses Jev when TYPESAFE_API_KEY is set and otherwise (or if Jev is slow or down) a local BM25 ranking fused with the source order, which needs no key and sends nothing anywhere; jev, cohere (COHERE_API_KEY) or bm25 forces that engine and never swaps silently; off keeps the plain fused order. Skipped in hint mode; with routing=rules only the local ranking runs. Jev and Cohere results carry `relevance` (comparable only within one search); the local ranking does not.' },
+      routing: { type: 'string', description: 'auto (default) or rules. With sources=auto and a TypeSafe key, auto lets Jev choose the domain sources; rules forces the keyword rules and sends nothing to TypeSafe (no rerank either). Source routing is ignored when sources are listed explicitly.' },
     },
     output: {
       schema: { type: 'json' },
@@ -255,10 +431,24 @@ export function apply(ctx) {
     async execute(args, exec) {
       const query = String(args.query || '').trim()
       if (!query) return { error: 'query is required' }
+      if (args.routing != null && !['auto', 'rules'].includes(args.routing)) {
+        return { error: 'routing must be "auto" or "rules"' }
+      }
+      if (args.rerank != null && !['auto', 'off', 'jev', 'cohere', 'bm25'].includes(args.rerank)) {
+        return { error: 'rerank must be "auto", "off", "jev", "cohere" or "bm25"' }
+      }
       let sources
+      let routing
+      let suggestedTools
       try {
         const adsToken = await resolveEnv('ADS_API_TOKEN')
-        sources = chooseSources(query, args.sources, { adsToken: Boolean(adsToken) })
+        const routed = await routeSources(query, args.sources, {
+          adsToken: Boolean(adsToken),
+          mode: args.routing || 'auto',
+          signal: exec.signal,
+        })
+        ;({ sources, routing } = routed)
+        suggestedTools = routed.suggested_tools
       } catch (error) {
         return { error: error.message }
       }
@@ -282,6 +472,16 @@ export function apply(ctx) {
         sources = sources.filter((source) => source !== 'crossref')
         warnings.push('Crossref skipped: its records do not carry open-access status.')
       }
+      if (args.open_access_only) {
+        const noOaInfo = sources.filter((source) => source === 'parallel' || source === 'firecrawl')
+        if (noOaInfo.length === sources.length) {
+          return { error: `open_access_only cannot be applied to ${noOaInfo.join(' or ')}; add another source or drop the filter` }
+        }
+        if (noOaInfo.length) {
+          sources = sources.filter((source) => !noOaInfo.includes(source))
+          warnings.push(`${noOaInfo.join(', ')} skipped: their records do not carry open-access status.`)
+        }
+      }
       const maxResults = Math.min(Math.max(Number(args.max_results) || 20, 1), 100)
       const yearMin = args.year_min != null && Number.isFinite(Number(args.year_min))
         ? Math.trunc(Number(args.year_min))
@@ -296,14 +496,14 @@ export function apply(ctx) {
       }
 
       const perSource = Math.min(maxResults, Math.max(10, Math.ceil(maxResults / sources.length) + 5))
-      const settled = await Promise.allSettled(sources.map((source) => runSource(source, {
+      const settled = await Promise.allSettled(sources.map((source) => runWithDeadline(source, exec.signal, (signal) => runSource(source, {
         query,
         perSource,
         yearMin,
         yearMax,
         openAccessOnly: Boolean(args.open_access_only),
-        signal: exec.signal,
-      })))
+        signal,
+      }))))
 
       const groups = []
       const failures = []
@@ -321,6 +521,7 @@ export function apply(ctx) {
             error: value?.error || 'no result',
             ...(value?.code ? { code: value.code } : {}),
             ...(value?.field ? { field: value.field } : {}),
+            ...(value?.retry_after_s != null ? { retry_after_s: value.retry_after_s } : {}),
           })
           return
         }
@@ -331,7 +532,30 @@ export function apply(ctx) {
         if (results.length) groups.push({ source, results })
       })
 
-      const merged = mergeRanked(groups)
+      let merged = mergeRanked(groups)
+      let rerank
+      const rerankMode = args.rerank || 'auto'
+      // routing=rules sends nothing to TypeSafe or Cohere: only the local ranking may run then
+      const networkEngineUnderRules = args.routing === 'rules' && RERANK_KEYS[rerankMode]
+      if (rerankMode !== 'off' && !networkEngineUnderRules && routing?.mode !== 'hint_only' && merged.length >= MIN_RERANK) {
+        const pool = merged.slice(0, RERANK_POOL)
+        const outcome = await rerankCandidates(query, pool, { mode: rerankMode, signal: exec.signal, localOnly: args.routing === 'rules' })
+        if (outcome.ok) {
+          const local = outcome.engine === 'bm25'
+          // BM25 + RRF scores are not probabilities, so only Jev/Cohere results carry `relevance`
+          const ordered = local ? outcome.ordered : orderByRelevance(pool, outcome.ranked.scores).map(({ paper, score }) => ({ ...paper, relevance: Number(score.toFixed(2)) }))
+          merged = [...ordered, ...merged.slice(RERANK_POOL)]
+          rerank = {
+            engine: outcome.engine,
+            model: local ? 'bm25+fused' : outcome.ranked.model,
+            ms: local ? outcome.ms : outcome.ranked.ms,
+            candidates: pool.length,
+            ...(Object.keys(outcome.skipped).length ? { fallback_from: outcome.skipped } : {}),
+          }
+        } else if (outcome.attempted) {
+          rerank = { engine: 'rrf', reason: outcome.reason }
+        }
+      }
       const papers = merged.slice(0, maxResults).map((paper) => ({
         ...paper,
         rrf_score: Number(paper.rrf_score.toFixed(5)),
@@ -343,6 +567,8 @@ export function apply(ctx) {
       return {
         query,
         sources,
+        routing: rerank ? { ...routing, rerank } : routing,
+        ...(suggestedTools?.length ? { suggested_tools: suggestedTools } : {}),
         counts,
         warnings,
         failures,

@@ -7,7 +7,7 @@
  */
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
-import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
+import { cooldownFailure, fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {
   fromSemanticScholarPaper,
   fromSemanticScholarSnippet,
@@ -78,7 +78,9 @@ export async function searchSnippets({ query, paperIds, limit = 6, signal } = {}
   const apiKey = await resolveEnv('S2_API_KEY')
   const headers = { 'User-Agent': searchUserAgent() }
   if (apiKey) headers['x-api-key'] = apiKey
-  const limiter = getLimiter('s2', { minIntervalMs: 1000 })
+  // 1 request per second with a key is enforced per rolling second, so start-to-start 1000 ms still
+  // collides when requests jitter; 2000 ms keeps well clear of it.
+  const limiter = getLimiter('s2', { minIntervalMs: apiKey ? 2000 : 1000 })
   const result = await limiter.run(() => fetchJson(`${API}/snippet/search?${params}`, { signal, headers }))
   if (!result.ok) return []
   return (result.data?.data || []).map((entry) => {
@@ -104,15 +106,21 @@ export async function runS2Search(args, exec) {
   const headers = { 'User-Agent': searchUserAgent() }
   if (apiKey) headers['x-api-key'] = apiKey
 
-  const limiter = getLimiter('s2', { minIntervalMs: 1000 })
+  const limiter = getLimiter('s2', { minIntervalMs: apiKey ? 2000 : 1000 })
   const result = await limiter.run(() => fetchJson(buildUrl(args, mode), {
     signal: exec?.signal,
     headers,
+    // S2 throttles intermittently even under the key's limit (observed: 6 of 8 calls 6 s apart, then a
+    // 200 within 1-3 tries), so a keyed call retries up to 4 times, each at least 2 s after the last
+    retries: apiKey ? 4 : 2,
+    minRetryDelayMs: apiKey ? 2000 : 0,
   }))
   if (!result.ok) {
     if (result.error === 'aborted') return { error: 'request cancelled' }
+    const paused = cooldownFailure('Semantic Scholar', result)
+    if (paused) return paused
     const hint = result.status === 429
-      ? ' — keyless requests share a throttled pool; set S2_API_KEY for a dedicated 1 RPS bucket'
+      ? (apiKey ? ' — Semantic Scholar throttles intermittently even under the key\'s limit; retried several times' : ' — keyless requests share a throttled pool; set S2_API_KEY for a dedicated 1 RPS bucket')
       : ''
     return { error: `Semantic Scholar API error ${result.status}${hint}`, status: result.status, detail: result.detail ?? result.error }
   }

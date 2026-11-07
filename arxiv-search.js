@@ -8,7 +8,7 @@
  */
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
-import { fetchText, getLimiter, searchUserAgent } from './search-http.js'
+import { cooldownFailure, fetchText, getLimiter, searchUserAgent } from './search-http.js'
 import { fromArxivEntry, renderPapers } from './search-normalize.js'
 
 const API = 'https://export.arxiv.org/api/query'
@@ -106,12 +106,18 @@ export async function runArxivSearch(args, exec) {
 
   const email = await resolveEnv('UNPAYWALL_EMAIL')
   const limiter = getLimiter('arxiv', { minIntervalMs: 3000, maxConcurrent: 1 })
+  // arXiv answers in 0.5-3.5 s when it is willing. A throttled arXiv stalls and then returns 429
+  // (observed: after ~15 s), so waiting the default 15 s twice only delays the whole search.
   const result = await limiter.run(() => fetchText(`${API}?${params}`, {
     signal: exec?.signal,
     headers: { 'User-Agent': searchUserAgent(email) },
+    timeoutMs: 8000,
+    retries: 1,
   }))
   if (!result.ok) {
     if (result.error === 'aborted') return { error: 'request cancelled' }
+    const paused = cooldownFailure('arXiv', result)
+    if (paused) return paused
     return { error: `arXiv API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
   }
   const parsed = parseAtom(result.data || '')

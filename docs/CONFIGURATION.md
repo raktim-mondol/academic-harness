@@ -13,10 +13,10 @@ No credential is required to install or boot. Each connector or tool stays disab
 
 | Field | Required for | Notes |
 |---|---|---|
-| `PARALLEL_API_KEY` | `parallel_search`, `parallel_extract` | Native REST calls; takes effect on the next call. |
-| `FIRECRAWL_API_KEY` | Firecrawl MCP connector | MCP mount needs a `dsh` restart. |
-| `CONSENSUS_API_KEY` | `consensus_search` | Required; the tool returns a clear error when unset. |
-| `SCITE_API_KEY` | Scite MCP connector | An `mcp`-scoped key from <https://scite.ai/users/me/api>; sent as a bearer token to `https://api.scite.ai/mcp`. |
+| `PARALLEL_API_KEY` | `parallel_search`, `parallel_extract`, `literature_search` (`sources=parallel`) | Native REST calls; takes effect on the next call. |
+| `FIRECRAWL_API_KEY` | Firecrawl MCP connector, `literature_search` (`sources=firecrawl`) | The agent-facing MCP mount needs a `dsh` restart; `literature_search` reads the key per call. |
+| `CONSENSUS_API_KEY` | `consensus_search`, `literature_search` (`sources=consensus`) | Required; the tool returns a clear error when unset. |
+| `SCITE_API_KEY` | Scite MCP connector, `literature_search` (`sources=scite`) | An `mcp`-scoped key from <https://scite.ai/users/me/api>; sent as a bearer token to `https://api.scite.ai/mcp`. `literature_search` reads it per call; the agent-facing mount needs a `dsh` restart. |
 | `BRAVE_API_KEY` | `brave_search` | Independent web index; not a literature index. |
 | `TAVILY_API_KEY` | `tavily_search` | AI-native chunks and filters. |
 | `EXA_API_KEY` | `exa_search` | Neural/entity search. |
@@ -32,6 +32,8 @@ No credential is required to install or boot. Each connector or tool stays disab
 | `IEEE_API_KEY` | `literature_search` (`sources=ieee`) | Optional; free developer keys have a daily quota. Read per call, no restart. |
 | `ELICIT_API_KEY` | `elicit_search` | Elicit Pro+ required. |
 | `FUTUREHOUSE_API_KEY` | `futurehouse_agent` | Edison Scientific API key. |
+| `TYPESAFE_API_KEY` | `literature_search` source routing (Jev) | Optional. Key from <https://console.typesafe.ai/keys>. With it, Jev chooses which domain sources to add to a query; without it the keyword rules apply. The query text is sent to `api.typesafe.ai`. Read per call, no restart. |
+| `COHERE_API_KEY` | `literature_search` reranking (Cohere Rerank) | Optional. Key from <https://dashboard.cohere.com/api-keys>. Used only when you pass `rerank: "cohere"`; `auto` never uses it (Jev, or a local BM25 ranking without a Jev key). The query and public title/abstract text are sent to `api.cohere.com`. A trial key allows about 10 rerank calls a minute. Read per call, no restart. |
 | `OPENALEX_API_KEY` | `openalex_search`, `openalex_citations`, `paper_get`, `journal_search`, `paper_context`, `integrity_check`, `funder_policy` | Optional; raises the keyless budget. |
 | `S2_API_KEY` | `s2_search`, `paper_get`, `paper_context` | Optional; raises Semantic Scholar limits, including paper-scoped snippet search. |
 | `CROSSREF_MAILTO` | `crossref_lookup`, `coscientist_verify`, `journal_search`, `paper_get`, publisher Crossref search | Puts requests in Crossref's polite pool; falls back to `UNPAYWALL_EMAIL`. |

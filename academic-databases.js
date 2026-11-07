@@ -209,7 +209,7 @@ export const DATABASES = [
     capabilities: ['study-design filters', 'journal quartile', 'sample size', 'takeaways'],
     key_field: 'CONSENSUS_API_KEY',
     live_without_key: false,
-    tools: ['consensus_search'],
+    tools: ['consensus_search', 'literature_search'],
   },
   {
     id: 'parallel',
@@ -221,7 +221,7 @@ export const DATABASES = [
     capabilities: ['web search', 'URL extraction'],
     key_field: 'PARALLEL_API_KEY',
     live_without_key: false,
-    tools: ['parallel_search', 'parallel_extract'],
+    tools: ['parallel_search', 'parallel_extract', 'literature_search'],
   },
   {
     id: 'firecrawl',
@@ -230,10 +230,10 @@ export const DATABASES = [
     base_url: 'https://mcp.firecrawl.dev',
     auth: 'FIRECRAWL_API_KEY',
     rate_limit: 'Plan quota',
-    capabilities: ['scrape', 'search', 'parse'],
+    capabilities: ['scrape', 'search', 'parse', 'semantic paper search (PubMed, bioRxiv, medRxiv, arXiv)', 'full-text passages', 'citation graph'],
     key_field: 'FIRECRAWL_API_KEY',
     live_without_key: false,
-    tools: ['mcp__firecrawl__*'],
+    tools: ['mcp__firecrawl__*', 'literature_search'],
   },
   {
     id: 'scite',
@@ -242,10 +242,10 @@ export const DATABASES = [
     base_url: 'https://api.scite.ai/mcp',
     auth: 'SCITE_API_KEY',
     rate_limit: 'Plan quota',
-    capabilities: ['supporting/contrasting citations', 'citation statements', 'evidence datasets'],
+    capabilities: ['paper search with DOIs', 'supporting/contrasting citations', 'citation statements', 'evidence datasets'],
     key_field: 'SCITE_API_KEY',
     live_without_key: false,
-    tools: ['mcp__scite__*'],
+    tools: ['mcp__scite__*', 'literature_search'],
   },
   {
     id: 'elicit',
