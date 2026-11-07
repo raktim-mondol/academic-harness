@@ -3,6 +3,8 @@ name: aer-rebuttal
 description: Use when responding to a Revise & Resubmit decision from AER, AER:Insights, or an AEJ, and a point-by-point response letter plus aligned manuscript revisions are needed. Handles triage, the concede / clarify / push-back decision, and the response-letter format that editors actually read.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Rebuttal
 
 ## Overview

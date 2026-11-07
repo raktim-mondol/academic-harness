@@ -3,6 +3,8 @@ name: aer-replication
 description: Use when assembling the AEA Data and Code Availability deposit for an AER, AER:Insights, or AEJ acceptance, writing the README, or auditing a replication package before the AEA Data Editor review. Implements the current AEA policy, including the February 2026 Data and Code Availability Policy.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Replication
 
 ## Overview

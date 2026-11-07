@@ -3,6 +3,8 @@ name: aer-referee-sim
 description: Use when a complete draft exists and needs an adversarial internal review before submission — simulating the AER desk screen and three referee reports with calibrated severity, scoring the paper against the editorial rubric, and producing a prioritized revise list. Apply after aer-consistency passes and before aer-submission; rerun until the simulated verdict is at least major R&R.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Referee Simulation
 
 ## Overview

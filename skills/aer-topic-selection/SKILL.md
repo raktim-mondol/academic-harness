@@ -3,6 +3,8 @@ name: aer-topic-selection
 description: Use when evaluating whether a research idea clears the AER top-5 bar, when routing between AER, AER:Insights, and the AEJ family, or when sharpening a fuzzy contribution sentence into one publishable claim. Apply before any writing begins.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Topic Selection
 
 ## Overview

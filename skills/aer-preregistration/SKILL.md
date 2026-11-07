@@ -3,6 +3,8 @@ name: aer-preregistration
 description: Use when the project collects primary data or runs a field, lab, or survey experiment, before the intervention begins — write the pre-analysis plan, size the sample from a power calculation, and register with the AEA RCT Registry. Apply after the design is chosen in aer-identification and before any outcome data are seen.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Pre-Registration
 
 ## Overview
@@ -84,8 +86,8 @@ MDE = (z_power + z_{1-alpha/2}) * sigma * sqrt(1 / (p (1 - p) N))
 
 Cite `mckenzie_2012` (more rounds beat larger cross-sections when outcomes are
 noisy) and `duflo_glennerster_kremer_2007` (the design toolkit). Keys in
-[`../../references.bib`](../../references.bib); defaults in
-[`../../docs/methods-reference.md`](../../docs/methods-reference.md).
+[`../aer-skills/references.bib`](../aer-skills/references.bib); defaults in
+[`../aer-skills/docs/methods-reference.md`](../aer-skills/docs/methods-reference.md).
 
 ## Reporting Against the Plan
 

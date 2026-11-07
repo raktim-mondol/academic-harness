@@ -3,6 +3,8 @@ name: aer-workflow
 description: Use when deciding which AER-skills sub-skill to use next, before choosing a specialized skill or after a user asks how to sequence manuscript work from topic selection through rebuttal for AER, AER:Insights, or AEJ journals. Routes — does not replace — the specialized skills.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Workflow
 
 ## Overview

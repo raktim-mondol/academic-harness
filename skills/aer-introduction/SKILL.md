@@ -3,6 +3,8 @@ name: aer-introduction
 description: Use when drafting or rewriting the introduction of an economics manuscript targeted at AER, AER:Insights, or an AEJ, or when compressing an abstract to the mandatory 100-word limit. Implements the Keith Head / Bellemare five-paragraph formula and AER-specific formatting conventions. Apply after the body sections exist.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Introduction
 
 ## Overview

@@ -3,6 +3,8 @@ name: aer-identification
 description: Use when selecting, implementing, or stress-testing the causal identification strategy for an empirical economics manuscript — difference-in-differences (including staggered designs), instrumental variables (including weak-IV-robust inference), regression discontinuity, synthetic control, or shift-share / Bartik. Apply before writing the introduction or results.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Identification
 
 ## Overview

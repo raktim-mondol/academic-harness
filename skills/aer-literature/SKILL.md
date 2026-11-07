@@ -3,6 +3,8 @@ name: aer-literature
 description: Use when positioning a manuscript against the existing economics literature, building the antecedents map for the introduction, deciding what to cite, or verifying that every reference in the bibliography is real, correctly attributed, and cited to the published version. Apply at topic selection for the novelty scan and again before drafting the introduction.
 ---
 
+> **Academic Harness mapping.** This sub-skill is a top-level skill so DSH's `skill` tool can load it (the catalog is one directory deep). Paths below are written against the upstream AER-Skills repo root: read `docs/`, `examples/`, `templates/` and `references.bib` from the sibling `aer-skills` skill folder (`../aer-skills/...` from here), `scripts/` from this skill's own folder first and then `../aer-skills/scripts/`, and `skills/aer-<name>/SKILL.md` as the skill named `aer-<name>`.
+
 # AER Literature
 
 ## Overview
