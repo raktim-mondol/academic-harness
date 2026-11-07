@@ -189,6 +189,7 @@ Local academic memory ([PaperMemory](https://github.com/raktim-mondol/papermemor
 - A PDF converted with \`write_to\` is ingested automatically (page-subset conversions are not). Auto-ingest is scoped to the project PaperMemory resolves from the workspace (\`ah.yaml\` ancestor, else manuscript \`root_path\`, else \`unassigned\`); set \`PAPERMEMORY_PROJECT\` to override. Scanned/OCR-converted markdown is \`origin_channel=ocr-recovered\`; its claims are capped at \`extracted\` with \`channel-capped:ocr-recovered\` and can never become \`verified\` — say so when citing them.
 - With the Academic Harness in a project, \`papermemory_register_to_ah\` registers the stored markdown by \`paper_id\` with citation-key aliases; AH verdicts are imported with the CLI (\`papermemory import-verdicts PATH\`) and only downgrade status (\`NOT_SUPPORTED\` → \`contradicted\`).
 - \`papermemory_remember\` for outline decisions and rejected phrasings; it is not a source of citations. Do not use the lab \`notebook\` or session notes as citation evidence.
+- Notes are not checked when written. When \`papermemory_recap\` reports \`stale_notes_hidden\`, or after a long writing session, \`papermemory dream --project SLUG\` (CLI; a dry run unless \`--apply\`) lists duplicate notes, notes whose source files changed, and quarantined claims that can come back. The plugin also runs it at most once an hour when a session ends; \`papermemory dream --restore NOTE_ID\` undoes one note. A recalled note is a lead, not evidence.
 
 ## Reference library
 

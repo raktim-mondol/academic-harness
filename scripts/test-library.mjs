@@ -52,7 +52,7 @@ assert.match(readFileSync(join(root, 'papermemory.js'), 'utf8'), /EXPECTED_TOOL_
 const hidden = JSON.parse(spawnSync(wrapper, ['tools', '--json'], { encoding: 'utf8', env: { ...process.env, PAPERMEMORY_HIDE_TOOLS: 'papermemory_library' } }).stdout)
 assert.equal(hidden.length, 14, 'the plugin hides the MCP library tool')
 assert.ok(!hidden.includes('papermemory_library'))
-assert.match(readFileSync(join(vendor, 'pyproject.toml'), 'utf8'), /version = "0\.3\.1"/)
+assert.match(readFileSync(join(vendor, 'pyproject.toml'), 'utf8'), /version = "0\.3\.2"/)
 
 // ---- the CLI bridge
 assert.equal(pm('library', 'import', src, '--project', 'thesis').status, 0)

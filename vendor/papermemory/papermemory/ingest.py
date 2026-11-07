@@ -8,7 +8,7 @@ from papermemory.bibtex import parse_bibtex
 from papermemory.citations import extract_cite_keys
 from papermemory.corpus import ingest_markdown as ingest_markdown_v2
 from papermemory.db import Store
-from papermemory.util import normalize_doi, slugify, strip_tex_comments, word_count
+from papermemory.util import normalize_doi, now_iso, slugify, strip_tex_comments, word_count
 
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".venv", "venv", ".tox", "figures", "qa_crops", "_work"}
 
@@ -133,6 +133,25 @@ def _outline_contributions(text: str) -> list[str]:
     return (preferred or fallback)[:8]
 
 
+MANUSCRIPT_NOTE_FILES = ("Journal_Paper_Outline.md", "review_protocol.md", "REVIEW.md")
+
+
+def manuscript_notes_text(root: Path, slug: str) -> str | None:
+    """The auto-generated note for a manuscript root, or None when no source file exists.
+
+    Shared with the dream pass so a stored note can be re-derived from the files
+    and compared, instead of being trusted forever.
+    """
+    notes = []
+    for name in MANUSCRIPT_NOTE_FILES:
+        path = Path(root) / name
+        if path.exists():
+            notes.append(path.read_text(encoding="utf-8", errors="replace")[:4000])
+    if not notes:
+        return None
+    return f"Manuscript {slug} notes:\n" + "\n---\n".join(notes)[:3500]
+
+
 def ingest_manuscript(store: Store, root: Path, *, slug: str | None = None) -> dict[str, Any]:
     root = root.resolve()
     readme = ""
@@ -190,19 +209,28 @@ def ingest_manuscript(store: Store, root: Path, *, slug: str | None = None) -> d
     contributions = _outline_contributions(outline_text or readme)
     if contributions:
         store.replace_contributions(ms["id"], contributions[:8])
-    notes = []
-    for name in ("Journal_Paper_Outline.md", "review_protocol.md", "REVIEW.md"):
-        path = root / name
-        if path.exists():
-            notes.append(path.read_text(encoding="utf-8", errors="replace")[:4000])
-    if notes:
-        store.remember(
-            f"Manuscript {slug} notes:\n" + "\n---\n".join(notes)[:3500],
+    notes_text = manuscript_notes_text(root, slug)
+    if notes_text:
+        previous = store.conn.execute(
+            """SELECT id FROM observations WHERE manuscript_id=? AND tier='episodic'
+               AND superseded_by IS NULL AND content LIKE ?""",
+            (ms["id"], f"Manuscript {slug} notes:%"),
+        ).fetchall()
+        fresh = store.remember(
+            notes_text,
             concepts=[slug, "manuscript", "outline"],
             project_id=slug,
             manuscript_id=ms["id"],
             tier="episodic",
         )
+        # Re-ingesting a manuscript replaces its auto-generated notes instead of
+        # stacking a near-identical copy each time (the old copies stay as history).
+        for row in previous:
+            store.conn.execute(
+                "UPDATE observations SET status='superseded', superseded_by=?, updated_at=? WHERE id=?",
+                (fresh["id"], now_iso(), row["id"]),
+            )
+        store.conn.commit()
     return {
         "manuscript": store.get_manuscript(slug),
         "papers": len(bib_papers),

@@ -50,7 +50,10 @@ MUTATORS = {
     "add_lesson": "LESSON_WRITE",
 }
 
-NON_SEMANTIC = {"get_paper": "access_count telemetry only"}
+NON_SEMANTIC = {
+    "get_paper": "access_count telemetry only",
+    "touch_observations": "access_count telemetry only",
+}
 
 LEGACY_OP_MAP = {
     "paper_create": "INGEST",

@@ -703,6 +703,28 @@ class Store:
         self.conn.commit()
         return dict(self.conn.execute("SELECT * FROM observations WHERE id=?", (oid,)).fetchone())
 
+    def touch_observations(self, ids: Iterable[str]) -> None:
+        """Count a deliberate lookup of these observations (search hits, not recap).
+
+        Best effort and not a semantic change, so it emits no event; a locked or
+        read-only database must never break a search.
+        """
+        ids = [i for i in dict.fromkeys(ids) if i]
+        if not ids:
+            return
+        try:
+            marks = ",".join("?" for _ in ids)
+            self.conn.execute(
+                f"UPDATE observations SET access_count=COALESCE(access_count,0)+1, accessed_at=? WHERE id IN ({marks})",
+                [now_iso(), *ids],
+            )
+            self.conn.commit()
+        except Exception:
+            try:
+                self.conn.rollback()
+            except Exception:
+                pass
+
     def add_lesson(self, content: str, concepts: Iterable[str] | None = None, project_id: str | None = None) -> dict[str, Any]:
         lid = new_id("les")
         concepts_list = [c.strip().lower() for c in (concepts or []) if c and c.strip()]
