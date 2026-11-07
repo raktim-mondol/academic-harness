@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **774 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **790 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -23,9 +23,10 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | First-party, distilled from Gottweis et al. / Ghareeb et al. 2026 | 1 skill | `generating-scientific-hypotheses` — literature-grounded hypothesis generation: search-checked novelty, ranked falsifiable cards (see [NOTICE](../NOTICE)) |
 | [`Paper2Agent`](https://github.com/jmiao24/Paper2Agent) | 3 vendored skills | `paper2agent` (router), `paper2skill`, and `paper2mcp` — turn a paper and/or its code repo into a reviewed paper skill and a tested FastMCP server. See [Paper agents](PAPERS.md#paper-agents-paper2agent) |
 | [`Supervisor-Skills`](https://github.com/HKUSTDial/Supervisor-Skills) | 12 research-lifecycle skills | Idea evaluation, paper planning and drafting, polishing, figure design, Draw.io reconstruction, pre-submission review, rebuttal guidance, deep research, benchmark papers, and the Vibe Research workflow. Licences are mixed: six CC BY 4.0, five CC BY-NC-SA 4.0 (non-commercial), one MIT — see [NOTICE](../NOTICE) |
+| [`AER-Skills`](https://github.com/brycewang-stanford/AER-Skills) | 16 vendored skills (MIT) | `aer-skills` (router, plus shared docs, examples and templates) and 15 `aer-*` sub-skills covering the AER / AER:Insights / AEJ manuscript lifecycle: topic selection, causal identification (DiD, IV, RDD, SCM, shift-share), pre-registration, robustness, drafting, AER-style tables, consistency audit, referee simulation, AEA replication deposits, submission preflight, and R&R rebuttals. Economics-specific; for other fields use `causal-inference-scientist` or the writing skills |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 774.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 790.
 
 ## Workflow and tool skills
 

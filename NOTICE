@@ -137,6 +137,19 @@ added at the top of `SKILL.md` (paper-first PNG/SVG export, skip website
 brand onboarding unless asked, `uv run python`); the rest of the skill is
 unmodified.
 
+The `aer-skills` skill and its fifteen `aer-*` sub-skills (`skills/aer-skills`,
+`skills/aer-workflow`, `skills/aer-identification`, and the rest) are vendored
+from `brycewang-stanford/AER-Skills` (MIT License) —
+https://github.com/brycewang-stanford/AER-Skills. That repository is the one
+first-party MIT subset of the Auto-Empirical-Research-Skills catalog; every
+other collection in that catalog is CC BY-SA 4.0 and nothing from them is
+included. `aer-skills/SKILL.md` is a new condensed router; the shared `docs/`,
+`examples/`, `templates/`, `assets/`, `scripts/` and `references.bib` stay in
+`skills/aer-skills/` with that project's `LICENSE`. The fifteen sub-skills were
+moved to top-level skill folders because DSH's skill catalog is one directory
+deep, and each received a short mapping note after its frontmatter pointing at
+the shared folder; the rest of each skill is unmodified.
+
 The `paper2agent` skill (`skills/paper2agent`) is vendored from the
 open-source `jmiao24/Paper2Agent` project (MIT License) —
 https://github.com/jmiao24/Paper2Agent, commit

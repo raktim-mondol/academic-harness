@@ -31,6 +31,16 @@ Adapted from the house style in Chen Liu's [figures4papers](https://github.com/C
 
 For paper-level figure strategy and a design audit before rendering, load `figure-designer`. To reconstruct a raster reference as editable Draw.io, load `drawio-reconstruction`. This skill remains the renderer for real data.
 
+## References
+
+Load these only when the task needs them:
+
+- [references/api.md](references/api.md) — full signatures for `publication_figure.py`.
+- [references/common-patterns.md](references/common-patterns.md) — copy-pasteable layout and encoding patterns.
+- [references/tutorials.md](references/tutorials.md) — end-to-end worked figures.
+- [references/design-theory.md](references/design-theory.md) — why the house style looks this way.
+- [references/demos.md](references/demos.md) — upstream `figure_*` projects to browse as read-only examples.
+
 ## Mapping onto this plugin
 
 1. Copy `scripts/publication_figure.py` into the workspace next to the figure script (e.g. `figures/publication_figure.py`), or import it by path.

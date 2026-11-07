@@ -2,6 +2,11 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+- **AER-Skills for economics manuscripts.** Vendored the MIT-licensed [AER-Skills](https://github.com/brycewang-stanford/AER-Skills) stack: an `aer-skills` router and fifteen `aer-*` sub-skills (topic selection, identification, pre-registration, robustness, drafting, tables, consistency audit, referee simulation, replication deposit, submission preflight, rebuttal), with the shared docs, examples and templates in `skills/aer-skills/`. The sub-skills are top-level skills so the `skill` tool can load them. Skill count 774 to 790. Nothing from the CC BY-SA parts of the parent catalog is included.
+- **`scientific-figure-making` references.** Added `api.md`, `common-patterns.md`, `tutorials.md`, `design-theory.md` and `demos.md`, linked from the skill. Written for this plugin; nothing is copied from the CC BY-NC `figures4papers` repository.
+
 ## 0.46.0
 
 - **Jev source routing for `literature_search`.** With a TypeSafe key, [Jev](https://docs.typesafe.ai) chooses which domain sources (PubMed, arXiv, bioRxiv/medRxiv, INSPIRE, and ADS when keyed) to add to OpenAlex and Semantic Scholar, instead of keyword regexes. On objective labels it routes 116 of 120 PubMed-derived queries to PubMed (rules: 48), 97% of arXiv-hosted papers to arXiv (rules: 18%), and routes non-English queries (tried: Spanish, French, German, Chinese, Japanese) that the keyword rules miss entirely. It never selects keyed or explicit-only sources. See [Search](SEARCH.md#jev-source-routing) for the policy, evaluation, and its limits.
