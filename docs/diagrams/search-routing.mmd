@@ -10,7 +10,7 @@ flowchart TD
   integrity --> next
   known -->|no| need{Literature, venue, or web?}
 
-  need -->|literature| router[literature_search router]
+  need -->|literature| router[literature_search router<br/>Jev picks sources and reorders<br/>see Jev routing diagram]
   router --> openalex[OpenAlex]
   router --> s2[Semantic Scholar]
   router --> pubmed[PubMed / Europe PMC]

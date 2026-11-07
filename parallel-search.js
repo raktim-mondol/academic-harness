@@ -10,6 +10,7 @@
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
+import { fromParallelResult } from './search-normalize.js'
 
 const API_URL = 'https://api.parallel.ai/v1/search'
 const MODES = ['turbo', 'fast', 'basic', 'advanced']
@@ -90,6 +91,26 @@ export async function runParallelSearch(args, { signal = null } = {}) {
           ? result.data
           : {}
         return { ...data, mode }
+}
+
+/**
+ * Parallel as a `literature_search` source. Parallel is a web index and returns no DOI
+ * field, so only rows that are plausibly papers are kept (a DOI, arXiv or PubMed id in
+ * the URL, or a scholarly host) and their identifiers come from the URL. `dropped`
+ * counts the news, blog and product pages left out.
+ */
+export async function runParallelPapers({ query, limit = 10 } = {}, { signal = null } = {}) {
+  const text = String(query || '').trim()
+  if (!text) return { error: 'query is required' }
+  const reply = await runParallelSearch({
+    objective: `Find peer-reviewed research papers and preprints on: ${text}`,
+    search_queries: [text],
+    mode: 'basic',
+  }, { signal })
+  if (reply.error) return reply
+  const rows = Array.isArray(reply.results) ? reply.results : []
+  const papers = rows.map(fromParallelResult).filter(Boolean)
+  return { results: papers.slice(0, Math.max(1, Number(limit) || 10)), dropped: rows.length - papers.length }
 }
 
 export const name = 'academic-harness-parallel-search'

@@ -98,6 +98,16 @@ export async function runOpenAlexSearch(args, exec) {
   }))
   if (!result.ok) {
     if (result.error === 'aborted') return { error: 'request cancelled' }
+    if (result.cooldown) {
+      const hours = result.retryAfterMs / 3_600_000
+      const wait = hours >= 1 ? `${hours.toFixed(1)} h` : `${Math.ceil(result.retryAfterMs / 60_000)} min`
+      return {
+        error: `OpenAlex rate limit reached${apiKey ? '' : ' (keyless daily budget)'}; not called again for ${wait}${apiKey ? '' : '. Add OPENALEX_API_KEY in Settings to lift it'}`,
+        status: result.status,
+        code: 'rate_limited',
+        retry_after_s: Math.round(result.retryAfterMs / 1000),
+      }
+    }
     return { error: `OpenAlex API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
   }
   const data = result.data || {}

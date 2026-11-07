@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import {
   RateLimiter,
+  cooldownFailure,
+  cooldownRemainingMs,
   fetchJson,
   getLimiter,
   resetLimitersForTests,
@@ -101,6 +103,81 @@ globalThis.fetch = async () => new Response(new ReadableStream({
 const streamedTooBig = await fetchJson('https://example.invalid/search', { maxBytes: 5, retries: 0 })
 assert.equal(streamedTooBig.ok, false)
 assert.match(streamedTooBig.error, /exceeds/)
+
+// A quota that resets in hours is not retried (waiting the 30 s cap cannot help) and is not
+// asked again: later calls fail instantly without a request. A different credential is not blocked.
+resetLimitersForTests()
+let quotaCalls = 0
+globalThis.fetch = async (url) => {
+  quotaCalls += 1
+  if (String(url).includes('api_key=GOOD')) {
+    return new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  return new Response(JSON.stringify({ message: 'budget exhausted' }), {
+    status: 429,
+    headers: { 'content-type': 'application/json', 'retry-after': '70384' },
+  })
+}
+const quotaStart = Date.now()
+const quotaFirst = await fetchJson('https://quota.invalid/works?search=a', { retries: 2 })
+assert.equal(quotaFirst.ok, false)
+assert.equal(quotaFirst.cooldown, true)
+assert.equal(quotaFirst.retryAfterMs, 70384000)
+assert.equal(quotaCalls, 1, 'a multi-hour Retry-After must not be retried')
+assert.ok(Date.now() - quotaStart < 2000, 'must fail fast, not sleep through retries')
+const quotaSecond = await fetchJson('https://quota.invalid/works?search=b', { retries: 2 })
+assert.equal(quotaSecond.cooldown, true)
+assert.equal(quotaCalls, 1, 'a provider in cooldown must not be called again')
+assert.ok(cooldownRemainingMs('https://quota.invalid/works?search=c') > 70_000_000)
+const withKey = await fetchJson('https://quota.invalid/works?search=a&api_key=GOOD', { retries: 2 })
+assert.equal(withKey.ok, true, 'entering a key lifts a keyless cooldown')
+assert.equal(quotaCalls, 2)
+// a short Retry-After is still retried as before
+resetLimitersForTests()
+let shortCalls = 0
+globalThis.fetch = async () => {
+  shortCalls += 1
+  return shortCalls === 1
+    ? new Response('{}', { status: 429, headers: { 'retry-after': '0' } })
+    : new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } })
+}
+assert.equal((await fetchJson('https://short.invalid/x', { retries: 1 })).ok, true)
+assert.equal(shortCalls, 2)
+
+// Two consecutive transient failures open a short cooldown; a success closes the streak;
+// a lone failure never trips it.
+resetLimitersForTests()
+let downCalls = 0
+globalThis.fetch = async () => { downCalls += 1; return new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } }) }
+await fetchJson('https://down.invalid/q?x=1', { retries: 0 })
+assert.equal(downCalls, 1)
+await fetchJson('https://down.invalid/q?x=2', { retries: 0 })
+assert.equal(downCalls, 2)
+const skipped = await fetchJson('https://down.invalid/q?x=3', { retries: 0 })
+assert.equal(downCalls, 2, 'after two failures in a row the provider is not called')
+assert.equal(skipped.cooldown, true)
+assert.match(cooldownFailure('Down', skipped).error, /Down is rate limiting or unavailable; not called again for 1\d\d s/)
+assert.equal(cooldownFailure('Down', { ok: false }), null)
+resetLimitersForTests()
+let flaky = 0
+globalThis.fetch = async () => { flaky += 1; return flaky % 2 ? new Response('{}', { status: 503 }) : new Response('{"ok":true}', { status: 200, headers: { 'content-type': 'application/json' } }) }
+for (let i = 0; i < 6; i += 1) await fetchJson(`https://flaky.invalid/q?x=${i}`, { retries: 0 })
+assert.equal(flaky, 6, 'alternating failures and successes never open the cooldown')
+// "slow down" (429) counts for half: two in a row do not pause a provider, four do
+resetLimitersForTests()
+let slow = 0
+globalThis.fetch = async () => { slow += 1; return new Response('{}', { status: 429 }) }
+for (let i = 0; i < 3; i += 1) await fetchJson(`https://slow.invalid/q?x=${i}`, { retries: 0 })
+assert.equal(slow, 3, 'three 429s in a row still call the provider')
+await fetchJson('https://slow.invalid/q?x=4', { retries: 0 })
+await fetchJson('https://slow.invalid/q?x=5', { retries: 0 })
+assert.equal(slow, 4, 'the fourth 429 in a row pauses it')
+// a permanent error (404) is not a streak
+resetLimitersForTests()
+let notFound = 0
+globalThis.fetch = async () => { notFound += 1; return new Response('{}', { status: 404 }) }
+for (let i = 0; i < 4; i += 1) await fetchJson(`https://nf.invalid/q?x=${i}`, { retries: 0 })
+assert.equal(notFound, 4)
 
 globalThis.fetch = originalFetch
 console.log('Search rate limiting OK')

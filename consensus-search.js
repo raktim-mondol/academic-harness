@@ -8,6 +8,8 @@
  */
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { getLimiter } from './search-http.js'
+import { fromConsensusResult } from './search-normalize.js'
 
 const STUDY_TYPES = [
   'bench experiment', 'case report', 'case study', 'case-control study', 'cohort study',
@@ -72,6 +74,37 @@ function render(value) {
   return [{ type: 'text', text: lines.join('\n\n') }]
 }
 
+/** One Consensus search. Shared by the `consensus_search` tool and `literature_search`. */
+export async function runConsensusSearch(args, { signal } = {}) {
+  const key = await resolveEnv('CONSENSUS_API_KEY')
+  if (!key) {
+    return { error: 'CONSENSUS_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).', code: 'key_missing' }
+  }
+  const params = buildQuery(args)
+  const res = await fetch(`${API_URL}?${params}`, { headers: { 'x-api-key': key }, signal })
+  const body = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    return { error: `Consensus API error ${res.status}`, status: res.status, detail: body.detail ?? body }
+  }
+  return body
+}
+
+/** Consensus as a `literature_search` source: normalised paper records, DOI on each. */
+export async function runConsensusPapers({ query, limit = 10, yearMin, yearMax, openAccessOnly = false } = {}, { signal } = {}) {
+  const body = await getLimiter('consensus', { minIntervalMs: 1000 }).run(() => runConsensusSearch({
+    query,
+    page_size: Math.max(1, Math.min(Number(limit) || 10, 50)),
+    ...(yearMin != null ? { year_min: yearMin } : {}),
+    ...(yearMax != null ? { year_max: yearMax } : {}),
+    ...(openAccessOnly ? { open_access: true } : {}),
+  }, { signal }))
+  if (body.error) return body
+  const results = (Array.isArray(body.results) ? body.results : []).map(fromConsensusResult).filter((paper) => paper && paper.title)
+  // the server already applied open_access, and Consensus rows carry no per-paper flag
+  if (openAccessOnly) for (const paper of results) paper.oa_status = paper.oa_status || 'open'
+  return { results }
+}
+
 export const name = 'academic-harness-consensus-search'
 export const inject = ['tools']
 
@@ -126,17 +159,7 @@ export function apply(ctx) {
       render: (_args, value) => render(value),
     },
     async execute(args) {
-      const key = await resolveEnv('CONSENSUS_API_KEY')
-      if (!key) {
-        return { error: 'CONSENSUS_API_KEY is not set (Settings -> Academic Harness API keys, or the matching env var).' }
-      }
-      const params = buildQuery(args)
-      const res = await fetch(`${API_URL}?${params}`, { headers: { 'x-api-key': key } })
-      const body = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        return { error: `Consensus API error ${res.status}`, status: res.status, detail: body.detail ?? body }
-      }
-      return body
+      return runConsensusSearch(args)
     },
     presentCall(args) {
       return { card: 'generic', title: `Consensus: ${args.query ?? ''}`, kind: 'search' }

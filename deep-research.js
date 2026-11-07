@@ -31,7 +31,7 @@ import {
 import { csvCell, ensureDir, exportText } from './ledger-kit.js'
 import { resolveEnv } from './credential-env.js'
 import { convertPdfMarkdown } from './pdf-to-markdown.js'
-import { chooseSources, runSource } from './literature-search.js'
+import { routeSources, runSource } from './literature-search.js'
 import { mergeRanked } from './search-normalize.js'
 import { fetchPdf, resolvePdfSources } from './paper-download.js'
 import { ingestConvertedMarkdown, projectSlugFromCwd, quoteCheck } from './papermemory-cli.js'
@@ -112,7 +112,9 @@ async function frameBrief({ llm, query, hint }) {
 function buildSearch(exec, { sources, perSource, signal, email, failures = [] }) {
   const searchFailures = failures
   return async function search({ query, perSource: override = null }) {
-    const chosen = sources ?? chooseSources(query, null)
+    // Explicit sources win; otherwise route per query (Jev when keyed, keyword
+    // rules otherwise). routeSources never throws for auto and caches repeats.
+    const chosen = sources ?? (await routeSources(query, null, { signal })).sources
     const limit = override ?? perSource
     const groups = await Promise.all(chosen.map(async (source) => {
       try {

@@ -9,7 +9,7 @@
  */
 import { defineTool } from 'ah-dsh-tools'
 import { exportText, mdCell, nowIso, shortHash } from './ledger-kit.js'
-import { chooseSources, runSource } from './literature-search.js'
+import { chooseSources, routeSources, runSource } from './literature-search.js'
 import { mergePapers } from './search-normalize.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 import {
@@ -117,7 +117,18 @@ export async function runLiteratureWatch(args, exec, deps = {}) {
       if (args[field] !== undefined) input[field] = args[field]
     }
     if (typeof input.sources === 'string') input.sources = input.sources.split(',').map((s) => s.trim()).filter(Boolean)
-    return { action, watch: await addWatch({ cwd, input, recordedBy }) }
+    // A saved watch needs a stable source list, or its seen-ledger stops being
+    // comparable between runs. When Jev is available, route once now and freeze the
+    // answer; otherwise leave it unset so the keyword rules keep applying.
+    let routing
+    if (!(Array.isArray(input.sources) && input.sources.length) && typeof input.query === 'string' && input.query.trim()) {
+      const routed = await (deps.routeSources || routeSources)(input.query, null, { signal: exec?.signal })
+      if (routed.routing.engine === 'jev') {
+        input.sources = routed.sources
+        routing = routed.routing
+      }
+    }
+    return { action, watch: await addWatch({ cwd, input, recordedBy }), ...(routing ? { routing } : {}) }
   }
   if (action === 'remove') return { action, removed: await removeWatch({ cwd, ref: args.watch || args.name, recordedBy }) }
   if (action === 'list') return { action, watches: listWatches(cwd) }

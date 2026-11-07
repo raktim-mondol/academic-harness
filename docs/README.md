@@ -49,11 +49,14 @@ All figures are Mermaid sources in [`diagrams/`](diagrams/) rendered to SVG with
 npm run docs:diagrams
 ```
 
+The Jev routing figure also ships as a PNG for viewers that do not render SVG: `inkscape docs/assets/diagrams/jev-routing.svg --export-type=png --export-filename=docs/assets/diagrams/jev-routing.png --export-width=2094 --export-background=white`.
+
 - [Architecture](assets/diagrams/architecture.svg)
 - [Capability map](assets/diagrams/capability-map.svg)
 - [Request lifecycle](assets/diagrams/request-lifecycle.svg)
 - [Install flow](assets/diagrams/install-flow.svg)
 - [Search routing](assets/diagrams/search-routing.svg)
+- [Jev routing](assets/diagrams/jev-routing.png) (SVG: [jev-routing.svg](assets/diagrams/jev-routing.svg))
 - [Paper pipeline](assets/diagrams/paper-pipeline.svg)
 - [Writing loop](assets/diagrams/writing-loop.svg)
 - [Review ledger](assets/diagrams/review-ledger.svg)

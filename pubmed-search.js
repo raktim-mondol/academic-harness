@@ -8,7 +8,7 @@
  */
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
-import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
+import { cooldownFailure, fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import {
   fromEuropePmcResult,
   fromNcbiSummary,
@@ -53,6 +53,8 @@ async function searchEuropePmc(args, exec) {
     headers: { 'User-Agent': searchUserAgent() },
   }))
   if (!result.ok) {
+    const paused = cooldownFailure('Europe PMC', result)
+    if (paused) return paused
     return { error: `Europe PMC API error ${result.status}`, status: result.status, detail: result.detail ?? result.error }
   }
   const data = result.data || {}

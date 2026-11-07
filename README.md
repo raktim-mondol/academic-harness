@@ -80,7 +80,7 @@ Full instructions, troubleshooting, and the "one DSH surface at a time" rule are
 
 | Tool | What it does |
 |---|---|
-| `literature_search` | One-shot multi-source router with RRF fusion and cross-provider dedupe |
+| `literature_search` | One-shot multi-source search: Jev (TypeSafe) picks the sources and reorders the results, merged by DOI with RRF fusion; keyword rules when no key is set |
 | `journal_search` | Venue discovery and metrics across OpenAlex, DOAJ, and Crossref; optional CiteScore/SJR/SNIP and JCR JIF/JCI |
 | `paper_get` | Merge one paper across OpenAlex, S2, Crossref, Europe PMC, and arXiv; OA URL and canonical BibTeX |
 | `paper_context` | Focus-ranked sections/snippets from S2, arXiv HTML, PMC BioC/PubTator3, optional publisher TDM, and OA PDF |
@@ -93,6 +93,31 @@ Full instructions, troubleshooting, and the "one DSH surface at a time" rule are
 | `crossref_lookup` | Canonical DOI metadata; polite pool via `CROSSREF_MAILTO` |
 | `domain_search` | Source-specific bioRxiv/ACL/INSPIRE/ADS/Scopus/WoS/Wikidata actions |
 | `database_catalog` | Source/key/capability catalog; reports key fields only as configured/not set |
+
+### How `literature_search` picks sources and orders results
+
+![How literature_search uses Jev](docs/assets/diagrams/jev-routing.png)
+
+[Jev](https://docs.typesafe.ai) is a small, fast TypeSafe model that answers yes/no questions about text. With a `TYPESAFE_API_KEY` (Settings → Academic Harness API keys; optional) it does two jobs in `literature_search`; without one, keyword rules pick the sources and results keep the fused order.
+
+1. **Routing.** One request, about 0.2 s, reads the query in any language. If it is a topic search, Jev adds the field sources (PubMed, arXiv, INSPIRE, bioRxiv, ADS with a token) to OpenAlex and Semantic Scholar. If it is really something else (a retraction check, one named paper, clinical trials, datasets, patents, grants, a venue, news), only OpenAlex and Semantic Scholar run and the result names the better tool in `suggested_tools`, so no calls are wasted on PubMed or arXiv.
+2. **Reranking.** After the sources are merged (same DOI is one paper; different DOIs are never merged), Jev scores the top 30 for relevance to the query in one request, about 0.4 s, and the best matches go first. Each paper carries a `relevance` value. **With a Jev key the rerank always runs; without one (or if Jev is down) the list keeps the plain fused source order.** Cohere Rerank is available only if you ask for it with `rerank: "cohere"` and a `COHERE_API_KEY`: on the same test data it was level with Jev on SciFact and behind it on NFCorpus, so it is not used automatically.
+
+Both steps fall back to the old behaviour if Jev is slow or down, and the result says so. `routing: "rules"` sends nothing to TypeSafe; `rerank: "off"` keeps the fused order. Query text and public abstracts go to `api.typesafe.ai` (Jev), or to `api.cohere.com` only when you choose `rerank: "cohere"`.
+
+What was measured (details and limits in [Search](docs/SEARCH.md#jev-source-routing)):
+
+| Test | Without Jev | With Jev |
+|---|---|---|
+| Right field sources chosen (55 topic queries) | 47% | 96% |
+| Wasted extra-source calls on 40 non-paper queries | 15 | 2 |
+| Recognises what is being asked (148 blind queries) | 40% | 95% |
+| Same, non-English queries (27) | 4% | 100% |
+| Result order, nDCG@10, 31 live queries rated blind by a separate model | 0.79 | 0.93 |
+| Result order, nDCG@10, human-labelled SciFact / NFCorpus | 0.66 / 0.31 | 0.76 / 0.37 |
+| Jev vs Cohere Rerank, nDCG@10, 100 queries each (same BM25 top-30 pools: BM25 0.724 / 0.342) | Cohere 0.786 / 0.372 | Jev 0.803 / 0.395 |
+
+Source calls are also protected against slow providers: each source has a time limit, a source that fails twice in a row is paused for 2 minutes, and a provider whose daily quota is spent is not called again until it resets. Adding `OPENALEX_API_KEY` and `S2_API_KEY` in Settings keeps the two default sources reliable.
 
 Free sources need no key. ADS, Scopus, Web of Science, Springer, IEEE, and publisher TDM tiers use their own keys and are implemented but intentionally not live-tested here. Web and AI-native discovery remains available through `consensus_search`, `parallel_search`/`parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, and `futurehouse_agent`, plus the Parallel, Firecrawl, and Scite MCP connectors. See [Search](docs/SEARCH.md) for routing and [Configuration](docs/CONFIGURATION.md) for the key fields.
 

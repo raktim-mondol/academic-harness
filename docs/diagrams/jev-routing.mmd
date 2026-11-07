@@ -1,0 +1,30 @@
+%%build: {"fontSize": 16, "padding": 24, "maxWidth": 900}
+flowchart TD
+  q["<b>1. You ask</b><br/>literature_search: any language"] --> key{"TypeSafe key<br/>set and Jev up?"}
+  key -->|"no, or Jev<br/>too slow"| rules["Keyword rules pick the sources<br/>(the old way, still works)"]
+  key -->|yes| jev["<b>2. Jev reads the query</b><br/>one request, about 0.2 s<br/>what is being asked? which field?"]
+  jev --> gate{"<b>3. Is it a topic search?</b>"}
+
+  gate -->|"No: a retraction, one named paper,<br/>trials, datasets, patents, grants,<br/>a venue, or news"| hint["<b>Hint mode</b><br/>search only OpenAlex + Semantic Scholar<br/>and name the better tool"]
+  gate -->|"Yes: a topic or a claim"| fields["<b>4. Add the right field sources</b><br/>biology: PubMed, bioRxiv<br/>computing, physics, maths: arXiv<br/>particle physics: INSPIRE<br/>astronomy: ADS (with token)"]
+  rules --> fields
+
+  hint --> tool["Better tool suggested<br/>trials: clinicaltrials<br/>one paper: paper_get<br/>retraction: integrity_check<br/>news: Parallel, Exa, Tavily, Brave"]
+
+  fields --> run["<b>5. Search all chosen sources at once</b><br/>each has a time limit<br/>a source that keeps failing is paused 2 min"]
+
+  run --> merge["<b>6. Merge</b><br/>same DOI = one paper<br/>(different DOIs are never merged)<br/>then rank by agreement across sources"]
+  merge --> rerank["<b>7. Jev reranks the top 30</b><br/>one request, about 0.4 s<br/>best match for your query goes first<br/>(no Jev key or Jev down: keep the fused order)"]
+  rerank --> out["<b>Result</b><br/>papers, a routing report,<br/>and a suggested tool if any<br/>(a claim also gets Scite or Consensus)"]
+  tool --> out
+
+  explicit["You can also list sources yourself<br/>Consensus, Scite, Firecrawl, Parallel, Crossref ...<br/>routing is skipped, merge and rerank still run"] -.-> run
+
+  classDef step fill:#ecfdf5,stroke:#059669,color:#064e3b
+  classDef decision fill:#eef2ff,stroke:#6366f1,color:#312e81
+  classDef jevstep fill:#fff7ed,stroke:#f97316,color:#7c2d12
+  classDef plain fill:#f8fafc,stroke:#94a3b8,color:#0f172a
+  class q,out step
+  class key,gate decision
+  class jev,rerank jevstep
+  class rules,hint,fields,run,merge,tool,explicit plain
