@@ -238,6 +238,7 @@
     "futurehouse-agent.js",
     "literature-search.js",
     "jev-router.js",
+    "bm25-rank.js",
     "cohere-rerank.js",
     "mcp-http.js",
     "firecrawl-papers.js",

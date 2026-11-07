@@ -6,6 +6,8 @@ import {
   askJev, borderlineSources, buildQuestions, decideSources, gatingIntents, GATE_THRESHOLD, JEV_MODEL, JEV_URL, resetJevForTests,
   ROUTE_THRESHOLD, suggestTools, rerankWithJev, orderByRelevance, RERANK_POOL,
 } from '../jev-router.js'
+import { rankWithBm25, tokenize } from '../bm25-rank.js'
+import { orderLocally } from '../literature-search.js'
 import { rerankWithCohere, resetCohereForTests, COHERE_RERANK_URL } from '../cohere-rerank.js'
 import { chooseSources, preprintTopic, routeSources } from '../literature-search.js'
 import { runLiteratureWatch } from '../literature-watch.js'
@@ -16,6 +18,7 @@ const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),
 assert.ok(pkg.files.includes('jev-router.js'), 'jev-router.js is imported by literature-search.js, so it must ship')
 assert.ok(pkg.files.includes('scripts'), 'the routing fixture ships with scripts/')
 assert.ok(pkg.files.includes('cohere-rerank.js'), 'cohere-rerank.js is imported by literature-search.js, so it must ship')
+assert.ok(pkg.files.includes('bm25-rank.js'), 'bm25-rank.js is imported by literature-search.js, so it must ship')
 
 const realFetch = globalThis.fetch
 for (const key of ['TYPESAFE_API_KEY', 'ADS_API_TOKEN', 'PATENTSVIEW_API_KEY', 'CONSENSUS_API_KEY', 'ELICIT_API_KEY']) delete process.env[key]
@@ -332,7 +335,7 @@ const fresh = () => { resetJevForTests(); resetLimitersForTests(); calls.length 
   const tools = []
   ;(await import('../literature-search.js')).apply({ tools: { register: (t) => tools.push(t) } })
   const tool = tools[0]
-  assert.deepEqual(await tool.execute({ query: 'x', rerank: 'maybe' }, {}), { error: 'rerank must be "auto", "off", "jev" or "cohere"' })
+  assert.deepEqual(await tool.execute({ query: 'x', rerank: 'maybe' }, {}), { error: 'rerank must be "auto", "off", "jev", "cohere" or "bm25"' })
   const works = Array.from({ length: 8 }, (_, i) => ({ id: `https://openalex.org/W${i + 1}`, doi: `https://doi.org/10.1000/x${i + 1}`, title: `Paper ${i + 1}`, publication_year: 2020 }))
   let rerankCalls = 0
   let rerankMode = 'ok'
@@ -498,6 +501,88 @@ const fresh = () => { resetJevForTests(); resetLimitersForTests(); calls.length 
   await tool.execute({ query: 'x topic', routing: 'rules' }, {})
   assert.equal(seen.jev + seen.cohere, 0)
   delete process.env.COHERE_API_KEY; delete process.env.TYPESAFE_API_KEY
+}
+
+/* ---------------------------------------------------------------- local BM25 fallback */
+{
+  assert.deepEqual(tokenize('Effects of the Vitamin-D supplementation'), ['effect', 'vitamin', 'supplementation'])
+  const cands = [
+    { title: 'Cooking pasta', abstract: 'boil water' },
+    { title: 'Vitamin D and bone density', abstract: 'postmenopausal women supplementation trial' },
+    { title: 'Bone cells', abstract: 'osteoclast' },
+  ]
+  const r = rankWithBm25('vitamin D supplementation bone density women', cands)
+  assert.equal(r.ok, true)
+  assert.equal(r.scores[0], 0)
+  assert.ok(r.scores[1] > r.scores[2] && r.scores[2] > 0)
+  assert.equal(rankWithBm25('the of', cands).reason, 'nothing_to_rank')
+  assert.equal(rankWithBm25('quark', cands).reason, 'no_term_overlap')
+  assert.equal(rankWithBm25('bone', []).reason, 'nothing_to_rank')
+
+  // fusion keeps the source order when BM25 has no opinion, and lets a strong lexical match move up
+  const pool = Array.from({ length: 6 }, (_, i) => ({ title: `Unrelated study ${i}`, abstract: '' }))
+  pool[5] = { title: 'Zebra finch song learning', abstract: 'zebra finch song learning in juveniles' }
+  const local = orderLocally('zebra finch song learning', pool)
+  assert.equal(local.ok, true)
+  // fusion is gentle: the lexical match climbs from 6th to 3rd, it does not jump the top two
+  assert.equal(local.ordered.findIndex((p) => p.title === 'Zebra finch song learning'), 2)
+  assert.deepEqual(local.ordered.filter((p) => p.title !== 'Zebra finch song learning').map((p) => p.title), pool.slice(0, 5).map((p) => p.title), 'the rest keep source order')
+  assert.equal(orderLocally('quark', pool).ok, false)
+}
+
+{
+  delete process.env.TYPESAFE_API_KEY; delete process.env.COHERE_API_KEY
+  const titles = ['Unrelated study A', 'Unrelated study B', 'Unrelated study C', 'Unrelated study D', 'Unrelated study E', 'Zebra finch song learning']
+  const works = titles.map((title, i) => ({ id: `https://openalex.org/W${i + 1}`, doi: `https://doi.org/10.1000/z${i + 1}`, title, publication_year: 2020, abstract_inverted_index: i === 5 ? { zebra: [0], finch: [1], song: [2], learning: [3] } : undefined }))
+  let network = 0
+  fresh()
+  const tools = []
+  ;(await import('../literature-search.js')).apply({ tools: { register: (t) => tools.push(t) } })
+  const tool = tools[0]
+  globalThis.fetch = async (url) => {
+    const u = String(url)
+    if (u === JEV_URL || u === COHERE_RERANK_URL) { network += 1; return new Response('{}', { status: 503, headers: { 'content-type': 'application/json' } }) }
+    return new Response(JSON.stringify({ meta: { count: 6 }, results: works }), { status: 200, headers: { 'content-type': 'application/json' } })
+  }
+  const run = (args) => tool.execute({ query: 'zebra finch song learning', sources: ['openalex'], ...args }, {})
+
+  // no keys: auto uses the local ranking, which calls nothing and carries no `relevance`
+  const auto = await run({})
+  assert.equal(auto.routing.rerank.engine, 'bm25')
+  assert.equal(auto.routing.rerank.model, 'bm25+fused')
+  assert.equal(auto.papers.findIndex((p) => p.title === 'Zebra finch song learning'), 2, 'moved up from 6th')
+  assert.equal(auto.papers[0].relevance, undefined)
+  assert.equal(network, 0)
+  assert.match(tool.output.render({}, auto)[0].text, /ranking: local BM25 fused with the source order over the top 6/)
+  // off keeps the plain fused order
+  const off = await run({ rerank: 'off' })
+  assert.equal(off.routing.rerank, undefined)
+  assert.equal(off.papers[0].title, 'Unrelated study A')
+  // routing=rules still allows the local ranking (nothing leaves the machine)
+  const rules = await run({ routing: 'rules' })
+  assert.equal(rules.routing.rerank.engine, 'bm25')
+  // a forced network engine without a key is reported, never swapped for BM25
+  const forced = await run({ rerank: 'jev' })
+  assert.equal(forced.routing.rerank.reason, 'no_key')
+  assert.equal(forced.papers[0].title, 'Unrelated study A')
+  // routing=rules with a forced network engine sends nothing and does not rerank
+  process.env.TYPESAFE_API_KEY = 'k-local'; fresh()
+  const rulesJev = await run({ routing: 'rules', rerank: 'jev' })
+  assert.equal(rulesJev.routing.rerank, undefined)
+  assert.equal(network, 0)
+  // Jev configured but failing: the local ranking takes over and says why
+  fresh()
+  const failing = await run({})
+  assert.equal(failing.routing.rerank.engine, 'bm25')
+  assert.deepEqual(failing.routing.rerank.fallback_from, { jev: 'http_503' })
+  assert.equal(failing.papers.findIndex((p) => p.title === 'Zebra finch song learning'), 2)
+  assert.match(tool.output.render({}, failing)[0].text, /jev skipped: http_503/)
+  // bm25 can be forced even with a Jev key, and then never calls Jev
+  network = 0; fresh()
+  const forcedLocal = await run({ rerank: 'bm25' })
+  assert.equal(forcedLocal.routing.rerank.engine, 'bm25')
+  assert.equal(network, 0)
+  delete process.env.TYPESAFE_API_KEY
 }
 
 /* ---------------------------------------------------------------- literature_watch add */

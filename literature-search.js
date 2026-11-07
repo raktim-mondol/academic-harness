@@ -28,6 +28,7 @@ import { runConsensusPapers } from './consensus-search.js'
 import { runFirecrawlPapers } from './firecrawl-papers.js'
 import { runParallelPapers } from './parallel-search.js'
 import { runSciteSearch } from './scite-search.js'
+import { rankWithBm25 } from './bm25-rank.js'
 import { rerankWithCohere } from './cohere-rerank.js'
 import { askJev, borderlineSources, decideSources, gatingIntents, HINT_KEYS, orderByRelevance, RERANK_POOL, rerankWithJev, suggestTools } from './jev-router.js'
 
@@ -287,7 +288,7 @@ function render(value) {
   if (value.routing?.rerank) {
     const k = value.routing.rerank
     bits.push(k.engine !== 'rrf'
-      ? `ranking: ${k.engine === 'cohere' ? 'Cohere' : 'Jev'} relevance over the top ${k.candidates} merged candidates (${k.ms} ms)${k.fallback_from ? `; ${Object.entries(k.fallback_from).map(([name, why]) => `${name} skipped: ${why}`).join(', ')}` : ''}`
+      ? `ranking: ${k.engine === 'bm25' ? 'local BM25 fused with the source order' : `${k.engine === 'cohere' ? 'Cohere' : 'Jev'} relevance`} over the top ${k.candidates} merged candidates (${k.ms} ms)${k.fallback_from ? `; ${Object.entries(k.fallback_from).map(([name, why]) => `${name} skipped: ${why}`).join(', ')}` : ''}`
       : `ranking: fused source ranking (rerank skipped: ${k.reason})`)
   }
   if (value.suggested_tools?.length) {
@@ -334,13 +335,33 @@ async function runWithDeadline(source, parentSignal, run) {
 
 /**
  * What `rerank: "auto"` may use: Jev when a TypeSafe key is set. With no key, or if Jev fails, the
- * fused source order stands. Cohere is opt-in only (`rerank: "cohere"`), never an automatic fallback.
+ * local fallback (BM25 fused with the source order, no network) runs instead. Cohere is opt-in only
+ * (`rerank: "cohere"`), never an automatic fallback.
  */
 export const RERANK_PREFERENCE = ['jev']
+const RRF_K = 60
+
+/**
+ * Local fallback: rank the candidates with BM25 over title + abstract, then fuse that ranking with
+ * the existing source order by reciprocal rank (k = 60). On 36 live merged lists rated blind this
+ * beat the plain source order; BM25 on its own did not, so the fusion is the whole point.
+ * Returns `{ ok, ordered }` (candidates in the new order) or `{ ok: false, reason }`.
+ */
+export function orderLocally(query, pool) {
+  const started = Date.now()
+  const lexical = rankWithBm25(query, pool)
+  if (!lexical.ok) return { ok: false, reason: lexical.reason }
+  const byBm25 = pool.map((_, i) => i).sort((a, b) => lexical.scores[b] - lexical.scores[a] || a - b)
+  const bm25Rank = new Map(byBm25.map((index, rank) => [index, rank]))
+  const fused = pool.map((paper, index) => ({ paper, index, score: 1 / (RRF_K + index) + 1 / (RRF_K + bm25Rank.get(index)) }))
+  fused.sort((a, b) => b.score - a.score || a.index - b.index)
+  return { ok: true, ordered: fused.map((entry) => entry.paper), ms: Date.now() - started }
+}
 const RERANK_KEYS = { jev: 'TYPESAFE_API_KEY', cohere: 'COHERE_API_KEY' }
 
-async function rerankCandidates(query, pool, { mode, signal }) {
-  const engines = RERANK_KEYS[mode] ? [mode] : RERANK_PREFERENCE
+async function rerankCandidates(query, pool, { mode, signal, localOnly = false }) {
+  if (mode === 'bm25') return localOutcome(query, pool, {}, false)
+  const engines = localOnly ? [] : RERANK_KEYS[mode] ? [mode] : RERANK_PREFERENCE
   const skipped = {}
   let attempted = false
   for (const engine of engines) {
@@ -357,7 +378,15 @@ async function rerankCandidates(query, pool, { mode, signal }) {
     if (ranked.ok) return { ok: true, engine, ranked, skipped }
     skipped[engine] = ranked.reason
   }
-  return { ok: false, attempted, reason: Object.values(skipped).at(-1), skipped }
+  // a forced engine never swaps; only auto falls back to the local ranking
+  if (RERANK_KEYS[mode]) return { ok: false, attempted, reason: Object.values(skipped).at(-1), skipped }
+  return localOutcome(query, pool, skipped, attempted)
+}
+
+function localOutcome(query, pool, skipped, attempted) {
+  const local = orderLocally(query, pool)
+  if (local.ok) return { ok: true, engine: 'bm25', ordered: local.ordered, ms: local.ms, skipped }
+  return { ok: false, attempted, reason: Object.values(skipped).at(-1) ?? local.reason, skipped }
 }
 
 /** Below this many merged candidates there is nothing worth reordering. */
@@ -370,7 +399,7 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'literature_search',
     description: [
-      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar and adds domain sources: with a TypeSafe key (TYPESAFE_API_KEY) Jev picks them from the query (non-English queries work) and the result lists `routing` and, when the query really asks for trials, datasets, patents, grants, a venue, one specific paper, news/product/regulation material, whether a claim is supported, or a retraction check, `suggested_tools`; without a key, or if Jev is slow or down, keyword rules pick them. The rules add PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, DOAJ, publisher Crossref members, Scopus, Web of Science, Springer, and IEEE are also available explicitly, as are the keyed `consensus` (CONSENSUS_API_KEY), `scite` (SCITE_API_KEY; adds supporting/contrasting citation counts), `firecrawl` (FIRECRAWL_API_KEY; semantic search over PubMed, bioRxiv, medRxiv and arXiv) and `parallel` (PARALLEL_API_KEY; web results filtered to papers, with the DOI read from the URL when it has one). Results from every source are merged by identifier, so a paper found by several appears once. With a TypeSafe key (Jev) the top 30 merged candidates are then scored for relevance to the query in one request and listed in that order (each paper carries `relevance`); without a key, or if Jev is down, the fused order stands. `rerank: "off"` keeps the fused order; `rerank: "cohere"` uses Cohere Rerank instead (COHERE_API_KEY).',
+      'One-shot multi-source literature discovery. Auto mode runs OpenAlex + Semantic Scholar and adds domain sources: with a TypeSafe key (TYPESAFE_API_KEY) Jev picks them from the query (non-English queries work) and the result lists `routing` and, when the query really asks for trials, datasets, patents, grants, a venue, one specific paper, news/product/regulation material, whether a claim is supported, or a retraction check, `suggested_tools`; without a key, or if Jev is slow or down, keyword rules pick them. The rules add PubMed for biomedical queries, arXiv for preprint/CS/physics queries, INSPIRE-HEP for high-energy physics, bioRxiv/medRxiv when a biomedical query asks for preprints, and ADS for astronomy only when ADS_API_TOKEN is set; Crossref, preprints, bioRxiv, DOAJ, publisher Crossref members, Scopus, Web of Science, Springer, and IEEE are also available explicitly, as are the keyed `consensus` (CONSENSUS_API_KEY), `scite` (SCITE_API_KEY; adds supporting/contrasting citation counts), `firecrawl` (FIRECRAWL_API_KEY; semantic search over PubMed, bioRxiv, medRxiv and arXiv) and `parallel` (PARALLEL_API_KEY; web results filtered to papers, with the DOI read from the URL when it has one). Results from every source are merged by identifier, so a paper found by several appears once. With a TypeSafe key (Jev) the top 30 merged candidates are then scored for relevance to the query in one request and listed in that order (each paper carries `relevance`); without a key, or if Jev is down, a local BM25 ranking fused with the source order is used instead (no key, no network). `rerank: "off"` keeps the plain fused order; `rerank: "cohere"` uses Cohere Rerank instead (COHERE_API_KEY).',
       'Results are deduplicated and rank-fused across sources (reciprocal-rank fusion), so use this when you want one clean discovery list instead of issuing the same query to several tools. Coverage is the top-N relevance slice per source, not exhaustive; use source-specific tools for filters, citation trails, or pagination.',
       'The `publishers` source searches publisher Crossref deposits keylessly; pass `publishers` aliases such as wiley, elsevier, springer, ieee, taylor_francis, sage, oup, cup, acm, acs, aps, iop, rsc, mdpi, frontiers, or plos. The keyed `springer`/`ieee` sources need SPRINGER_API_KEY/IEEE_API_KEY. Scopus and Web of Science are never auto-selected and need SCOPUS_API_KEY/WOS_API_KEY; without a key they return key_missing and make no request. Scopus/WoS records are metadata-only. Source-specific keys (OPENALEX_API_KEY, S2_API_KEY, CROSSREF_MAILTO) only raise limits; no key is required for the default auto sources.',
     ].join(' '),
@@ -392,7 +421,7 @@ export function apply(ctx) {
       year_max: { type: 'number', description: 'Latest publication year. Records with unknown years are kept.' },
       open_access_only: { type: 'boolean', description: 'Only return records with an open-access link.' },
       include_abstracts: { type: 'boolean', description: 'Render abstract text in the result view. Default false.' },
-      rerank: { type: 'string', description: 'auto (default), off, jev or cohere. Orders the top merged candidates by relevance to the query in one request: Jev needs TYPESAFE_API_KEY, Cohere Rerank needs COHERE_API_KEY. auto uses whichever has a key (Jev first), falling back to the other and then to the fused order; jev or cohere forces that engine. Skipped in hint mode, with routing=rules, and when the engine is slow or down. Each paper carries `relevance`; scores are comparable only within one search.' },
+      rerank: { type: 'string', description: 'auto (default), off, jev, cohere or bm25. Reorders the top merged candidates by relevance to the query. auto uses Jev when TYPESAFE_API_KEY is set and otherwise (or if Jev is slow or down) a local BM25 ranking fused with the source order, which needs no key and sends nothing anywhere; jev, cohere (COHERE_API_KEY) or bm25 forces that engine and never swaps silently; off keeps the plain fused order. Skipped in hint mode; with routing=rules only the local ranking runs. Jev and Cohere results carry `relevance` (comparable only within one search); the local ranking does not.' },
       routing: { type: 'string', description: 'auto (default) or rules. With sources=auto and a TypeSafe key, auto lets Jev choose the domain sources; rules forces the keyword rules and sends nothing to TypeSafe (no rerank either). Source routing is ignored when sources are listed explicitly.' },
     },
     output: {
@@ -405,8 +434,8 @@ export function apply(ctx) {
       if (args.routing != null && !['auto', 'rules'].includes(args.routing)) {
         return { error: 'routing must be "auto" or "rules"' }
       }
-      if (args.rerank != null && !['auto', 'off', 'jev', 'cohere'].includes(args.rerank)) {
-        return { error: 'rerank must be "auto", "off", "jev" or "cohere"' }
+      if (args.rerank != null && !['auto', 'off', 'jev', 'cohere', 'bm25'].includes(args.rerank)) {
+        return { error: 'rerank must be "auto", "off", "jev", "cohere" or "bm25"' }
       }
       let sources
       let routing
@@ -505,19 +534,21 @@ export function apply(ctx) {
 
       let merged = mergeRanked(groups)
       let rerank
-      if (args.rerank !== 'off' && args.routing !== 'rules' && routing?.mode !== 'hint_only' && merged.length >= MIN_RERANK) {
+      const rerankMode = args.rerank || 'auto'
+      // routing=rules sends nothing to TypeSafe or Cohere: only the local ranking may run then
+      const networkEngineUnderRules = args.routing === 'rules' && RERANK_KEYS[rerankMode]
+      if (rerankMode !== 'off' && !networkEngineUnderRules && routing?.mode !== 'hint_only' && merged.length >= MIN_RERANK) {
         const pool = merged.slice(0, RERANK_POOL)
-        const outcome = await rerankCandidates(query, pool, { mode: args.rerank || 'auto', signal: exec.signal })
+        const outcome = await rerankCandidates(query, pool, { mode: rerankMode, signal: exec.signal, localOnly: args.routing === 'rules' })
         if (outcome.ok) {
-          const ordered = orderByRelevance(pool, outcome.ranked.scores)
-          merged = [
-            ...ordered.map(({ paper, score }) => ({ ...paper, relevance: Number(score.toFixed(2)) })),
-            ...merged.slice(RERANK_POOL),
-          ]
+          const local = outcome.engine === 'bm25'
+          // BM25 + RRF scores are not probabilities, so only Jev/Cohere results carry `relevance`
+          const ordered = local ? outcome.ordered : orderByRelevance(pool, outcome.ranked.scores).map(({ paper, score }) => ({ ...paper, relevance: Number(score.toFixed(2)) }))
+          merged = [...ordered, ...merged.slice(RERANK_POOL)]
           rerank = {
             engine: outcome.engine,
-            model: outcome.ranked.model,
-            ms: outcome.ranked.ms,
+            model: local ? 'bm25+fused' : outcome.ranked.model,
+            ms: local ? outcome.ms : outcome.ranked.ms,
             candidates: pool.length,
             ...(Object.keys(outcome.skipped).length ? { fallback_from: outcome.skipped } : {}),
           }

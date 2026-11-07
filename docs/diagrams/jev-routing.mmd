@@ -14,7 +14,7 @@ flowchart TD
   fields --> run["<b>5. Search all chosen sources at once</b><br/>each has a time limit<br/>a source that keeps failing is paused 2 min"]
 
   run --> merge["<b>6. Merge</b><br/>same DOI = one paper<br/>(different DOIs are never merged)<br/>then rank by agreement across sources"]
-  merge --> rerank["<b>7. Jev reranks the top 30</b><br/>one request, about 0.4 s<br/>best match for your query goes first<br/>(no Jev key or Jev down: keep the fused order)"]
+  merge --> rerank["<b>7. Jev reranks the top 30</b><br/>one request, about 0.4 s<br/>best match for your query goes first<br/>(no Jev key or Jev down:<br/>local BM25 + source order)"]
   rerank --> out["<b>Result</b><br/>papers, a routing report,<br/>and a suggested tool if any<br/>(a claim also gets Scite or Consensus)"]
   tool --> out
 
