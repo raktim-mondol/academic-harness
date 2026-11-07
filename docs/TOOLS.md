@@ -25,6 +25,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
 | `paper_download` | Academic Harness preset | DOI / arXiv ID / URL → open-access PDF, tried through Unpaywall, OpenAlex, Europe PMC, CORE, and arXiv; auto-ingests into PaperMemory | [Papers](PAPERS.md#download-a-paper) |
+| `paper_backfill` | Academic Harness preset | Give a project's text-less PaperMemory papers (`cite_state: chunkless`) their open-access full text: OA PDF, or an OA page read through Exa/Firecrawl, behind a quality gate. Dry run by default; paywalled papers are never scraped | [Papers](PAPERS.md#giving-text-less-papers-their-text-paper_backfill) |
 | `paper_get` | Academic Harness preset | Merge one paper across OpenAlex, S2, Crossref, Europe PMC, and arXiv; OA URL and canonical BibTeX with provenance | [Search](SEARCH.md#merged-paper-lookup-and-bibtex) |
 | `paper_context` | Academic Harness preset | Focus-ranked sections/snippets from S2, arXiv HTML, PMC BioC/PubTator3, optional publisher TDM, and OA PDF; no writes | [Search](SEARCH.md#full-text-context) |
 | `paper_fold` | Academic Harness preset | Map-first paper reading through TextFold: section map, then one section at a time; local first-sentence levels by default | [Papers](PAPERS.md#read-at-the-right-level) |

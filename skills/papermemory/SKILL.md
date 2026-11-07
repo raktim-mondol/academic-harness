@@ -99,6 +99,14 @@ through the steps below.
 `papermemory verify CLAIM` walks provenance; `papermemory lookup KEY` is DOI
 metadata lookup (not the same command).
 
+## Papers with no text
+
+`cite_state: chunkless` means a bibliographic row: no text, nothing to search,
+quote or cite, and `supports_statement` stays false. Run `paper_backfill` (dry run
+first: it only reports how many have an open-access copy) and then again with
+`dry_run: false`. It never scrapes a paywalled paper; report those to the user as
+unavailable rather than inventing content.
+
 ## Keeping notes honest
 
 `papermemory_remember` and `papermemory_lesson` are not checked when written, so

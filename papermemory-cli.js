@@ -490,7 +490,7 @@ export function projectSlugFromCwd(cwd) {
   return slug.length > 0 ? slug : undefined
 }
 
-function parseJsonOutput(out) {
+export function parseJsonOutput(out) {
   const text = String(out || '').trim()
   if (!text) return undefined
   try {
