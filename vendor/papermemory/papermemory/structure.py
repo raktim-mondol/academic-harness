@@ -7,6 +7,9 @@ SETEXT_RE = re.compile(r"^[ \t]*(=+|-+)[ \t]*$")
 NUMBERED_RE = re.compile(r"^(\d+(?:\.\d+)*)\.?\s+([^\n]{1,90})$")
 FENCE_RE = re.compile(r"^[ \t]*(```|~~~)")
 BIBLIOGRAPHY_RE = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s*)?(references|bibliography|works cited|literature cited)\s*$", re.I)
+# A bare "References" line (optionally bold) with no markdown marker. Web and PDF conversions often emit
+# the reference list this way; without a heading it is searchable body text and outranks the paper.
+PLAIN_BIBLIOGRAPHY_RE = re.compile(r"^\s*(?:\*\*|__)?\s*(references|bibliography|works cited|literature cited)\s*:?\s*(?:\*\*|__)?\s*$", re.I)
 ABSTRACT_RE = re.compile(r"^\s*(?:\d+(?:\.\d+)*\.?\s*)?(abstract|summary)\s*$", re.I)
 
 
@@ -62,6 +65,19 @@ def _collect_headings(text: str) -> list[dict]:
                 }
             )
             index += 2
+            continue
+        # Only in the second half of the text: a table of contents near the top also lists "References".
+        if PLAIN_BIBLIOGRAPHY_RE.match(stripped) and offsets[index] >= len(text) // 2 and index + 1 < len(lines):
+            headings.append(
+                {
+                    "level": 1,
+                    "title": stripped.strip("*_: ").strip(),
+                    "char_start": offsets[index],
+                    "line_start": index + 1,
+                    "heading_end_line": index,
+                }
+            )
+            index += 1
             continue
         numbered = NUMBERED_RE.match(stripped)
         if numbered and not stripped.endswith("."):

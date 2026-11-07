@@ -1,6 +1,6 @@
 Vendored from https://github.com/raktim-mondol/papermemory
 Commit: 5f39434282daa8ac5b566f5717bb414f7edf6892 (tag v0.3.1, pushed)
-Version: 0.3.1 upstream; vendored as 0.3.2 (local dream/recap changes below)
+Version: 0.3.1 upstream; vendored as 0.3.4 (local dream/recap/listing/structure changes below)
 Upstream exceptions:
 - library_export.py: a collection's project scopes every export even when
   --out is given (a collection's project is inferred whenever it is named;
@@ -26,3 +26,10 @@ Companion local patch (this repo only): vendor/academic-harness registry
 --keys aliases (entry_for consulted by resolve/resolve_all/BIB-02) and
 byte-copy of .md/.txt sources, applied ahead of the Academic Harness upstream
 release; documented in vendor/academic-harness/SOURCE.txt.
+- listing.py: `list --kind papers` also returns arxiv_id (paper_backfill needs it to
+  reach arXiv-only papers).
+- structure.py: a bare "References" / "Bibliography" / "Works cited" / "Literature cited"
+  line (optionally bold) in the second half of a document starts a bibliography
+  section, so reference lists from web and PDF conversions are suppressed from
+  search like a `## References` heading. Existing documents are repaired with
+  `papermemory reindex --from-raw --paper ID`.

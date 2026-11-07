@@ -217,6 +217,27 @@ Run `papermemory dream --project <slug>` after a writing session or when recap r
 
 **At session end.** The plugin runs `papermemory dream` when an agent is disposed, at most once an hour, only on the plugin-managed CLI (never a CLI found on `PATH`), and appends one line per run to `$DSH_HOME/papermemory/dream-log.jsonl`. `PAPERMEMORY_DREAM=apply` (default) consolidates, `report` is a dry run that only writes the log, `off` does nothing; an unreadable value means `report`. A locked database or a timeout is logged and retried at the next disposal.
 
+### Giving text-less papers their text (`paper_backfill`)
+
+A paper added from a bibliography, a literature search or a bare DOI is only a bibliographic row (`cite_state: chunkless`). Nothing can be searched, quoted or cited from it, so every `papermemory_cite` answers `supports_statement: false`. `paper_backfill` fixes that for a whole project. In one real library 136 of 144 papers had no text, and OpenAlex listed 78 of the 85 DOI-only papers in the largest project as open access.
+
+For each text-less paper that has a DOI or arXiv id it tries, in order:
+
+1. an open-access PDF (Unpaywall, OpenAlex, Europe PMC, CORE, arXiv), converted to markdown;
+2. when a publisher refuses the direct download (HTTP 403, common), the same open-access URL read through Exa or Firecrawl, which parse PDFs themselves;
+3. an open-access landing page read as markdown through Exa, then Firecrawl.
+
+It ingests the result only when it passes a quality gate: long enough, shaped like an article, **at least 5,000 characters before the reference list** (an abstract page with a hundred references is long but is not the paper), a title that matches the stored one, and not a paywall stub. The first real run caught aggregator pages that were an abstract plus references; they are refused and the next source is tried. Text is stored with `origin_channel` `oa-pdf` or `oa-html` and the converter details, so a claim can be traced to how its text was obtained.
+
+- **Open access only.** A paper OpenAlex does not list as open access is `paywalled` and never scraped. A paper with neither DOI nor arXiv id is skipped instead of being matched by title.
+- **Dry run by default.** It reports, from metadata alone, how many papers have a PDF route, an HTML route, or neither. `dry_run: false` downloads and ingests. `limit` defaults to 10 (max 100).
+- **Ledger.** Every outcome is appended to `$DSH_HOME/papermemory-backfill/ledger.jsonl` (override `PAPERMEMORY_BACKFILL_DIR`). Paywalled and gate-failed papers are not retried for 30 days, unreachable ones for 7, errors for 1; `retry: true` overrides. Three rate-limit answers stop the run early.
+- **Keys.** Works with no key beyond the keyless sources. `UNPAYWALL_EMAIL`, `OPENALEX_API_KEY`, `EXA_API_KEY` and `FIRECRAWL_API_KEY` (Settings) add routes; without Exa or Firecrawl only PDF routes run.
+
+Reference lists are marked as a bibliography section and left out of search, even when the converted text has a bare `References` line rather than a heading. For documents stored before that fix, `papermemory reindex --from-raw --paper ID` re-derives their chunks (new chunk ids, so skip papers that already have claims).
+
+After a backfill, `papermemory dream` can bring back quarantined claims whose paper now has text, and `papermemory_recap` shows the new `citable` count.
+
 ### The tools
 
 PaperMemory has 15 tools. In this plugin 14 are mounted as `mcp__papermemory__*`; the fifteenth, the reference library, is the native `reference_library` tool (see below).

@@ -91,7 +91,7 @@ def list_rows(
         where.append("p.cite_state=?")
         args.append(cite_state)
     total = store.conn.execute(f"SELECT COUNT(*) FROM papers p WHERE {' AND '.join(where)}", args).fetchone()[0]
-    sql = f"""SELECT p.id, p.title, p.year, p.doi, p.cite_state, p.verified,
+    sql = f"""SELECT p.id, p.title, p.year, p.doi, p.arxiv_id, p.cite_state, p.verified,
                      (SELECT group_concat(pp.project_key) FROM paper_projects pp WHERE pp.paper_id=p.id) AS projects
               FROM papers p WHERE {' AND '.join(where)}"""
     qargs = list(args)

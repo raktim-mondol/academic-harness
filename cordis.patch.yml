@@ -833,6 +833,12 @@
           - id: papermemory-dream
             name: academic-harness/papermemory-dream
 
+          # paper_backfill: gives text-less PaperMemory papers (cite_state chunkless) their
+          # open-access full text so they can be searched, quoted and cited. Dry run by
+          # default. See papermemory-backfill.js.
+          - id: papermemory-backfill
+            name: academic-harness/papermemory-backfill
+
           # Academic Harness (LaTeX writing oracle). Native `ah_*` tools plus
           # guard / post-edit check / gate / paper-state interceptors. Engine is
           # vendored in this plugin (`vendor/academic-harness`); Pi is not required.

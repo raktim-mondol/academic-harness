@@ -165,6 +165,7 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 | `XDG_DATA_HOME` | Base for the default PaperMemory store when neither `PAPERMEMORY_DB` nor `PAPERMEMORY_DATA_DIR` is set. |
 | `PAPERMEMORY_PROJECT` | Override the project for auto-ingest (slugified). |
 | `PAPERMEMORY_SKIP_INSTALL=1` | Skip installing the bundled PaperMemory venv. |
+| `PAPERMEMORY_BACKFILL_DIR` | Where `paper_backfill` keeps downloaded PDFs, converted markdown and `ledger.jsonl`. Default `$DSH_HOME/papermemory-backfill`. |
 | `PAPERMEMORY_DREAM` | `apply` (default), `report` (dry run, log only) or `off`: whether `papermemory dream` runs at session end. See [Papers](PAPERS.md#notes-recap-and-dreaming). |
 | `AH_RSI`, `AH_RSI_STORE`, `AH_RSI_*` | Control the local RSI loop; see [RSI](RSI.md#configuration). |
 | `IMAGE_PROVIDER`, `IMAGE_BASE_URL`, `IMAGE_API_KEY` | Use an OpenAI-compatible Images API instead of Gemini. |
