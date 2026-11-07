@@ -234,6 +234,8 @@ It ingests the result only when it passes a quality gate: long enough, shaped li
 - **Ledger.** Every outcome is appended to `$DSH_HOME/papermemory-backfill/ledger.jsonl` (override `PAPERMEMORY_BACKFILL_DIR`). Paywalled and gate-failed papers are not retried for 30 days, unreachable ones for 7, errors for 1; `retry: true` overrides. Three rate-limit answers stop the run early.
 - **Keys.** Works with no key beyond the keyless sources. `UNPAYWALL_EMAIL`, `OPENALEX_API_KEY`, `EXA_API_KEY` and `FIRECRAWL_API_KEY` (Settings) add routes; without Exa or Firecrawl only PDF routes run.
 
+Reference lists are marked as a bibliography section and left out of search, even when the converted text has a bare `References` line rather than a heading. For documents stored before that fix, `papermemory reindex --from-raw --paper ID` re-derives their chunks (new chunk ids, so skip papers that already have claims).
+
 After a backfill, `papermemory dream` can bring back quarantined claims whose paper now has text, and `papermemory_recap` shows the new `citable` count.
 
 ### The tools
