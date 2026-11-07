@@ -839,6 +839,27 @@ def cmd_sweep(args: argparse.Namespace) -> int:
     return _emit(result, args.json, f"sweep: {result}")
 
 
+def cmd_dream(args: argparse.Namespace) -> int:
+    from papermemory.dream import dream, restore
+
+    if args.restore:
+        result = restore(_store(), args.restore)
+        code = _emit(result, args.json, f"dream restore: {result}")
+        return code if result["restored"] else 1
+    result = dream(_store(), args.project, apply=args.apply, similarity=args.similarity)
+    s = result["summary"]
+    text = (
+        f"dream ({'applied' if result['applied'] else 'dry run; pass --apply to change anything'}): "
+        f"{s['duplicates']} duplicate notes, {s['stale']} stale notes, "
+        f"{s['recoverable_claims']} recoverable legacy claims "
+        f"({s['recovered_claims']} recovered), "
+        f"{s['claims_awaiting_markdown']} claims waiting on markdown for {s['papers_awaiting_markdown']} papers"
+    )
+    for item in result["recover"]["awaiting_markdown"][:5]:
+        text += f"\n  waiting: {item['claims']} claims  {item.get('bibtex_key') or item.get('paper_id')}  {(item.get('title') or '')[:60]}"
+    return _emit(result, args.json, text)
+
+
 def cmd_catalog(args: argparse.Namespace) -> int:
     from papermemory.claims import write_catalog
 
@@ -1241,6 +1262,17 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--doc", required=True)
     s.add_argument("--batch-size", type=int, default=200, dest="batch_size")
     s.set_defaults(func=cmd_sweep)
+
+    s = sub.add_parser(
+        "dream",
+        help="consolidate notes: dedupe, re-check against ground truth, recover legacy claims (dry run unless --apply)",
+        parents=[shared],
+    )
+    s.add_argument("--project")
+    s.add_argument("--apply", action="store_true", help="make the changes; the default only reports")
+    s.add_argument("--similarity", type=float, default=0.9, help="token-Jaccard threshold for near-duplicates")
+    s.add_argument("--restore", metavar="NOTE_ID", help="undo dream for one note; later passes leave it alone")
+    s.set_defaults(func=cmd_dream)
 
     s = sub.add_parser("catalog", help="write corpus/CATALOG.json|.md from rows", parents=[shared])
     s.add_argument("--project")

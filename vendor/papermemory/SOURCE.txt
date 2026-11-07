@@ -1,12 +1,22 @@
 Vendored from https://github.com/raktim-mondol/papermemory
 Commit: 5f39434282daa8ac5b566f5717bb414f7edf6892 (tag v0.3.1, pushed)
-Version: 0.3.1
+Version: 0.3.1 upstream; vendored as 0.3.2 (local dream/recap changes below)
 Upstream exceptions:
 - library_export.py: a collection's project scopes every export even when
   --out is given (a collection's project is inferred whenever it is named;
   the default .bib destination is still used only for BibTeX/BibLaTeX).
   Regression: tests/test_library_export.py::
   test_a_collections_project_scope_survives_an_explicit_out.
+
+- dream.py (new) and `papermemory dream`: offline consolidation of observations,
+  lessons and quarantined legacy claims (dry run unless --apply). Tests:
+  tests/test_dream.py.
+- context.py: recap selects notes half by importance (tier, lookups, confidence)
+  and half by recency, hides stale/superseded notes, reports stale_notes_hidden.
+- db.py / search_v2.py / audit.py: `touch_observations` counts search hits
+  (best effort, no event); note search skips stale/superseded notes.
+- ingest.py: re-ingesting a manuscript supersedes its previous auto-generated
+  note instead of adding a copy; `manuscript_notes_text` is shared with dream.
 
 Tests are the upstream tests (vendor/papermemory/tests, tests/test_phase0.py …
 test_phase7.py), run by CI. The upstream skill is not copied; the plugin's

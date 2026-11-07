@@ -100,6 +100,23 @@ def _degrade(payload: dict[str, Any], max_chars: int) -> dict[str, Any]:
     return payload
 
 
+def _select_notes(rows: list[Any], limit: int) -> list[tuple[Any, str]]:
+    """Half the window by importance, half by recency.
+
+    Importance is tier (semantic first), then how often the note was actually
+    looked up, then confidence. Recency alone buries a durable decision under
+    recent noise; importance alone hides what was just decided. Both are kept.
+    """
+    def importance(row):
+        return (1 if row["tier"] == "semantic" else 0, row["access_count"] or 0,
+                row["confidence"] or 0.0, row["created_at"])
+
+    salient = sorted(rows, key=importance, reverse=True)[: (limit + 1) // 2]
+    taken = {row["id"] for row in salient}
+    recent = [row for row in rows if row["id"] not in taken][: limit - len(salient)]
+    return [(row, "salient") for row in salient] + [(row, "recent") for row in recent]
+
+
 def recap(store: Store, project: str | None = None, limit: int = 8, max_chars: int = 6000) -> dict[str, Any]:
     global_stats = store.stats()
     if project:
@@ -173,28 +190,29 @@ def recap(store: Store, project: str | None = None, limit: int = 8, max_chars: i
     volatile["claims"] = claim_rows
     if not claim_rows:
         empty_reasons["claims"] = "no-claims-in-project"
-    obs_sql = """SELECT * FROM observations WHERE superseded_by IS NULL"""
+    obs_sql = """SELECT * FROM observations WHERE superseded_by IS NULL
+                 AND COALESCE(status,'active') NOT IN ('stale','superseded')"""
     obs_args: list[Any] = []
     if project:
         obs_sql += " AND (project_id=? OR project_id IS NULL)"
         obs_args.append(project)
-    obs_sql += " ORDER BY CASE tier WHEN 'semantic' THEN 0 ELSE 1 END, created_at DESC LIMIT ?"
-    obs_args.append(limit)
+    obs_sql += " ORDER BY created_at DESC LIMIT 200"
     observations = []
-    for row in store.conn.execute(obs_sql, obs_args).fetchall():
+    for row, why in _select_notes(store.conn.execute(obs_sql, obs_args).fetchall(), limit):
         content, was_truncated = _short(row["content"], 600)
         observations.append(
             {
                 "id": row["id"], "tier": row["tier"], "content": content,
                 "truncated": was_truncated, "created_at": row["created_at"],
-                "project_id": row["project_id"],
+                "project_id": row["project_id"], "why": why,
                 "concepts": loads(row["concepts_json"], []),
             }
         )
     volatile["observations"] = observations
     if not observations:
         empty_reasons["observations"] = "no-observations"
-    lesson_sql = "SELECT * FROM lessons WHERE superseded_by IS NULL"
+    lesson_sql = ("SELECT * FROM lessons WHERE superseded_by IS NULL "
+                  "AND COALESCE(status,'active') NOT IN ('stale','superseded')")
     lesson_args: list[Any] = []
     if project:
         lesson_sql += " AND (project_id=? OR project_id='unassigned' OR project_id IS NULL)"
@@ -253,6 +271,12 @@ def recap(store: Store, project: str | None = None, limit: int = 8, max_chars: i
             payload[key] = value
     if scope_stats["papers"] > len(recent) or scope_stats["claims"] > len(claim_rows):
         payload["hint"] = "Call papermemory_list (kind=claims|lessons|coverage) for the full rows."
+    stale_notes = sum(
+        store.conn.execute(f"SELECT COUNT(*) FROM {table} WHERE status='stale'").fetchone()[0]
+        for table in ("observations", "lessons")
+    )
+    if stale_notes:
+        payload["stale_notes_hidden"] = stale_notes
     if not empty_reasons:
         payload.pop("empty_reasons")
     if not payload["truncated"]:

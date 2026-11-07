@@ -202,6 +202,21 @@ Each paper is stored as content-addressed markdown; chunks are byte slices, sect
 - Existing stores migrate once with `papermemory migrate` (schema 2000); legacy chunks/claims are quarantined, not promoted — re-ingest papers as markdown to make them citable.
 - A 104-paper scale run (28/28 checks, bm25 top-N 20/20, scoped p95 11.7 ms) is documented in [`reports/papermemory-v2-scale-test.md`](../reports/papermemory-v2-scale-test.md).
 
+### Notes, recap and dreaming
+
+Claims are checked against the paper text when they are written. The notes around them (`papermemory_remember` observations and `papermemory_lesson` rules) used to be plain inserts, so copies piled up and a note derived from a file kept being believed after the file changed. Three changes:
+
+- **`papermemory dream`** (CLI; the 14-tool MCP surface is unchanged) is a background consolidation pass. It reports by default and only changes anything with `--apply`; it never deletes a row or edits a note's text, and each change is a status flip with its reason in the event log (`SWEEP`). It does three things:
+  1. *Dedupe.* A near-duplicate (same whitespace-folded text, or token Jaccard of at least `--similarity`, default 0.9) of a newer note in the same project, tier, paper and manuscript is marked `superseded` by it. Notes in different projects or tiers are never merged.
+  2. *Re-check against ground truth.* A manuscript note is re-derived from the outline/protocol files on disk; if the files changed or are gone it is marked `stale`. A note about a deleted paper or manuscript is `stale`. A manuscript root that is not on this machine is *unknown*, not stale.
+  3. *Recover quarantined claims.* Claims the v2 migration put aside are re-submitted through `papermemory_claim`'s own path once their paper has markdown, so the verbatim check decides. A recovered claim comes back `extracted`, never `verified`. A quote that is not in the paper is marked `unrecoverable:quote-not-verbatim`. Papers that still have no markdown are listed with their waiting claim counts.
+- **Recap picks half by importance, half by recency.** Importance is tier (semantic first), then how often a note was looked up, then confidence. Each note carries `why: "salient" | "recent"`. Only a `papermemory_search` hit counts as a lookup; showing a note in recap does not, so a note cannot make itself important by being shown. `stale` and `superseded` notes are hidden from recap and search, and recap reports `stale_notes_hidden`.
+- **Re-ingesting a manuscript replaces its auto-generated notes** instead of adding another copy; the old copies stay as `superseded` history.
+
+Run `papermemory dream --project <slug>` after a writing session or when recap reports `stale_notes_hidden`; add `--apply` once the report looks right. `papermemory dream --restore NOTE_ID` undoes one retired note, and later passes leave it alone.
+
+**At session end.** The plugin runs `papermemory dream` when an agent is disposed, at most once an hour, only on the plugin-managed CLI (never a CLI found on `PATH`), and appends one line per run to `$DSH_HOME/papermemory/dream-log.jsonl`. `PAPERMEMORY_DREAM=apply` (default) consolidates, `report` is a dry run that only writes the log, `off` does nothing; an unreadable value means `report`. A locked database or a timeout is logged and retried at the next disposal.
+
 ### The tools
 
 PaperMemory has 15 tools. In this plugin 14 are mounted as `mcp__papermemory__*`; the fifteenth, the reference library, is the native `reference_library` tool (see below).

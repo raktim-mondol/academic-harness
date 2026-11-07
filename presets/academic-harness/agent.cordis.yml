@@ -805,6 +805,12 @@
 - id: papermemory
   name: academic-harness/papermemory
 
+# PaperMemory dreaming: when an agent is disposed, consolidate the free-text notes
+# (dedupe, re-check against source files, recover quarantined claims) at most once
+# an hour. PAPERMEMORY_DREAM=apply (default) | report | off. See papermemory-dream.js.
+- id: papermemory-dream
+  name: academic-harness/papermemory-dream
+
 # Academic Harness (LaTeX writing oracle). Native `ah_*` tools plus
 # guard / post-edit check / gate / paper-state interceptors. Engine is
 # vendored in this plugin (`vendor/academic-harness`); Pi is not required.

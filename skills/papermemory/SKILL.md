@@ -95,9 +95,21 @@ through the steps below.
 
 ## CLI fallback
 
-`papermemory recap|search|list|outline|paper|cite|cite-check|claims|trace|verify|quote-check|ingest|register-ah|evidence-export|import-verdicts|sweep|catalog|health|log --json`.
+`papermemory recap|search|list|outline|paper|cite|cite-check|claims|trace|verify|quote-check|ingest|register-ah|evidence-export|import-verdicts|sweep|dream|catalog|health|log --json`.
 `papermemory verify CLAIM` walks provenance; `papermemory lookup KEY` is DOI
 metadata lookup (not the same command).
+
+## Keeping notes honest
+
+`papermemory_remember` and `papermemory_lesson` are not checked when written, so
+treat a recalled note as a lead. Recap marks each note `why: salient|recent` and
+reports `stale_notes_hidden` when notes were retired. When that number is above
+zero, or after a long writing session, run the CLI `papermemory dream --project
+SLUG` (it only reports), read what it would change, then add `--apply`. It marks
+copies `superseded`, notes whose source files changed `stale`, and re-checks
+quarantined legacy claims against the paper text. It never deletes anything,
+`--restore NOTE_ID` undoes one note, and the plugin also runs it at session end
+(`PAPERMEMORY_DREAM=apply|report|off`).
 
 ## Do not
 

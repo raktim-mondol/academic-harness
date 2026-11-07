@@ -223,7 +223,10 @@ def _note_leg(store, query, kind, limit, project_id):
     )
     for item_kind, table in tables:
         where = "(" + " OR ".join("content LIKE ?" for _ in tokens) + ")"
-        sql = f"SELECT * FROM {table} WHERE {where} AND superseded_by IS NULL"
+        sql = (
+            f"SELECT * FROM {table} WHERE {where} AND superseded_by IS NULL "
+            "AND COALESCE(status,'active') NOT IN ('stale','superseded')"
+        )
         args: list[Any] = [f"%{token}%" for token in tokens]
         if project_id:
             sql += " AND (project_id=? OR project_id IS NULL)"
@@ -360,6 +363,7 @@ def search_with_status(
         final.append(record)
         if len(final) >= limit:
             break
+    store.touch_observations(r["id"] for r in final if r.get("kind") == "observation")
 
     empty_reason = None
     if not final:
