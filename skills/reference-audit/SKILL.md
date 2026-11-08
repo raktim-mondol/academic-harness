@@ -28,9 +28,15 @@ metadata:
      This is not a pass. Add DOIs, retry, or raise the cap.
    - **no_issues_found** — these checks found nothing. It does not show the reference is
      correct, relevant, or the best source.
-3. A retracted reference carries the notice DOI. Remove it, or cite it explicitly as
+3. The audit reads registry answers from a snapshot (`.ah/cache/lookups.json`), so re-running
+   it on the same bibliography gives the same findings; the output line "Lookups: registry
+   data as of …" says how old they are. Re-running does not look for new problems. Before
+   submission, run once with `refresh_lookups: true` so a retraction or correction that
+   appeared since is seen. If a refresh fails, the earlier answer is kept and the line says
+   so; treat that as unverified for anything newer than its date.
+4. A retracted reference carries the notice DOI. Remove it, or cite it explicitly as
    retracted when the retraction is the point.
-4. `citation-checker` (the specialist) is the next step when claim support matters.
+5. `citation-checker` (the specialist) is the next step when claim support matters.
 
 ## Checking data and code availability
 

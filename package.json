@@ -309,6 +309,7 @@
     "citation-format.js",
     "manuscript-citations.js",
     "integrity-check.js",
+    "lookup-snapshot.js",
     "review.js",
     "grade-store.js",
     "meta-analysis.js",

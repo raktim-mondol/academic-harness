@@ -10,6 +10,7 @@ import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi, normalizeTitle } from './search-normalize.js'
+import { openSnapshot, pacedFetch, snapshotOptions, SNAPSHOT_PARAMETERS } from './lookup-snapshot.js'
 import { libraryPapers, librarySetIntegrity } from './papermemory-library.js'
 
 const CROSSREF_WORKS = 'https://api.crossref.org/works'
@@ -27,12 +28,13 @@ async function fetchCrossrefWork(doi, { signal, mailto, deps }) {
   const params = new URLSearchParams()
   if (mailto) params.set('mailto', mailto)
   const limiter = getLimiter('crossref-single', { minIntervalMs: mailto ? 100 : 200 })
-  const result = await limiter.run(() => fetchJsonUrl(`${CROSSREF_WORKS}/${encodeURIComponent(doi)}`, params, {
+  const result = await pacedFetch(http, limiter, urlWith(`${CROSSREF_WORKS}/${encodeURIComponent(doi)}`, params), {
     signal,
     headers: { 'User-Agent': searchUserAgent(mailto) },
-  }, http))
-  if (result.ok) return { work: result.data?.message || null }
-  if (result.status === 404) return { work: null, missing: true }
+  })
+  const asof = result.snapshot?.fetched_at
+  if (result.ok) return { work: result.data?.message || null, asof }
+  if (result.status === 404) return { work: null, missing: true, asof }
   return { error: registryError(result, 'Crossref') }
 }
 
@@ -43,18 +45,19 @@ async function fetchOpenAlexWork(doi, { signal, apiKey, mailto, deps }) {
   if (apiKey) params.set('api_key', apiKey)
   if (mailto) params.set('mailto', mailto)
   const limiter = getLimiter('openalex', { minIntervalMs: apiKey ? 34 : 100 })
-  const result = await limiter.run(() => fetchJsonUrl(`${OPENALEX_WORKS}/doi:${encodeURIComponent(doi).replace(/%2F/gi, '/')}`, params, {
+  const result = await pacedFetch(http, limiter, urlWith(`${OPENALEX_WORKS}/doi:${encodeURIComponent(doi).replace(/%2F/gi, '/')}`, params), {
     signal,
     headers: { 'User-Agent': searchUserAgent(mailto) },
-  }, http))
-  if (result.ok) return { work: result.data || null }
-  if (result.status === 404) return { work: null, missing: true }
+  })
+  const asof = result.snapshot?.fetched_at
+  if (result.ok) return { work: result.data || null, asof }
+  if (result.status === 404) return { work: null, missing: true, asof }
   return { error: registryError(result, 'OpenAlex') }
 }
 
-function fetchJsonUrl(base, params, options, http) {
+function urlWith(base, params) {
   const query = params.toString()
-  return http(`${base}${query ? `?${query}` : ''}`, options)
+  return `${base}${query ? `?${query}` : ''}`
 }
 
 /* ---------------------------------------------------------------- classify */
@@ -228,8 +231,11 @@ async function checkOne(doi, { signal, mailto, openalexKey, deps }) {
   if (cr.missing) unavailable.push('crossref: DOI not registered')
   if (oa.missing) unavailable.push('openalex: DOI not indexed')
 
+  // The registry answers may come from the snapshot: say how old the oldest one is.
+  const answered = [cr.asof, oa.asof].filter(Boolean).sort()
   return {
     checked_at: new Date().toISOString(),
+    data_as_of: answered[0] || null,
     doi,
     title: cr.work?.title?.[0] || oa.work?.display_name || null,
     verdict,
@@ -252,10 +258,10 @@ async function resolveTitle(title, { signal, mailto, deps }) {
   })
   if (mailto) params.set('mailto', mailto)
   const limiter = getLimiter('crossref-list', { minIntervalMs: mailto ? 334 : 1000 })
-  const result = await limiter.run(() => fetchJsonUrl(CROSSREF_WORKS, params, {
+  const result = await pacedFetch(http, limiter, urlWith(CROSSREF_WORKS, params), {
     signal,
     headers: { 'User-Agent': searchUserAgent(mailto) },
-  }, http))
+  })
   if (!result.ok) return { error: registryError(result, 'Crossref') }
   const wanted = normalizeTitle(title)
   const items = (result.data?.message?.items || []).map((item) => ({
@@ -274,6 +280,7 @@ async function resolveTitle(title, { signal, mailto, deps }) {
 
 function renderResult(result) {
   const lines = [`DOI: ${result.doi}`, `Verdict: ${result.verdict}`, `Checked: ${result.checked_at}`]
+  if (result.data_as_of && result.data_as_of !== result.checked_at) lines.push(`Registry data as of: ${result.data_as_of}${result.lookup?.served_stale ? ' (a refresh failed; the earlier answer was used)' : ''}`)
   if (result.title) lines.push(`Title: ${result.title}`)
   if (result.signals.length) {
     lines.push('', 'Signals:')
@@ -386,7 +393,27 @@ async function sweepLibrary(args, exec, shared, deps) {
   }
 }
 
+/**
+ * Registry answers are read through the lookup snapshot (.ah/cache/lookups.json), so the same DOI gives the
+ * same verdict until the snapshot is refreshed. An injected `deps.fetchJson` is a test or caller override and
+ * bypasses it unless `deps.lookupSnapshot` is true.
+ */
 export async function runIntegrityCheck(args, exec, deps = {}) {
+  const useSnapshot = !deps.fetchJson || deps.lookupSnapshot === true
+  if (!useSnapshot) return runIntegrityCheckOnce(args, exec, deps)
+  const cwd = exec?.agent?.session?.header?.cwd || process.cwd()
+  const snapshot = openSnapshot(cwd, { base: deps.fetchJson, ...snapshotOptions(args) })
+  try {
+    const result = await runIntegrityCheckOnce(args, exec, { ...deps, fetchJson: snapshot.fetchJson })
+    snapshot.flush()
+    if (result && typeof result === 'object' && !result.error) result.lookup = snapshot.stats()
+    return result
+  } finally {
+    snapshot.flush()
+  }
+}
+
+async function runIntegrityCheckOnce(args, exec, deps = {}) {
   const readEnv = deps.resolveEnv || resolveEnv
   const mailto = await readEnv('CROSSREF_MAILTO') || await readEnv('UNPAYWALL_EMAIL')
   const openalexKey = await readEnv('OPENALEX_API_KEY')
@@ -445,6 +472,7 @@ export function apply(ctx) {
       limit: { type: 'number', description: 'Library sweep: papers to check per call (default 25, max 100). Run again to continue.' },
       recheck: { type: 'boolean', description: 'Library sweep: include papers that were already checked.' },
       record_in_library: { type: 'boolean', description: 'Single DOI: also record the result on that paper in the reference library, if it is there.' },
+      ...SNAPSHOT_PARAMETERS,
     },
     output: {
       schema: { type: 'json' },
