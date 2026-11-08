@@ -4,6 +4,10 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+## 0.47.1
+
+- **Simplified README.** The main README now offers a concise overview, a quick start, one architecture diagram, and links to the detailed modular documentation.
+
 ## 0.47.0
 
 - **PaperMemory evidence and runtime fixes.** Quote checks and claims now resolve citation keys to the canonical paper ID, and a missing or text-less source is distinguished from a quote absent from a document that was actually read. The deep-research quote-check bridge no longer passes unsupported CLI options or treats an unread source as a negative verdict. The vendored build is `0.3.6+ah.1`; CLI and MCP versions now agree, and outdated unmanaged fallback binaries cannot bypass startup validation. The managed install is preferred over PATH; an explicit CLI override still wins. Tested through the DSH browser on a fresh 0.2.2 profile, plus the CLI, MCP, and runtime regression suites.

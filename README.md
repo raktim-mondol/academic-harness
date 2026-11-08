@@ -4,245 +4,49 @@
 ![DeepSeek Harness 0.2.1](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1-5b7bd5)
 ![Tested on Linux](https://img.shields.io/badge/tested%20on-Linux-2f855a)
 
-**A research workbench for DeepSeek Harness** — literature and web discovery, verbatim paper memory, a writing oracle for LaTeX, systematic-review, meta-analysis, and reproducible-analysis ledgers, 790 bundled skills, and local self-improvement, all inside the DSH web UI.
+**A research workbench for DeepSeek Harness (DSH).** Academic Harness adds literature discovery, evidence-linked paper memory, scientific writing and review tools, research ledgers, and 790 bundled skills to the DSH web UI.
 
-Academic Harness is a **DSH profile**: it installs as a plugin, adds a preset with a research persona and academic tools, and keeps the general-purpose tools available on every preset.
+It installs as a DSH plugin and provides an **Academic Harness** preset. Its tools support human-directed research; advisory reviews and audit results are not substitutes for expert judgment.
 
-![Architecture overview](docs/assets/diagrams/architecture.svg)
+![Academic Harness architecture overview](docs/assets/diagrams/architecture.svg)
 
-## Why Academic Harness
+## Quick start
 
-| Principle | What it means in practice |
-|---|---|
-| **Evidence, not citation-shaped guesses** | PaperMemory stores papers as content-addressed Markdown and anchors claims to exact quote spans. `quote_check` and `trace` verify a quotation before it becomes a citation; an empty `cite` means *do not invent one*. [Read more](docs/PAPERS.md#paper-memory) |
-| **A writing oracle with a gate** | The vendored `ah_*` engine inventories every number, citation, unit, and claim in a LaTeX tree. A turn closes only when it introduced no open blocker or major. [Read more](docs/WRITING.md#academic-harness-engine) |
-| **Auditable research ledgers** | Systematic reviews and hypothesis tournaments live in append-only logs under the workspace, so a resumed session sees the same protocol, screening decisions, and ratings. [Reviews](docs/RESEARCH.md#systematic-reviews) · [Tournaments](docs/RESEARCH.md#hypothesis-tournaments) |
-| **Discovery across the real literature** | OpenAlex, Semantic Scholar, PubMed/Europe PMC, arXiv, Crossref, DOAJ, publisher Crossref deposits, bioRxiv/medRxiv, INSPIRE, and keyed ADS/Scopus/Web of Science through one `literature_search` entry point, plus `journal_search`, `paper_get`, `paper_context`, `paper_resolve`, `openalex_citations`, `database_catalog`, `domain_search`, Consensus, Parallel, Firecrawl, Scite, CORE, Elicit, and FutureHouse. [Read more](docs/SEARCH.md) |
-| **A lab notebook that survives context loss** | A JSONL notebook shared across the delegation tree, a schema-validated `scientific_result` card, and deletion-only reply folding at five levels. [Read more](docs/WORKSPACE.md) |
-| **One question, one bounded investigation** | `deep_research` reads the request, sweeps the literature and a web lane, finds where the sources disagree, drafts, lets four critics attack the draft, and refuses to ship a report that cites a source it cannot support. Five syndicated copies of one release count as one voice. `effort=low|medium|high` is the only knob; a request that contradicts itself gets a question instead of a bill. [Deep research](#deep-research) |
-| **Local-first by design** | Workspace search (zvec-grep), PaperMemory, TextFold, ledgers, and the RSI store stay on disk. No key is required to boot. [Read more](docs/ARCHITECTURE.md#runtime-installs) |
-
-## Install
-
-Requires **DeepSeek Harness >=0.2.1-rc.5 <0.3.0** (`engines.dsh`; validated against `0.2.1-rc.5` and `0.2.2-rc.1` and watched daily by a [DSH compatibility canary](docs/DEVELOPMENT.md)) and **Linux** (the only platform tested so far; see [Requirements](#requirements-and-scope)). DSH fixes beyond `0.2.2-rc.1` are adopted after the canary passes; see [Install and run](docs/INSTALL.md#requirements).
+Academic Harness requires **DeepSeek Harness >=0.2.1-rc.5 <0.3.0** and has been tested on **Linux**. See [installation requirements](docs/INSTALL.md#requirements) for validated versions and optional runtimes.
 
 ```sh
 npm install -g @deepseek-ai/dsh@0.2.1-rc.5
-# or the validated 0.2.2 prerelease, currently on npm's `next` channel:
-#   npm install -g @deepseek-ai/dsh@next
+dsh web
 ```
 
-Then either:
+In the web UI:
 
-**A — from the DSH Web UI (recommended):** open **Plugins → Add plugin**, paste `github:raktim-mondol/academic-harness`, click **Install**, and start a new chat.
+1. Open **Plugins → Add plugin**.
+2. Enter `github:raktim-mondol/academic-harness` and click **Install**.
+3. Start a new chat and select the **Academic Harness** preset.
 
-**B — a dedicated CLI profile:**
+No API key is required to install or start; some connectors and compute services require their own credentials. For a dedicated CLI profile, troubleshooting, and setup details, see [Install and run](docs/INSTALL.md) and [Configuration](docs/CONFIGURATION.md).
 
-```sh
-dsh plugin --profile academic-harness add github:raktim-mondol/academic-harness
-# DSH creates fresh profiles without the web-app bundle the preset needs:
-f="${DSH_HOME:-$HOME/.dsh}/profiles/academic-harness/package.json"
-node -e 'const fs=require("fs"),f=process.argv[1],j=JSON.parse(fs.readFileSync(f));const b=j.dsh.profile.bundles;if(!b.includes("@deepseek-ai/dsh-web-app"))b.splice(1,0,"@deepseek-ai/dsh-web-app");fs.writeFileSync(f,JSON.stringify(j,null,2)+"\n")' "$f"
-dsh --profile academic-harness
-```
+## What you can do
 
-Confirm the preset selector at the top of the message box reads **Academic Harness**. The academic tools are preset-only; a session left on Standard/PTC will fail with `tools[name] is not a function`.
-
-Full instructions, troubleshooting, and the "one DSH surface at a time" rule are in **[Install and run](docs/INSTALL.md)**.
-
-## What is inside
-
-![Capability map](docs/assets/diagrams/capability-map.svg)
-
-| Surface | Highlights | Guide |
-|---|---|---|
-| **Search and discovery** | `literature_search` router, `journal_search` (OpenAlex/DOAJ/Crossref metrics plus optional CiteScore/JIF), `paper_get` (merged metadata + BibTeX), `paper_context` (focused sections/snippets), `database_catalog`, `domain_search` (bioRxiv/medRxiv, INSPIRE, ACL, ADS, Scopus, Web of Science, Wikidata), OpenAlex, Semantic Scholar, PubMed, arXiv, Crossref, DOAJ, publisher Crossref deposits, Consensus, Parallel, Firecrawl, Scite, Tavily, Exa, Perplexity, Jina, CORE, Elicit, FutureHouse | [Search](docs/SEARCH.md) |
-| **Papers and evidence** | `paper_get`, `paper_download`, `paper_context`, `paper_fold`, `pdf_to_markdown`, `deep_review` (multi-pass manuscript critique with anchored comments and reference verification, powered by [open-deepreview](https://github.com/raktim-mondol/open-deepreview)), PaperMemory's 14 tools, `reference_library` (the native reference manager: BibTeX, BibLaTeX, RIS, and CSL-JSON in and out; imports Scopus and Web of Science RIS exports), `integrity_check`, Paper2Agent | [Papers](docs/PAPERS.md) |
-| **Writing and citation** | `ah_*` writing oracle and gate, `citation` (including DOI/arXiv/INSPIRE/title → BibTeX, batch `audit`, and `repair` that writes a new .bib), `manuscript_citations`, `reporting_check` (CONSORT/STROBE/PRISMA/ARRIVE/TRIPOD+AI/CARE/STARD), LaTeX, Supervisor-Skills paper lifecycle, `scientific-figure-making`, `diagram-design`, `image_generate`, `mermaid_render` (Pele) | [Writing](docs/WRITING.md) |
-| **Submission and communication** | `rebuttal` review-point coverage and evidence-linked responses; `submission_pack` journal checklist and hashed bundle (never submits); `journal_search match` advisory venue fit with due-diligence signals; `manuscript_diff` revision artifacts and response-letter skeleton; `numbers_audit` numerical-reporting candidates; `presentation_build` posters and slides with a vision-QA checklist; `authorship` CRediT/ICMJE ledger | [Writing](docs/WRITING.md#reviewer-response-ledger) |
-| **Reviews, synthesis, and hypotheses** | `review` PRISMA-style ledger with dual-reviewer screening, structured extraction, risk-of-bias appraisal (RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, CASP checklists), GRADE certainty and summary-of-findings tables, κ agreement, PRISMA flow and RoB exports; `meta_analysis` pairwise pooling, heterogeneity, subgroup/meta-regression, publication-bias diagnostics, and forest/funnel/SROC plots; `coscientist` Glicko-2 tournament, published-results feedback, cross-session priors, append-only limitation records with coverage, experiment traces fed back into evolution, evidence-bound champion selection, and grounded novelty via `coscientist_verify` | [Research](docs/RESEARCH.md) |
-| **Deep research** | `deep_research`: a self-driving investigation on an append-only run ledger — frozen query, effort levels (`low`/`medium`/`high`) inferred from the request, scholarly sweep plus a web lane, contradiction graph, loci and depth notes, three drafts, four adversarial critics, capped-hunk repair, cite check against PaperMemory, independence clustering, untrusted-source fencing, and a ship gate that reports `not_checked` honestly | [Research](docs/RESEARCH.md#deep-research) |
-| **Reproducible analysis and data** | `analysis_run` frozen plans, hashed manifests, declared numbers, re-execution checks, and frozen-rule compliance; `experiment_log` staged subset/full comparisons with named reproduced or reported references, protocol drift, verdicts and Pareto ranking; `ablation` linked removal arms and attribution; `dataset_get`, `data_profile`, and `repro_package` with compliance exclusions and confirm-gated Zenodo drafts | [Reproducible analysis](docs/ANALYSIS.md) |
-| **Provenance audit** | `provenance_audit` read-only cross-ledger index: joins review, reporting, deep-review (claims, citation verdicts, validity flags), notebook, analysis (expectations, re-executions, compliance), experiment, ablation, dataset, meta-analysis, and AH claim sidecars by stored ids and hashes; coverage, unsupported (`no_link`/`not_checked`/`unverified`/`stale`/`not_found`/`spec_drift`/`no_attribution`/`rerun_mismatch`/`verdict_missing`), stale hashes, impact, the four-column `arms` readiness roll-up, the report-only `rollup` loop record with a reproduced-baseline gate and honest cost/time, and Markdown/CSV/JSON/GraphML/Mermaid exports | [Provenance audit](docs/PROVENANCE.md) |
-| **Scientific data and toolkits** | `science_source` (UniProt, RCSB PDB, AlphaFold DB, PubChem) with provenance on every record; local `chem_toolkit` (RDKit), `seq_toolkit`, and `structure_toolkit` that log hashed inputs | [Scientific data](docs/SCIENCE-DATA.md) |
-| **Discovery and reference checks** | `literature_watch` saved searches with unseen-only digests, `paper_recommend`, `citation_network` (frozen OpenAlex sample, centrality and clusters), `paper_artifacts` link/accession extraction, `citation` batch `audit` | [Discovery](docs/DISCOVERY.md) |
-| **Identity, funding, and audits** | `author_lookup` (ORCID/ROR), `openreview`, `grant_search`, `patent_search`, `stat_audit`, `figure_audit`, `repo_audit` (including `probe` and method→code `align`), `pdf_references` (GROBID); advisory, never verdicts | [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) |
-| **Study planning** | `power_analysis`: sample size, power, effect sizes, multiplicity correction, simulation | [Research](docs/RESEARCH.md#study-planning) |
-| **Study conduct, ethics, and grants** | `preregister` hashed write-once plans; `causal_dag` identification diagnostics and E-values; `design` seeded randomization/DOE; `ethics_protocol` and `deidentify` for ethics and PHI/PII review; `dmp` funder-shaped data-management plans; `grant_budget` multi-year budgets with arithmetic checks. None submits or certifies compliance | [Research](docs/RESEARCH.md#pre-registration) |
-| **Clinical and policy records** | `clinicaltrials`, `openfda`, `dataset_search`, `journal_policy`, `funder_policy` | [Research](docs/RESEARCH.md) |
-| **Workspace and notebook** | zvec-grep semantic search, lab notebook, `scientific_result`, `fold_text`, `research_template`, `sci_inspect` | [Workspace](docs/WORKSPACE.md) |
-| **Compute and delegation** | `runpod_run`/`modal_run`/`vastai_run`, `subagent` with optional `subagent_pro`/`subagent_vision` routes, specialist briefs, `agent-browser` | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) |
-| **Skills** | 790 bundled skills: 140 domain, 16 methodology, 503 expert profiles, 23 drug-discovery, 12 Supervisor-Skills research-lifecycle skills, plus writing, figures, agents, and compute; `pele` renders Mermaid without a browser | [Skills](docs/SKILLS.md) |
-| **Self-improvement** | Local RSI: capture, diagnose, admit, inject, compare against control, promote or quarantine | [RSI](docs/RSI.md) |
-| **Configuration** | Settings → Academic Harness API keys; every credential is optional at install | [Configuration](docs/CONFIGURATION.md) |
-
-### Search tools
-
-| Tool | What it does |
-|---|---|
-| `literature_search` | One-shot multi-source search: Jev (TypeSafe) picks the sources and reorders the results, merged by DOI with RRF fusion; keyword rules when no key is set |
-| `journal_search` | Venue discovery and metrics across OpenAlex, DOAJ, and Crossref; optional CiteScore/SJR/SNIP and JCR JIF/JCI |
-| `paper_get` | Merge one paper across OpenAlex, S2, Crossref, Europe PMC, and arXiv; OA URL and canonical BibTeX |
-| `paper_context` | Focus-ranked sections/snippets from S2, arXiv HTML, PMC BioC/PubTator3, optional publisher TDM, and OA PDF |
-| `paper_resolve` | Convert DOI/PMID/PMCID/arXiv/OpenAlex/S2 and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers |
-| `openalex_search` | OpenAlex works, authors, sources, and topics with filters, facets, and source metrics |
-| `openalex_citations` | Forward, backward, or both citation trails with an OpenCitations fallback |
-| `s2_search` | Semantic Scholar relevance, bulk, and paper-scoped snippet search |
-| `pubmed_search` | Europe PMC by default; NCBI E-utilities on request; preprint filter |
-| `arxiv_search` | Fielded arXiv queries, serialized to one request every 3 seconds |
-| `crossref_lookup` | Canonical DOI metadata; polite pool via `CROSSREF_MAILTO` |
-| `domain_search` | Source-specific bioRxiv/ACL/INSPIRE/ADS/Scopus/WoS/Wikidata actions |
-| `database_catalog` | Source/key/capability catalog; reports key fields only as configured/not set |
-
-### How `literature_search` picks sources and orders results
-
-![How literature_search uses Jev](docs/assets/diagrams/jev-routing.png)
-
-[Jev](https://docs.typesafe.ai) is a small, fast TypeSafe model that answers yes/no questions about text. With a `TYPESAFE_API_KEY` (Settings → Academic Harness API keys; optional) it does two jobs in `literature_search`; without one, keyword rules pick the sources and a local BM25 ranking fused with the source order orders the results (no key, nothing sent anywhere).
-
-1. **Routing.** One request, about 0.2 s, reads the query in any language. If it is a topic search, Jev adds the field sources (PubMed, arXiv, INSPIRE, bioRxiv, ADS with a token) to OpenAlex and Semantic Scholar. If it is really something else (a retraction check, one named paper, clinical trials, datasets, patents, grants, a venue, news), only OpenAlex and Semantic Scholar run and the result names the better tool in `suggested_tools`, so no calls are wasted on PubMed or arXiv.
-2. **Reranking.** After the sources are merged (same DOI is one paper; different DOIs are never merged), Jev scores the top 30 for relevance to the query in one request, about 0.4 s, and the best matches go first. Each paper carries a `relevance` value. **With a Jev key, Jev does the rerank. Without one (or if Jev is down) a local BM25 ranking over title and abstract, fused with the source order, does it instead:** it needs no key and sends nothing anywhere, and it measured a small but real gain over the plain source order (below). Cohere Rerank is available only if you ask for it with `rerank: "cohere"` and a `COHERE_API_KEY`: on the same test data it was level with Jev on SciFact and behind it on NFCorpus, so it is not used automatically.
-
-Both steps fall back to the old behaviour if Jev is slow or down, and the result says so. `routing: "rules"` sends nothing to TypeSafe; `rerank: "off"` keeps the plain fused order and `rerank: "bm25"` forces the local ranking. Query text and public abstracts go to `api.typesafe.ai` (Jev), or to `api.cohere.com` only when you choose `rerank: "cohere"`.
-
-What was measured (details and limits in [Search](docs/SEARCH.md#jev-source-routing)):
-
-| Test | Without Jev | With Jev |
-|---|---|---|
-| Right field sources chosen (55 topic queries) | 47% | 96% |
-| Wasted extra-source calls on 40 non-paper queries | 15 | 2 |
-| Recognises what is being asked (148 blind queries) | 40% | 95% |
-| Same, non-English queries (27) | 4% | 100% |
-| Result order, nDCG@10, 31 live queries rated blind by a separate model | 0.79 | 0.93 |
-| Result order, nDCG@10, human-labelled SciFact / NFCorpus | 0.66 / 0.31 | 0.76 / 0.37 |
-| Jev vs Cohere Rerank, nDCG@10, 100 queries each (same BM25 top-30 pools: BM25 0.724 / 0.342) | Cohere 0.786 / 0.372 | Jev 0.803 / 0.395 |
-
-Order quality without a Jev key, on the same 36 live merged lists, every paper in the top 10 of any ordering rated blind in one pass by a separate model (nDCG@10, higher is better; this is a second rating pass, so absolute values differ a little from the table above, where the best possible order was computed over a different set of rated papers):
-
-| Order | nDCG@10 | Against plain source order (95% CI) |
-|---|---|---|
-| Plain source order (reciprocal-rank fusion) | 0.836 | |
-| BM25 alone | 0.843 | +0.007 (-0.028, +0.042): no gain, so not used on its own |
-| **BM25 fused with source order (the no-key fallback)** | **0.863** | **+0.027 (+0.005, +0.051); better on 20 queries, worse on 7** |
-| Jev rerank | 0.974 | +0.138 (+0.096, +0.184); better on 26, worse on 0 |
-
-So a key is worth having: the free fallback recovers about a fifth of Jev's gain.
-
-Source calls are also protected against slow providers: each source has a time limit, a source that fails twice in a row is paused for 2 minutes, and a provider whose daily quota is spent is not called again until it resets. Adding `OPENALEX_API_KEY` and `S2_API_KEY` in Settings keeps the two default sources reliable.
-
-Free sources need no key. ADS, Scopus, Web of Science, Springer, IEEE, and publisher TDM tiers use their own keys and are implemented but intentionally not live-tested here. Web and AI-native discovery remains available through `consensus_search`, `parallel_search`/`parallel_extract`, `brave_search`, `tavily_search`, `exa_search`, `perplexity_search`, `jina_read`, `core_search`, `elicit_search`, and `futurehouse_agent`, plus the Parallel, Firecrawl, and Scite MCP connectors. See [Search](docs/SEARCH.md) for routing and [Configuration](docs/CONFIGURATION.md) for the key fields.
-
-The complete tool list, with scope and links, is the **[tool index](docs/TOOLS.md)**. The [architecture guide](docs/ARCHITECTURE.md) explains which tools are available on every preset and which are preset-only.
-
-## How a request works
-
-![Request lifecycle](docs/assets/diagrams/request-lifecycle.svg)
-
-Discovery finds candidate papers, `paper_resolve` collapses their identifiers, `paper_get` produces one merged metadata/BibTeX record, and `integrity_check` reports retraction status. A downloaded PDF is stored as content-addressed Markdown in PaperMemory, and a quotation must pass `quote_check` or `trace` before the agent treats it as evidence. The notebook records the work; `scientific_result` records the final finding.
-
-## Evidence-led research and revision
-
-![Evidence-led research and revision: limitations, ideas, staged experiments, attribution, review, revision, and integrity audit](docs/assets/diagrams/evidence-cycle.svg)
-
-The [ScientistTwo-inspired roadmap](docs/SCIENTISTTWO-ROADMAP.md) has implemented phases 0–10; maintenance continues. Its components support a **human-directed, auditable workflow**, not an unattended loop:
-
-1. **Ground ideas:** `coscientist` records source-quoted limitations, prior-art checks, idea coverage, experiment traces, and an evidence-bound selection.
-2. **Test and attribute:** `experiment_log` distinguishes reproduced from reported baselines and records subset/full stages, protocol drift and verdicts. `analysis_run` records reproducible runs and score checks; `ablation` links removal arms to evidence.
-3. **Review and revise:** `deep_review` preserves rounds, compares changes and records evaluator provenance. `rebuttal` tracks reviewer points, linked evidence, answers and declines; a fresh review can check what changed.
-4. **Audit the record:** `provenance_audit` joins existing ledgers, reports the four integrity columns and a read-only `rollup`, including missing evidence and unrecorded cost. Violations of frozen task rules are excluded from selection and reproducibility packages.
-
-Readings and verdict records are advisory, not acceptance decisions. The roll-up does not execute experiments or promote an incumbent; `not_checked` is not a pass. The existing `ah_check` writing gate remains separate. See [Research](docs/RESEARCH.md), [Analysis](docs/ANALYSIS.md), [Writing](docs/WRITING.md#reviewer-response-ledger), and [Provenance](docs/PROVENANCE.md).
-
-## Deep review
-
-![Deep review](docs/assets/diagrams/deep-review.svg)
-
-`deep_review` runs a full Deep-Review-style critique of one manuscript with the vendored
-[open-deepreview](https://github.com/raktim-mondol/open-deepreview) engine. The paper is segmented
-and every segment is reviewed with the whole manuscript in context; comments are anchored to a page
-or a quotation, and a scholar-peer pass adds strengths and weaknesses, a claim-evidence map, a
-nine-item reproducibility checklist and questions for the authors. `estimate` prices a run before it
-starts, `review` runs on the session model (no separate key or endpoint), `show` reads a stored
-review back, and `status` marks it stale after the manuscript changes. Every pass is kept as a
-numbered round, so reviewing again after a revision does not erase the first, and `compare` diffs
-two rounds — findings closed, opened, or moved in severity, plus claim, checklist, and citation
-transitions. `validity` reads a stored round against a deterministic count of the manuscript itself
-and answers four advisory questions: whether a claimed gain has a removal arm behind it rather than
-only generic training controls, whether a stated before-and-after change sits in the evaluation
-harness rather than the model, how wide the results grid actually is, and whether a quality or
-feasibility counter-metric is reported beside a speed or memory gain. Each answers `clear`,
-`flagged`, or `not_checked` — a flag names an absence in the text, not a flaw in the work, and
-`not_checked` is not a pass — with at most one critic model call on the session route and none with
-`critic: false`. `score` adds four advisory dimension readings — soundness, originality, clarity and
-significance — on a declared scale, each citing stored comment ids; it is one bounded model call,
-never an acceptance decision or a gate. Rounds record whether the reviewer was `held_out` or
-`in_distribution`, and Phase 0 can correlate stored scores with real decisions. Artifacts stay in
-`.dsh/deep-review/<key>/`, and `provenance_audit` indexes the
-claims stored there together with `extra_checks.json` (a `flagged` validity check appears as an
-unverified claim; `clear` is not a claim).
-[Read more](docs/PAPERS.md#deep-review)
-
-## Deep research
-
-![Deep research](docs/assets/diagrams/deep-research.svg)
-
-`deep_research` runs the investigation a literature question actually asks for, and keeps the
-state a chat cannot. The request is frozen verbatim and re-read by every step, so a long run
-cannot quietly drift onto a different question. It sweeps the literature through the existing
-`literature_search` router and a web lane (Parallel, Exa, Tavily, Brave) for guidance documents,
-registers, and reporting; finds where the sources contradict each other; picks the loci where
-reading deeply would change the answer; drafts from three angles; then has four critics attack the
-draft and repairs it with capped hunks — after synthesis the report cannot be regenerated, only
-patched.
-
-Two things it counts that a plain agent gets wrong. **Voice, not copies:** an independence
-clustering pass groups DOI, exact and near titles, and identical bodies across hosts, so five
-reprints of one press release argue with the weight of one source (distinct DOIs are never
-merged). **Verified, not plausible:** every citation is checked against stored text in
-PaperMemory, a quote nothing read is reported `not_checked` rather than passed, and an
-unacknowledged retraction blocks the ship. Fetched pages arrive inside an
-`<untrusted-source>` fence, so a page that tries to instruct the agent is read as content.
-
-Scale is one knob — `effort=low|medium|high` — and it is inferred from the request when not given
-("quickly" is low, "comprehensive systematic review" is high). A request that points both ways
-returns `needs_input` with a question and creates nothing: no run, no model call. Runs are
-resumable and budget-capped, so a crash continues at the step that died instead of restarting.
-The pipeline shape — step-per-phase, the frozen canonical query, patch-only repair, the ship
-gate, independence clustering, and untrusted-source fencing — is adapted from
-[hyperresearch](https://github.com/jordan-gibbs/hyperresearch) (MIT); no upstream code is
-vendored, and [NOTICE](NOTICE) records the attribution.
-[Read more](docs/RESEARCH.md#deep-research)
+- **Find and assess literature:** search scholarly sources, retrieve papers, and check claims against stored quotations. [Search](docs/SEARCH.md) · [Papers and evidence](docs/PAPERS.md)
+- **Investigate research questions:** run deep research, systematic reviews, meta-analyses, and hypothesis tournaments. [Research](docs/RESEARCH.md)
+- **Write and revise:** use the LaTeX writing oracle, citation tools, manuscript reviews, and reviewer-response ledgers. [Writing](docs/WRITING.md) · [Deep review](docs/PAPERS.md#deep-review)
+- **Keep work auditable:** record experiments, reproducible analyses, and links across research artifacts. [Analysis](docs/ANALYSIS.md) · [Provenance](docs/PROVENANCE.md) · [Workspace](docs/WORKSPACE.md)
+- **Extend your workflow:** use scientific data tools, specialist agents, bundled skills, and remote compute. [Scientific data](docs/SCIENCE-DATA.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [Compute](docs/COMPUTE.md)
 
 ## Documentation
 
-| Start here | Go deeper | Reference |
-|---|---|---|
-| [Install and run](docs/INSTALL.md) | [Search](docs/SEARCH.md) | [Tool index](docs/TOOLS.md) |
-| [Architecture](docs/ARCHITECTURE.md) | [Papers and evidence](docs/PAPERS.md) | [Configuration](docs/CONFIGURATION.md) |
-| [Documentation home](docs/README.md) | [Writing](docs/WRITING.md) | [Changelog](docs/CHANGELOG.md) |
-| | [Research](docs/RESEARCH.md) | [Development](docs/DEVELOPMENT.md) |
-| | [Workspace](docs/WORKSPACE.md) | [Engine notes](docs/ACADEMIC-HARNESS-ENGINE.md) |
-| | [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [RSI](docs/RSI.md) | |
-| | [Analysis](docs/ANALYSIS.md) · [Provenance](docs/PROVENANCE.md) · [Scientific data](docs/SCIENCE-DATA.md) · [Discovery](docs/DISCOVERY.md) · [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) | |
+The [documentation home](docs/README.md) lists all guides and diagrams. Start with the links below:
 
-## Requirements and scope
-
-- **Tested on Linux only.** The plugin, its runtime installs (PaperMemory, zvec-grep, TextFold), and the end-to-end browser tests have been run on Linux (Python 3.13, Node 24). macOS and Windows have not been tested and may not work; Python is needed for PaperMemory, `power_analysis`, the `sci_inspect` helpers, and the managed Modal SDK.
-- **DSH 0.2.1.** The plugin's bundle patches the web-app layer, so the profile must include `@deepseek-ai/dsh-web-app`; the standard `web` profile does. Newer DSH releases need compatibility testing before support is claimed.
-- **A preset check matters.** The research persona, search connectors, PaperMemory, zvec-grep, paper tools, citation/review/tournament tools, and the `subagent_pro`/`subagent_vision` routes are scoped to the Academic Harness preset. Both routes inherit the session model unless you configure a provider/model. Only the general-purpose tools (`notebook`, `fold_text`, `scientific_result`, `sci_inspect`, images, LaTeX, PDF, Mermaid, compute, templates) are on every preset.
-- **Keys are optional.** No credential is needed to install or start; each connector stays disabled until its key is present. Some runtimes install in the background on first use — see [Architecture](docs/ARCHITECTURE.md#runtime-installs).
-- **One DSH surface at a time.** `dsh-web`, `dsh-tui`, `dsh-martty`, and `academic-harness` share `$DSH_HOME`, port `3080`, and the zvec-grep daemon. Stop the previous one before starting another; see [Install](docs/INSTALL.md#one-dsh-surface-at-a-time).
-
-## Development
-
-```sh
-npm install       # once, for the Settings page build
-npm run build     # after any client/ change
-npm run docs:diagrams   # regenerate the SVG figures from docs/diagrams/*.mmd
-```
-
-Server-side code is plain ESM JS with no build step. Tests are plain Node scripts; see [Development](docs/DEVELOPMENT.md) for the full suite and the `paper_fold` live test.
+| Topic | Guides |
+|---|---|
+| Getting started | [Install and run](docs/INSTALL.md) · [Configuration](docs/CONFIGURATION.md) · [Architecture](docs/ARCHITECTURE.md) |
+| Research workflow | [Search](docs/SEARCH.md) · [Papers and evidence](docs/PAPERS.md) · [Research](docs/RESEARCH.md) · [Writing](docs/WRITING.md) |
+| Data and reproducibility | [Analysis](docs/ANALYSIS.md) · [Provenance](docs/PROVENANCE.md) · [Scientific data](docs/SCIENCE-DATA.md) · [Workspace](docs/WORKSPACE.md) |
+| More capabilities | [Discovery and reference checks](docs/DISCOVERY.md) · [Identity and audit tools](docs/IDENTITY-AND-AUDIT-TOOLS.md) · [Compute](docs/COMPUTE.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [Local self-improvement](docs/RSI.md) |
+| Reference | [Tool index](docs/TOOLS.md) · [Development](docs/DEVELOPMENT.md) · [Changelog](docs/CHANGELOG.md) · [Engine notes](docs/ACADEMIC-HARNESS-ENGINE.md) · [ScientistTwo roadmap](docs/SCIENTISTTWO-ROADMAP.md) |
 
 ## License
 
-MIT — see [LICENSE](LICENSE). Scientific skills are vendored or adapted from several open-source catalogues; [NOTICE](NOTICE) records exactly what was copied, renamed, or adapted from each. The Supervisor-Skills bundle is mixed-license: six skills are CC BY 4.0, five are CC BY-NC-SA 4.0 (non-commercial, share-alike), and `drawio-reconstruction` is MIT; those terms apply to those skill files, not to the plugin as a whole.
+MIT — see [LICENSE](LICENSE). Some bundled skills have different license terms, including non-commercial terms; see [NOTICE](NOTICE) for attribution and details.
