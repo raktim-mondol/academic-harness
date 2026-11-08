@@ -48,7 +48,14 @@ CI requires this test (`TEXTFOLD_LIVE_REQUIRED=1`) and runs the vendored PaperMe
 
 Set up the profile on a real disk, not `/tmp` (a `tmpfs` with a per-user quota fills quickly): create `<dir>/home/profiles/e2e/package.json` with `@deepseek-ai/dsh`, `dsh-base` and `dsh-web-app` at one version plus `academic-harness` as `file:<tarball>`, and a `cordis.yml` containing `[]`. Install a **packed copy from a clean export** (`git archive HEAD | tar -x -C <src>`, then `npm pack` there), not a symlink to the working tree, whose `node_modules` may be older than the profile's. After repacking, delete the profile's `package-lock.json` or npm reuses the stale tarball.
 
-Not covered: a real model's judgement, the approval prompts a model would raise, and any provider-specific behaviour.
+Not covered by the scripted run: a real model's judgement and the approval prompts a model would raise. `real-model.mjs` drives the same isolated DSH with a **real** model (the key comes from your environment and is never read or printed; it spends credits) one turn at a time, and dumps every tool call and result from the session log. A model's `ask_user_question` blocks the turn until it is answered; the host rejected the RPC answer in testing, so answer it in the web UI (agent-browser works).
+
+**Real-model run, 2026-11-08** (DeepSeek Flash, one session of four turns; one model, one scenario, with my own scripted approvals, so an observation and not a statistic):
+
+- *Turn 1, no instruction to stop.* The model fetched the `research-cycle` template, inspected the workspace read-only, profiled the data, wrote notebook notes, asked two rounds of questions, and stopped at scope. It made no consequential call and declined to scaffold code. It guessed placeholder keys (`experiment_slug`) and was never told they matched nothing; `research_template` now says so.
+- *Turn 2, one approved action.* Exactly one `analysis_run run` with the approved command. It then flagged, unprompted, that the "metrics" were literals hard-coded in the script.
+- *Turns 3-4.* It delegated the picture to `subagent_vision`, which reported an empty 8x8 placeholder square, and passed that reading as `vision_review`. The handoff's own states were all consistent (hash current, run succeeded, caption numbers equal the metrics file): the report cannot tell that a figure shows nothing, and only the vision reading and the model's reasoning did. The model reconciled the two itself. Its first `prior_art` call declared abstracts but supplied no text, so the tool reported every quotation `not_checked`; the retry verified 5 of 5. Quotations are checked only against the text the caller supplies, so a caller that invents both text and quotation would pass. It also paraphrased `overlap_candidates` (five partial overlaps) as "no close overlap found"; the statement text now says outright that partial overlap is overlap.
+
 
 ## Documentation diagrams
 

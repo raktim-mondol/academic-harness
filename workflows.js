@@ -43,6 +43,10 @@ export function queryResearchTemplates(args = {}) {
     const missing = (w.placeholders ?? [])
       .filter((p) => p.required && !(args.values && typeof args.values[p.key] === 'string' && args.values[p.key].trim()))
       .map((p) => p.key)
+    // A caller (especially a model that skipped action=list) may guess its own keys; report
+    // the ones that matched no placeholder instead of silently ignoring them.
+    const known = new Set((w.placeholders ?? []).map((p) => p.key))
+    const unknown = args.values && typeof args.values === 'object' ? Object.keys(args.values).filter((key) => !known.has(key)).sort() : []
     return {
       id: w.id,
       name: w.name,
@@ -50,7 +54,9 @@ export function queryResearchTemplates(args = {}) {
       requiresFiles: Boolean(w.requiresFiles),
       suggestedSkills: w.suggestedSkills ?? [],
       prompt: fillPrompt(w.prompt, args.values),
+      ...(known.size ? { placeholders: [...known] } : {}),
       ...(missing.length ? { missing_required_values: missing } : {}),
+      ...(unknown.length ? { unrecognized_value_keys: unknown } : {}),
     }
   }
 
@@ -105,7 +111,11 @@ export function applyWorkflows(ctx) {
           return [{ type: 'text', text: `${value.workflows.length} workflow(s):\n${value.workflows.map((w) => `- ${w.id}: ${w.name} (${w.category})`).join('\n')}` }]
         }
         if (value.error) return [{ type: 'text', text: value.error }]
-        return [{ type: 'text', text: value.prompt }]
+        // The model only sees this text, so a template with unfilled or ignored values must say so.
+        const notes = []
+        if (value.missing_required_values?.length) notes.push(`Missing required value(s): ${value.missing_required_values.join(', ')}. Their {tokens} above are still unfilled; ask the user or call again with them.`)
+        if (value.unrecognized_value_keys?.length) notes.push(`Ignored value key(s) that match no placeholder: ${value.unrecognized_value_keys.join(', ')}. This template's placeholders are: ${(value.placeholders ?? []).join(', ') || '(none)'}.`)
+        return [{ type: 'text', text: notes.length ? `${value.prompt}\n\n[template notice] ${notes.join(' ')}` : value.prompt }]
       },
     },
     async execute(args) {

@@ -2,6 +2,14 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.48.1
+
+Fixes found by running the research-cycle guide against a real model in an isolated DSH. No behaviour change for correctly filled templates or for `no_close_overlap_found_in_searched_material`.
+
+- **`research_template` reports missing and ignored values.** A real model called `get` with guessed keys (`experiment_slug`, `data_path`); they were silently ignored and the rendered text never said `{slug}` was unfilled. `get` now returns the placeholder list and unrecognized keys, and the rendered text appends a `[template notice]`.
+- **`prior_art` statement text.** For claimed overlap the text now gives the close and partial counts and says partial overlap is still overlap, not "no close overlap found"; the tool description says to report `statement` as returned. A real model had paraphrased five partial overlaps as "no close overlap found".
+- **Real-model run tooling and results.** `scripts/live-e2e/real-model.mjs` drives the isolated DSH with a real model, one turn at a time; results and caveats are in [Development](DEVELOPMENT.md#live-end-to-end-run-real-host-scripted-model).
+
 ## 0.48.0
 
 The human-directed research cycle: scoped experiment comparisons, repeated-seed and branch views, a guided workflow, and evidence-grounded prior-art and figure handoffs. Nothing here runs experiments, spends money, sends data, edits a manuscript, or publishes on its own.
