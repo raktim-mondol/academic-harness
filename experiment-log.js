@@ -353,13 +353,15 @@ export async function runExperimentAction(args, exec) {
       maxEdges: args.max_edges,
       maxLinksPerRun: args.max_links_per_run,
     })
+    // Optional fields are omitted, never set to undefined: the host rejects a tool result
+    // that is not lossless JSON, and undefined is not.
     return {
       action,
       format,
       branches,
-      mermaid: branches.mermaid,
-      path: branches.export?.path,
-      bytes: branches.export?.bytes,
+      ...(branches.mermaid !== undefined ? { mermaid: branches.mermaid } : {}),
+      ...(branches.export?.path !== undefined ? { path: branches.export.path } : {}),
+      ...(branches.export?.bytes !== undefined ? { bytes: branches.export.bytes } : {}),
     }
   }
 
