@@ -46,7 +46,7 @@ try {
     benchmark: { datasets: ['d'], splits: ['test'], baseline_arm: 'base', task_rules: ['no leakage'] }, protocol,
   } })
   await logExperimentRun({ cwd, slug: 'exp', metrics: { acc: 0.8 }, role: 'baseline', baselineRef: 'reproduced', stage: 'full', sampling: { rule: 'all' }, protocol })
-  await logExperimentRun({ cwd, slug: 'exp', metrics: { acc: 0.9 }, role: 'variant', baselineRef: 'reproduced', stage: 'full', sampling: { rule: 'all' }, protocol })
+  await logExperimentRun({ cwd, slug: 'exp', metrics: { acc: 0.9 }, role: 'variant', baselineRef: 'reproduced', stage: 'full', sampling: { rule: 'all' }, baselineRunId: 'x0001', protocol })
 
   // Two ablations: one without a verdict, one explicitly unattributed.
   await startExperiment({ cwd, slug: 'runs', experiment: { question: 'runs', metrics: [{ name: 'acc', direction: 'higher' }] } })

@@ -4,10 +4,37 @@ This page covers the local ledgers that keep work auditable past the context win
 
 For limitation and prior-art triage, load `limitation-mining` and
 `novelty-triage`. The `research_template` actions `limitation-mining`,
-`subset-first-eval`, `ablation-plan`, `rebuttal-plan`, and
-`review-round-diff` are prompt templates, not executors. They connect existing
-ledgers without turning a generated hypothesis or a lexical novelty reading
-into a scientific finding.
+`subset-first-eval`, `ablation-plan`, `rebuttal-plan`,
+`review-round-diff`, and `research-cycle` are prompt templates, not executors.
+They connect existing ledgers without turning a generated hypothesis or a
+lexical novelty reading into a scientific finding.
+
+### Guided research cycle
+
+`research_template action=get id=research-cycle slug=<slug> question=<question>`
+returns a prompt that walks one human-directed path through the existing tools.
+It starts nothing: the agent does one step, reports it, and stops for the
+researcher. Status comes from the source ledgers (`provenance_audit rollup` is
+the cross-ledger report); there is no second state machine, and missing records
+are reported separately from `unknown`/`not_checked` states, never as a pass.
+
+| Step | Existing tools | Approval needed before |
+|---|---|---|
+| 1. Scope | the brief, optional preregistration | nothing is run |
+| 2. Prior art and hypotheses | search tools, PaperMemory, `coscientist`, `coscientist_verify novelty` | nothing is run; the researcher selects or rejects hypotheses |
+| 3. Plan and baseline | `analysis_run plan`, `experiment_log start`, `dataset_get`, `data_profile` | nothing is run; missing inputs are listed |
+| 4. Pilot or slice | `analysis_run run`, `experiment_log log`, optional `runpod_run`/`modal_run`/`vastai_run` | the exact command, data transfer, environment, and cost bound |
+| 5. Compare and repeat | scoped `compare`/`best`, `replicates`, `branches` | nothing is run; no winning seed or significance claim |
+| 6. Follow-up | `ablation`, optional `coscientist trace` | any new execution |
+| 7. Draft and review | `provenance_audit`, `deep_review estimate`, `rebuttal` | a full review or any manuscript edit |
+| 8. Export | `repro_package plan` | a draft deposit, which keeps its own explicit-confirmation flow |
+
+Approval is action-specific: a general instruction to explore does not permit a
+new command, upload, paid provisioning, or manuscript edit, and changed inputs
+or a larger cost or scope need a fresh approval. The agent follows the host's
+actual approval controls (`ask_user_question`); the template does not create a
+durable approval record. Nothing here gates a turn: `ah_check` remains the only
+blocking gate.
 
 ## Systematic reviews
 

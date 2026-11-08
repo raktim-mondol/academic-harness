@@ -8,7 +8,7 @@
 
 It installs as a DSH plugin and provides an **Academic Harness** preset. Its tools support human-directed research; advisory reviews and audit results are not substitutes for expert judgment.
 
-![Academic Harness architecture overview](docs/assets/diagrams/architecture.svg)
+![Academic Harness capability map](docs/assets/diagrams/capability-map.svg)
 
 ## Quick start
 

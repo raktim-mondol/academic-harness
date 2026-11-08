@@ -6,6 +6,7 @@
 import { existsSync } from 'node:fs'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
+import { figureHandoff, renderFigureHandoff } from './figure-handoff.js'
 import { runHelper } from './python-runtime.js'
 
 function workspaceRoot(exec) {
@@ -26,6 +27,15 @@ function resolveInside(cwd, path) {
 export async function runFigureAudit(args, exec, deps = {}) {
   const helper = deps.runHelper || runHelper
   const cwd = workspaceRoot(exec)
+  const action = args.action ?? 'inventory'
+  if (action === 'handoff') {
+    try {
+      return figureHandoff({ cwd, figure: args.figure, caption: args.caption, reference: args.reference, sources: args.sources, values: args.values })
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+  if (action !== 'inventory') return { error: 'action must be inventory or handoff' }
   const paths = Array.isArray(args.paths) ? args.paths : (args.paths ? [args.paths] : [])
   let resolved = []
   let dir = null
@@ -53,6 +63,7 @@ export async function runFigureAudit(args, exec, deps = {}) {
 }
 
 function render(value) {
+  if (value.action === 'handoff') return renderFigureHandoff(value)
   if (value.error) return [{ type: 'text', text: `Error: ${value.error}` }]
   const lines = [
     `Figure audit: ${value.summary.files} file(s) · ${value.summary.low_dpi} below ${value.min_dpi} DPI · ${value.summary.dpi_missing} without DPI metadata · ${value.summary.duplicate_pairs} near-duplicate pair(s)`,
@@ -91,6 +102,20 @@ export function apply(ctx) {
       'Requires Pillow in the Python helper environment.',
     ].join(' '),
     parameters: {
+      action: { type: 'string', enum: ['inventory', 'handoff'], description: 'inventory (default) audits image files. handoff is a read-only figure-to-result report: it joins one figure (and optional caption) to the analysis_run / experiment_run records you declare, and reports link, hash, execution, and extracted-number states. Nothing is written or inferred.' },
+      figure: { type: 'string', description: 'handoff: workspace-relative figure path.' },
+      reference: { type: 'string', description: 'handoff: optional manuscript label such as "Figure 2".' },
+      caption: { type: 'string', description: 'handoff: optional caption text. Plain numbers are compared with values you extract; the comparison is advisory.' },
+      sources: {
+        type: 'array',
+        description: 'handoff: every generating record you declare, e.g. [{kind: "analysis_run", slug, run_id, path?}] or [{kind: "experiment_run", slug, run_id, path?}]. `path` names a hashed data file of that run that values may be read from. All declared links are kept; none is guessed.',
+        items: { type: 'object', additionalProperties: true },
+      },
+      values: {
+        type: 'array',
+        description: 'handoff: numbers to read from a hashed source path: [{path, format: "json"|"csv"|"tsv", field (json dotted path such as "metrics.acc" or "rows[0].f1"), column + row (csv/tsv header name and zero-based data row)}]. Format is never inferred, and a path whose bytes are not confirmed by a run is not_checked.',
+        items: { type: 'object', additionalProperties: true },
+      },
       paths: {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
         description: 'Workspace-relative image path(s).',

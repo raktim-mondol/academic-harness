@@ -165,8 +165,12 @@ for (const marker of ['journal_search', 'paper_get', 'paper_context', 'openalex_
 }
 
 const readmeSource = readFileSync(join(root, 'README.md'), 'utf8')
+const architectureSource = readFileSync(join(root, 'docs/ARCHITECTURE.md'), 'utf8')
+check(readmeSource.includes('docs/assets/diagrams/capability-map.svg'), 'README.md missing capability map figure')
+check(readmeSource.includes('docs/ARCHITECTURE.md'), 'README.md missing architecture guide link')
+check(architectureSource.includes('assets/diagrams/architecture.svg'), 'architecture guide missing architecture diagram')
 for (const marker of ['journal_search', 'paper_get', 'paper_context', 'paper_resolve', 'openalex_citations', 'database_catalog']) {
-  check(readmeSource.includes(marker), `README.md missing search marker: ${marker}`)
+  check(architectureSource.includes(marker), `architecture guide missing search marker: ${marker}`)
 }
 const searchRoutingSource = readFileSync(join(root, 'docs/diagrams/search-routing.mmd'), 'utf8')
 for (const marker of ['journal_search', 'paper_get', 'paper_context', 'openalex_citations', 'database_catalog']) {

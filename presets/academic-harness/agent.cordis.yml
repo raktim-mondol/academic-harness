@@ -779,6 +779,13 @@
 - id: repo-audit
   name: academic-harness/repo-audit
 
+# Prior-art triage (Phase 5A): assembles a report for one claim from searches the
+# agent already ran. It does not search and never says a claim is novel. See
+# prior-art.js. The figure-to-result handoff is `figure_audit action=handoff`
+# (figure-handoff.js).
+- id: prior-art
+  name: academic-harness/prior-art
+
 # Funding and patent discovery. patent_search additionally requires
 # PATENTSVIEW_API_KEY on every call and returns a clear error without it. See
 # grant-search.js and patent-search.js.

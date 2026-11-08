@@ -1,10 +1,10 @@
 ---
 name: experiment-tracking
-description: Track hyperparameter sweeps, simulations, pilots, and model comparisons with the native `experiment_log` ledger — append-only runs with params, metrics, hashed artifacts, seeds, parents, and captured environment; a staged benchmark contract with baseline/variant roles, subset/slice/full stages, sampling rules, and a protocol digest that reports spec drift; advisory good/engineer/bad verdicts with a force-bad exhausted engineering budget; best by named metric or the multi-metric Pareto front, with runs linked to a compliance-violating analysis run excluded; compare tables; links to notebook entries, analysis runs, and papers; CSV/JSON/Markdown/MLflow export. Use when a set of runs is too large or too varied for a single pre-registered analysis plan.
+description: Use when tracking sweeps, simulations, pilots, or model comparisons with the experiment ledger and scoped rankings.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
-  version: "1.1"
+  version: "1.2"
   skill-author: Academic Harness
 ---
 
@@ -50,38 +50,61 @@ run that confirms it.
    For a staged experiment, log the baseline first:
 
    ```text
-   experiment_log action=log slug=bench role=baseline baseline_ref=reproduced stage=subset
-     sampling={"size":32,"seed":7,"stratification":"by dataset"} metrics={"accuracy":0.80,"latency":100}
-   experiment_log action=log slug=bench role=variant baseline_ref=reproduced stage=full
+   experiment_log action=log slug=bench role=baseline baseline_ref=reproduced stage=full
+     comparison_identity={"dataset":{"id":"D1","version_or_hash":"v1"},"split":{"id":"test","version_or_hash":"v1"},"baseline_cohort_id":"reference-v1","metric_definitions":{"accuracy":{"unit":"fraction","implementation":"accuracy-v1","parameters":{}},"latency":{"unit":"ms","implementation":"timer-v1","parameters":{}}}}
+     metrics={"accuracy":0.80,"latency":100}
+   experiment_log action=log slug=bench role=variant baseline_ref=reproduced stage=full baseline_run_id=x0001
+     comparison_identity={"dataset":{"id":"D1","version_or_hash":"v1"},"split":{"id":"test","version_or_hash":"v1"},"baseline_cohort_id":"reference-v1","metric_definitions":{"accuracy":{"unit":"fraction","implementation":"accuracy-v1","parameters":{}},"latency":{"unit":"ms","implementation":"timer-v1","parameters":{}}}}
      metrics={"accuracy":0.85,"latency":90}
    ```
 
-   The baseline captures `protocol_digest`; every variant must name a baseline
-   with the same `baseline_ref`. A changed `eval_script` or `metric_params` is
+   The baseline captures `protocol_digest`; every variant must name its explicit
+   `baseline_run_id` with the same reference, stage, and sampling. A changed `eval_script` or `metric_params` is
    stored as `spec_drift` against that baseline. Never paper over drift by
    editing the baseline; log the changed protocol as its own run and report it.
 
 3. **Compare and select.**
 
    ```text
-   experiment_log action=compare slug=lr-sweep field=lr
-   experiment_log action=best slug=lr-sweep metric=accuracy
-   experiment_log action=best slug=bench dominance=true
+   experiment_log action=compare slug=bench
+   experiment_log action=compare slug=bench scope_id=<scope-id-from-compare> field=lr
+   experiment_log action=best slug=bench scope_id=<scope-id-from-compare> metric=accuracy
+   experiment_log action=best slug=bench scope_id=<scope-id-from-compare> dominance=true
    ```
 
-   `best` requires a named metric; an undeclared metric also needs an explicit
-   `direction`. Ties are listed, not silently broken. `dominance: true` returns
+   `best` requires a declared metric and explicit scope; its declared direction
+   cannot be overridden. A scope is a user declaration, not verification.
+   Runs without identities remain visible but are not ranked. Ties are listed,
+   not silently broken. `dominance: true` returns
    the Pareto front over declared metrics; a run missing a metric is incomplete
    and not ranked. Never report "the best model" without saying which metric
    and direction chose it, and do not present the front as a scientific result.
 
-4. **Record the human verdict.** `action=verdict run_id=x0007 verdict=engineer
+4. **Summarize repeated runs.** Log the candidate label in `params.method` and
+   the actual seed on every run. Use, for example:
+
+   ```text
+   experiment_log action=replicates slug=bench scope_id=<scope-id-from-compare>
+     metric=accuracy candidate_field=method candidates=["base","variant"]
+     baseline_candidate=base replicate_unit="one independent training run"
+     expected_seeds=[1,2,3] selection_history=unknown
+   ```
+
+   If the intended seeds are unknown, omit `expected_seeds` and pass
+   `coverage_unknown=true`. Duplicate seeds, missing values, failed or
+   incompatible runs, and unexpected seeds are visible and not silently
+   averaged. Pairing requires the variant's explicit baseline run ID and the
+   same seed; equal seed numbers alone are insufficient. The grouping, unit,
+   and selection history are user declarations. Mean and sample SD are
+   descriptive; do not infer significance, confidence intervals, or a winner.
+
+5. **Record the human verdict.** `action=verdict run_id=x0007 verdict=engineer
    reason="try a wider slice" engineering_round=2
    budget={"max_rounds":2,"used":2}`. Engineer is not terminal: an exhausted
    budget is force-`bad`, with both the request and the forced outcome stored.
    The verdict is an advisory human decision, not a model output.
 
-5. **Link, don't duplicate.** `action=link run_id=x0007 target_kind=analysis_run
+6. **Link, don't duplicate.** `action=link run_id=x0007 target_kind=analysis_run
    target_id=run-…` connects a promising configuration to the pre-registered
    confirmation run, a notebook entry, or a paper. The link is live: if the
    linked `analysis_run` fails its frozen task rules (`analysis_run
@@ -91,7 +114,26 @@ run that confirms it.
    record naming the analysis run and the violated rule ids — discard the
    solution, do not "refine" it, and a recorded violation is sticky.
 
-6. **Export.** `export format=csv|json|markdown` for reports; `format=mlflow`
+7. **Read the branch history.** When a run needs context — what it came from,
+   what was tried beside it, or why it stopped — use the read-only branch view:
+
+   ```text
+   experiment_log action=branches slug=bench
+   experiment_log action=branches slug=bench format=json
+   experiment_log action=branches slug=bench format=mermaid write=true
+   ```
+
+   It follows recorded `parent` IDs and resolves links against the analysis,
+   notebook, and review ledgers. Read `status` as evidence-only: `failed` means
+   a linked analysis run recorded a non-zero exit or timeout, `pruned` means a
+   human verdict said `bad`, and `not_recorded`/`unknown` mean the ledger does
+   not know. A run without metrics is not failed. `paper` links are
+   `not_checked` and `scientific_result` links are `unknown` by design. Missing,
+   self, or cyclic parents and duplicate links are reported in `anomalies`, not
+   repaired. Text and JSON are read-only; only `format=mermaid write=true`
+   writes `exports/branches.mmd`.
+
+8. **Export.** `export format=csv|json|markdown` for reports; `format=mlflow`
    for an MLflow-compatible JSON (interop, not an MLflow backend).
 
 ## Rules
@@ -99,7 +141,9 @@ run that confirms it.
 - Log the params that actually ran, including the seed — a run without a seed
   is unreproducible by construction.
 - Do not edit runs.jsonl by hand; a wrong entry is corrected by logging a new
-  run or an analysis note, and the original stays.
+  run or an analysis note, and the original stays. The branch view reports
+  missing, self, or cyclic parents and duplicate links as anomalies; it never
+  repairs them, and neither should you.
 - Do not present compare/best output or a verdict as a result; findings go
   through `analysis_run`, `scientific_result`, or the manuscript with their own
   verification. The Pareto front and the verdict are advisory records.

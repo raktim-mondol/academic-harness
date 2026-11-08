@@ -60,10 +60,11 @@ try {
     benchmark: { datasets: ['d'], splits: ['val', 'test'], baseline_arm: 'static', task_rules: ['no test leakage'] }, protocol,
   } })
   await logExperimentRun({ cwd, slug: 'exp', metrics: { auroc: 0.78 }, params: { idea_id: 'h2' }, role: 'baseline', baselineRef: 'reproduced', stage: 'subset', sampling: { size: 100, seed: 7 }, protocol })
-  await logExperimentRun({ cwd, slug: 'exp', metrics: { auroc: 0.84 }, params: { idea_id: 'h1' }, role: 'variant', baselineRef: 'reproduced', stage: 'full', sampling: { rule: 'all' }, protocol })
+  await logExperimentRun({ cwd, slug: 'exp', metrics: { auroc: 0.78 }, role: 'baseline', baselineRef: 'reproduced', stage: 'full', sampling: { rule: 'all' }, protocol })
+  await logExperimentRun({ cwd, slug: 'exp', metrics: { auroc: 0.84 }, params: { idea_id: 'h1' }, role: 'variant', baselineRef: 'reproduced', stage: 'full', sampling: { rule: 'all' }, baselineRunId: 'x0002', protocol })
   await linkExperimentRun({ cwd, slug: 'exp', runId: 'x0001', targetKind: 'analysis_run', targetId: analysisRun.run_id })
-  await linkExperimentRun({ cwd, slug: 'exp', runId: 'x0002', targetKind: 'analysis_run', targetId: analysisRun.run_id })
-  await verdictExperiment({ cwd, slug: 'exp', runId: 'x0002', verdict: 'good', reason: 'improves AUROC' })
+  await linkExperimentRun({ cwd, slug: 'exp', runId: 'x0003', targetKind: 'analysis_run', targetId: analysisRun.run_id })
+  await verdictExperiment({ cwd, slug: 'exp', runId: 'x0003', verdict: 'good', reason: 'improves AUROC' })
 
   // Ablation: the champion's component has a good human attribution verdict.
   await startAblation({ cwd, slug: 'ab', ideaId: 'h1', method: { name: 'gate' }, question: 'Does the gate help?' })
@@ -103,7 +104,7 @@ try {
   assert.equal(cycle.ideas.counts.total, 2)
   assert.equal(cycle.ideas.champion_id, 'h1')
   assert.equal(cycle.stages.subset.run_count, 1)
-  assert.equal(cycle.stages.scale_up.run_count, 1)
+  assert.equal(cycle.stages.scale_up.run_count, 2)
   assert.equal(cycle.stages.scale_up.verdicts.good, 1)
   assert.equal(cycle.selection.idea_id, 'h1')
   assert.match(cycle.selection.evidence_digest, /^sha256:/)

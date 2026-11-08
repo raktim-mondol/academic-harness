@@ -51,24 +51,21 @@ try {
   // Compare, best, and named-metric discipline.
   result = await run({ action: 'compare', slug: 'sweep' })
   assert.equal(result.comparison.runs.length, 4)
-  assert.equal(result.comparison.best.accuracy.run_id, 'x0002')
-  assert.equal(result.comparison.best.accuracy.direction, 'higher')
-  assert.equal(result.comparison.best.loss.run_id, 'x0002')
-  assert.equal(result.comparison.best.loss.direction, 'lower')
+  assert.deepEqual(result.comparison.best, {}, 'legacy records are visible but never ranked without scope')
+  assert.ok(result.comparison.comparison_scope.assessments.every((entry) => entry.state === 'not_checked'))
   assert.equal(result.comparison.runs.find((entry) => entry.run_id === 'x0003').metrics.loss, undefined, 'missing metrics stay blank')
   result = await run({ action: 'compare', slug: 'sweep', field: 'lr' })
-  assert.ok(result.comparison.grouped.some((group) => group.value === '0.01' && group.runs === 2))
+  assert.deepEqual(result.comparison.grouped, [])
   result = await run({ action: 'best', slug: 'sweep', metric: 'accuracy' })
-  assert.equal(result.best.run.run_id, 'x0002')
-  assert.deepEqual(result.best.tied_runs, ['x0002', 'x0004'])
+  assert.match(result.error, /requires an explicit scope_id/)
   result = await run({ action: 'best', slug: 'sweep', metric: 'f1' })
-  assert.match(result.error, /no direction/)
+  assert.match(result.error, /requires an explicit scope_id/)
   result = await run({ action: 'best', slug: 'sweep', metric: 'f1', direction: 'higher' })
-  assert.equal(result.best.run.run_id, 'x0003')
+  assert.match(result.error, /requires an explicit scope_id/)
   result = await run({ action: 'best', slug: 'sweep' })
   assert.match(result.error, /named metric or dominance/)
   result = await run({ action: 'best', slug: 'sweep', metric: 'nonexistent', direction: 'higher' })
-  assert.match(result.error, /no run records metric/)
+  assert.match(result.error, /requires an explicit scope_id/)
 
   // Links, status, list, show. An analysis_run link must name a real run: a
   // dangling one would silently disable the compliance exclusion it claims to carry.
@@ -103,7 +100,7 @@ try {
   const report = readFileSync(join(cwd, result.path), 'utf8')
   assert.match(report, /# Experiment: LR sweep/)
   assert.match(report, /x0002/)
-  assert.match(report, /Best per named metric/)
+  assert.match(report, /No ranking: an explicit scope_id is required/)
   assert.match(report, /missing values stay blank/)
   result = await run({ action: 'export', slug: 'sweep' })
   assert.match(result.error, /already exists/)
@@ -165,19 +162,19 @@ try {
   assert.equal(result.experiment.metrics[0].direction, 'higher')
 
   result = await run({
-    action: 'log', slug: 'bench', role: 'baseline', baseline_ref: 'reproduced', stage: 'subset',
+    action: 'log', slug: 'bench', role: 'baseline', baseline_ref: 'reproduced', stage: 'full',
     sampling: { seed: 7, size: 32, stratification: 'by dataset' },
     params: { lr: 0.1 }, metrics: { accuracy: 0.8, latency: 100 },
   })
   assert.equal(result.run.run_id, 'x0001')
   assert.equal(result.run.role, 'baseline')
-  assert.equal(result.run.stage, 'subset')
+  assert.equal(result.run.stage, 'full')
   assert.equal(result.run.sampling.size, 32)
   assert.match(result.run.protocol_digest, /^sha256:[0-9a-f]{64}$/)
   assert.equal(result.run.spec_drift.state, 'baseline')
 
   result = await run({
-    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full',
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full', baseline_run_id: 'x0001', sampling: { seed: 7, size: 32, stratification: 'by dataset' },
     params: { lr: 0.05 }, metrics: { accuracy: 0.85, latency: 90 },
   })
   assert.equal(result.run.run_id, 'x0002')
@@ -185,7 +182,7 @@ try {
   assert.equal(result.run.spec_drift.state, 'match')
 
   result = await run({
-    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full',
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full', baseline_run_id: 'x0001', sampling: { seed: 7, size: 32, stratification: 'by dataset' },
     protocol: { eval_script: 'eval.py', metric_params: { threshold: 0.6 } },
     params: { lr: 0.05 }, metrics: { accuracy: 0.82, latency: 80 },
   })
@@ -195,7 +192,7 @@ try {
 
   workspace.write('eval.py', 'print("v2")\n')
   result = await run({
-    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full',
+    action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced', stage: 'full', baseline_run_id: 'x0001', sampling: { seed: 7, size: 32, stratification: 'by dataset' },
     params: { lr: 0.02 }, metrics: { accuracy: 0.88, latency: 95 },
   })
   assert.equal(result.run.run_id, 'x0004')
@@ -209,7 +206,7 @@ try {
     action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reported', stage: 'full',
     metrics: { accuracy: 0.8, latency: 90 },
   })
-  assert.match(result.error, /no baseline run with baseline_ref "reported"/)
+  assert.match(result.error, /explicit baseline_run_id/)
   result = await run({
     action: 'log', slug: 'bench', role: 'variant', baseline_ref: 'reproduced',
     metrics: { accuracy: 0.8, latency: 90 },
@@ -278,17 +275,11 @@ try {
   assert.equal(result.comparison.runs.find((entry) => entry.run_id === 'x0002').verdict.verdict, 'engineer')
 
   result = await run({ action: 'best', slug: 'bench', dominance: true })
-  assert.equal(result.best, null)
-  assert.equal(result.dominance.front.length, 3)
-  assert.deepEqual(result.dominance.front.map((entry) => entry.run_id).sort(), ['x0002', 'x0003', 'x0004'])
-  assert.deepEqual(result.dominance.dominated, ['x0001'])
-  assert.deepEqual(result.dominance.incomplete, [{ run_id: 'x0005', missing: ['latency'] }])
+  assert.match(result.error, /requires an explicit scope_id/)
   result = await run({ action: 'best', slug: 'bench', metric: 'accuracy', dominance: true })
-  assert.equal(result.best.run.run_id, 'x0005', 'single-metric best still considers an incomplete run')
-  assert.equal(result.dominance.front.length, 3)
+  assert.match(result.error, /requires an explicit scope_id/)
   result = await run({ action: 'best', slug: 'bench', metric: 'accuracy' })
-  assert.equal(result.best.run.run_id, 'x0005')
-  assert.equal(result.dominance, null)
+  assert.match(result.error, /requires an explicit scope_id/)
 
   result = await run({ action: 'export', slug: 'bench', format: 'markdown' })
   const benchReport = readFileSync(join(cwd, result.path), 'utf8')
