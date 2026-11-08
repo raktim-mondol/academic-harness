@@ -19,6 +19,7 @@
 import { existsSync, lstatSync, readFileSync, statSync } from 'node:fs'
 import { extname, posix } from 'node:path'
 import { hashFile, nowIso } from './ledger-kit.js'
+import { fenceUntrusted } from './untrusted-fence.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 import { listAnalysisRuns, excludedAnalysisRunIds } from './analysis-store.js'
 import { experimentBranches } from './experiment-store.js'
@@ -30,6 +31,7 @@ export const FIGURE_FORMATS = ['.png', '.jpg', '.jpeg', '.tif', '.tiff', '.gif',
 const MAX_SOURCES = 20
 const MAX_VALUES = 50
 const MAX_CAPTION = 20000
+const MAX_VISION_CHARS = 4000
 const MAX_HASH_BYTES = 200 * 1024 * 1024
 const MAX_PARSE_BYTES = 5 * 1024 * 1024
 
@@ -267,7 +269,27 @@ function matches(parsed, extracted) {
 
 /* --------------------------------------------------------------------- main */
 
-export function figureHandoff({ cwd, figure, caption = null, reference = null, sources = [], values = [] } = {}) {
+/**
+ * A vision reading is a model's interpretation of the image. It is recorded so the
+ * researcher can see it, labelled as such, and it never verifies the data, never
+ * changes a state, and never closes a gap.
+ */
+function visionReview(raw) {
+  if (raw == null) return { state: 'not_requested' }
+  if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('vision_review must be an object {summary, reviewer?}')
+  const summary = text(raw.summary).slice(0, MAX_VISION_CHARS)
+  if (!summary) return { state: 'not_requested', reason: 'vision_review had no summary' }
+  const reviewer = text(raw.reviewer)
+  return {
+    state: 'model_interpretation',
+    verified: false,
+    reviewer: /^[\w .:@/+-]{1,60}$/.test(reviewer) ? reviewer : null,
+    summary,
+    note: 'A model\'s reading of the picture. It does not verify the underlying data, a hash, or any state above, and it does not replace expert review.',
+  }
+}
+
+export function figureHandoff({ cwd, figure, caption = null, reference = null, sources = [], values = [], vision_review: vision = null } = {}) {
   const figureRel = text(figure)
   if (!figureRel) throw new Error('figure is required (a workspace-relative path)')
   if (!Array.isArray(sources)) throw new Error('sources must be an array')
@@ -377,6 +399,7 @@ export function figureHandoff({ cwd, figure, caption = null, reference = null, s
     sources: outSources,
     values: outValues,
     caption: captionCheck,
+    vision_review: visionReview(vision),
     gaps: [...new Set(gaps)],
     limitations: [
       'A recorded relation between a run and a figure is not proof that the figure depicts that data.',
@@ -405,6 +428,9 @@ export function renderFigureHandoff(value) {
   for (const entry of value.values) lines.push(`- value [${entry.index}] ${entry.path}: ${entry.state === 'extracted' ? entry.value : `not_checked (${entry.reason})`}`)
   if (value.caption.state !== 'not_provided') {
     lines.push(`Caption (advisory): ${value.caption.state}${value.caption.reason ? ` — ${value.caption.reason}` : ` · ${value.caption.matched} matched, ${value.caption.unmatched} unmatched, ${value.caption.ambiguous} ambiguous of ${value.caption.parsed_count} number(s)`}`)
+  }
+  if (value.vision_review?.state === 'model_interpretation') {
+    lines.push(`Vision review (model interpretation, not verification${value.vision_review.reviewer ? `, by ${value.vision_review.reviewer}` : ''}):`, fenceUntrusted(value.vision_review.summary, { source: 'vision-review', kind: 'model-interpretation' }))
   }
   if (value.gaps.length) lines.push('', 'Gaps:', ...value.gaps.map((gap) => `- ${gap}`))
   lines.push('', ...value.limitations.map((note) => `Note: ${note}`))

@@ -276,6 +276,9 @@ assert.equal(wos.wos_uid, 'WOS:000123')
 assert.equal(wos.licence, 'restricted')
 assert.equal(wos.citation_count, 3)
 
+// A works search must ask for the abstract, or every OpenAlex result arrives as a bare title.
+assert.ok(buildOpenAlexParams({ entity: 'works', query: 'x' }, null, null).get('select').split(',').includes('abstract_inverted_index'), 'default works select includes the abstract')
+assert.ok(!buildOpenAlexParams({ entity: 'sources', query: 'x' }, null, null).get('select').includes('abstract_inverted_index'), 'and only for works')
 const grouped = buildOpenAlexParams({ entity: 'works', group_by: 'publication_year' }, null, null)
 assert.equal(grouped.has('select'), false, 'group_by must not send select')
 assert.equal(grouped.get('group_by'), 'publication_year')

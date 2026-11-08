@@ -30,7 +30,7 @@ export async function runFigureAudit(args, exec, deps = {}) {
   const action = args.action ?? 'inventory'
   if (action === 'handoff') {
     try {
-      return figureHandoff({ cwd, figure: args.figure, caption: args.caption, reference: args.reference, sources: args.sources, values: args.values })
+      return figureHandoff({ cwd, figure: args.figure, caption: args.caption, reference: args.reference, sources: args.sources, values: args.values, vision_review: args.vision_review })
     } catch (error) {
       return { error: error instanceof Error ? error.message : String(error) }
     }
@@ -116,6 +116,7 @@ export function apply(ctx) {
         description: 'handoff: numbers to read from a hashed source path: [{path, format: "json"|"csv"|"tsv", field (json dotted path such as "metrics.acc" or "rows[0].f1"), column + row (csv/tsv header name and zero-based data row)}]. Format is never inferred, and a path whose bytes are not confirmed by a run is not_checked.',
         items: { type: 'object', additionalProperties: true },
       },
+      vision_review: { type: 'object', additionalProperties: true, description: 'handoff: optional {summary, reviewer?}. The top-level agent cannot read images; delegate the picture to subagent_vision and pass its summary here. It is recorded and shown as a model interpretation only: it never verifies data or changes any state.' },
       paths: {
         oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }],
         description: 'Workspace-relative image path(s).',
