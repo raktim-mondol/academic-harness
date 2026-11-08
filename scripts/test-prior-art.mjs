@@ -127,6 +127,19 @@ assert.equal((rendered.match(/<\/untrusted-source>/g) || []).length, (rendered.m
 assert.match(rendered, /Prior-art triage: overlap_candidates/)
 assert.match(rendered, /Coverage limits:/)
 
+// A real model reported "no close overlap found" for five PARTIAL overlaps. The statement for
+// claimed overlap must say it is overlap and must not read like the reassuring sentence.
+const partialsOnly = priorArtReport({ claim: 'c d e', searches: [{ provider: 'p', query: 'q', status: 'ok', result_count: 2 }], candidates: [
+  { ref: { title: 'x' }, evidence_level: 'abstract', text: 'alpha beta gamma delta epsilon', quotes: [{ quote: 'alpha beta gamma delta', location: 'abstract' }], overlap: { claimed: 'partial', distinction: 'd' } },
+  { ref: { title: 'y' }, evidence_level: 'abstract', text: 'one two three four five six', quotes: [{ quote: 'one two three four five six', location: 'abstract' }], overlap: { claimed: 'partial', distinction: 'd' } },
+] })
+assert.equal(partialsOnly.statement, 'overlap_candidates')
+assert.match(partialsOnly.statement_text, /0 close, 2 partial; 2 with a verified quotation/)
+assert.match(partialsOnly.statement_text, /Partial overlap is still overlap: this is not the statement "no close overlap found in the searched material"/)
+assert.doesNotMatch(partialsOnly.statement_text, /\bnovel\b/i)
+const mixed = priorArtReport({ claim: 'c d e', searches: [{ provider: 'p', query: 'q', status: 'ok', result_count: 1 }], candidates: [{ ref: { title: 'x' }, evidence_level: 'abstract', text: 'alpha beta gamma delta epsilon', quotes: [], overlap: { claimed: 'close', distinction: 'd' } }] })
+assert.match(mixed.statement_text, /1 close, 0 partial; 0 with a verified quotation/)
+
 // ------------------------------------------- review findings, one by one
 // A trivial verbatim span cannot turn a claimed overlap into a supported one.
 const trivial = priorArtReport({ claim: 'c d e', searches: [{ provider: 'p', query: 'q', status: 'ok', result_count: 1 }], candidates: [{ ref: { title: 't' }, evidence_level: 'abstract', text: 'the we propose', quotes: [{ quote: 'the' }, { quote: 'we propose' }], overlap: { claimed: 'close', distinction: 'x' } }] })

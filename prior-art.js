@@ -225,7 +225,12 @@ export function priorArtReport({ claim, searches = [], candidates = [] } = {}) {
     statementText = 'No successful search was recorded, so nothing can be said about prior art.'
   } else if (overlapping.length) {
     statement = 'overlap_candidates'
-    statementText = `${overlapping.length} candidate(s) are claimed to overlap (${overlapping.filter((entry) => entry.support === 'supported_by_verified_quote').length} with a verified quotation); the researcher decides what they mean for the claim.`
+    const closeCount = overlapping.filter((entry) => entry.claimed_overlap === 'close').length
+    const partialCount = overlapping.length - closeCount
+    const quoted = overlapping.filter((entry) => entry.support === 'supported_by_verified_quote').length
+    // A real model once reported "no close overlap found" for five partial overlaps, taking the
+    // reassuring phrase from the tool description. Say plainly that overlap was claimed.
+    statementText = `${overlapping.length} candidate(s) are claimed to overlap (${closeCount} close, ${partialCount} partial; ${quoted} with a verified quotation). Partial overlap is still overlap: this is not the statement "no close overlap found in the searched material". The researcher decides what the candidates mean for the claim.`
   } else if (undecided.length || unreviewed) {
     statement = 'inconclusive'
     statementText = undecided.length
@@ -330,7 +335,7 @@ export function apply(ctx) {
       'Assemble a prior-art triage report for ONE claim from searches you already ran and candidates you already read. It does not search and does not judge meaning.',
       'Record every search (provider, query, status, access time, limit, result count, error) and every candidate (identifiers, evidence_level full_text|abstract|metadata_only|full_text_unavailable, the text you compared when you have it, quotations with locations, your claimed overlap none|partial|close|unknown, and your distinction).',
       'It reports coverage limits (failed or capped searches, abstract-only comparisons, unavailable full text), checks each quotation is a verbatim span (of at least 4 words) of the text you supplied for that candidate, keeps your claimed overlap separate from the evidence for it, and cross-checks it with a lexical token-overlap reading.',
-      'The strongest statement it makes is "no close overlap found in the searched material" with its limits; it never says a claim is novel, and it makes no statement when no search succeeded. Use PaperMemory quote_check for authoritative quote verification of ingested papers, and paper_resolve to resolve identifiers.',
+      'The strongest statement it makes is "no close overlap found in the searched material" with its limits; it never says a claim is novel, and it makes no statement when no search succeeded. Report the returned `statement` and `statement_text` as they are: use the "no close overlap" sentence only when `statement` is no_close_overlap_found_in_searched_material, never when it is overlap_candidates (even if every candidate is only partial) or inconclusive. Supply each candidate\'s `text` (the abstract you read) as well as the quotations, or the quotations stay not_checked. Use PaperMemory quote_check for authoritative quote verification of ingested papers, and paper_resolve to resolve identifiers.',
       'Read-only unless write is true, which saves the report (without candidate text) under .dsh/prior-art/<slug>/. Bounded: 20 searches and 50 candidates; ask before expanding queries that cost network or model time.',
     ].join(' '),
     parameters: {
