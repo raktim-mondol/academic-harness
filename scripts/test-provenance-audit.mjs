@@ -194,11 +194,11 @@ await startExperiment({
   },
 })
 await logExperimentRun({
-  cwd, slug: 'drift', role: 'baseline', baselineRef: 'reproduced', stage: 'subset',
-  sampling: { size: 16, seed: 1 }, params: { lr: 0.1 }, metrics: { loss: 0.5 },
+  cwd, slug: 'drift', role: 'baseline', baselineRef: 'reproduced', stage: 'full',
+  params: { lr: 0.1 }, metrics: { loss: 0.5 },
 })
 await logExperimentRun({
-  cwd, slug: 'drift', role: 'variant', baselineRef: 'reproduced', stage: 'full',
+  cwd, slug: 'drift', role: 'variant', baselineRef: 'reproduced', stage: 'full', baselineRunId: 'x0001',
   protocol: { eval_script: 'eval.py', metric_params: { threshold: 0.6 } },
   params: { lr: 0.1 }, metrics: { loss: 0.45 },
 })

@@ -101,20 +101,56 @@ rather than zero.
 Subset and slice stages require a sampling rule; the rule is ours to declare,
 not a claim that the slice is representative.
 
-The first `baseline` run captures a **`protocol_digest`**: SHA-256 of the
-evaluated script hash plus the canonical metric parameters. Every later
-`variant` must name a baseline with the same `baseline_ref`; its protocol is
+Each `baseline` run captures a **`protocol_digest`**: SHA-256 of the
+evaluated script hash plus the canonical metric parameters. Every new staged
+`variant` must supply `baseline_run_id` explicitly, naming a baseline in the
+same ledger with the same `baseline_ref`, stage, and sampling rule; its protocol is
 hashed the same way and compared. A changed eval script or metric parameters
 is recorded as **`spec_drift`** with the expected/actual digests and the
-changed components, not silently accepted. A variant with no matching
-baseline reference is refused.
+changed components, not silently accepted. An unknown or incompatible baseline
+is refused. Older recorded baseline references are never rewritten.
 
-**Selection.** `best` still selects by a named metric and direction (ties are
-listed). With `dominance: true` it also returns the **Pareto front** over all
+**Comparison identity.** Ranking additionally requires a user-declared
+`comparison_identity` on each staged run:
+
+```json
+{
+  "dataset": { "id": "D1", "version_or_hash": "v1" },
+  "split": { "id": "test", "version_or_hash": "split-v1" },
+  "baseline_cohort_id": "reference-v1",
+  "metric_definitions": {
+    "accuracy": { "unit": "fraction", "implementation": "accuracy-v1", "parameters": {} },
+    "latency": { "unit": "ms", "implementation": "timer-v1", "parameters": {} }
+  }
+}
+```
+
+The dataset and split IDs must appear in the benchmark, and every declared
+metric needs a unit, implementation identifier, and parameters object. Identity
+version 1 hashes the canonical JSON of these declarations together with stage,
+normalized sampling rule, protocol digest, baseline reference, metric names and
+directions. The resulting `scope_id` is returned on `log` and `compare`. The
+scope is **user-declared**, not proof of dataset integrity, equivalent random
+streams, or scientific validity. A variant carrying an identity must match its
+explicit baseline's identity except for protocol changes, which are recorded as
+drift and excluded from rankings.
+
+**Selection.** First call `compare` without a `scope_id` to inspect all raw runs,
+available scope IDs, and per-run assessments. No ranking is returned without a
+scope. Pass the desired `scope_id` to `compare`, `best`, `dominance`, or
+`export` to rank only that scope. `best` requires a declared metric and uses its
+declared direction (ties are listed). With `dominance: true` it returns the **Pareto front** over all
 declared metrics: a run dominates only when it is at least as good on every
 declared metric and strictly better on one. Runs missing a declared metric are
 listed as incomplete and not ranked. This is the plugin's specification of the
-paper's undefined "preferred" relation, not a scientific claim.
+paper's undefined "preferred" relation, not a scientific claim. Drifted,
+incompatible, unresolved, failed linked analysis runs, and compliance-excluded runs are reported separately.
+Historical or unstaged runs without a complete identity remain readable but are
+`not_checked` and cannot be ranked; no historical record is silently migrated.
+To compare them, log new runs with the required scope rather than editing old
+ledger entries. CSV/JSON/Markdown/MLflow exports retain the raw runs and include
+scope assessments. MLflow and other external consumers do not enforce these
+rules after import.
 
 **Compliance exclusion.** An experiment run linked to an `analysis_run` whose
 compliance ledger contains a `violated` verdict is excluded from `best`, `dominance`,
@@ -140,6 +176,121 @@ one. Verdicts are append-only; the latest per run is shown in `compare`,
 `export` writes CSV/JSON/Markdown or an MLflow-compatible JSON, including the
 staged fields and verdicts. The tool records logged values and human
 decisions; none of it is a scientific claim.
+
+### Repeated seeds and paired comparisons
+
+`experiment_log action=replicates` is a **read-only** descriptive report over
+one explicit comparison scope. It does not run jobs, edit ledgers, select a
+winner, calculate p-values, or produce confidence intervals. First log the
+actual seed on each run and put a consistent candidate label in `params` (for
+example, `{"method":"base"}` or `{"method":"variant"}`). A variant's
+`baseline_run_id` must identify the particular baseline run it is compared
+against; equal seed numbers alone do not establish that relationship.
+
+After `compare` shows the scope ID:
+
+```text
+experiment_log action=replicates slug=bench scope_id=<scope-id> metric=accuracy
+  candidate_field=method candidates=["base","variant"] baseline_candidate=base
+  replicate_unit="one independent training run" expected_seeds=[1,2,3]
+  selection_history=unknown
+```
+
+Alternatively, omit `expected_seeds` and pass `coverage_unknown=true`; missing
+and unexpected seed coverage is then unknown, not zero. `candidate_field`, the
+explicit candidate list, and `replicate_unit` are researcher declarations, not
+evidence that the runs are independent or that grouping is correct. The optional
+`selection_history` is `unknown` (default), `exploratory`, or
+`declared_preplanned`; the tool does not verify a preplanning claim.
+
+For each candidate, the JSON and text outputs show the raw run IDs, seed,
+metric value, parameters, baseline ID, scope assessment and inclusion reasons;
+expected/observed/missing/unexpected seeds; duplicates; and the mean and sample
+standard deviation. Mean is `sum(x) / n`; sample SD is
+`sqrt(sum((x - mean)^2) / (n - 1))`. SD is `not_checked` for fewer than
+two eligible values. Per-candidate `counts` summarize total, included, and
+excluded runs, eligibility states, missing or non-finite metrics, missing,
+duplicate, or unexpected seeds, and failed linked analyses. Duplicate seeds within the same candidate and scope are
+ambiguous, even when one attempt failed or lacks a metric: none of those
+duplicates are averaged. Missing seeds or metrics, unexpected seeds when an
+expected list was supplied, mixed baseline/variant candidate roles, incompatible
+scope, failed linked analyses, and compliance exclusions are visible but not
+included. Runs in the scope with an unselected or missing candidate label are
+listed separately. To distinguish reruns from independent replicates, record
+appropriate candidate labels and seeds; the tool will not choose among retries.
+
+When a `baseline_candidate` is supplied, only unambiguous included variant runs
+with the **same seed** as their explicitly linked included baseline are paired.
+The report lists every `variant − baseline` difference, unmatched runs on both
+sides, and the mean and sample SD of the paired differences. Direction is shown
+separately; a negative difference is not automatically called an improvement.
+Matching seeds do not guarantee identical random streams or independent samples,
+and matching declarations do not verify the science. The report is descriptive
+and must not be presented as a statistical significance or acceptance decision.
+
+### Branch view
+
+`experiment_log action=branches` is a **read-only** view over the same ledger:
+it follows recorded `parent` IDs and joins recorded runs, verdicts, links, and
+linked analysis manifests. It never executes anything, never creates a second
+experiment ledger, and writes nothing unless a Mermaid export is explicitly
+requested. `format` is `text` (default), `json`, or `mermaid`:
+
+```text
+experiment_log action=branches slug=bench
+experiment_log action=branches slug=bench format=json
+experiment_log action=branches slug=bench format=mermaid write=true
+```
+
+Only `format: mermaid` with `write: true` writes
+`.dsh/experiments/<slug>/exports/branches.mmd`; `overwrite: true` replaces an
+existing file. Every other call leaves the ledgers and the workspace untouched.
+
+The structured report contains `nodes` (run id, `parent` and `parent_state`,
+role/stage/seed, `scope_id` and `comparison_state`, metrics and
+`metrics_state`, protocol digest and `spec_drift`, latest verdict, compliance
+state, artifact paths and hashes, and resolved `links`), `edges` (recorded
+parent ancestry), `roots`, `orphans`, `cycles`, `counts`, `limits`,
+`anomalies`, and `notes`. A parent edge is recorded ancestry, not proof of
+scientific causality.
+
+Link resolution is explicit. An `analysis_run` link reports the owning analysis
+slug, exit code, timeout, spawn error, duration, and manifest path/state.
+Notebook, review, and experiment-run links resolve against their ledgers where
+present. `paper` links are `not_checked` because PaperMemory is not opened by
+this view, and `scientific_result` links are `unknown` because those cards are
+not persisted. A missing target is `not_found`; an ambiguous bare id is
+`ambiguous`; a malformed target is `invalid`. No unresolved link is treated as
+success.
+
+Node status is derived **only from recorded evidence**:
+
+| Status | Evidence |
+|---|---|
+| `good` | the latest recorded human verdict is `good` |
+| `engineering` | the latest recorded human verdict is `engineer` |
+| `pruned` | the latest recorded human verdict is `bad` (including a forced-bad exhausted engineer) |
+| `failed` | a resolved linked `analysis_run` recorded a non-zero exit, timeout, or spawn error |
+| `unknown` | an `analysis_run` link could not be resolved, so execution is not known |
+| `not_recorded` | no verdict and no linked execution failure is recorded |
+
+Missing metrics alone never make a run `failed`; they are shown as
+`metrics_state: not_recorded`. A compliance exclusion is reported separately
+(`excluded: true`, `compliance.state: excluded`) and inherits the linked
+analysis ledger's violated rule ids. When a linked analysis run cannot be
+resolved, compliance is `unknown` because an exclusion cannot be ruled out.
+
+Defensive behaviour is part of the contract. Multiple roots, missing, self, or
+non-string parents, parent cycles, duplicate run ids, duplicate links, links to
+unknown runs, verdicts for unknown runs, and corrupt JSONL lines are reported
+in `anomalies` and do not abort the view. `max_nodes` (default 500, max 5000),
+`max_edges` (default 1000, max 10000), and `max_links_per_run` (default 50, max
+500) bound the output; omitted runs, edges, and links remain counted. Every
+source file is hashed into `source_snapshot` and re-read, so
+`changed_during_read` distinguishes the view from a ledger that changed
+afterwards. Mermaid labels escape markup, and run params, notes, environment,
+and link notes are excluded from the report, so secrets are not copied into
+text, JSON, or diagram labels.
 
 ## `ablation`
 

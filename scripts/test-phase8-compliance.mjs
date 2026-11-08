@@ -45,18 +45,20 @@ try {
   const compliance = await complianceAnalysisRun({ cwd, slug: 'analysis' })
   assert.equal(compliance.compliance.verdict, 'violated')
 
-  await startExperiment({ cwd, slug: 'exp', experiment: { question: 'Which is best?', metrics: [{ name: 'acc', direction: 'higher' }] } })
-  await logExperimentRun({ cwd, slug: 'exp', metrics: { acc: 0.99 } })
-  await logExperimentRun({ cwd, slug: 'exp', metrics: { acc: 0.80 } })
+  const identity = { dataset: { id: 'd', version_or_hash: 'v1' }, split: { id: 'test', version_or_hash: 'v1' }, baseline_cohort_id: 'base', metric_definitions: { acc: { unit: 'unitless', implementation: 'acc-v1', parameters: {} } } }
+  await startExperiment({ cwd, slug: 'exp', experiment: { question: 'Which is best?', metrics: [{ name: 'acc', direction: 'higher' }], benchmark: { datasets: ['d'], splits: ['test'], baseline_arm: 'base', task_rules: ['rule'] }, protocol: { eval_script: 'analysis/bad.py', metric_params: {} } } })
+  const { run: first } = await logExperimentRun({ cwd, slug: 'exp', role: 'baseline', baselineRef: 'reproduced', stage: 'full', comparison: identity, metrics: { acc: 0.99 } })
+  const scopeId = first.comparison_identity.scope_id
+  await logExperimentRun({ cwd, slug: 'exp', role: 'baseline', baselineRef: 'reproduced', stage: 'full', comparison: identity, metrics: { acc: 0.80 } })
   await linkExperimentRun({ cwd, slug: 'exp', runId: 'x0001', targetKind: 'analysis_run', targetId: run.run_id, note: 'the violating re-execution' })
 
-  const comparison = compareExperiments(cwd, 'exp')
+  const comparison = compareExperiments(cwd, 'exp', { scopeId })
   assert.deepEqual(comparison.compliance.excluded_run_ids, ['x0001'])
   assert.equal(comparison.runs.find((entry) => entry.run_id === 'x0001').excluded.analysis_run_id, run.run_id)
   assert.equal(comparison.best.acc.run_id, 'x0002', 'the violating run is not the best')
-  assert.equal(bestExperimentRun(cwd, 'exp', { metric: 'acc' }).run.run_id, 'x0002')
-  assert.deepEqual(dominanceExperiment(cwd, 'exp').front.map((entry) => entry.run_id), ['x0002'])
-  assert.deepEqual(dominanceExperiment(cwd, 'exp').excluded.map((entry) => entry.run_id), ['x0001'])
+  assert.equal(bestExperimentRun(cwd, 'exp', { metric: 'acc', scopeId }).run.run_id, 'x0002')
+  assert.deepEqual(dominanceExperiment(cwd, 'exp', { scopeId }).front.map((entry) => entry.run_id), ['x0002'])
+  assert.deepEqual(dominanceExperiment(cwd, 'exp', { scopeId }).excluded.map((entry) => entry.run_id), ['x0001'])
 
   // Exports are an audit trail: the row is kept, marked excluded.
   const exported = exportExperiment({ cwd, slug: 'exp', format: 'csv' })
@@ -68,7 +70,7 @@ try {
   const recheck = await complianceAnalysisRun({ cwd, slug: 'analysis', runId: run.run_id })
   assert.equal(recheck.compliance.verdict, 'not_checked', 'a different run\'s file cannot satisfy the rule')
   assert.equal(excludedAnalysisRunIds(cwd, 'analysis').has(run.run_id), true, 'the recorded violation is sticky')
-  assert.equal(bestExperimentRun(cwd, 'exp', { metric: 'acc' }).run.run_id, 'x0002')
+  assert.equal(bestExperimentRun(cwd, 'exp', { metric: 'acc', scopeId }).run.run_id, 'x0002')
 
   await saveReproPlan({ cwd, slug: 'pkg', plan: {
     name: 'Excluded-run package', authors: ['A. Author'],
@@ -162,10 +164,10 @@ try {
   // corrupt ledger containing its own evidence must still fail closed.
   mkdirSync(join(cwd, '.dsh', 'analysis', 'unrelated'), { recursive: true })
   writeFileSync(join(cwd, '.dsh', 'analysis', 'unrelated', 'compliance.jsonl'), '{ not json }\n')
-  assert.doesNotThrow(() => bestExperimentRun(cwd, 'exp', { metric: 'acc' }))
+  assert.doesNotThrow(() => bestExperimentRun(cwd, 'exp', { metric: 'acc', scopeId }))
   // Corrupt exclusion evidence fails closed, never open.
   writeFileSync(join(cwd, '.dsh', 'analysis', 'analysis', 'compliance.jsonl'), '{ not json }\n')
-  assert.throws(() => bestExperimentRun(cwd, 'exp', { metric: 'acc' }), /cannot read the compliance ledger/)
+  assert.throws(() => bestExperimentRun(cwd, 'exp', { metric: 'acc', scopeId }), /cannot read the compliance ledger/)
 
   console.log('phase 8 compliance OK')
 } finally {
