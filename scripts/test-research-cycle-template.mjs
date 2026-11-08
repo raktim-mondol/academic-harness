@@ -95,6 +95,17 @@ assert.match(prompt, /never turn either into a pass or a failure/i)
 assert.match(prompt, /do not pick a winning seed or claim significance/)
 assert.match(prompt, /only ah_check blocks/)
 
+// What the model sees must say when values are missing or ignored (a real model guessed
+// `experiment_slug` and `data_path` and was never told they matched nothing).
+const guessed = queryResearchTemplates({ action: 'get', id: ID, values: { experiment_slug: 'bench', question: 'Q?', data_path: 'data/x.csv' } })
+assert.deepEqual(guessed.missing_required_values, ['slug'])
+assert.deepEqual(guessed.unrecognized_value_keys, ['data_path', 'experiment_slug'])
+const shown = (() => { const out = []; applyWorkflows({ tools: { register: (tool) => out.push(tool) } }); return out[0].output.render({}, guessed)[0].text })()
+assert.match(shown, /\[template notice\] Missing required value\(s\): slug\./)
+assert.match(shown, /Ignored value key\(s\) that match no placeholder: data_path, experiment_slug\. This template's placeholders are: slug, question, constraints\./)
+const clean = (() => { const out = []; applyWorkflows({ tools: { register: (tool) => out.push(tool) } }); return out[0].output.render({}, queryResearchTemplates({ action: 'get', id: ID, values: { slug: 's', question: 'q', constraints: 'c' } }))[0].text })()
+assert.ok(!clean.includes('[template notice]'), 'a fully and correctly filled template carries no notice')
+
 // Fetching a template runs nothing: the tool is a pure catalogue lookup.
 const registered = []
 applyWorkflows({ tools: { register: (tool) => registered.push(tool) } })
