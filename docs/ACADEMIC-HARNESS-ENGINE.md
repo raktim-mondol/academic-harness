@@ -2,6 +2,8 @@
 
 Status: **deferred** (2026-10-05). Keep the current layout until we pick one of the options below.
 
+Update (2026-11-09): the engine is now **maintained in this repository**. It keeps the `vendor/academic-harness/` path (option 1 below), but it is no longer a frozen copy. Changes are listed in `vendor/academic-harness/SOURCE.txt`, the test suite lives in `vendor/academic-harness/tests/` (`npm run test:ah-engine`), and each change bumps `BUNDLE_REV` in `academic-harness-cli.js` so the local venv is reinstalled. Moving the tree first-party (option 2) or porting it to JavaScript (option 3) is still undecided.
+
 ## What is shipped now (v0.16.0)
 
 The writing oracle (inventory, facts, T0–T6 checks, ledger, briefs, plans, reviews, guard, gate) runs **inside this plugin**. Pi is not required. Nothing is installed into `$DSH_HOME`.

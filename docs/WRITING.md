@@ -15,6 +15,12 @@ The Academic Harness engine (vendored at `vendor/academic-harness`; see [the eng
 
 A paper has no compiler. The engine inventories every number, citation, unit, and declared claim, then a **gate** closes only when this turn introduced no open blocker or major. Unchanged units keep the verdicts they already had.
 
+### Stable findings: checking the checker
+
+A fix loop only converges when the same text gives the same findings. `ah_audit stability_runs=5` (CLI: `ah stability --runs 5`, or `ah audit --stability 5`) runs the checks five times on the unchanged text without touching the ledger and reports, per tier, the findings per run and the minimum fingerprint overlap, every finding that appeared in some runs but not all (`unstable`), and open ledger findings whose cause is `UNEXPLAINED`. The verdict is `stable`, `unstable` (exit 2 from `audit`), or `input-changed` when a file changed during the runs.
+
+It also counts paragraphs with no `%% @unit` anchor. Such a paragraph is keyed by a hash of its text, so any edit to it re-keys every finding it carries and the ledger reports them as fixed and new at once. Run `ah_units` (`ah units sync`) before relying on the ledger; the post-edit hook does this for edits made through the agent.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).

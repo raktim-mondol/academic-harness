@@ -121,6 +121,10 @@ ok('engine README does not require Pi', !/you use it through \*\*\[Pi\]/.test(re
 // ── tool argv ─────────────────────────────────────────────────────────────
 
 ok('ah_check brief json', JSON.stringify(toolArgv('ah_check', { files: ['a.tex'], evidence: true })) === JSON.stringify(['check', '--files', 'a.tex', '--evidence', '--brief', '--json']))
+ok('ah_audit default', JSON.stringify(toolArgv('ah_audit', {})) === JSON.stringify(['audit', '--det-check', '--limit', '30']))
+ok('ah_audit stability_runs', JSON.stringify(toolArgv('ah_audit', { stability_runs: 5 })) === JSON.stringify(['audit', '--det-check', '--limit', '30', '--stability', '5']))
+ok('ah_audit stability_runs capped', toolArgv('ah_audit', { stability_runs: 99 }).at(-1) === '20')
+ok('ah_audit stability_runs ignores <2', !toolArgv('ah_audit', { stability_runs: 1 }).includes('--stability'))
 ok('ah_state --unit', JSON.stringify(toolArgv('ah_state', { unit: 'u1' })) === JSON.stringify(['state', '--unit', 'u1']))
 ok('ah_fact list', JSON.stringify(toolArgv('ah_fact', {})) === JSON.stringify(['facts', 'list', '--json']))
 ok('ah_fact build', JSON.stringify(toolArgv('ah_fact', { action: 'build' })) === JSON.stringify(['facts', 'build']))

@@ -2,6 +2,11 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+- **Stability report for the writing checks.** `ah_audit stability_runs=N` (CLI `ah stability --runs N` or `ah audit --stability N`) runs the engine's checks N times on unchanged text, without the ledger, and reports per-tier finding counts and overlap, every finding that came and went, open findings with cause `UNEXPLAINED`, and paragraphs without a `%% @unit` anchor (their findings re-key on any edit). On a migrated copy of `paper/rsi-local` the 227 findings were identical over 5 runs, and a second ledger audit added 0 new and 0 unexplained findings. This is phase 0 of making writing feedback repeatable: measure first, then widen the deterministic checks. See [Writing](WRITING.md#stable-findings-checking-the-checker).
+- **The engine has tests again.** `vendor/academic-harness/tests/` scaffolds a LaTeX project with planted findings and pins DET-01, N-run stability, line-move-independent fingerprints, an unchanged second audit, and a cause for every new finding after an edit. Run with `npm run test:ah-engine`; CI runs it. The vendored engine is now maintained here (`vendor/academic-harness/SOURCE.txt`), and `BUNDLE_REV` is `dsh6` so the plugin-local venv is reinstalled on the next start.
+
 ## 0.48.2
 
 Fixes from the real-model research-cycle run through guide steps 5–8.

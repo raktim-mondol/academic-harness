@@ -268,15 +268,47 @@ def cmd_audit(a):
                 incremental=getattr(a, "incremental", False), **_t3kw(a))
     if a.det_check:
         rep["det01"] = det_check(p, _tiers(a), backend=_backend(a, p))
+    if getattr(a, "stability", 0):
+        from .stability import stability
+        rep["stability"] = stability(p, _tiers(a), a.stability, backend=_backend(a, p))
     if a.json:
         print(json.dumps(rep, indent=1))
     else:
         print(render_report(rep, a.limit))
         if "det01" in rep:
             print(f"DET-01: {'identical' if rep['det01']['identical'] else 'DIFFERENT'} ({rep['det01']['findings']} findings, hash {rep['det01']['hash']})")
+        if "stability" in rep:
+            print(render_stability(rep["stability"]))
     if rep.get("unexplained") or ("det01" in rep and not rep["det01"]["identical"]):
         return EXIT_ERROR
+    if rep.get("stability", {}).get("verdict") == "unstable":
+        return EXIT_ERROR
     return EXIT_OK if rep["gate"]["passed"] else EXIT_FINDINGS
+
+
+def render_stability(st: dict) -> str:
+    lines = [f"stability: {st['verdict']} over {st['runs']} runs"
+             + ("" if st["identical"] else f" ({len(st['distinct_report_hashes'])} distinct reports)")]
+    for tier, t in st["per_tier"].items():
+        lines.append(f"  {tier}: findings per run {t['findings']}, min overlap {t['jaccard_min']}")
+    for u in st["unstable"][:20]:
+        lines.append(f"  UNSTABLE {u['check']} {u['unit'] or u['file']} seen {u['seen_in_runs']}/{st['runs']}: {u['message']}")
+    for w in st.get("warnings", []):
+        lines.append(f"  warning: {w}")
+    if st.get("ledger_unexplained"):
+        lines.append(f"  ledger: {len(st['ledger_unexplained'])} open finding(s) with cause UNEXPLAINED")
+    return "\n".join(lines)
+
+
+def cmd_stability(a):
+    from .stability import ledger_unexplained, stability
+    p = _proj(a)
+    st = stability(p, _tiers(a), a.runs, backend=_backend(a, p), **_t3kw(a))
+    st["ledger_unexplained"] = ledger_unexplained(p)
+    print(json.dumps(st, indent=1) if a.json else render_stability(st))
+    if st["verdict"] == "input-changed":
+        return EXIT_ERROR
+    return EXIT_OK if st["verdict"] == "stable" and not st["ledger_unexplained"] else EXIT_FINDINGS
 
 
 def cmd_build(a):
@@ -741,6 +773,19 @@ def main(argv=None) -> int:
             sp.add_argument("--det-check", action="store_true", help="DET-01: rebuild twice, compare")
             sp.add_argument("--incremental", action="store_true",
                             help="re-run T3 only on units whose hash changed since the last ledger run")
+            sp.add_argument("--stability", type=int, default=0, metavar="N",
+                            help="also run the checks N times without the ledger and report findings that move")
+    sp = add("stability", cmd_stability, "run the checks N times on unchanged text; report findings that come and go")
+    sp.add_argument("--runs", type=int, default=5)
+    sp.add_argument("--tiers", help="comma list from " + ",".join(TIERS))
+    sp.add_argument("--evidence", action="store_true", help="include tier T3 (deterministic half unless --verify)")
+    sp.add_argument("--verify", action="store_true", help="T3 with the model verifier (cached verdicts are reused)")
+    sp.add_argument("--no-cache", action="store_true")
+    sp.add_argument("--limit-claims", type=int, default=0)
+    sp.add_argument("--model", help="override verifier.model")
+    sp.add_argument("--provider", help="override verifier.provider")
+    sp.add_argument("--thinking", default=None, help="override thinking level; empty sends no flag")
+    sp.add_argument("--file", action="append", help="only claims in this file (relative to the TeX root)")
     sp = add("build", cmd_build, "compile a view and parse the log")
     sp.add_argument("--view")
     sp = add("sweep", cmd_sweep, "list every place a value or fact appears")

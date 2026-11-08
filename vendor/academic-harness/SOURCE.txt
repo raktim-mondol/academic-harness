@@ -18,7 +18,10 @@ to a `pi` binary when a project sets `verifier.backend: pi`. That is unused
 unless the project asks for it; `http` (OpenAI-compatible) and `command`
 backends work without Pi.
 
-Python package unmodified.
+Python package modified in this plugin (the vendored tree is maintained here as first-party):
+- `ah stability` and `ah audit --stability N` (ah/stability.py): run the checks N times on
+  unchanged text and report findings that come and go, plus unanchored units.
+- tests/: a restored engine test suite with a scaffolded LaTeX fixture project.
 
 Local DSH patch (ahead of upstream): registry --keys citation-key aliases
 (entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt
