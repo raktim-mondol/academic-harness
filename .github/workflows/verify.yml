@@ -52,6 +52,11 @@ jobs:
       - name: Run the PaperMemory test suite
         run: python -m pytest -q vendor/papermemory/tests
 
+      - name: Run the Academic Harness engine test suite
+        run: |
+          pip install pyyaml
+          PYTHONPATH="$PWD/vendor/academic-harness" python -m pytest -q vendor/academic-harness/tests
+
       - name: Install TextFold for paper_fold integration
         run: python -m pip install 'textfold==0.10.31'
 

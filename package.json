@@ -470,6 +470,7 @@
     "test:submission": "node scripts/test-submission-pack.mjs",
     "test:manuscript-diff": "node scripts/test-manuscript-diff.mjs",
     "test:numbers": "node scripts/test-numbers-audit.mjs",
+    "test:ah-engine": "PYTHONPATH=$PWD/vendor/academic-harness python3 -m pytest -q vendor/academic-harness/tests",
     "test:presentation": "node scripts/test-presentation-build.mjs",
     "test:authorship": "node scripts/test-authorship.mjs",
     "test:journal-match": "node scripts/test-journal-match.mjs",

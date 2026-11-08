@@ -111,6 +111,8 @@ export function toolArgv(name, args = {}, cwd) {
       if (args.tiers) extra.push('--tiers', String(args.tiers))
       if (args.evidence) extra.push('--evidence')
       if (args.no_ledger) extra.push('--no-ledger')
+      const runs = Number(args.stability_runs)
+      if (Number.isInteger(runs) && runs >= 2) extra.push('--stability', String(Math.min(runs, 20)))
       return ['audit', ...extra]
     }
     case 'ah_fact': {
@@ -423,6 +425,7 @@ export async function apply(ctx) {
       tiers: { type: 'string', description: 'Comma list, e.g. T0,T1,T2,T4.' },
       evidence: { type: 'boolean' },
       no_ledger: { type: 'boolean' },
+      stability_runs: { type: 'integer', description: 'Also run the checks N times (2-20) on the unchanged text and report findings that come and go, plus paragraphs without a stable anchor. Exit status 2 when unstable.' },
     },
   })
   register(ctx, {

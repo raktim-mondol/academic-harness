@@ -38,7 +38,7 @@ python -m pip install 'textfold==0.10.31'
 TEXTFOLD_SKIP_INSTALL=1 TEXTFOLD_PYTHON="$(command -v python)" node scripts/test-paper-fold-live.mjs
 ```
 
-CI requires this test (`TEXTFOLD_LIVE_REQUIRED=1`) and runs the vendored PaperMemory suite with `pytest`, SciPy, Pillow, and defusedxml.
+CI requires this test (`TEXTFOLD_LIVE_REQUIRED=1`) and runs the vendored PaperMemory suite with `pytest`, SciPy, Pillow, and defusedxml. It also runs the Academic Harness engine suite (`npm run test:ah-engine`, i.e. `PYTHONPATH=$PWD/vendor/academic-harness python3 -m pytest -q vendor/academic-harness/tests`); set `PYTHONPATH` so pytest imports the vendored `ah`, and the suite's `conftest.py` refuses to run against any other copy.
 
 ### Live end-to-end run (real host, scripted model)
 
