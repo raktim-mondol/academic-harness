@@ -2,7 +2,13 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
-## Unreleased
+## 0.48.0
+
+The human-directed research cycle: scoped experiment comparisons, repeated-seed and branch views, a guided workflow, and evidence-grounded prior-art and figure handoffs. Nothing here runs experiments, spends money, sends data, edits a manuscript, or publishes on its own.
+
+**Behaviour change:** experiment rankings (`compare`, `best`, dominance, exports) now require an explicit `scope_id`, and new staged variants require an explicit `baseline_run_id`. Legacy and incomplete runs stay readable but are `not_checked` and are no longer ranked; no historical ledger is rewritten. See [Reproducible analysis](ANALYSIS.md#experiment_log).
+
+**Fixed in this release:** `experiment_log action=branches` failed in the real DSH host (a result with `undefined` properties is not lossless JSON), and OpenAlex results arrived with no abstract.
 
 - **Fix: `experiment_log action=branches` failed in the real host.** The result carried `mermaid`, `path` and `bytes` as `undefined` when no Mermaid export was requested, and the DSH host rejects a tool result that is not lossless JSON ("returned invalid output: value is not lossless JSON"). Every real `branches` call since it shipped failed; offline tests call `execute()` directly and never saw the host check. Optional keys are now omitted. `scripts/test-tool-output-json.mjs` applies the host's own `isJsonValue` to every Phase 1-5 action and fails on the unfixed code with the offending paths. Found by the live end-to-end run.
 - **Live end-to-end run.** `scripts/live-e2e/` drives the Phase 1-5 tools through a real, isolated DSH with a scripted (non-model) provider, including a live `literature_search`; see [Development](DEVELOPMENT.md#live-end-to-end-run-real-host-scripted-model).
