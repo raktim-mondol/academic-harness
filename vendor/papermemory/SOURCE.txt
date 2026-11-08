@@ -1,6 +1,6 @@
 Vendored from https://github.com/raktim-mondol/papermemory
 Commit: 5f39434282daa8ac5b566f5717bb414f7edf6892 (tag v0.3.1, pushed)
-Version: 0.3.1 upstream; vendored as 0.3.4 (local dream/recap/listing/structure changes below)
+Version: 0.3.1 upstream; vendored as 0.3.5 (local dream/recap/listing/structure changes below)
 Upstream exceptions:
 - library_export.py: a collection's project scopes every export even when
   --out is given (a collection's project is inferred whenever it is named;
@@ -33,3 +33,7 @@ release; documented in vendor/academic-harness/SOURCE.txt.
   section, so reference lists from web and PDF conversions are suppressed from
   search like a `## References` heading. Existing documents are repaired with
   `papermemory reindex --from-raw --paper ID`.
+- structure.py: inside a bibliography section, numbered lines (wrapped reference
+  entries such as "06. Pesapane F, Codari M. Artificial") are entries, not numbered
+  section headings; only a real heading ends the reference list. Before this,
+  those pseudo-headings escaped the bibliography and stayed searchable.

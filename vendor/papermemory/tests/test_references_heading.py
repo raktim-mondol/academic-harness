@@ -61,3 +61,41 @@ def test_reindex_repairs_a_document_stored_with_a_bare_references_line(tmp_path)
     assert store.conn.execute("SELECT COUNT(*) FROM chunks WHERE is_bibliography=1").fetchone()[0] == 0
     reindex_from_raw(store)
     assert store.conn.execute("SELECT COUNT(*) FROM chunks WHERE is_bibliography=1").fetchone()[0] >= 1
+
+
+WRAPPED = "".join(
+    f"{n:02d}. Author{n} A, Other B, Third C. A long reference title that\n    wraps onto a second line, _J Imaging_ 20{n % 20:02d};\n    **{n}:** 1-9\\.\n\n"
+    for n in range(1, 40)
+)
+
+
+def test_wrapped_numbered_reference_entries_stay_inside_the_bibliography():
+    # a numbered line with no trailing period used to open a new "section", escaping the bibliography
+    for heading in ("## References", "References", "**References**"):
+        text = f"# A study\n\n## Introduction\n\n{BODY}\n\n## Results\n\n{BODY}\n\n{heading}\n\n{WRAPPED}"
+        sections = build_section_tree(text)
+        after = [s for s in sections if s["char_start"] >= text.index(heading)]
+        assert after and all(s["is_bibliography"] for s in after), heading
+
+
+def test_a_real_heading_ends_the_reference_list():
+    text = f"# A study\n\n## Introduction\n\n{BODY}\n\n## References\n\n{WRAPPED}\n## Appendix\n\n{BODY}\n\n1 Extra material heading\n\nmore text\n"
+    roles = _roles(text)
+    assert ("Appendix", 0) in roles
+    assert all(flag == 0 for name, flag in roles if name.startswith("1 Extra"))
+
+
+def test_numbered_section_headings_in_the_body_are_unchanged():
+    text = f"# A study\n\n1 Introduction\n\n{BODY}\n\n2 Methods\n\n{BODY}\n\n## References\n\n{WRAPPED}"
+    names = [n for n, _ in _roles(text)]
+    assert "1 Introduction" in names and "2 Methods" in names
+
+
+def test_wrapped_reference_chunks_are_not_searchable_body_text(tmp_path):
+    store = Store(tmp_path / "pm.db")
+    path = tmp_path / "w.md"
+    path.write_text("---\ndoi: 10.1234/wrapped\ntitle: A study of spoil\nyear: 2024\n---\n"
+                    f"# A study of spoil\n\n## Introduction\n\n{BODY}\n\n## Results\n\n{BODY}\n\nReferences\n\n{WRAPPED}", encoding="utf-8")
+    ingest_markdown(store, path, project_id="p")
+    result = search_with_status(store, "Author17 wraps onto second line imaging", kind="chunk", project_id="p")
+    assert result["results"] == []

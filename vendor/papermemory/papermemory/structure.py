@@ -26,6 +26,7 @@ def _collect_headings(text: str) -> list[dict]:
         cursor += len(line)
     headings: list[dict] = []
     in_fence = False
+    in_bibliography = False  # inside a reference list, numbered lines are entries, not sections
     index = 0
     while index < len(lines):
         raw = lines[index]
@@ -42,6 +43,7 @@ def _collect_headings(text: str) -> list[dict]:
             continue
         atx = ATX_RE.match(raw.rstrip("\n"))
         if atx:
+            in_bibliography = bool(BIBLIOGRAPHY_RE.match(atx.group(2).strip().rstrip("#").strip()))
             headings.append(
                 {
                     "level": len(atx.group(1)),
@@ -55,6 +57,7 @@ def _collect_headings(text: str) -> list[dict]:
             continue
         if index + 1 < len(lines) and SETEXT_RE.match(lines[index + 1]) and not stripped.startswith(("|", "-", "*", ">")):
             level = 1 if lines[index + 1].strip().startswith("=") else 2
+            in_bibliography = bool(BIBLIOGRAPHY_RE.match(_heading_text(stripped)))
             headings.append(
                 {
                     "level": level,
@@ -68,6 +71,7 @@ def _collect_headings(text: str) -> list[dict]:
             continue
         # Only in the second half of the text: a table of contents near the top also lists "References".
         if PLAIN_BIBLIOGRAPHY_RE.match(stripped) and offsets[index] >= len(text) // 2 and index + 1 < len(lines):
+            in_bibliography = True
             headings.append(
                 {
                     "level": 1,
@@ -81,6 +85,10 @@ def _collect_headings(text: str) -> list[dict]:
             continue
         numbered = NUMBERED_RE.match(stripped)
         if numbered and not stripped.endswith("."):
+            in_bibliography = in_bibliography or bool(BIBLIOGRAPHY_RE.match(stripped))
+            if in_bibliography and not BIBLIOGRAPHY_RE.match(stripped):
+                index += 1  # a wrapped reference entry such as "06. Pesapane F, Codari M. Artificial"
+                continue
             level = min(6, 2 + numbered.group(1).count("."))
             headings.append(
                 {
