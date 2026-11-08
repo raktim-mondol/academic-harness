@@ -1,4 +1,5 @@
 description: Empirical journal paper (IMRaD). Every outcome sought in Methods is reported in Results; limitations are stated.
+rubric: [core, empirical]   # bundled criteria sets (ah/rubrics/); the project's own are in rubric/*.yaml
 params:
   abstract_words: 250
   methods_glob: "*method*"

@@ -29,7 +29,7 @@ const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['
 export const LOG = '[academic-harness] ah'
 export const MIN_AH_VERSION = '0.1.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh7'
+const BUNDLE_REV = 'dsh8'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -219,8 +219,8 @@ export function ahEnv(extra = {}, { root, model } = {}) {
 
 /** How the agent should drive the engine on DeepSeek Harness (appended to the paper-state card). */
 export const DSH_STATE_FOOTER = `On DeepSeek Harness use native ah_* tools (not the shell, not Pi):
-ah_state, ah_check, ah_audit, ah_inventory, ah_units, ah_fact (action list|build|check), ah_source (list|add|search) / ah_source_search, ah_claims, ah_claims_sync, ah_claims_bind, ah_bind, ah_pack, ah_brief_new, ah_plan, ah_sweep, ah_build, ah_findings, ah_decision_request, ah_review (list|import|show|check), ah_review_set, ah_review_respond, ah_fact_propose, ah_snapshot, ah_provenance, ah_disclosure, ah_profile, ah_config, ah_catalogue, ah_init, ah_migrate.
-You cannot waive findings, approve briefs or plans, accept or reject fact proposals, verify claims, decline a review item, fill provenance, or approve a disclosure. Call ah_decision_request and stop. If the human explicitly asked in this message, ah_author (DSH will ask them to confirm).
+ah_state, ah_check, ah_audit, ah_inventory, ah_units, ah_fact (action list|build|check), ah_source (list|add|search) / ah_source_search, ah_claims, ah_claims_sync, ah_claims_bind, ah_bind, ah_pack, ah_brief_new, ah_plan, ah_sweep, ah_build, ah_findings, ah_decision_request, ah_review (list|import|show|check), ah_review_set, ah_review_respond, ah_fact_propose, ah_snapshot, ah_provenance, ah_disclosure, ah_external, ah_rubric, ah_profile, ah_config, ah_catalogue, ah_init, ah_migrate.
+You cannot waive findings, approve briefs or plans, accept or reject fact proposals, verify claims, decline a review item, fill provenance, approve a disclosure, or admit a rubric criterion. Call ah_decision_request and stop. If the human explicitly asked in this message, ah_author (DSH will ask them to confirm).
 Numbers from data are \\fact{id}. Cite only registered sources. Keep every "%% @unit" line with its paragraph. Done means coverage is complete and this turn introduced no open blocker or major.`
 
 async function installBundled() {

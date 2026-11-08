@@ -1,0 +1,8 @@
+# Additional criteria for funding proposals.
+criteria:
+  - id: RUB-PROMISE
+    version: 1
+    level: minor
+    question: >-
+      Does the paragraph promise an outcome as certain (for example "will cure", "will eliminate", "will
+      revolutionise", "will definitely") where the proposed work can only aim at it or test it as a hypothesis?

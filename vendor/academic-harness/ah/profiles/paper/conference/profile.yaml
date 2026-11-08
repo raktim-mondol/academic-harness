@@ -1,4 +1,5 @@
 description: Conference paper. Length limit, double-blind lint, every contribution backed by an experiment unit.
+rubric: [core, empirical]   # bundled criteria sets (ah/rubrics/); the project's own are in rubric/*.yaml
 params:
   max_words: 6000          # set from the venue's page limit
   anonymous: true          # false for the camera-ready version

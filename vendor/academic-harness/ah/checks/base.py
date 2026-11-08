@@ -98,10 +98,14 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "RPT-02": ("TX", "major", "A recorded reporting verdict no longer verifies against the manuscript (its quote is gone)"),
     "RPT-03": ("TX", "info", "Reporting-guideline item needs a verdict: not assessed yet, or a not-reported claim from an earlier manuscript version"),
     "EXT-00": ("TX", "major", "An external check is stale, invalid or was not run"),
+    # TR: the frozen rubric. A model answers fixed yes/no questions about one paragraph and must quote the words
+    # that show the problem; the quote is checked here. A criterion reports at info until it is admitted.
+    "RUB-01": ("TR", "info", "Rubric criterion failed: the model found the defect and quoted it (the quote is verified)"),
+    "RUB-02": ("TR", "major", "Rubric: a criteria file is malformed, or a criterion id is duplicated"),
 }
 
-TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6", "TX")
-DEFAULT_TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")  # T3 deterministic half runs by default; the model half needs a backend. TX joins only when --external is given.
+TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6", "TX", "TR")
+DEFAULT_TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")  # T3 deterministic half runs by default; the model half needs a backend. TX joins only when --external is given, TR only with --rubric.
 
 
 @dataclass

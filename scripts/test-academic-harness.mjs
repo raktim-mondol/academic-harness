@@ -132,6 +132,18 @@ ok('ah_check external adds --external', toolArgv('ah_check', { external: 'use' }
 ok('ah_external plan argv', JSON.stringify(toolArgv('ah_external', { action: 'plan' })) === JSON.stringify(['external', 'plan']))
 ok('ah_external status argv', JSON.stringify(toolArgv('ah_external', { action: 'status' })) === JSON.stringify(['external', 'status']))
 ok('ah_external rejects an unknown action', Boolean(toolArgv('ah_external', { action: 'nope' }).error))
+ok('ah_audit rubric adds --rubric only', JSON.stringify(toolArgv('ah_audit', { rubric: true }).filter((a) => /rubric|judge/.test(a))) === JSON.stringify(['--rubric']))
+ok('ah_audit judge implies --rubric and adds --judge', (() => { const a = toolArgv('ah_audit', { judge: true }); return a.includes('--rubric') && a.includes('--judge') })())
+ok('ah_audit judge_limit needs judge', !toolArgv('ah_audit', { judge_limit: 5 }).includes('--judge-limit') && toolArgv('ah_audit', { judge: true, judge_limit: 5 }).join(' ').includes('--judge-limit 5'))
+ok('ah_audit without rubric has no rubric flags', !toolArgv('ah_audit', {}).some((a) => /rubric|judge/.test(a)))
+ok('ah_check rubric adds --rubric', toolArgv('ah_check', { rubric: true }).includes('--rubric'))
+ok('ah_rubric list argv', JSON.stringify(toolArgv('ah_rubric', {})) === JSON.stringify(['rubric', 'list']))
+ok('ah_rubric run argv with criteria, judge and files', JSON.stringify(toolArgv('ah_rubric', { action: 'run', criterion: ['RUB-CAUSAL', 'RUB-GENERAL'], judge: true, judge_limit: 3, files: ['a.tex'] })) === JSON.stringify(['rubric', 'run', 'RUB-CAUSAL', 'RUB-GENERAL', '--judge', '--judge-limit', '3', '--file', 'a.tex']))
+ok('ah_rubric run without judge asks nothing', !toolArgv('ah_rubric', { action: 'run' }).includes('--judge'))
+ok('ah_rubric sheet needs one criterion', Boolean(toolArgv('ah_rubric', { action: 'sheet' }).error) && JSON.stringify(toolArgv('ah_rubric', { action: 'sheet', criterion: 'RUB-CAUSAL', limit: 20 })) === JSON.stringify(['rubric', 'sheet', 'RUB-CAUSAL', '--limit', '20']))
+ok('ah_rubric has no admit action', /ah_author action=rubric-admit/.test(toolArgv('ah_rubric', { action: 'admit' }).error || ''))
+ok('ah_author rubric-admit argv', JSON.stringify(toolArgv('ah_author', { action: 'rubric-admit', id: 'RUB-CAUSAL', file: 'labels.yaml' })) === JSON.stringify(['rubric', 'admit', 'RUB-CAUSAL', '--labels', 'labels.yaml', '--yes']))
+ok('ah_author rubric-admit needs a criterion and labels', Boolean(toolArgv('ah_author', { action: 'rubric-admit', id: 'RUB-CAUSAL' }).error) && Boolean(toolArgv('ah_author', { action: 'rubric-admit', file: 'l.yaml' }).error))
 ok('ah_state --unit', JSON.stringify(toolArgv('ah_state', { unit: 'u1' })) === JSON.stringify(['state', '--unit', 'u1']))
 ok('ah_fact list', JSON.stringify(toolArgv('ah_fact', {})) === JSON.stringify(['facts', 'list', '--json']))
 ok('ah_fact build', JSON.stringify(toolArgv('ah_fact', { action: 'build' })) === JSON.stringify(['facts', 'build']))
@@ -355,6 +367,10 @@ try {
       ok('ah init creates ah.yaml', init.status === 0 && existsSync(join(paper, 'ah.yaml')), (init.stderr || init.stdout).slice(0, 200))
       const check = spawnSync(ah, ['check', '--project', paper, '--json', '--brief'], { encoding: 'utf8', timeout: 60_000 })
       ok('ah check runs on a new project', check.status === 0 || check.status === 1, (check.stderr || '').slice(0, 240))
+      const rubric = spawnSync(ah, ['rubric', 'list', '--project', paper, '--json'], { encoding: 'utf8', timeout: 60_000 })
+      let listed = null
+      try { listed = JSON.parse(rubric.stdout) } catch { /* reported below */ }
+      ok('the installed engine ships the bundled rubric criteria', rubric.status === 0 && listed?.criteria?.some((c) => c.id === 'RUB-CAUSAL' && c.admitted === false && c.effective_level === 'info'), (rubric.stderr || rubric.stdout).slice(0, 240))
       const hook = spawnSync(ah, ['hook', 'pre'], {
         encoding: 'utf8',
         timeout: 20_000,

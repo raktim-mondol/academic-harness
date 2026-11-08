@@ -209,7 +209,7 @@ export function apply(ctx) {
     if (exec?.name === 'ah_author') {
       return {
         kind: 'ask',
-        reason: 'Author-only Academic Harness act (waive, accept/reject a fact, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure). Confirm to run it.',
+        reason: 'Author-only Academic Harness act (waive, accept/reject a fact, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure, admit a rubric criterion). Confirm to run it.',
       }
     }
     if (exec?.name === 'ah_migrate' && exec.arguments?.apply && !exec.arguments?.confirm) {

@@ -44,6 +44,7 @@ DEFAULTS: dict[str, Any] = {
     "claims_policy": {"require_binding": False},
     "lexicons": {},       # {name: regex} extra or replacement style lexicons for must_not / hedging
     "style": {},          # {lints: [names]|[], level: info|minor}; empty = all code lints at info
+    "criteria": {"files": ["rubric/*.yaml"], "off": [], "workers": 4, "min_words": 12},  # frozen rubric (tier TR): extra criteria files, ids to switch off
     "external": {"required": []},  # tools whose results (.ah/external/<tool>.json) must exist: numbers_audit, figure_audit, citation
     "data_policy": "open",  # open | restricted | local (design 13.3)
     "data_policy_allow": [],  # named providers permitted when restricted
@@ -125,6 +126,7 @@ class Project:
             pass
         out += [f"{self.cfg['briefs']}/**", f"{self.cfg['claims_dir']}/**", f"{self.cfg['reviews']}/**",
                 f"{self.cfg.get('plans', 'plans')}/**", self.cfg["outline"]]
+        out += ["rubric/**"]      # criteria, hand labels and admissions are the author's: an agent must not admit its own check
         out += list(self.cfg.get("protected") or [])
         out += profiles.protected_files(self)
         return list(dict.fromkeys(out))
@@ -143,4 +145,8 @@ class Project:
         for key in ("facts", "sources", "glossary", "bindings"):
             p = self.path(key)
             snap[key] = sha256_file(p)[:16] if p.exists() else "-"
+        from .rubric import criteria_digest
+        digest = criteria_digest(self)
+        if digest:                      # only when a rubric exists, so projects without one keep their old snapshot
+            snap["criteria"] = digest
         return snap

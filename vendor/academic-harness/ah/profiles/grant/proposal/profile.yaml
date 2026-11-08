@@ -1,4 +1,5 @@
 description: Grant proposal. Aims, work packages, deliverables, milestones and budget form one record graph that must be consistent; funder criteria are covered.
+rubric: [core, grant]   # bundled criteria sets (ah/rubrics/); the project's own are in rubric/*.yaml
 defaults:
   data_policy: restricted
 params:

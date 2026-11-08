@@ -1,0 +1,22 @@
+# Default criteria for any academic prose. Each asks about a DEFECT: "yes" means the problem is present, and the
+# model must quote the words that show it. They ship unadmitted, so they report at info until the author measures
+# them against hand labels (`ah rubric admit`). Omissions (a missing section, a missing statement) are profile rules.
+criteria:
+  - id: RUB-CAUSAL
+    version: 1
+    level: minor
+    question: >-
+      Does the paragraph state a causal relationship (for example "causes", "leads to", "drives", "results in") for
+      something the paragraph itself presents only as a correlation, an association, or an observed co-occurrence?
+  - id: RUB-GENERAL
+    version: 1
+    level: minor
+    question: >-
+      Does the paragraph claim a result holds universally or in general (for example "always", "in all cases",
+      "every", "universally") when the evidence the paragraph itself describes covers only a limited set of cases?
+  - id: RUB-SUPERLATIVE
+    version: 1
+    level: minor
+    question: >-
+      Does the paragraph make a novelty or superlative claim (for example "first", "best", "state of the art",
+      "outperforms all") without any comparison, citation or measurement in the same paragraph that backs it?

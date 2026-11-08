@@ -29,11 +29,20 @@ TIER_FUNCS = {"T0": check_t0, "T1": check_t1, "T2": check_t2, "T4": lambda c: ch
 
 
 def run_checks(ctx: Context, tiers: tuple[str, ...] = DEFAULT_TIERS, extra: list[Finding] | None = None, backend=None,
-               evidence: dict | None = None, **t3kw) -> list[Finding]:
+               evidence: dict | None = None, *, rubric_backend=None, rubric_stats: dict | None = None, rubric_limit: int = 0,
+               rubric_criteria: list[str] | None = None, **t3kw) -> list[Finding]:
     found: list[Finding] = []
     for t in tiers:
         if t == "TX":
             continue   # external results arrive through `extra` (audit loads them from .ah/external/)
+        if t == "TR":
+            from .checks.rubric import run_rubric
+            fr, rs = run_rubric(ctx, rubric_backend, use_cache=t3kw.get("use_cache", True), limit=rubric_limit,
+                                only_files=t3kw.get("only_files"), only_criteria=rubric_criteria)
+            found += fr
+            if rubric_stats is not None:
+                rubric_stats.update(rs)
+            continue
         if t == "T3":
             from .checks.t3_evidence import run_t3
             f3, stats = run_t3(ctx, backend, **t3kw)
@@ -91,6 +100,19 @@ def _carry_t3(led: Ledger, unit_hashes: dict[str, str], prev_h: dict, changed: s
     return out
 
 
+def _carry_tr(project: Project, unjudged: set[tuple[str, str]], admitted: list[str]) -> list[Finding]:
+    """Open rubric findings on (criterion, unit) pairs that got no verdict this run (no backend, no cached answer, an error,
+    over the call budget). Not being able to ask is not a fix. A criterion that is no longer admitted falls back to info."""
+    if not unjudged or not (project.state_dir / "ledger.sqlite").exists():
+        return []
+    led = Ledger(project)
+    try:
+        return [Finding(r["check_id"], r["level"] if r["key"] in admitted else "info", r["ref"], r["file"], None, r["key"], r["message"], "TR")
+                for r in led.list(("open", "decision-needed")) if r["tier"] == "TR" and r["check_id"] == "RUB-01" and (r["key"], r["ref"]) in unjudged]
+    finally:
+        led.close()
+
+
 def _carry_tx(project: Project, tools: set[str]) -> list[Finding]:
     """Open TX findings of tools whose result cannot be trusted right now (stale, invalid, required but missing).
     Their absence is not a fix, so they are replayed; the EXT-00 finding says why."""
@@ -107,7 +129,8 @@ def _carry_tx(project: Project, tools: set[str]) -> list[Finding]:
 
 def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: bool = True,
           extra_findings: list[Finding] | None = None, backend=None, incremental: bool = False,
-          external: str | bool | None = None, **t3kw) -> dict:
+          external: str | bool | None = None, rubric_backend=None, rubric_limit: int = 0,
+          rubric_criteria: list[str] | None = None, **t3kw) -> dict:
     """`external`: None leaves tier TX out; "" or True reads .ah/external/; a path reads that directory.
     TX joins the tiers only then, so a run without external results never marks their findings fixed."""
     t0 = time.perf_counter()
@@ -143,7 +166,11 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
             mode, note = "incremental", f"{len(changed)}/{len(unit_hashes)} units changed"
         led_peek.close()
     evidence: dict = {}
-    findings = run_checks(ctx, tiers, extra_findings, backend, evidence, **t3kw) + carried + carried_tx
+    rubric_stats: dict = {}
+    findings = run_checks(ctx, tiers, extra_findings, backend, evidence, rubric_backend=rubric_backend, rubric_stats=rubric_stats,
+                          rubric_limit=rubric_limit, rubric_criteria=rubric_criteria, **t3kw) + carried + carried_tx
+    if "TR" in tiers and use_ledger:
+        findings += _carry_tr(project, rubric_stats.get("unjudged", set()), rubric_stats.get("admitted", []))
     gate_levels = set(project.cfg["gate"]["blocking_levels"])
     report: dict = {
         "engine": __version__, "rubric": RUBRIC_VERSION, "project": project.cfg["project"],
@@ -160,6 +187,8 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
         report["evidence"] = evidence
     if ext is not None:
         report["external"] = ext.report()
+    if "TR" in tiers:
+        report["rubric_run"] = {k: v for k, v in rubric_stats.items() if k != "unjudged"}   # (report["rubric"] is the engine's rubric VERSION)
     states: dict[str, dict] = {}
     if use_ledger:
         led = Ledger(project)
