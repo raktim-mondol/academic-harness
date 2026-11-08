@@ -126,7 +126,9 @@ def test_scopes_filter_collection_project_and_cited_only(store, tmp_path):
     library_org.create_collection(store, "refs", project="thesis", bib_path="references.bib")
     library_org.add_to_collection(store, "refs", ["he2016deep", "lee2020conf"])
     assert export_library(store, query=["year:2020"])["count"] == 1
-    assert export_library(store, collection="refs")["count"] == 2
+    # A collection bound to a bibliography writes that file. Keep the export
+    # in the test workspace rather than whichever directory launched pytest.
+    assert export_library(store, collection="refs", cwd=str(tmp_path))["count"] == 2
     assert export_library(store, project="thesis")["count"] == 3  # imported under the project
 
     root = tmp_path / "ms"

@@ -3,9 +3,10 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from papermemory import __version__
 
 APP_NAME = "papermemory"
-VERSION = "0.3.1"
+VERSION = __version__
 
 
 def data_dir() -> Path:

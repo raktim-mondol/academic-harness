@@ -79,6 +79,9 @@ def add_claim(
     paper = store.get_paper(paper_id)
     if not paper:
         raise ClaimError("paper-not-found")
+    # Callers may supply a citation key or another supported paper identity.
+    # Everything persisted and hashed below must use the canonical foreign key.
+    paper_id = paper["id"]
     doc_id = paper.get("current_doc_id")
     if not doc_id:
         raise ClaimError("no-source-text")

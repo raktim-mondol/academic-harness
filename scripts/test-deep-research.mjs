@@ -6,6 +6,12 @@ import { appendClaims, appendRecords, readArtifact, readCorpus, readFindings, re
 
 const workspace = makeWorkspace('ah-deep-research-tool-')
 const cwd = workspace.cwd
+// This suite uses fake retrieval and must never install into the user's DSH
+// home or read/write their PaperMemory database as a side effect.
+process.env.DSH_HOME = join(cwd, '.dsh-test-home')
+process.env.PAPERMEMORY_DB = join(cwd, 'papermemory-test.db')
+process.env.PAPERMEMORY_SKIP_INSTALL = '1'
+delete process.env.PAPERMEMORY_CLI
 
 const checks = []
 const ok = (label, condition, detail) => {

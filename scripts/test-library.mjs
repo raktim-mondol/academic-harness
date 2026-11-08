@@ -21,7 +21,7 @@ process.env.PAPERMEMORY_DB = join(work, 'pm.db')
 process.env.DSH_HOME = join(work, 'dsh')
 
 const { libraryCli, libraryPapers, libraryRecords, libraryResolve, librarySetIntegrity } = await import('../papermemory-library.js')
-const { ensurePaperMemoryDb, MIN_PAPERMEMORY_VERSION, resolvePaperMemoryLaunch, run, cliArgs } = await import('../papermemory-cli.js')
+const { ensurePaperMemoryDb, MIN_PAPERMEMORY_VERSION, quoteCheck, resolvePaperMemoryLaunch, run, cliArgs } = await import('../papermemory-cli.js')
 const { runCitation } = await import('../citation.js')
 const { runManuscriptCitations } = await import('../manuscript-citations.js')
 const { runIntegrityCheck } = await import('../integrity-check.js')
@@ -43,7 +43,7 @@ writeFileSync(src, BIB)
 const pm = (...args) => spawnSync(wrapper, args, { encoding: 'utf8', cwd: ws })
 
 // ---- the tool surface and version
-assert.equal(MIN_PAPERMEMORY_VERSION, '0.3.0')
+assert.equal(MIN_PAPERMEMORY_VERSION, '0.3.6')
 assert.equal(pm('init', '--json').status, 0)
 const names = JSON.parse(pm('tools', '--json').stdout)
 assert.equal(names.length, 15, 'PaperMemory should expose 15 tools')
@@ -52,7 +52,25 @@ assert.match(readFileSync(join(root, 'papermemory.js'), 'utf8'), /EXPECTED_TOOL_
 const hidden = JSON.parse(spawnSync(wrapper, ['tools', '--json'], { encoding: 'utf8', env: { ...process.env, PAPERMEMORY_HIDE_TOOLS: 'papermemory_library' } }).stdout)
 assert.equal(hidden.length, 14, 'the plugin hides the MCP library tool')
 assert.ok(!hidden.includes('papermemory_library'))
-assert.match(readFileSync(join(vendor, 'pyproject.toml'), 'utf8'), /version = "0\.3\.5"/)
+assert.match(readFileSync(join(vendor, 'pyproject.toml'), 'utf8'), /version = "0\.3\.6\+ah\.1"/)
+
+// Quote checks with workspace/project context must actually query the source;
+// unknown or text-less papers are unverified, never a fabricated-quote verdict.
+const quotePaper = join(ws, 'quote.md')
+const libraryDb = process.env.PAPERMEMORY_DB
+process.env.PAPERMEMORY_DB = join(work, 'quotes.db')
+writeFileSync(quotePaper, '---\ndoi: 10.1234/quote-test\ntitle: Quote Test\nbibtex_key: quote2024\n---\n# Results\n\nThe measured result was forty two.\n')
+assert.equal(pm('ingest', quotePaper, '--project', 'quotes', '--json').status, 0)
+const quoteResult = await quoteCheck({ quote: 'The measured result was forty two.', paper: 'quote2024', project: 'quotes', cwd: ws })
+assert.equal(quoteResult.ok, true)
+assert.equal(quoteResult.found, true)
+const absentQuote = await quoteCheck({ quote: 'The measured result was ninety nine.', paper: 'quote2024', project: 'quotes', cwd: ws })
+assert.equal(absentQuote.ok, true)
+assert.equal(absentQuote.found, false)
+const unknownPaper = await quoteCheck({ quote: 'The measured result was forty two.', paper: 'missing-paper', cwd: ws })
+assert.equal(unknownPaper.ok, false)
+assert.equal(unknownPaper.code, 'paper-not-found')
+process.env.PAPERMEMORY_DB = libraryDb
 
 // ---- the CLI bridge
 assert.equal(pm('library', 'import', src, '--project', 'thesis').status, 0)

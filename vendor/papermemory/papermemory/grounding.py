@@ -34,10 +34,13 @@ def resolve_doc(store, *, paper_id=None, chunk_id=None, doc_id=None):
             "SELECT * FROM raw_documents WHERE id=?", (row["doc_id"],)
         ).fetchone()
     if paper_id:
+        paper = store.get_paper(paper_id)
+        if not paper:
+            return None
         return store.conn.execute(
             """SELECT r.* FROM raw_documents r JOIN papers p ON p.current_doc_id=r.id
                WHERE p.id=?""",
-            (paper_id,),
+            (paper["id"],),
         ).fetchone()
     return None
 
@@ -53,10 +56,20 @@ def quote_check(
 ) -> dict[str, Any]:
     doc = resolve_doc(store, paper_id=paper_id, chunk_id=chunk_id, doc_id=doc_id)
     if doc is None or not quote:
+        if not quote:
+            reason = "quote-required"
+        elif doc_id:
+            reason = "document-not-found"
+        elif chunk_id:
+            reason = "chunk-not-found"
+        elif paper_id:
+            reason = "no-source-text" if store.get_paper(paper_id) else "paper-not-found"
+        else:
+            reason = "source-required"
         return {
             "found": False,
             "occurrences": [],
-            "reason": "no-match",
+            "reason": reason,
             "checked_against": {"sha256": None, "doc_id": None},
         }
     text = doc["text"]

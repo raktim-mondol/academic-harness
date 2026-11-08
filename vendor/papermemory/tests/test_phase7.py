@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from papermemory import __version__
 from papermemory import mcp_server
 from papermemory.corpus import ingest_markdown
 from papermemory.db import Store
@@ -51,6 +52,13 @@ def test_tools_golden_surface():
     assert names == EXPECTED_TOOLS
 
 
+def test_cli_version_matches_mcp_version(tmp_path):
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1]), PAPERMEMORY_DB=str(tmp_path / "pm.db"))
+    result = subprocess.run([sys.executable, "-m", "papermemory", "version", "--json"], env=env, capture_output=True, text=True, check=True)
+    assert json.loads(result.stdout)["version"] == __version__
+    assert mcp_server.__version__ == __version__
+
+
 def test_search_payload_and_absence(monkeypatch, tmp_path):
     store = _store(tmp_path)
     _ingest(store, tmp_path)
@@ -76,6 +84,56 @@ def test_get_payload_materializes_evidence(monkeypatch, tmp_path):
     assert payload["chunks"] and payload["totals"]["chunks"] >= len(payload["chunks"])
     assert payload["paper"]["doi"] == "10.20/a"
     store.close()
+
+
+def test_quote_and_claim_resolve_citation_keys_and_report_missing_sources(monkeypatch, tmp_path):
+    store = _store(tmp_path)
+    ingested = _ingest(store, tmp_path)
+    quote = "We used a sample of 120 participants in the trial."
+
+    def payload(name, args):
+        result = _call(monkeypatch, tmp_path, name, args)
+        return result, json.loads(result["content"][0]["text"])
+
+    _, checked = payload("papermemory_quote_check", {"paper": "key7", "quote": quote})
+    assert checked["found"] and checked["checked_against"]["doc_id"] == ingested["doc_id"]
+    _, missing = payload("papermemory_quote_check", {"paper": "missing", "quote": quote})
+    assert not missing["found"] and missing["reason"] == "paper-not-found"
+    assert missing["checked_against"]["doc_id"] is None
+    chunkless = store.upsert_paper({"title": "Only metadata", "doi": "10.20/chunkless"})
+    _, no_text = payload("papermemory_quote_check", {"paper": chunkless["id"], "quote": quote})
+    assert not no_text["found"] and no_text["reason"] == "no-source-text"
+    _, no_source = payload("papermemory_quote_check", {"quote": quote})
+    assert no_source["reason"] == "source-required"
+    _, absent = payload("papermemory_quote_check", {"paper": "key7", "quote": "not in the paper"})
+    assert not absent["found"] and absent["reason"] == "no-match"
+    assert absent["checked_against"]["doc_id"] == ingested["doc_id"]
+
+    _, claim = payload("papermemory_claim", {"paper": "key7", "text": "Trial size.", "evidence": quote})
+    assert claim["claim"]["paper_id"] == ingested["paper_id"]
+    _, repeat = payload("papermemory_claim", {"paper": ingested["paper_id"], "text": "Trial size.", "evidence": quote})
+    assert repeat["claim"]["id"] == claim["claim"]["id"]
+    result, error = payload("papermemory_claim", {"paper": "missing", "text": "Trial size.", "evidence": quote})
+    assert result["isError"] and error["code"] == "paper-not-found"
+    store.close()
+
+
+def test_quote_check_cli_accepts_key_and_reports_no_source(tmp_path):
+    store = _store(tmp_path)
+    ingested = _ingest(store, tmp_path)
+    store.close()
+    env = dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[1]), PAPERMEMORY_DB=str(tmp_path / "pm.db"))
+    base = [sys.executable, "-m", "papermemory", "quote-check", "sample of 120 participants", "--json", "--paper"]
+    found = subprocess.run([*base, "key7"], env=env, capture_output=True, text=True, check=True)
+    assert json.loads(found.stdout)["checked_against"]["doc_id"] == ingested["doc_id"]
+    missing = subprocess.run([*base, "not-a-paper"], env=env, capture_output=True, text=True, check=True)
+    assert json.loads(missing.stdout)["reason"] == "paper-not-found"
+    claim = subprocess.run(
+        [sys.executable, "-m", "papermemory", "claim", "Trial size", "--paper", "key7",
+         "--evidence", "We used a sample of 120 participants in the trial.", "--json"],
+        env=env, capture_output=True, text=True, check=True,
+    )
+    assert json.loads(claim.stdout)["paper_id"] == ingested["paper_id"]
 
 
 def test_cite_payload_and_support(monkeypatch, tmp_path):

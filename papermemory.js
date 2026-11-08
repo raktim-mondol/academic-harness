@@ -1,8 +1,8 @@
 /**
  * PaperMemory MCP connector on the Academic Harness preset.
  *
- * First Academic Harness start installs the `papermemory` CLI (PATH, then a
- * plugin-managed venv under $DSH_HOME/papermemory from the vendored package)
+ * First Academic Harness start installs the vendored `papermemory` CLI in a
+ * plugin-managed venv under $DSH_HOME/papermemory (a compatible PATH CLI is a fallback)
  * and mounts `mcp__papermemory__*` over stdio (`papermemory mcp`). Stopping
  * DSH tears the child down with the MCP client. The SQLite store stays at
  * ~/.local/share/papermemory/papermemory.db (override PAPERMEMORY_DB) so a

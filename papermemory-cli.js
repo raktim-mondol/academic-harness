@@ -23,9 +23,9 @@ const UV_BIN = process.platform === 'win32' ? 'uv.exe' : 'uv'
 const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['python3', 'python']
 
 export const LOG = '[academic-harness] papermemory'
-export const MIN_PAPERMEMORY_VERSION = '0.3.0'
+export const MIN_PAPERMEMORY_VERSION = '0.3.6'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh17'
+const BUNDLE_REV = 'dsh18'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -151,6 +151,11 @@ function findPython() {
   return PYTHON_BINS[0]
 }
 
+// Unmanaged fallbacks are usable only after the asynchronous version and MCP
+// probes have passed in this process. Never let a synchronous consumer bypass
+// the startup check and silently select an older PATH executable.
+let validatedFallback
+
 /**
  * Resolve how DSH should spawn the papermemory CLI.
  * Order: PAPERMEMORY_CLI, the plugin-managed venv (vendored MCP with NDJSON
@@ -161,9 +166,10 @@ export function resolvePaperMemoryLaunch() {
   const override = process.env.PAPERMEMORY_CLI?.trim()
   if (override) return launchFromCommand(override)
   const bundled = findBundled()
-  if (bundled) return bundled
+  if (bundled && bundledInstalledVersion() === wantStamp()) return bundled
+  if (bundled && validatedFallback?.command === bundled.command) return validatedFallback
   const onPath = findOnPath()
-  return onPath ? { ...onPath, readOnly: true } : undefined
+  return onPath && validatedFallback?.command === onPath.command ? validatedFallback : undefined
 }
 
 export function run(command, args, { cwd, timeoutMs, env, signal, silent } = {}) {
@@ -347,33 +353,34 @@ async function probeNdjson(launch, timeoutMs = 5000) {
  * install fails. PAPERMEMORY_CLI always wins.
  */
 export async function ensurePaperMemoryInstalled() {
-  if (process.env.PAPERMEMORY_SKIP_INSTALL === '1') return resolvePaperMemoryLaunch()
   if (process.env.PAPERMEMORY_CLI?.trim()) return resolvePaperMemoryLaunch()
 
   const have = bundledInstalledVersion()
   if (findBundled() && have === wantStamp()) return findBundled()
 
-  const installed = await installBundled()
+  const skipInstall = process.env.PAPERMEMORY_SKIP_INSTALL === '1'
+  const installed = skipInstall ? undefined : await installBundled()
   if (installed) return installed
-  const onPath = findOnPath()
-  if (onPath) {
-    const version = await installedVersion(onPath)
+  const fallback = (skipInstall && findBundled()) || findOnPath()
+  if (fallback) {
+    const version = await installedVersion(fallback)
     if (!versionAtLeast(version, MIN_PAPERMEMORY_VERSION)) {
       console.warn(
-        `${LOG}: PATH fallback ${onPath.command} is version ${version || 'unknown'} `
+        `${LOG}: fallback ${fallback.command} is version ${version || 'unknown'} `
         + `(< ${MIN_PAPERMEMORY_VERSION}); not using it`,
       )
       return undefined
     }
-    if (!(await probeNdjson(onPath))) {
+    if (!(await probeNdjson(fallback))) {
       console.warn(
-        `${LOG}: PATH fallback ${onPath.command} does not speak NDJSON MCP on startup; refusing it `
+        `${LOG}: fallback ${fallback.command} does not speak NDJSON MCP on startup; refusing it `
         + '(Content-Length-only servers deadlock DSH)',
       )
       return undefined
     }
-    console.warn(`${LOG}: bundled install missing; PATH fallback ${onPath.command} is read-only (${version})`)
-    return { ...onPath, readOnly: true, version }
+    console.warn(`${LOG}: using validated fallback ${fallback.command} (${version})`)
+    validatedFallback = { ...fallback, readOnly: true, version }
+    return validatedFallback
   }
   return undefined
 }
@@ -452,14 +459,15 @@ export async function quoteCheck({ quote, paper, project, cwd, signal } = {}) {
 
   const args = ['quote-check', text, '--json']
   if (paper) args.push('--paper', String(paper))
-  if (project) args.push('--project', String(project))
-  if (cwd) args.push('--cwd', String(cwd))
+  // quote-check scopes to a paper/document, not a project; the CLI does not
+  // accept --project or --cwd. cwd is only the child process working directory.
 
   let result
   try {
     result = await run(launch.command, cliArgs(launch, args), {
       timeoutMs: QUOTE_CHECK_TIMEOUT_MS,
       env: papermemoryEnv(),
+      cwd,
       signal,
       silent: true,
     })
@@ -473,6 +481,10 @@ export async function quoteCheck({ quote, paper, project, cwd, signal } = {}) {
   const parsed = parseJsonOutput(result.out)
   if (!parsed || typeof parsed !== 'object') {
     return { ok: false, code: 'not_found', error: 'quote-check returned no JSON' }
+  }
+  if (!parsed.checked_against?.doc_id || !parsed.checked_against?.sha256) {
+    const reason = parsed.reason || 'source-unavailable'
+    return { ok: false, code: reason, error: `quote-check could not read a source (${reason})` }
   }
   return {
     ok: true,
