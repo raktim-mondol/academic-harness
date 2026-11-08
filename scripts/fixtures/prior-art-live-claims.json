@@ -1,0 +1,13 @@
+{
+  "description": "Claims used by scripts/prior-art-live-eval.mjs. Chosen to mix well-covered topics (a close paper is likely to exist) with obscure ones (none is expected).",
+  "claims": [
+    { "id": "c1", "claim": "Contrastive pretraining of graph neural networks on molecular graphs improves molecular property prediction with few labels.", "query": "contrastive pretraining graph neural network molecular property prediction few labels", "sources": ["openalex", "arxiv"] },
+    { "id": "c2", "claim": "Large language models can be used as zero-shot rerankers for scientific literature search.", "query": "large language model zero-shot reranking scientific literature search", "sources": ["openalex", "arxiv"] },
+    { "id": "c3", "claim": "Retrieval-augmented generation reduces hallucination in biomedical question answering.", "query": "retrieval-augmented generation hallucination biomedical question answering", "sources": ["openalex", "arxiv", "pubmed"] },
+    { "id": "c4", "claim": "Deep learning on histopathology whole-slide images can predict gene expression profiles.", "query": "deep learning histopathology whole slide images predict gene expression", "sources": ["openalex", "pubmed"] },
+    { "id": "c5", "claim": "Predicted protein structures from AlphaFold can be used for structure-based virtual screening of drug candidates.", "query": "AlphaFold predicted structures virtual screening docking drug discovery", "sources": ["openalex", "arxiv", "pubmed"] },
+    { "id": "c6", "claim": "Mendelian randomization shows a causal effect of vitamin D levels on multiple sclerosis risk.", "query": "Mendelian randomization vitamin D multiple sclerosis", "sources": ["openalex", "pubmed"] },
+    { "id": "c7", "claim": "A fixed-seed paired design reduces variance when comparing two deep learning training recipes.", "query": "paired seeds variance reduction comparing deep learning training recipes", "sources": ["openalex", "arxiv"] },
+    { "id": "c8", "claim": "Evaluating an agent benchmark on a fixed subset first lowers cost while preserving the ranking of models.", "query": "benchmark subset evaluation preserves model ranking reduces cost", "sources": ["openalex", "arxiv"] }
+  ]
+}

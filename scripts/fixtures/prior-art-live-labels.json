@@ -1,0 +1,218 @@
+{
+ "description": "Implementer-written labels (an AI assistant, reading title and abstract only) for scripts/prior-art-live-eval.mjs. No independent human labelled these and human labelling is not available. A label judges the CANDIDATE against the CLAIM: close = its stated main finding is essentially the claim; partial = shares the central method or the central domain but not the claim; none = otherwise. Keys are DOI, arXiv id, or title; abstracts are re-fetched at run time and not stored here.",
+ "labelled_on": "2026-11-08",
+ "labels": {
+  "c1|doi:10.1093/bioinformatics/btac112": {
+   "label": "none",
+   "note": "suite of GNN/sequence methods; no contrastive pretraining stated"
+  },
+  "c1|doi:10.1093/bib/bbae474": {
+   "label": "close",
+   "note": "contrastive pretraining stage with GNN encoders for molecular property prediction"
+  },
+  "c1|doi:10.1038/s41467-024-45566-8": {
+   "label": "partial",
+   "note": "GNN transfer learning for sparse data, not contrastive"
+  },
+  "c1|doi:10.1609/aaai.v36i4.20377": {
+   "label": "close",
+   "note": "graph contrastive learning for molecular property prediction under label scarcity"
+  },
+  "c1|doi:10.48550/arxiv.1905.12265": {
+   "label": "partial",
+   "note": "pre-training GNNs with scarce labels; not specifically contrastive"
+  },
+  "c2|doi:10.1145/3726302.3730119": {
+   "label": "partial",
+   "note": "zero-shot LLM reranking, general IR rather than scientific literature"
+  },
+  "c2|doi:10.1038/s41586-025-10072-4": {
+   "label": "none",
+   "note": "retrieval-augmented synthesis of literature; not zero-shot reranking"
+  },
+  "c2|doi:10.48550/arxiv.2410.02642": {
+   "label": "partial",
+   "note": "zero-shot LLM re-ranking, general IR"
+  },
+  "c2|doi:10.18653/v1/2020.emnlp-main.341": {
+   "label": "partial",
+   "note": "zero-shot ranking for COVID scientific literature, not an LLM reranker"
+  },
+  "c2|doi:10.18653/v1/2023.acl-long.885": {
+   "label": "partial",
+   "note": "LM prompting for reranking, few-shot multi-hop QA"
+  },
+  "c2|doi:10.1101/2021.07.09.450648": {
+   "label": "none",
+   "note": "protein language models, unrelated"
+  },
+  "c3|doi:10.1109/icdmw69685.2025.00352": {
+   "label": "close",
+   "note": "RAG for biomedical QA motivated by LLM hallucination"
+  },
+  "c3|doi:10.1109/iciice69672.2026.11565268": {
+   "label": "close",
+   "note": "biomedical retrieval pipeline aimed at reducing hallucination risk in RAG"
+  },
+  "c3|doi:10.1109/sds66131.2025.00029": {
+   "label": "partial",
+   "note": "RAG for biomedical QA; studies retrieval and latency, not hallucination"
+  },
+  "c3|doi:10.18653/v1/2024.findings-acl.372": {
+   "label": "partial",
+   "note": "benchmarks RAG for medicine; hallucination is motivation, not the finding"
+  },
+  "c3|arxiv:2411.00300": {
+   "label": "close",
+   "note": "RAG for medical QA addressing hallucination and outdated knowledge"
+  },
+  "c3|arxiv:2601.04531": {
+   "label": "close",
+   "note": "hybrid RAG for medical QA aimed at hallucination and ungrounded reasoning"
+  },
+  "c3|arxiv:2604.08549": {
+   "label": "partial",
+   "note": "RAG plus claim verification for biomedical QA; verification rather than retrieval is the mechanism"
+  },
+  "c3|arxiv:2510.14400": {
+   "label": "partial",
+   "note": "evidence verification for RAG hallucination in biomedical QA"
+  },
+  "c4|doi:10.3390/cancers15092569": {
+   "label": "close",
+   "note": "deep learning predicts gene expression from breast cancer histopathology images"
+  },
+  "c4|doi:10.1038/s41467-020-17678-4": {
+   "label": "close",
+   "note": "HE2RNA predicts RNA-Seq expression from whole slide images"
+  },
+  "c4|doi:10.1038/s41598-022-19112-9": {
+   "label": "none",
+   "note": "grading and survival, not gene expression"
+  },
+  "c4|doi:10.3389/fgene.2021.661109": {
+   "label": "partial",
+   "note": "predicts BRCA mutation status from histopathology, not expression"
+  },
+  "c4|doi:10.1158/0008-5472.can-21-0482": {
+   "label": "close",
+   "note": "transcriptome-wide expression-morphology analysis predicting expression from histopathology"
+  },
+  "c4|doi:10.1186/s12885-024-13248-9": {
+   "label": "close",
+   "note": "predicts expression-based proliferation scores from WSIs with deep learning"
+  },
+  "c5|doi:10.1016/j.isci.2022.105920": {
+   "label": "close",
+   "note": "evaluates AlphaFold models for docking-based virtual screening"
+  },
+  "c5|doi:10.15252/msb.202211081": {
+   "label": "partial",
+   "note": "AlphaFold2 with docking to predict binding targets of antibiotics, not candidate screening"
+  },
+  "c5|doi:10.26434/chemrxiv.15000478/v1": {
+   "label": "close",
+   "note": "AlphaFold-derived structures for early-stage virtual screening"
+  },
+  "c5|doi:10.1038/s41467-024-52061-7": {
+   "label": "none",
+   "note": "virtual screening platform built on docking accuracy; AlphaFold not the subject"
+  },
+  "c5|doi:10.3390/ijms25021358": {
+   "label": "close",
+   "note": "virtual screening with an optimized AlphaFold model identifies an HDAC11 inhibitor"
+  },
+  "c5|doi:10.6019/tol.alphafold-protein-models-strucchemical-libraries-w.2026.00001.1": {
+   "label": "close",
+   "note": "virtual screening of compound libraries with AlphaFold models"
+  },
+  "c5|arxiv:2412.10966": {
+   "label": "none",
+   "note": "generative docking method, no AlphaFold screening claim"
+  },
+  "c6|doi:10.1371/journal.pmed.1001866": {
+   "label": "close",
+   "note": "Mendelian randomization of vitamin D and MS risk"
+  },
+  "c6|doi:10.1177/1352458517737373": {
+   "label": "close",
+   "note": "Mendelian randomization of vitamin D and obesity in MS"
+  },
+  "c6|doi:10.1212/nxg.0000000000000097": {
+   "label": "close",
+   "note": "states a causal effect of low vitamin D on MS risk by MR"
+  },
+  "c6|doi:10.1371/journal.pmed.1001981": {
+   "label": "none",
+   "note": "correction notice for authorship, no findings"
+  },
+  "c6|doi:10.82308/29086": {
+   "label": "partial",
+   "note": "literature review of MR for vitamin D in MS"
+  },
+  "c6|doi:10.1177/1352458521995484": {
+   "label": "partial",
+   "note": "MR of obesity, vitamin D, leptin and adiponectin in MS; vitamin D as mediator"
+  },
+  "c7|doi:10.48550/arxiv.2605.09235": {
+   "label": "none",
+   "note": "variance reduction inside a training objective, not comparison design"
+  },
+  "c7|doi:10.48550/arxiv.2605.04913": {
+   "label": "none",
+   "note": "local learning recipe for LLM post-training"
+  },
+  "c7|doi:10.48550/arxiv.2112.01423": {
+   "label": "none",
+   "note": "training efficiency and robustness"
+  },
+  "c7|doi:10.1016/j.physrep.2019.03.001": {
+   "label": "none",
+   "note": "bias-variance review for physicists"
+  },
+  "c7|doi:10.1609/aaaiss.v10i1.43406": {
+   "label": "none",
+   "note": "LLM controller for training recipes"
+  },
+  "c8|doi:10.1145/3770855.3817569": {
+   "label": "partial",
+   "note": "dataset subset selection to preserve model rankings, ML benchmarks not agents"
+  },
+  "c8|doi:10.48550/arxiv.2603.23749": {
+   "label": "close",
+   "note": "small task subsets preserve AI agent rankings at lower cost"
+  },
+  "c8|doi:10.1613/jair.3994": {
+   "label": "none",
+   "note": "image description ranking task"
+  },
+  "c8|doi:10.48550/arxiv.2406.15527": {
+   "label": "partial",
+   "note": "data-efficient LLM evaluation by adaptive sampling"
+  },
+  "c8|doi:10.48550/arxiv.2607.19987": {
+   "label": "none",
+   "note": "recommender ranking models"
+  },
+  "c8|doi:10.1038/s41746-026-02671-w": {
+   "label": "partial",
+   "note": "cost-effective LLM benchmarking by adaptive testing in medicine"
+  },
+  "c8|arxiv:2406.15527": {
+   "label": "partial",
+   "note": "data-efficient LLM evaluation by adaptive sampling"
+  },
+  "c8|arxiv:2603.23749": {
+   "label": "close",
+   "note": "small task subsets preserve AI agent rankings at lower cost"
+  },
+  "c8|arxiv:2502.13595": {
+   "label": "none",
+   "note": "multilingual embedding benchmark"
+  },
+  "c8|arxiv:2603.02663": {
+   "label": "none",
+   "note": "multimodal item response theory"
+  }
+ }
+}

@@ -12,7 +12,9 @@ import { fromOpenAlexWork, renderPapers } from './search-normalize.js'
 
 const API = 'https://api.openalex.org'
 const ENTITIES = ['works', 'authors', 'sources', 'topics']
-const DEFAULT_SELECT = 'id,doi,ids,title,publication_year,authorships,primary_location,best_oa_location,open_access,cited_by_count,type,topics'
+// abstract_inverted_index is needed for any abstract at all: without it every work reaches
+// literature_search, the relevance rerank, and prior_art as a bare title.
+const DEFAULT_SELECT = 'id,doi,ids,title,publication_year,authorships,primary_location,best_oa_location,open_access,cited_by_count,type,topics,abstract_inverted_index'
 const DEFAULT_SOURCE_SELECT = 'id,display_name,issn_l,issn,host_organization_name,is_oa,is_in_doaj,apc_usd,homepage_url,summary_stats,works_count,cited_by_count,topics,counts_by_year,type,country_code'
 
 export function buildParams(args, apiKey, mailto) {
