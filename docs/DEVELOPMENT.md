@@ -38,6 +38,18 @@ TEXTFOLD_SKIP_INSTALL=1 TEXTFOLD_PYTHON="$(command -v python)" node scripts/test
 
 CI requires this test (`TEXTFOLD_LIVE_REQUIRED=1`) and runs the vendored PaperMemory suite with `pytest`, SciPy, Pillow, and defusedxml.
 
+### Live end-to-end run (real host, scripted model)
+
+`npm test` calls tools directly. The DSH host adds checks they never see; for example it rejects any tool result that is not lossless JSON, which an `undefined` property is enough to break (`experiment_log action=branches` shipped broken for this reason). `scripts/live-e2e/` runs the Phase 1-5 tools through a real, isolated DSH:
+
+- `provider.mjs` is a loopback Anthropic-Messages endpoint that plays the fixed tool calls in `steps.mjs`. It is **not a model**: it says nothing about how a model would choose or phrase anything. It is stateless (its position is the number of its own tool results in the request).
+- `start.sh` starts it plus a DSH with its own `DSH_HOME`, XDG directories, and a random port, so it never touches a DSH on :3080 or your PaperMemory store. `drive.mjs` opens a session and sends one prompt; `verify.mjs` asserts on the receipt; `stop.sh` stops only the two ports of that run, by exact PID.
+- The step script calls the real `literature_search` (network).
+
+Set up the profile on a real disk, not `/tmp` (a `tmpfs` with a per-user quota fills quickly): create `<dir>/home/profiles/e2e/package.json` with `@deepseek-ai/dsh`, `dsh-base` and `dsh-web-app` at one version plus `academic-harness` as `file:<tarball>`, and a `cordis.yml` containing `[]`. Install a **packed copy from a clean export** (`git archive HEAD | tar -x -C <src>`, then `npm pack` there), not a symlink to the working tree, whose `node_modules` may be older than the profile's. After repacking, delete the profile's `package-lock.json` or npm reuses the stale tarball.
+
+Not covered: a real model's judgement, the approval prompts a model would raise, and any provider-specific behaviour.
+
 ## Documentation diagrams
 
 The SVG diagrams in `docs/assets/diagrams/` are generated from the Mermaid sources in `docs/diagrams/` through Pele:
