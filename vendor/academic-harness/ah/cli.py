@@ -69,6 +69,9 @@ def render_report(rep: dict, limit: int = 25) -> str:
         extra = f"; T3 calls {c.get('t3_calls', 0)} cached {c.get('t3_cached', 0)}" if "t3_calls" in c else ""
         lines.append(f"cost: {c['seconds']}s  {c['mode']}" + (f" ({c['note']})" if c.get("note") else "")
                      + f"; units {c.get('units_changed', '?')}/{c.get('units_total', '?')} rechecked" + extra)
+    if rep.get("external"):
+        lines.append("external: " + "; ".join(
+            f"{t} {i['status']}" + (f" ({i['findings']})" if i["status"] == "fresh" else "") for t, i in rep["external"]["tools"].items()))
     lines.append(f"open findings: {len(live)}  by level: {rep['counts']}")
     lines.append(f"by check: {rep['checks_fired']}")
     if "ledger" in rep:
@@ -238,7 +241,8 @@ def _narrow(rep: dict, files: list[str] | None, brief: bool) -> dict:
         blocking = [f for f in live if f["level"] in rep["gate"]["levels"]]
         rep["gate"] = dict(rep["gate"], passed=not blocking, blocking=len(blocking))
     if brief:
-        rep = {"gate": rep["gate"], "counts": rep["counts"], "tiers": rep["tiers"],
+        ext = {"external": {t: i["status"] for t, i in rep["external"]["tools"].items()}} if rep.get("external") else {}
+        rep = {**ext, "gate": rep["gate"], "counts": rep["counts"], "tiers": rep["tiers"],
                "findings": [{"fp": f["fingerprint"], "check": f["check"], "level": f["level"], "unit": f["unit"], "file": f["file"],
                              "line": f["line"], "state": f["state"], "message": f["message"][:240]} for f in rep["findings"]
                             if f["state"] in ("open", "decision-needed")]}
@@ -247,7 +251,7 @@ def _narrow(rep: dict, files: list[str] | None, brief: bool) -> dict:
 
 def cmd_check(a):
     p = _proj(a)
-    rep = audit(p, _tiers(a), use_ledger=False, backend=_backend(a, p), **_t3kw(a))
+    rep = audit(p, _tiers(a), use_ledger=False, backend=_backend(a, p), external=getattr(a, "external", None), **_t3kw(a))
     rep = _narrow(rep, a.files.split(",") if getattr(a, "files", None) else None, getattr(a, "brief", False))
     print(json.dumps(rep, indent=1) if a.json else (render_report(rep, a.limit) if "coverage" in rep else json.dumps(rep, indent=1)))
     return EXIT_OK if rep["gate"]["passed"] else EXIT_FINDINGS
@@ -265,7 +269,7 @@ def cmd_audit(a):
             return EXIT_ERROR
         extra = log_findings(ctx, parse_log(b["log"]))
     rep = audit(p, _tiers(a), use_ledger=not a.no_ledger, extra_findings=extra, backend=_backend(a, p),
-                incremental=getattr(a, "incremental", False), **_t3kw(a))
+                incremental=getattr(a, "incremental", False), external=getattr(a, "external", None), **_t3kw(a))
     if a.det_check:
         rep["det01"] = det_check(p, _tiers(a), backend=_backend(a, p))
     if getattr(a, "stability", 0):
@@ -309,6 +313,23 @@ def cmd_stability(a):
     if st["verdict"] == "input-changed":
         return EXIT_ERROR
     return EXIT_OK if st["verdict"] == "stable" and not st["ledger_unexplained"] else EXIT_FINDINGS
+
+
+def cmd_external(a):
+    from .external import external_dir, load_external, plan
+    p = _proj(a)
+    if a.action == "plan":
+        print(json.dumps(plan(p), indent=1))
+        return EXIT_OK
+    res = load_external(p, build_context(p), a.dir)
+    rep = res.report()
+    if a.json:
+        print(json.dumps(rep, indent=1))
+    else:
+        print(f"external results in {rep['directory']}")
+        for tool, info in rep["tools"].items():
+            print(f"  {tool:14} {info['status']:15}" + (f" {info['findings']} finding(s)" if info["status"] == "fresh" else f" {info.get('detail', '')}"))
+    return EXIT_OK if not res.carry_tools else EXIT_FINDINGS   # stale, invalid, or required and missing
 
 
 def cmd_build(a):
@@ -767,6 +788,8 @@ def main(argv=None) -> int:
         sp.add_argument("--provider", help="override verifier.provider")
         sp.add_argument("--thinking", default=None, help="override thinking level; empty sends no flag")
         sp.add_argument("--file", action="append", help="only claims in this file (relative to the TeX root)")
+        sp.add_argument("--external", nargs="?", const="", default=None, metavar="DIR",
+                        help="add tier TX: results of external tools (default .ah/external); stale ones are reported as EXT-00")
         if name == "audit":
             sp.add_argument("--build", action="store_true", help="also compile and parse the log")
             sp.add_argument("--no-ledger", action="store_true")
@@ -786,6 +809,9 @@ def main(argv=None) -> int:
     sp.add_argument("--provider", help="override verifier.provider")
     sp.add_argument("--thinking", default=None, help="override thinking level; empty sends no flag")
     sp.add_argument("--file", action="append", help="only claims in this file (relative to the TeX root)")
+    sp = add("external", cmd_external, "plan what external tools must run on, or show the state of their results")
+    sp.add_argument("action", choices=["plan", "status"])
+    sp.add_argument("--dir", default=None, help="results directory (default .ah/external)")
     sp = add("build", cmd_build, "compile a view and parse the log")
     sp.add_argument("--view")
     sp = add("sweep", cmd_sweep, "list every place a value or fact appears")

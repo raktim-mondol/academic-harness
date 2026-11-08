@@ -105,6 +105,10 @@ class Ledger:
             if prev["unit_hashes"][f.ref] != unit_hashes[f.ref]:
                 return "text-changed"
         ps = prev.get("snapshot", {})
+        if f.tier == "TX" and ps.get("external") != snap.get("external"):
+            if f.check == "EXT-00" and ps.get("tex") != snap.get("tex"):
+                return "text-changed"   # a result went stale because the text it was computed from changed
+            return "evidence-changed"   # an external tool was re-run (or its result went unusable) since the last audit
         if any(ps.get(k) != snap.get(k) for k in ("facts", "sources", "bindings", "glossary", "bib")):
             return "evidence-changed"
         if ps.get("rubric") != snap.get("rubric") or ps.get("config") != snap.get("config"):

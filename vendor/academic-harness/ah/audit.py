@@ -18,6 +18,7 @@ from .checks.t4_coherence import check_t4
 from .checks.t5_authoring import check_t5
 from .profiles.rules import check_profile
 from .context import Context, build_context, unit_ref
+from .external import TOOL_CHECKS, load_external
 from .ledger.db import Ledger
 from .project import Project
 from .util import canonical_json, sha1
@@ -31,6 +32,8 @@ def run_checks(ctx: Context, tiers: tuple[str, ...] = DEFAULT_TIERS, extra: list
                evidence: dict | None = None, **t3kw) -> list[Finding]:
     found: list[Finding] = []
     for t in tiers:
+        if t == "TX":
+            continue   # external results arrive through `extra` (audit loads them from .ah/external/)
         if t == "T3":
             from .checks.t3_evidence import run_t3
             f3, stats = run_t3(ctx, backend, **t3kw)
@@ -88,12 +91,39 @@ def _carry_t3(led: Ledger, unit_hashes: dict[str, str], prev_h: dict, changed: s
     return out
 
 
+def _carry_tx(project: Project, tools: set[str]) -> list[Finding]:
+    """Open TX findings of tools whose result cannot be trusted right now (stale, invalid, required but missing).
+    Their absence is not a fix, so they are replayed; the EXT-00 finding says why."""
+    if not tools or not (project.state_dir / "ledger.sqlite").exists():
+        return []
+    checks = {c for t in tools for c in TOOL_CHECKS[t]}
+    led = Ledger(project)
+    try:
+        return [Finding(r["check_id"], r["level"], r["ref"], r["file"], None, r["key"], r["message"], "TX")
+                for r in led.list(("open", "decision-needed")) if r["tier"] == "TX" and r["check_id"] in checks]
+    finally:
+        led.close()
+
+
 def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: bool = True,
-          extra_findings: list[Finding] | None = None, backend=None, incremental: bool = False, **t3kw) -> dict:
+          extra_findings: list[Finding] | None = None, backend=None, incremental: bool = False,
+          external: str | bool | None = None, **t3kw) -> dict:
+    """`external`: None leaves tier TX out; "" or True reads .ah/external/; a path reads that directory.
+    TX joins the tiers only then, so a run without external results never marks their findings fixed."""
     t0 = time.perf_counter()
     ctx = build_context(project)
     unit_hashes = {unit_ref(u): u.hash for u in ctx.units}
     snap = project.snapshot()
+    tiers = tuple(t for t in tiers if t != "TX")
+    ext = None
+    carried_tx: list[Finding] = []
+    if external is not None and external is not False:
+        ext = load_external(project, ctx, None if external in (True, "") else external)
+        extra_findings = list(extra_findings or []) + ext.findings
+        tiers = tiers + ("TX",)
+        snap = dict(snap, external=ext.digest)
+        if use_ledger:
+            carried_tx = _carry_tx(project, ext.carry_tools)
     mode, note, changed = "full", "", None
     carried: list[Finding] = []
     if incremental:
@@ -113,7 +143,7 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
             mode, note = "incremental", f"{len(changed)}/{len(unit_hashes)} units changed"
         led_peek.close()
     evidence: dict = {}
-    findings = run_checks(ctx, tiers, extra_findings, backend, evidence, **t3kw) + carried
+    findings = run_checks(ctx, tiers, extra_findings, backend, evidence, **t3kw) + carried + carried_tx
     gate_levels = set(project.cfg["gate"]["blocking_levels"])
     report: dict = {
         "engine": __version__, "rubric": RUBRIC_VERSION, "project": project.cfg["project"],
@@ -128,6 +158,8 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
     }
     if evidence:
         report["evidence"] = evidence
+    if ext is not None:
+        report["external"] = ext.report()
     states: dict[str, dict] = {}
     if use_ledger:
         led = Ledger(project)

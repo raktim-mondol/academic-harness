@@ -1,6 +1,6 @@
 Vendored from https://github.com/raktim-mondol/academic-harness
 Commit: dbc7414662c776b55e9da87c798d1ad08bf1c941
-Version: 0.1.0 (rubric 1.2.0)
+Version: 0.1.0 (rubric 1.3.0 here; upstream pin was 1.2.0)
 
 Note (2026-10-23): the upstream engine repository is no longer available at this
 URL; the name now refers to this DSH plugin. The vendored tree and this pin are
@@ -22,6 +22,10 @@ Python package modified in this plugin (the vendored tree is maintained here as 
 - `ah stability` and `ah audit --stability N` (ah/stability.py): run the checks N times on
   unchanged text and report findings that come and go, plus unanchored units.
 - tests/: a restored engine test suite with a scaffolded LaTeX fixture project.
+- Tier TX (ah/external.py): findings of tools that live outside the engine (numbers_audit,
+  figure_audit, the citation audit, reporting_check verdicts) read from .ah/external/<tool>.json, with staleness by input hash
+  (EXT-00), `ah audit --external`, `ah external plan|status`, and ledger cause `evidence-changed` when a
+  tool is re-run. New checks STAT-01..05, FIG-01..04, CIT-01..06, RPT-01..03, EXT-00; rubric 1.3.0.
 
 Local DSH patch (ahead of upstream): registry --keys citation-key aliases
 (entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt
