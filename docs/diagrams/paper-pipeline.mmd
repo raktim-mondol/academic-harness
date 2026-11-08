@@ -11,7 +11,7 @@ flowchart TD
   download -->|paywalled| paywall[Report paywalled<br/>list every source tried]
   download --> convert[pdf_to_markdown<br/>headings, tables, reading order]
   convert -->|text-based| ingest
-  convert -->|scanned| vision[OCR or subagent_vision]
+  convert -->|scanned| vision[read_image or OCR]
 
   ingest --> fold[paper_fold<br/>section map first]
   ingest --> quote

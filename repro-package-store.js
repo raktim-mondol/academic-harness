@@ -440,13 +440,27 @@ export function buildReproPackage({ cwd, slug: slugValue, overwrite = false }) {
     '',
     '## Run order',
     '',
-    ...(includedRuns.length ? includedRuns.map((run) => `1. \`${run.command.join(' ')}\` (analysis "${run.slug}", ${run.run_id}, recorded exit ${run.exit_code ?? 'n/a'})`) : ['1. _no analysis runs included_']),
+    ...(includedRuns.length && entries.some((entry) => entry.role === 'code')
+      ? [
+          'The recorded commands use paths relative to the original workspace. Each command below starts from the package root and runs inside `code/`, so it can be pasted as shown.',
+          '',
+          'Only the selected code files were copied into `code/`. Restore any other required inputs at their original workspace-relative paths before running; copied dataset_get files are under the package root `data/`, not automatically staged in `code/`. Review the run manifests and licenses first. To keep the package unchanged, copy `code/` to a separate working directory and adapt the `cd code` prefix; commands may create or overwrite files.',
+          '',
+        ]
+      : includedRuns.length
+        ? ['No code files were copied. The recorded commands below require the original workspace or a separately reconstructed working directory; they have not been tested in this package and are shown without a `cd` prefix.', '']
+        : []),
+    ...(includedRuns.length ? includedRuns.map((run) => {
+      const command = run.command.join(' ')
+      const shown = entries.some((entry) => entry.role === 'code') ? `(cd code && ${command})` : command
+      return `1. \`${shown}\` (analysis "${run.slug}", ${run.run_id}, recorded exit ${run.exit_code ?? 'n/a'})`
+    }) : ['1. _no analysis runs included_']),
     '',
     ...(excludedRuns.length ? ['## Compliance exclusions', '', ...excludedRuns.map((run) => `- ${run.run_id}${run.analysis_slug ? ` (analysis ${run.analysis_slug})` : ''}: excluded because it violated frozen task rules${run.violated?.length ? ` (${run.violated.join(', ')})` : ''}`), ''] : []),
     '## Expected outputs',
     '',
     ...(entries.filter((entry) => entry.role === 'analysis-manifest').length
-      ? ['See `analysis/*-manifest.json`: each records the command, hashed inputs/outputs, environment, and exit status of one run.']
+      ? ['See `analysis/<slug>/*-manifest.json`: each records the command, hashed inputs/outputs, environment, and exit status of one run.']
       : ['_none recorded_']),
     '',
     '## Data availability',

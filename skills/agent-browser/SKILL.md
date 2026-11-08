@@ -1,6 +1,6 @@
 ---
 name: agent-browser
-description: "Browse and interact with live websites — navigate, fill forms, extract data, download datasets/files — when web_search/web_fetch can't reach rendered or interactive content. Delegate any screenshot it takes to subagent_vision."
+description: "Browse and interact with live websites — navigate, fill forms, extract data, download datasets/files — when web_search/web_fetch can't reach rendered or interactive content. Inspect screenshots with read_image on an image-capable model; report when vision is unavailable."
 ---
 
 # agent-browser
@@ -53,15 +53,15 @@ agent-browser read <direct-file-url>    # or fetch a direct URL straight into th
 
 Save into the workspace (e.g. `user_data/` or wherever the task's other inputs live), not `/tmp`, so the downloaded dataset is visible to the rest of the session.
 
-## Screenshots need a vision model — delegate, don't eyeball
+## Screenshots need a vision model
 
-`agent-browser screenshot <path>` is the right call whenever the accessibility-tree snapshot isn't enough to judge a page — visual layout, a chart/canvas/image-heavy page, a CAPTCHA, confirming something *looks* right. But the main session's model is not guaranteed to have vision input. After capturing a screenshot, delegate reading it to `subagent_vision` (this plugin's vision-pinned specialist) rather than trying to interpret the PNG yourself:
+`agent-browser screenshot <path>` is the right call whenever the accessibility-tree snapshot isn't enough to judge a page — visual layout, a chart/canvas/image-heavy page, a CAPTCHA, confirming something *looks* right.
 
 ```bash
 agent-browser screenshot page.png
 ```
 
-then delegate: "Read `page.png` with `read_image` and report `<what you need to know>`" to `subagent_vision`. Never guess at on-screen content, layout, or chart values from the snapshot text alone if a screenshot is available — request one.
+Read `page.png` with `read_image` on an image-capable session model. The host checks whether the active route supports images. If image reading is unavailable, report that the visual check could not be performed; do not substitute OCR or guess at on-screen content, layout, or chart values.
 
 ## Cleanup
 

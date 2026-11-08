@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { apply, runReproPackage } from '../repro-package.js'
 import { freezeAnalysisPlan, runAnalysis } from '../analysis-store.js'
@@ -17,7 +18,7 @@ const direct = (args, deps = {}) => runReproPackage(args, exec, deps)
 
 try {
   // A real analysis ledger with one successful run.
-  workspace.write('analysis/main.py', 'import os\nos.makedirs("results", exist_ok=True)\nwith open("results/out.csv","w") as fh: fh.write("a\\n1\\n")\nprint("done")\n')
+  workspace.write('analysis/main.py', 'import os\nassert open("data/in.csv").read() == "x\\n1\\n"\nos.makedirs("results", exist_ok=True)\nwith open("results/out.csv","w") as fh: fh.write("a\\n1\\n")\nprint("done")\n')
   workspace.write('data/in.csv', 'x\n1\n')
   await freezeAnalysisPlan({ cwd, slug: 'primary', plan: { question: 'Q?', inputs: ['data/in.csv'], outputs: ['results/out.csv'] } })
   const manifest = await runAnalysis({ cwd, slug: 'primary', kind: 'python', command: ['python3', 'analysis/main.py'], notebookEntry: null })
@@ -47,7 +48,7 @@ try {
   result = await run({ action: 'plan', slug: 'paper1', plan: {
     name: 'Paper One', authors: [{ given: 'A', family: 'Researcher', orcid: '0000-0001-0000-0000' }, 'B Person'],
     analyses: [{ slug: 'primary', run_id: manifest.run_id }], experiments: ['sweep'], datasets: [{ slug: 'zenodo-123' }],
-    code_files: ['src/model.py'], manuscript: 'paper.md', license: 'MIT', funder: 'Test Council', citation: 'Researcher et al. 2026',
+    code_files: ['src/model.py', 'analysis/main.py', 'data/in.csv'], manuscript: 'paper.md', license: 'MIT', funder: 'Test Council', citation: 'Researcher et al. 2026',
     include_data: true,
   } })
   assert.equal(result.plan.slug, 'paper1')
@@ -71,7 +72,16 @@ try {
   assert.equal(built.environment.runs[0].run_id, manifest.run_id)
   const readme = readFileSync(join(packageDir, 'README.md'), 'utf8')
   assert.match(readme, /## Run order/)
-  assert.match(readme, /python3 analysis\/main\.py/)
+  assert.match(readme, /Each command below starts from the package root and runs inside `code\/`/)
+  assert.match(readme, /not automatically staged in `code\/`/)
+  assert.match(readme, /\(cd code && python3 analysis\/main\.py\)/)
+  // Replay the exact documented command from a separate copy: executing in the
+  // package itself would add unmanifested files to it.
+  const replay = join(cwd, 'replay')
+  cpSync(join(packageDir, 'code'), join(replay, 'code'), { recursive: true })
+  const replayed = spawnSync('/bin/sh', ['-c', '(cd code && python3 analysis/main.py)'], { cwd: replay, encoding: 'utf8' })
+  assert.equal(replayed.status, 0, replayed.stderr)
+  assert.equal(readFileSync(join(replay, 'code/results/out.csv'), 'utf8'), 'a\n1\n')
   assert.match(readme, /## Data availability/)
   assert.match(readme, /doi.org\/10.5281\/zenodo.123/)
   assert.match(readme, /evidence of the recorded environment and artifacts, not a guarantee/)
@@ -138,6 +148,14 @@ try {
   result = await run({ action: 'build', slug: 'paper2' })
   assert.ok(result.package.warnings.some((warning) => /did not succeed/.test(warning)))
   assert.ok(result.package.warnings.some((warning) => /no license stated/i.test(warning)))
+
+  // A plan with recorded runs but no copied code must not claim a runnable code directory.
+  await run({ action: 'plan', slug: 'no-code', plan: { name: 'No code', authors: ['Tester'], analyses: [{ slug: 'primary', run_id: manifest.run_id }] } })
+  await run({ action: 'build', slug: 'no-code' })
+  const noCodeReadme = readFileSync(join(cwd, 'package', 'no-code', 'README.md'), 'utf8')
+  assert.match(noCodeReadme, /No code files were copied/)
+  assert.doesNotMatch(noCodeReadme, /\(cd code &&/)
+  assert.match(noCodeReadme, /`python3 analysis\/main\.py`/)
 
   // Deposit: preview first, blockers, confirmation gate, key gate, fake upload.
   let preview = await direct({ action: 'deposit', slug: 'paper1' })

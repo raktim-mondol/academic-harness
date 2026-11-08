@@ -256,12 +256,11 @@
               # plugin writes that route onto the llm-pi-ai entry and stores the key in
               # the credential service. With no complete custom route the tool inherits
               # the session model.
-              # `subagent_pro` is for difficulty-bound work, `subagent_vision` for image
-              # reading (paired with the shared `read_image` tool from
-              # `@deepseek-ai/dsh-tool-fs`, gated on the child's route actually declaring
-              # image input). The plugin also hides and guards `read_image` for the
-              # top-level agent so image reads cannot bypass the vision child, and it
-              # records each Pro/Vision routing decision and outcome in the session
+              # `subagent_pro` is for difficulty-bound work, `subagent_vision` for an
+              # optional separate image-capable route. The top-level agent may use the
+              # host's `read_image` directly when its session model supports images;
+              # the host checks the actual route's declared image input. The plugin
+              # records each Pro/Vision delegation decision and outcome in the session
               # notebook. Mounted programmatically rather than as static rows so the
               # custom route can come from Settings -> Academic Harness API keys as well
               # as SUBAGENT_PRO_* / SUBAGENT_VISION_* env vars; see subagent-models.js

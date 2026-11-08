@@ -83,7 +83,7 @@ The first preset start installs `textfold==0.10.31` into `$DSH_HOME/textfold/ven
 - Quotes, numbers, claims, and citation keys come from PaperMemory (`quote_check`, `trace`, `cite`).
 - Use `pdf_to_markdown` for the full text, for a scanned PDF, for a PaperMemory ingest, or when a PDF's map is shallow.
 - HTML/JATS sources (arXiv, PMC) produce better maps than PDFs.
-- Scanned PDFs are not handled by `paper_fold`: it returns `scanned-pdf` and the agent routes them to `pdf_to_markdown`'s OCR path or `subagent_vision`.
+- Scanned PDFs are not handled by `paper_fold`: it returns `scanned-pdf` and the agent routes them to `pdf_to_markdown`'s OCR path or to `read_image` on an image-capable model.
 - `paper_fold` is **not a discovery tool** — use `literature_search`, `openalex_search`, `s2_search`, and the other academic databases.
 
 ## PDF to Markdown
@@ -95,7 +95,7 @@ The first preset start installs `textfold==0.10.31` into `$DSH_HOME/textfold/ven
 | `path` | the PDF to convert |
 | `pages` | optional 1-indexed page numbers to limit conversion to |
 | `write_to` | workspace-relative output path for the Markdown. Recommended for anything but a short excerpt; converting many papers with `write_to` set keeps each paper's full text out of the conversation and on disk instead (e.g. `literature/<author>-<year>.md`) |
-| `ocr` | selectively OCR pages flagged as low quality (mode `Auto`). Requires the PDFium and ONNX Runtime shared libraries installed locally (set `PDFIUM_LIB_PATH`/`ORT_DYLIB_PATH` if they're not on the library search path — see [pdf-inspector's OCR runtime guide](https://github.com/firecrawl/pdf-inspector/blob/main/docs/ocr-runtime.md)); without them, a scanned PDF still comes back with `pages_needing_ocr` populated, so the agent knows to fall back to `subagent_vision` on rendered page images instead |
+| `ocr` | selectively OCR pages flagged as low quality (mode `Auto`). Requires the PDFium and ONNX Runtime shared libraries installed locally (set `PDFIUM_LIB_PATH`/`ORT_DYLIB_PATH` if they're not on the library search path — see [pdf-inspector's OCR runtime guide](https://github.com/firecrawl/pdf-inspector/blob/main/docs/ocr-runtime.md)); without them, a scanned PDF still comes back with `pages_needing_ocr` populated, so the agent knows to fall back to `read_image` on rendered page images (or an explicitly configured `subagent_vision` route) instead |
 
 Prebuilt native binaries ship as `optionalDependencies` for Linux (x64/ARM64, glibc and musl), macOS (ARM64), and Windows (x64) — a plain `npm install` picks up the right one, no Rust toolchain needed.
 

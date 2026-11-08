@@ -18,6 +18,11 @@ vendor/papermemory/*.egg-info/
 .env
 .env.local
 
+# Local agent tooling and installed skills
+.agents/
+.claude/
+skills-lock.json
+
 # LaTeX build outputs
 paper/rsi-local/main.pdf
 paper/rsi-local/main.bbl

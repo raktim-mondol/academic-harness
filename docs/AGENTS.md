@@ -40,9 +40,9 @@ It explicitly steers away from routine review, lookup, simple data validation, o
 
 `subagent_vision` only routes the child to a model; the child still calls `read_image` (`@deepseek-ai/dsh-tool-fs`) itself, which refuses to read an image unless the calling route's resolved model actually declares `image` input in this deployment's model catalog. A custom vision endpoint must declare image input; with no custom route the session model is used (DeepSeek-V4.1-Flash accepts images).
 
-The top-level Academic Harness agent cannot read image files itself: the plugin hides `read_image` from it and installs a guard that refuses any direct call, with a message pointing at `subagent_vision`. Children are unaffected, so the vision child reads the PNG/JPEG/WebP/GIF. This makes automatic image delegation deterministic instead of depending on the model choosing the child over its own `read_image`.
+The top-level Academic Harness agent can call `read_image` directly on PNG/JPEG/WebP/GIF when its active model supports image input. The host enforces that capability check. Use `subagent_vision` for a focused or multi-image visual inspection, or when a separate image-capable route is configured; the child must use native `read_image` and report when it cannot. If image reading is unavailable, report that the visual check was not performed rather than substituting OCR, metadata, or source-code reconstruction.
 
-Beyond a plain "look at this image" request, the system prompt steers the agent to delegate to `subagent_vision` for scientific reading tasks specifically:
+Beyond a plain "look at this image" request, the system prompt steers the agent to use native image reading for scientific tasks specifically:
 
 - interpreting a plot or trend,
 - comparing panels in a multi-panel figure,
@@ -68,7 +68,7 @@ For anything that needs a real rendered browser — exploring a site interactive
 
 The CLI isn't bundled with this plugin's package, but the agent installs it itself when missing (`npm i -g agent-browser && agent-browser install`, or `npx agent-browser@latest ...` for a one-off task) rather than asking the user to.
 
-Most of what it does — navigating, reading, filling forms, extracting data, downloading files — works off an accessibility-tree snapshot and needs no image at all. The one exception is `screenshot`: since the session's own model isn't guaranteed to have vision input, the skill steers the agent to delegate reading any screenshot to `subagent_vision` (see above) instead of guessing at its content.
+Most of what it does — navigating, reading, filling forms, extracting data, downloading files — works off an accessibility-tree snapshot and needs no image at all. For `screenshot`, use `read_image` with an image-capable session model; if image input is unavailable, report the limitation instead of guessing at its content.
 
 ## Related
 

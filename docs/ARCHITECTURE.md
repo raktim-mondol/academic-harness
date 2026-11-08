@@ -20,7 +20,7 @@ The preset is a **standing composition**: it mounts once as a shared composition
 
 ![Capability map](assets/diagrams/capability-map.svg)
 
-The [tool index](TOOLS.md) lists every registered tool, its scope, and the page that documents it.
+The map covers the implemented phase 1–5 capabilities of the [human-directed research cycle](HUMAN-DIRECTED-RESEARCH-CYCLE-PLAN.md): scoped experiment comparisons, repeated-seed summaries, read-only branch views, the guided `research-cycle` template, and prior-art and figure-to-result handoffs. The [tool index](TOOLS.md) lists every registered tool, its scope, and the page that documents it.
 
 ## A request through the system
 
@@ -67,6 +67,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/analysis/<slug>/` | `analysis_run` | Append-only plan versions and run manifests; per-run logs, artifacts, environment captures, `repro_check.json`, and `compliance.json`; expectation, verification, and compliance ledgers |
 | `<cwd>/.dsh/experiments/<slug>/` | `experiment_log` | Write-once experiment definition; append-only runs and links; verdicts; exports |
 | `<cwd>/.dsh/ablation/<slug>/` | `ablation` | Write-once method spec and frozen plan; records linked to experiment/analysis runs, verdicts, pruning events; exports |
+| `<cwd>/.dsh/prior-art/<slug>/` | `prior_art` | Saved triage report snapshots, written only with `write: true`; candidate text is not stored |
 | `<cwd>/.dsh/data/<slug>/` + `data/<slug>/` | `dataset_get` | Download manifest with licenses and checksums; downloaded files under the workspace `data/` tree |
 | `<cwd>/.dsh/repro/<slug>/` + `package/<slug>/` | `repro_package` | Frozen inventory; built package with manifest, environment, Dockerfile, citation metadata, and checksums |
 | `<cwd>/.dsh/watch/<slug>/` | `literature_watch` | Append-only saved-search ledger and seen-record state; digests |
@@ -109,7 +110,7 @@ The SQLite store is PaperMemory's default. A standalone `papermemory` CLI, Grok,
 | Reproducible analysis and data | `analysis-run.js`, `analysis-store.js`, `experiment-log.js`, `experiment-store.js`, `dataset-get.js`, `data-profile.js`, `repro-package.js`, `repro-package-store.js`, `python-helpers/data_profile.py` |
 | Cross-ledger provenance | `provenance-audit.js`, `provenance-store.js` (read-only; joins the ledgers above and the AH claim sidecars) |
 | Study conduct, ethics, and grants | `preregister.js`, `preregister-store.js`, `causal-dag.js`, `causal-dag-store.js`, `causal-graph.js`, `design.js`, `design-store.js`, `ethics-protocol.js`, `ethics-protocol-store.js`, `deidentify.js`, `deidentify-store.js`, `dmp.js`, `dmp-store.js`, `grant-budget.js`, `grant-budget-store.js`, `python-helpers/grant_budget.py` |
-| Clinical, datasets, policy, audits | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js`, `grant-search.js`, `patent-search.js`, `power-analysis.js`, `stat-audit.js`, `figure-audit.js`, `repo-audit.js` |
+| Clinical, datasets, policy, audits | `clinicaltrials.js`, `openfda.js`, `dataset-search.js`, `journal-policy.js`, `funder-policy.js`, `grant-search.js`, `patent-search.js`, `power-analysis.js`, `stat-audit.js`, `figure-audit.js`, `figure-handoff.js`, `prior-art.js`, `repo-audit.js` |
 | Scientific data and toolkits | `science-source.js`, `science-sources/`, `science-toolkit-kit.js`, `chem-toolkit.js`, `seq-toolkit.js`, `structure-toolkit.js`, `python-helpers/` |
 | Workspace and notebook | `notebook.js`, `notebook-export.js`, `notebook-zip.js`, `zvec-grep.js`, `zvec-index.js`, `zvec-index-engine.js`, `fold-core.js`, `fold-text.js`, `scientific-result.js`, `zvec-grep-cli.js`, `zg-excludes.js` |
 | Shared helpers | `workflows.js` + `workflows.json` (research templates), `python-runtime.js`, `preset-ids.js`, `image-gen-config.js`, `rsi-bus.js` |

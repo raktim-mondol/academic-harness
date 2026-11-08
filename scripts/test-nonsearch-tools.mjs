@@ -5,7 +5,6 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  READ_IMAGE_DENIAL,
   buildCustomRoute,
   customRouteProfile,
   routingDecisionEntry,
@@ -39,9 +38,12 @@ assert.match(prompt, /merely because no route is set/i, 'a missing Pro route mus
 assert.doesNotMatch(prompt, /only when the user explicitly asks for the Pro route/i, 'Pro must not require an explicit user request')
 assert.match(prompt, /records the routing decision and the child's outcome/i, 'routing record must be automatic')
 assert.match(prompt, /do not duplicate those entries/i, 'the model must not add duplicate routing entries')
-assert.match(prompt, /read_image.*hidden from this top-level agent/i, 'the top-level read_image restriction must be documented')
-assert.match(read('subagent-models.js'), /tools\.restrict\(\{ deny: \[READ_IMAGE_TOOL\] \}\)/, 'the top-level agent must lose read_image')
-assert.match(read('subagent-models.js'), /tools\.guard\(/, 'a guard must refuse direct read_image calls')
+assert.match(prompt, /read the PNG\/JPEG\/WebP\/GIF directly with the image-capable session model/)
+assert.match(prompt, /delegate to .*subagent_vision/)
+assert.match(prompt, /child must use native .*read_image.* and report when it cannot/)
+assert.match(prompt, /do not accept OCR, pixel calculations, metadata, source-code reconstruction, or a guess as vision/)
+assert.doesNotMatch(read('subagent-models.js'), /tools\.restrict\(\{ deny: \[READ_IMAGE_TOOL\] \}\)/, 'native image reading must remain available')
+assert.doesNotMatch(read('subagent-models.js'), /tools\.guard\([^\n]*READ_IMAGE/, 'native image reading must not be blocked')
 assert.match(read('subagent-models.js'), /'tools\/result'/, 'routing decisions must be recorded from tool results')
 assert.match(read('subagent-models.js'), /'subagent\/end'/, 'routing outcomes must be recorded from child settlement')
 assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-harness' } } }), true)
@@ -49,7 +51,6 @@ assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-h
 assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-harness', origin: 'subagent' } } }), false)
 assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'standard' } } }), false)
 assert.equal(topLevelPresetAgent({ session: { header: {} } }), false)
-assert.match(READ_IMAGE_DENIAL, /subagent_vision/)
 const decision = routingDecisionEntry({
   callId: 'call_1', toolName: 'subagent_vision', description: 'Read chart trend', prompt: 'Read /tmp/x.png and report the trend.',
   route: 'custom route academic-harness-vision/deepseek-flash (anthropic-messages)', now: 1,

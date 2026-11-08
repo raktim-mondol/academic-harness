@@ -371,6 +371,14 @@ Builds a reader-facing package from the other ledgers, under
 - `CITATION.cff`, `codemeta.json`, `ro-crate-metadata.json` (RO-Crate 1.1)
 - `checksums.sha256`
 
+When selected code files were copied, the generated README shows each recorded
+command as `(cd code && <command>)` so it can be pasted from the package root.
+Those commands were recorded in the original workspace, not replayed by `build`
+or `verify`: restore any missing inputs at their original relative paths first.
+Copied `dataset_get` files live under the package's separate `data/` directory
+and are not staged automatically. Copy `code/` to a separate workspace before
+running to avoid modifying the verified package.
+
 `build` never uploads and copies data only with `include_data: true`; failed
 runs, missing licenses, and uncopied datasets are surfaced as warnings.
 `verify` re-hashes the package against its manifest. `deposit` is Zenodo-only

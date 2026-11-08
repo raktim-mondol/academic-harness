@@ -241,7 +241,7 @@ It ignores references, citations, equations, and years in its targeted patterns.
 - `poster` — `tikzposter` (default), `beamerposter`, or `baposter`; sections and figure files are filled into blocks; compiled PDF plus PNG preview when `pdftoppm` is available.
 - `slides` — Beamer by default, or PowerPoint (`engine: "pptx"`) when `python-pptx` is installed in the helper environment.
 - `status` — builds, artifacts, missing figures, compile failures.
-- `qa` — a visual-QA checklist and rendering command. Render the pages and delegate them to `subagent_vision`; the tool never claims the visual check passed.
+- `qa` — a visual-QA checklist and rendering command. Render the pages and inspect them with `read_image` on an image-capable model; the tool never claims the visual check passed.
 
 Empty sections become explicit placeholders; no result or figure is generated. The design guidance lives in `latex-posters` and `scientific-slides`; load the `presentation-build` routing skill.
 
@@ -262,7 +262,7 @@ It never decides author order or qualification and never invents an affiliation,
 
 `latex_compile` compiles a `.tex` file to PDF: `latexmk` when it's on `PATH` (handles bibtex/biber automatically), otherwise a `pdflatex`/`xelatex`/`lualatex` fallback with a bibtex/biber pass when the source needs one. Requires a TeX Live (or similar) install. Compiles run with `latexmk -norc` and the fallback passes `-no-shell-escape`, so a workspace `.latexmkrc` or shell-escape directive is not executed; a build that needs either must be run by the author outside the tool.
 
-For layout auditing, the agent can render PDF pages to images with `pdftoppm -png -r 150 file.pdf page` (poppler, usually present with TeX Live) and delegate them to `subagent_vision`; `read_image` only accepts PNG/JPEG/WebP/GIF.
+For layout auditing, the agent can render PDF pages to images with `pdftoppm -png -r 150 file.pdf page` (poppler, usually present with TeX Live) and inspect them with `read_image`; `read_image` only accepts PNG/JPEG/WebP/GIF and requires an image-capable model.
 
 ## Figures
 

@@ -59,8 +59,8 @@ if (process.env.DSH_COMPAT_RECEIPT) {
   }
   if (!receipt) throw new Error('mock provider did not receive tool results within 30 seconds')
   const missing = Object.entries(receipt.declared || {}).filter(([, present]) => !present).map(([name]) => name)
-  if (missing.length || !receipt.template || !receipt.agents || !receipt.imageGuard || !receipt.delegation) {
-    throw new Error(`tool compatibility failed: ${JSON.stringify({ missing, template: receipt.template, agents: receipt.agents, imageGuard: receipt.imageGuard, delegation: receipt.delegation })}`)
+  if (missing.length || !receipt.template || !receipt.agents || !receipt.nativeImage || !receipt.delegation) {
+    throw new Error(`tool compatibility failed: ${JSON.stringify({ missing, template: receipt.template, agents: receipt.agents, nativeImage: receipt.nativeImage, delegation: receipt.delegation })}`)
   }
 }
-console.log(`Academic Harness preset session and settings write succeeded${process.env.DSH_COMPAT_RECEIPT ? '; tool calls and image guard verified' : ''}`)
+console.log(`Academic Harness preset session and settings write succeeded${process.env.DSH_COMPAT_RECEIPT ? '; tool calls and native image tool verified' : ''}`)

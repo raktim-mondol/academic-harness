@@ -1,6 +1,6 @@
 ---
 name: presentation-build
-description: Build conference posters and slide decks from a manuscript or outline with `presentation_build`, then run its visual-QA checklist through `subagent_vision`. Use for talks, posters, defense decks, and lab-meeting slides. Routes design detail to `latex-posters` and `scientific-slides`; the tool never invents results and a compile is not a visual pass.
+description: Build conference posters and slide decks from a manuscript or outline with `presentation_build`, then run its visual-QA checklist with `read_image` on an image-capable model. Use for talks, posters, defense decks, and lab-meeting slides. Routes design detail to `latex-posters` and `scientific-slides`; the tool never invents results and a compile is not a visual pass.
 allowed-tools: Read Write Edit Bash
 license: MIT license
 metadata:
@@ -32,7 +32,7 @@ metadata:
    preview when `pdftoppm` is available. `status` lists builds, missing figures,
    and compile failures.
 5. **Run QA.** Call `action: "qa"`, render every PDF page at 150 DPI, and
-   delegate the images to `subagent_vision`. Read its report; the tool never
+   inspect the images with `read_image` on an image-capable model. The tool never
    claims the visual check passed.
 6. **Fix and rebuild.** Re-run after edits; a new build id is created.
 
@@ -47,5 +47,5 @@ metadata:
 ## Related
 
 - `latex-posters`, `scientific-slides`, `scientific-figure-making`.
-- `subagent_vision` for the visual inspection.
+- `read_image` (image-capable model) or an explicitly configured `subagent_vision` route for the visual inspection.
 - `manuscript_diff` / `submission_pack` for the text side.

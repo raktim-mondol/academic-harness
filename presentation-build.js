@@ -532,7 +532,7 @@ function qaChecklist(build) {
     artifact ? `Artifact: \`${artifact}\`` : 'No artifact was found.',
     build?.artifact?.png ? `Preview: \`${build.artifact.png}\`` : null,
     '',
-    'Render every PDF page at 150 DPI and delegate the images to `subagent_vision`; this tool does not claim the visual check passed.',
+    'Render every PDF page at 150 DPI and inspect the images with `read_image` on an image-capable model; if image reading is unavailable, report the visual check as not performed. This tool does not claim the visual check passed.',
     '',
     '```sh',
     'pdftoppm -png -r 150 <deck>.pdf page',

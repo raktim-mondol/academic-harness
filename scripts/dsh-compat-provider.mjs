@@ -40,7 +40,10 @@ const server = createServer(async (req, res) => {
         declared: Object.fromEntries(expectedTools.map((name) => [name, declared?.includes(name) === true])),
         template: byId[calls[0].id]?.is_error === false,
         agents: byId[calls[1].id]?.is_error === false,
-        imageGuard: image?.is_error === true && imageText.includes('Direct read_image is disabled'),
+        // The file may be absent or the route may reject images; either is a
+        // normal tool error. The regression this pins is the old plugin-level
+        // denial, which must never appear now that native read_image is allowed.
+        nativeImage: image !== undefined && !imageText.includes('Direct read_image is disabled') && !/unknown tool/i.test(imageText),
         delegation: byId[calls[3].id]?.is_error === false,
       }
       writeFileSync(`${receiptFile}.tmp`, JSON.stringify(receipt))

@@ -279,11 +279,11 @@ function visionReview(raw) {
   if (typeof raw !== 'object' || Array.isArray(raw)) throw new Error('vision_review must be an object {summary, reviewer?}')
   const summary = text(raw.summary).slice(0, MAX_VISION_CHARS)
   if (!summary) return { state: 'not_requested', reason: 'vision_review had no summary' }
-  const reviewer = text(raw.reviewer)
+  const reviewer = text(raw.reviewer).slice(0, 500)
   return {
     state: 'model_interpretation',
     verified: false,
-    reviewer: /^[\w .:@/+-]{1,60}$/.test(reviewer) ? reviewer : null,
+    reviewer: reviewer || null,
     summary,
     note: 'A model\'s reading of the picture. It does not verify the underlying data, a hash, or any state above, and it does not replace expert review.',
   }
@@ -430,7 +430,10 @@ export function renderFigureHandoff(value) {
     lines.push(`Caption (advisory): ${value.caption.state}${value.caption.reason ? ` — ${value.caption.reason}` : ` · ${value.caption.matched} matched, ${value.caption.unmatched} unmatched, ${value.caption.ambiguous} ambiguous of ${value.caption.parsed_count} number(s)`}`)
   }
   if (value.vision_review?.state === 'model_interpretation') {
-    lines.push(`Vision review (model interpretation, not verification${value.vision_review.reviewer ? `, by ${value.vision_review.reviewer}` : ''}):`, fenceUntrusted(value.vision_review.summary, { source: 'vision-review', kind: 'model-interpretation' }))
+    const body = value.vision_review.reviewer
+      ? `Reviewer/method (caller supplied): ${value.vision_review.reviewer}\n\n${value.vision_review.summary}`
+      : value.vision_review.summary
+    lines.push('Vision review (model interpretation, not verification):', fenceUntrusted(body, { source: 'vision-review', kind: 'model-interpretation' }))
   }
   if (value.gaps.length) lines.push('', 'Gaps:', ...value.gaps.map((gap) => `- ${gap}`))
   lines.push('', ...value.limitations.map((note) => `Note: ${note}`))

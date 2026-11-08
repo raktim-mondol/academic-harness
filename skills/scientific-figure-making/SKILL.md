@@ -47,7 +47,7 @@ Load these only when the task needs them:
 2. `uv add matplotlib numpy` if missing. Set a non-interactive backend before pyplot (`publication_figure.py` does this on import).
 3. `apply_publication_style(...)` once, then helpers, then `finalize_figure` to **PNG and PDF**.
 4. Real computed data only — never `image_generate`, never fabricated values.
-5. Log the output paths as a `notebook` artifact. For a paper figure, delegate `subagent_vision` to check labels, overlap, and that the plot matches the caption.
+5. Log the output paths as a `notebook` artifact. For a paper figure, use `read_image` on an image-capable model to check labels, overlap, and that the plot matches the caption. If image reading is unavailable, report the check as not performed.
 
 ## House style
 
@@ -110,4 +110,4 @@ Signatures, validation, and a smoke-test `__main__` are in the module. Implement
 - [ ] Proposed method is blue; baselines are not
 - [ ] Axes labeled with units; panel letters on multi-panel figures
 - [ ] PNG + PDF written under `figures/` (or the path the user gave)
-- [ ] `subagent_vision` checked a paper-destined figure
+- [ ] A paper-destined figure was visually checked with `read_image` (or the check was reported as not performed)

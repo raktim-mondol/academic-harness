@@ -10,9 +10,10 @@
  *   an OpenAI/Anthropic-compatible route with the host's `dsh-llm-pi-ai`
  *   adapter and routes this tool there. Otherwise the tool inherits the
  *   session model.
- * - `subagent_vision` — image-reading/visual-inspection work, with the same
- *   three optional fields. Otherwise it inherits the session model, which is
- *   DeepSeek-V4.1-Flash in the default deployment and accepts image input.
+ * - `subagent_vision` — an optional delegation for visual inspection through a
+ *   separately configured image-capable route, with the same three fields.
+ *   The top-level agent can also use the host's native `read_image` directly
+ *   when its session model accepts image input.
  *
  * The API key is stored in the host credential service under
  * AH_SUBAGENT_PRO_KEY / AH_SUBAGENT_VISION_KEY and referenced by the provider
@@ -21,13 +22,10 @@
  * removes its two routes and never touches other providers. A partial custom
  * configuration is ignored and the tool inherits the session model.
  *
- * Image routing is enforced per top-level agent, not left to model choice: the
- * plugin registers an agent-scoped `tools.restrict({ deny: ['read_image'] })`
- * plus a guard that refuses any direct read_image call, so only the spawned
- * subagent_vision child (whose scope does not import the parent's restriction)
- * reads files. Promoting a tool through the child over the parent's own
- * `read_image` is otherwise stochastic — DSH's child scopes deliberately drop
- * agent-local tool restrictions and guards. Each Pro/Vision call is also
+ * Image-capable session models can use the host's native `read_image` directly;
+ * the host checks the actual route's image capability. The optional vision
+ * specialist remains useful when a separate image-capable route is configured.
+ * Each Pro/Vision delegation is also
  * recorded in the session notebook from the agent's own `tools/result` /
  * `subagent/end` events, so the routing record does not depend on the model
  * remembering to call `notebook`.
@@ -92,10 +90,6 @@ const SPECS = {
     },
   },
 }
-
-const READ_IMAGE_TOOL = 'read_image'
-export const READ_IMAGE_DENIAL =
-  'Direct read_image is disabled for the top-level Academic Harness agent. Delegate the image inspection to subagent_vision: pass the file path(s) and exactly what to look for.'
 
 /** Whether this agent is the top-level Academic Harness session, not a child. */
 export function topLevelPresetAgent(agent) {
@@ -172,16 +166,6 @@ function installAgentHooks(agent, ctx, routes, scopedInstalls) {
   let fiber
   try {
     fiber = agent.ctx.inject(['tools'], (runtimeCtx) => {
-      const tools = runtimeCtx.tools
-      try {
-        if (tools.get(READ_IMAGE_TOOL) !== undefined) {
-          tools.restrict({ deny: [READ_IMAGE_TOOL] })
-        }
-      } catch (error) {
-        ctx.logger?.warn(`academic-harness: could not hide ${READ_IMAGE_TOOL} from the top-level agent: ${error instanceof Error ? error.message : String(error)}`)
-      }
-      tools.guard((exec) => (exec.name === READ_IMAGE_TOOL ? READ_IMAGE_DENIAL : undefined))
-
       const pending = new Map()
       runtimeCtx.on('tools/result', (exec, result) => {
         if (result.isError || !ROUTING_TOOLS.has(exec.name)) return
@@ -233,7 +217,7 @@ function installAgentHooks(agent, ctx, routes, scopedInstalls) {
       })
     })
   } catch (error) {
-    ctx.logger?.warn(`academic-harness: could not enforce image-routing policy: ${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger?.warn(`academic-harness: could not install delegation routing recorder: ${error instanceof Error ? error.message : String(error)}`)
     return
   }
   scopedInstalls.set(agent, fiber)
@@ -424,7 +408,7 @@ export function apply(ctx) {
   try {
     for (const agent of ctx.get('agents')?.list?.() ?? []) install(agent)
   } catch (error) {
-    ctx.logger?.warn(`academic-harness: could not install image-routing policy on existing agents: ${error instanceof Error ? error.message : String(error)}`)
+    ctx.logger?.warn(`academic-harness: could not install delegation routing recorder on existing agents: ${error instanceof Error ? error.message : String(error)}`)
   }
 
   scheduleCustomRoutes(ctx, routes)
