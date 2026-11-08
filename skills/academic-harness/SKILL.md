@@ -40,6 +40,7 @@ Native `ah_*` tools (not MCP, not Pi). Prefer them over shelling out to `ah`. Do
 | Need | Tool |
 |---|---|
 | Coverage / "are we done" | `ah_inventory`, then `ah_check` / `ah_audit` |
+| Numbers, figures, references (outside the engine) | `ah_external` `run`, then `ah_audit` `external=use` |
 | Anchors, facts macros | `ah_units`, `ah_fact` `build` |
 | Evidence | `ah_source` `add`/`list`, `ah_source_search` |
 | Draft | `ah_plan` → `ah_brief_new` → `ah_pack` → `edit` |

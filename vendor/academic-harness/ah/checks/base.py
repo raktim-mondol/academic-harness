@@ -76,10 +76,32 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "PRF-07": ("T6", "major", "Profile: a required item (criterion, outcome, contribution) is not covered by text"),
     "PRF-08": ("T6", "major", "Profile: a rule or its data file is missing or malformed"),
     "PRF-09": ("T6", "major", "Profile: a reviewer item is not closed"),
+    # TX: results of external tools (numbers_audit, figure_audit, citation audit), read from .ah/external/.
+    # They ship at minor unless they are a registry fact, because the tools report candidates for review.
+    # A project promotes one in ah.yaml `levels:` once it has seen how precise it is on its own text.
+    "STAT-01": ("TX", "minor", "Reported p-value does not match its test statistic"),
+    "STAT-02": ("TX", "minor", "GRIM: a reported mean is impossible for the stated sample size"),
+    "STAT-03": ("TX", "minor", "Sample size, flow count or percentage does not reconcile in the text"),
+    "STAT-04": ("TX", "minor", "Confidence interval or effect estimate is inconsistent"),
+    "STAT-05": ("TX", "minor", "Table value differs from the value stated in the text"),
+    "FIG-01": ("TX", "minor", "Figure resolution is below the minimum DPI"),
+    "FIG-02": ("TX", "minor", "Near-duplicate figure files"),
+    "FIG-03": ("TX", "info", "Figure file has no DPI metadata"),
+    "FIG-04": ("TX", "major", "Figure file cannot be read"),
+    "CIT-01": ("TX", "blocker", "Cited reference is retracted (registry record)"),
+    "CIT-02": ("TX", "major", "Reference DOI is invalid or not registered"),
+    "CIT-03": ("TX", "major", "Reference has an expression of concern or a correction"),
+    "CIT-04": ("TX", "minor", "Reference metadata differs from the registry record"),
+    "CIT-05": ("TX", "minor", "Reference is duplicated, incomplete or does not format"),
+    "CIT-06": ("TX", "info", "Reference could not be verified (no DOI, or the lookup failed)"),
+    "RPT-01": ("TX", "minor", "Reporting-guideline item is recorded as not reported or only partly reported"),
+    "RPT-02": ("TX", "major", "A recorded reporting verdict no longer verifies against the manuscript (its quote is gone)"),
+    "RPT-03": ("TX", "info", "Reporting-guideline item needs a verdict: not assessed yet, or a not-reported claim from an earlier manuscript version"),
+    "EXT-00": ("TX", "major", "An external check is stale, invalid or was not run"),
 }
 
-TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")
-DEFAULT_TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")  # T3 deterministic half runs by default; the model half needs a backend
+TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6", "TX")
+DEFAULT_TIERS = ("T0", "T1", "T2", "T3", "T4", "T5", "T6")  # T3 deterministic half runs by default; the model half needs a backend. TX joins only when --external is given.
 
 
 @dataclass

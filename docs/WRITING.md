@@ -32,6 +32,25 @@ Crossref and OpenAlex answers drive the reference findings (`citation action=aud
 
 Keep the 30-day default in mind for retractions: a paper retracted last week is not seen until the entry is refreshed. Pass `refresh_lookups` before submitting. The snapshot holds public registry metadata only; contact addresses and API keys are not part of a key or stored.
 
+### External checks in the ledger (tier TX)
+
+`numbers_audit`, `figure_audit` and the citation audit need SciPy, Pillow or the network, so they run outside the engine; `reporting_check` keeps its verdicts in its own store. Left there, their results had no check IDs, no fingerprints and no baseline: two runs could not be compared. `ah_external` runs them on what the project would audit and writes `.ah/external/<tool>.json`; `ah_audit external=use` (CLI `ah audit --external`) reads those files as tier TX, so they get the same ledger states, causes and gate as every other finding. `external=run` does both in one call.
+
+| Tool | Checks | Default level |
+|---|---|---|
+| `numbers_audit` (all prose files read as one manuscript) | STAT-01 p-value vs statistic · STAT-02 GRIM · STAT-03 sample size, flow, percentage · STAT-04 confidence interval · STAT-05 table vs text | minor |
+| `figure_audit` (raster figures the document includes) | FIG-01 low DPI · FIG-02 near-duplicate · FIG-03 no DPI metadata · FIG-04 unreadable | minor · minor · info · major |
+| `citation` audit (each `.bib`) | CIT-01 retracted · CIT-02 invalid or unregistered DOI · CIT-03 concern or correction · CIT-04 metadata differs from the registry · CIT-05 duplicate, incomplete or does not format · CIT-06 could not be verified | blocker · major · major · minor · minor · info |
+| `reporting_check` (recorded verdicts of each reporting-guideline check) | RPT-01 item recorded as not reported or partial · RPT-02 a recorded quote is no longer in the manuscript · RPT-03 item not assessed yet, or an absence claim older than the latest edit | minor · major · info |
+
+The tools report candidates for human review, so the statistical and figure checks start at minor and cannot block. A project promotes one in `ah.yaml` (`levels: {STAT-01: major}`) once it has seen how precise it is on its own text. The citation audit's lookups go through the [snapshot](#frozen-registry-lookups). Unreferenced bibliography entries stay with BIB-05, not here.
+
+A result is trusted only while every file it was computed from has the hash it was run on, and the set of files is still the set the project would audit. Otherwise the tool's findings stay open in the ledger (not fixed by their absence) and one **EXT-00** (major) says the result is out of date, unreadable, or that a tool listed under `external: {required: [...]}` in `ah.yaml` was never run. Fix it by running `ah_external` again, not by editing around it. Hashes are taken before a tool runs, so an edit made while it runs shows up as stale. A re-run that finds something new is recorded with cause `evidence-changed`; one that went stale because the text changed, `text-changed`.
+
+`numbers_audit` is run once on all prose files joined into one manuscript (comments stripped, files in project order), so a total that must agree across sections, such as N in Methods against N in Results, or a subgroup larger than the total, is compared across files. Each finding is mapped back to its own file and line; a finding about several places (different totals) is attributed to the first mention. `reporting_check` is read, never re-judged: the engine plans each check under `<project root>/.dsh/reporting/` whose manuscript is a file in the project, and the check manifest, its verdict log and the manuscript are the inputs, so recording a verdict or editing the manuscript makes the stored result stale. Only a quote that no longer verifies is RPT-02 (a fact about the text, major); an absence claim made before the latest edit is RPT-03 (a prompt to judge again, info), because every edit would otherwise block until each claim was re-judged.
+
+Limits: a run of `numbers_audit` without SciPy is a failure, not an empty result. `reporting_check` stores are only found under the project root, and PaperMemory-paper manuscripts are not part of the project. The verdicts are an agent's recorded judgments with verified quotes, not a compliance statement; RPT-01 starts at minor for that reason. Stability (`ah stability`) does not re-run the external tools; their stored results do not change between runs by construction.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).
@@ -44,6 +63,7 @@ On first mount the plugin prepares a local `.venv` next to that vendored tree (v
 |---|---|---|
 | `ah_profile` / `ah_init` / `ah_migrate` | anyone | List document types; scaffold a new project; overlay `ah.yaml` on an existing LaTeX tree (dry-run first; apply needs `confirm`) |
 | `ah_state` / `ah_inventory` / `ah_check` / `ah_audit` / `ah_config` / `ah_catalogue` | anyone | Paper-state card; coverage counts; cheap checks; full audit with ledger; project config; check catalogue |
+| `ah_external` | anyone | Run numbers_audit, figure_audit and the citation audit on the project and store their findings (`.ah/external/`) so `ah_audit external=use` gives them IDs and ledger states; `plan`, `status` |
 | `ah_units` / `ah_fact` / `ah_bind` / `ah_fact_propose` / `ah_sweep` | anyone | Sync `%% @unit` anchors; list/build/check facts; suggest number→fact bindings; propose a new fact; find every use of a value |
 | `ah_source` / `ah_source_search` / `ah_claims` / `ah_claims_sync` / `ah_claims_bind` | anyone | Register/list sources; quote-located passages; claim sidecars; bind a claim to a source or fact |
 | `ah_pack` / `ah_brief_new` / `ah_plan` | anyone | Evidence pack before drafting; draft a brief; propose an outline (author approves) |

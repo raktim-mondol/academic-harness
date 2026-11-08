@@ -44,6 +44,7 @@ DEFAULTS: dict[str, Any] = {
     "claims_policy": {"require_binding": False},
     "lexicons": {},       # {name: regex} extra or replacement style lexicons for must_not / hedging
     "style": {},          # {lints: [names]|[], level: info|minor}; empty = all code lints at info
+    "external": {"required": []},  # tools whose results (.ah/external/<tool>.json) must exist: numbers_audit, figure_audit, citation
     "data_policy": "open",  # open | restricted | local (design 13.3)
     "data_policy_allow": [],  # named providers permitted when restricted
     "profile_params": {}, # overrides for the profile's parameters (word limits, venue switches)

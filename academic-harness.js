@@ -7,6 +7,7 @@
  * and are gated by DSH approval (see academic-harness-hooks.js).
  */
 import { defineTool } from 'ah-dsh-tools'
+import { EXTERNAL_TOOLS, renderExternalRun, runExternal } from './external-bridge.js'
 import {
   ahEnv,
   cliArgs,
@@ -103,6 +104,7 @@ export function toolArgv(name, args = {}, cwd) {
       const files = strList(args.files)
       if (files.length) extra.push('--files', files.join(','))
       if (args.evidence) extra.push('--evidence')
+      if (args.external) extra.push('--external')
       extra.push('--brief', '--json')
       return ['check', ...extra]
     }
@@ -111,9 +113,16 @@ export function toolArgv(name, args = {}, cwd) {
       if (args.tiers) extra.push('--tiers', String(args.tiers))
       if (args.evidence) extra.push('--evidence')
       if (args.no_ledger) extra.push('--no-ledger')
+      if (args.external) extra.push('--external')
       const runs = Number(args.stability_runs)
       if (Number.isInteger(runs) && runs >= 2) extra.push('--stability', String(Math.min(runs, 20)))
       return ['audit', ...extra]
+    }
+    case 'ah_external': {
+      const action = String(args.action || 'run').toLowerCase()
+      if (action === 'plan') return ['external', 'plan']
+      if (action === 'status') return ['external', 'status']
+      return { error: 'ah_external action must be run, plan, or status' }
     }
     case 'ah_fact': {
       const action = String(args.action || 'list').toLowerCase()
@@ -314,8 +323,33 @@ function sessionModel(exec) {
   return h?.model || h?.route?.model || exec?.agent?.options?.model
 }
 
+/** Ask the engine what each external tool must be run on, then run them and write .ah/external/*.json. */
+async function runBridge(root, args, exec) {
+  const planned = await serial(root, () => runAh(root, ['external', 'plan', '--project', root], { signal: exec.signal }))
+  if (planned.code !== 0) return { error: (planned.err || planned.out || 'ah external plan failed').trim() }
+  let plan
+  try {
+    plan = JSON.parse(planned.out)
+  } catch {
+    return { error: 'ah external plan did not return JSON' }
+  }
+  const tools = strList(args.tools)
+  return { summary: await runExternal({ root, plan, tools, exec, args }) }
+}
+
 export async function executeAh(name, args, exec) {
   const cwd = workspaceRoot(exec)
+  if (name === 'ah_external' && String(args.action || 'run').toLowerCase() === 'run') {
+    const project = needProject(cwd)
+    if (project.error) return { error: project.error }
+    const ran = await runBridge(project.root, args, exec)
+    if (ran.error) return { error: ran.error }
+    const failed = ran.summary.errors.length > 0
+    return {
+      text: `${renderExternalRun(ran.summary)}\nRun ah_audit with external=use to bring these into the ledger (tier TX).`,
+      code: failed ? 1 : 0,
+    }
+  }
   const mapped = toolArgv(name, args, cwd)
   if (mapped && mapped.error) return { error: mapped.error }
 
@@ -324,6 +358,12 @@ export async function executeAh(name, args, exec) {
     const project = needProject(cwd)
     if (project.error) return { error: project.error }
     root = project.root
+  }
+
+  let bridgeNote = ''
+  if ((name === 'ah_audit' || name === 'ah_check') && args.external === 'run') {
+    const ran = await runBridge(root, args, exec)
+    bridgeNote = ran.error ? `external: could not run (${ran.error})` : renderExternalRun(ran.summary)
   }
 
   const timeoutMs = name === 'ah_build' ? BUILD_TIMEOUT_MS
@@ -376,7 +416,9 @@ export async function executeAh(name, args, exec) {
   if (name === 'ah_fact_propose' && r.code === 0) {
     return { text: `${(r.out || '').trim()}\nStop and let the author decide; do not type the number meanwhile.`, code: 0 }
   }
-  return resultOf(r)
+  const result = resultOf(r)
+  if (bridgeNote && result.text) result.text = `${bridgeNote}\n${result.text}`
+  return result
 }
 
 function jsonOutput() {
@@ -416,6 +458,7 @@ export async function apply(ctx) {
     parameters: {
       files: { type: 'array', items: { type: 'string' }, description: 'Files relative to the project or TeX root.' },
       evidence: { type: 'boolean', description: 'Also check numbers in cited clauses against the cited sources.' },
+      external: { type: 'string', enum: ['use', 'run'], description: 'Also read the results of the external tools (numbers_audit, figure_audit, citation audit) as tier TX. use reads the stored results and reports stale ones as EXT-00; run first runs the tools again.' },
     },
   })
   register(ctx, {
@@ -425,7 +468,20 @@ export async function apply(ctx) {
       tiers: { type: 'string', description: 'Comma list, e.g. T0,T1,T2,T4.' },
       evidence: { type: 'boolean' },
       no_ledger: { type: 'boolean' },
+      external: { type: 'string', enum: ['use', 'run'], description: 'Also read the results of the external tools (numbers_audit, figure_audit, citation audit) as tier TX, with ledger states. use reads the stored results and reports stale ones as EXT-00; run first runs the tools again (the citation audit reads Crossref/OpenAlex through the lookup snapshot).' },
       stability_runs: { type: 'integer', description: 'Also run the checks N times (2-20) on the unchanged text and report findings that come and go, plus paragraphs without a stable anchor. Exit status 2 when unstable.' },
+    },
+  })
+  register(ctx, {
+    name: 'ah_external',
+    description: `Run the tools that live outside the engine (${EXTERNAL_TOOLS.join(', ')}) on this project and store their findings in .ah/external/, so ah_audit external=use can give them check IDs, fingerprints and ledger states. The results go stale when any input file changes (EXT-00); run again after editing. action=run (default), plan (what each tool runs on), or status (fresh, stale, invalid, missing).`,
+    parameters: {
+      action: { type: 'string', enum: ['run', 'plan', 'status'], description: 'Default run.' },
+      tools: { type: 'array', items: { type: 'string', enum: EXTERNAL_TOOLS }, description: 'Run only these tools. Default all.' },
+      refresh_lookups: { type: 'boolean', description: 'citation: fetch Crossref/OpenAlex answers again instead of using the lookup snapshot.' },
+      lookup_max_age_days: { type: 'number', description: 'citation: reuse a snapshot answer at most this many days old. Default 30; 0 never expires.' },
+      min_dpi: { type: 'number', description: 'figure_audit: minimum DPI. Default 300.' },
+      grim: { type: 'boolean', description: 'numbers_audit: also run the GRIM mean check.' },
     },
   })
   register(ctx, {
