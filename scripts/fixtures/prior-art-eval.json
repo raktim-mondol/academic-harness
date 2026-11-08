@@ -1,5 +1,5 @@
 {
- "description": "Synthetic fixtures for prior_art, labelled by the implementer (an AI assistant), not by an independent human reviewer. Written for this project; no third-party text. Labels were fixed before the tool was run against them. The set is small, so results are reported as counts, not rates.",
+ "description": "Regression fixtures for prior_art, not a validation set. Synthetic, written for this project (no third-party text), and labelled by the implementer (an AI assistant) because independent human labelling is not available. Labels were fixed before the tool was run against them. They check that the documented rules keep behaving as documented; they say nothing about accuracy on real retrieval output or against human judgement.",
  "thresholds_declared_before_evaluation": {
   "statement_agreement": "every case",
   "candidate_state_agreement": "every labelled field",

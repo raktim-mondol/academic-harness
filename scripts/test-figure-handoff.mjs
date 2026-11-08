@@ -262,6 +262,23 @@ try {
   assert.ok(r.gaps.some((gap) => /compliance exclusion is unknown/.test(gap)))
   assert.match(tool.output.render({}, r)[0].text, /compliance exclusion: unknown/)
 
+  // A ledger larger than the branch view's 5000-node cap: a run past the cap is not_checked, not "unresolved".
+  await startExperiment({ cwd, slug: 'big', experiment: { question: 'q', metrics: [{ name: 'acc', direction: 'higher' }] } })
+  const seed = (await logExperimentRun({ cwd, slug: 'big', metrics: { acc: 0.1 } })).run
+  const bigRuns = join(cwd, '.dsh', 'experiments', 'big', 'runs.jsonl')
+  const rows = []
+  for (let i = 2; i <= 5100; i += 1) rows.push(JSON.stringify({ ...seed, run_id: `x${String(i).padStart(4, '0')}` }))
+  appendFileSync(bigRuns, `${rows.join('\n')}\n`)
+  r = await handoff({ figure: 'out/fig.png', sources: [
+    { kind: 'experiment_run', slug: 'big', run_id: 'x0002' },
+    { kind: 'experiment_run', slug: 'big', run_id: 'x5100' },
+    { kind: 'experiment_run', slug: 'big', run_id: 'x9999' },
+  ] })
+  assert.equal(r.sources[0].link_state, 'resolved', 'a run inside the cap resolves')
+  assert.equal(r.sources[1].link_state, 'not_checked', 'a run that exists past the cap is not reported as missing')
+  assert.match(r.sources[1].reason, /truncated at 5000 runs/)
+  assert.equal(r.sources[2].link_state, 'not_checked', 'with a truncated view an absent id cannot be called unresolved either')
+
   // 10. Caption number parsing is explicit about what it skips.
   assert.deepEqual(captionNumbers('Seeds 3-5, 12,345 samples, 1e-3 rate, ResNet-50, Figures 2 and 3, Figs. 4a, 5 & 6, n = 7.').map((n) => n.token), ['12345', '7'])
   assert.deepEqual(captionNumbers('The change was -2.5 points and +3 units (p=0.01).').map((n) => [n.token, n.value]), [['-2.5', -2.5], ['+3', 3], ['0.01', 0.01]])
