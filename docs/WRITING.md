@@ -21,6 +21,17 @@ A fix loop only converges when the same text gives the same findings. `ah_audit 
 
 It also counts paragraphs with no `%% @unit` anchor. Such a paragraph is keyed by a hash of its text, so any edit to it re-keys every finding it carries and the ledger reports them as fixed and new at once. Run `ah_units` (`ah units sync`) before relying on the ledger; the post-edit hook does this for edits made through the agent.
 
+### Frozen registry lookups
+
+Crossref and OpenAlex answers drive the reference findings (`citation action=audit`, `integrity_check`). Asked again each time, a timeout, a rate limit or a quiet upstream edit changes the findings while the manuscript is the same. Both tools now read through a lookup snapshot, `.ah/cache/lookups.json` in the workspace:
+
+- A definitive answer (found, or "no such DOI") is stored and reused. The same bibliography gives the same findings until you refresh.
+- A failed lookup is never stored. With nothing stored it comes back as the failure it was, which the audit already reports as `unverified`, never as a problem and never as a pass. With an earlier answer stored, the earlier answer is used, so an outage cannot change a verdict.
+- A new fetch happens for a reference not seen before, for an answer older than `lookup_max_age_days` (default 30; 0 never expires), or when you pass `refresh_lookups: true`. A refresh that fails keeps the earlier answer.
+- The result says how old the data is: `lookup.asof`, and a "Lookups: registry data as of …" line in the audit output. `integrity_check` adds `data_as_of`.
+
+Keep the 30-day default in mind for retractions: a paper retracted last week is not seen until the entry is refreshed. Pass `refresh_lookups` before submitting. The snapshot holds public registry metadata only; contact addresses and API keys are not part of a key or stored.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).

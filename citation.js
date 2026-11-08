@@ -19,6 +19,7 @@ import { resolveBibtexForIdentifier } from './bibtex-resolve.js'
 import { resolveWorkspacePath as resolveWritePath } from './workspace-path.js'
 import { auditReferences } from './citation-audit.js'
 import { runIntegrityCheck } from './integrity-check.js'
+import { openSnapshot, pacedFetch, snapshotOptions, SNAPSHOT_PARAMETERS } from './lookup-snapshot.js'
 import { extractMarkdownCitations, extractTexCitations } from './manuscript-citations.js'
 import {
   SUPPORTED_STYLES, assignCitationKeys, formatBibliography, formatCitations, normalizeCsl,
@@ -269,19 +270,19 @@ async function fetchDoiBibtex(doi, exec) {
   return resolved.bibtex
 }
 
-async function fetchCrossrefWork(doi, exec) {
+async function fetchCrossrefWork(doi, exec, http = fetchJson) {
   const mailto = await crossrefContact()
   const params = new URLSearchParams()
   if (mailto) params.set('mailto', mailto)
   const query = params.toString()
   const url = `${CROSSREF_WORKS}/${encodeURIComponent(doi)}${query ? `?${query}` : ''}`
   const limiter = getLimiter('crossref-single', { minIntervalMs: mailto ? 100 : 200 })
-  const result = await limiter.run(() => fetchJson(url, {
+  const result = await pacedFetch(http, limiter, url, {
     signal: exec?.signal,
     timeoutMs: 20_000,
     retries: 1,
     headers: { 'User-Agent': searchUserAgent(mailto) },
-  }))
+  })
   if (!result.ok) return { ok: false, error: result.error, status: result.status, detail: result.detail }
   return { ok: true, work: result.data?.message || null }
 }
@@ -396,10 +397,21 @@ function repairedKeyNote(reference) {
   return ' — key changed, re-check citations'
 }
 
+/** One line saying where the registry answers came from and how old they are. */
+function lookupLine(lookup) {
+  const fetched = lookup.fetched + lookup.refreshed
+  const parts = [`${lookup.hits} from the snapshot`, `${fetched} fetched now`]
+  if (lookup.served_stale) parts.push(`${lookup.served_stale} kept from an earlier snapshot because the refresh failed`)
+  if (lookup.failed - lookup.served_stale > 0) parts.push(`${lookup.failed - lookup.served_stale} lookup(s) failed (unverified)`)
+  const asof = lookup.asof ? `registry data as of ${lookup.asof.slice(0, 10)}` : 'no registry data'
+  return `Lookups: ${asof} (${parts.join(', ')}). Pass refresh_lookups to fetch again.`
+}
+
 function renderCitation(value) {
   if (value.error) return [{ type: 'text', text: `Error: ${value.error}` }]
   if (value.action === 'audit') {
     const lines = [`Reference audit: ${value.count} reference(s) · ${value.counts.problem} problem · ${value.counts.review} review · ${value.counts.unverified} unverified · ${value.counts.no_issues_found} no issues found (${value.network_checked} DOI(s) checked online).`]
+    if (value.lookup) lines.push(lookupLine(value.lookup))
     for (const ref of value.references.filter((r) => r.status === 'problem' || r.status === 'review')) {
       lines.push(`- ${ref.status.toUpperCase()} ${ref.key}${ref.doi ? ` (${ref.doi})` : ''}`)
       for (const f of ref.findings.filter((x) => x.severity !== 'info')) lines.push(`    ${f.code}: ${f.detail}${f.suggested_fix ? ` → ${f.suggested_fix}` : ''}`)
@@ -734,14 +746,27 @@ async function checkCitations(records, args, deps, exec) {
     const cited = /\.(md|markdown|qmd|rmd)$/i.test(args.manuscript) ? extractMarkdownCitations(source) : extractTexCitations(source)
     citedKeys = cited.nociteAll ? null : new Set(cited.keys.keys())
   }
-  return await auditReferences(records, {
-    fetchCrossref: deps.fetchCrossref || ((doi) => fetchCrossrefWork(doi, exec)),
-    integrity: deps.integrity || ((doi) => runIntegrityCheck({ doi }, exec).catch((error) => ({ error: error.message }))),
-    titleMatches,
-    citedKeys,
-    style: args.style || 'apa',
-    maxAudit: args.max_audit,
-  })
+  // Registry answers come through the lookup snapshot, so the same bibliography gives the same findings
+  // until it is refreshed. An injected fetchCrossref is an override and bypasses it; an injected fetchJson
+  // replaces only the network underneath it.
+  const snapshot = deps.fetchCrossref ? null : openSnapshot(workspaceRoot(exec), { base: deps.fetchJson, ...snapshotOptions(args) })
+  try {
+    const audit = await auditReferences(records, {
+      fetchCrossref: deps.fetchCrossref || ((doi) => fetchCrossrefWork(doi, exec, snapshot.fetchJson)),
+      integrity: deps.integrity || ((doi) => runIntegrityCheck({ doi }, exec, snapshot ? { fetchJson: snapshot.fetchJson } : {}).catch((error) => ({ error: error.message }))),
+      titleMatches,
+      citedKeys,
+      style: args.style || 'apa',
+      maxAudit: args.max_audit,
+    })
+    if (snapshot) {
+      snapshot.flush()
+      audit.lookup = snapshot.stats()
+    }
+    return audit
+  } finally {
+    snapshot?.flush()
+  }
 }
 
 export async function runCitation(args, exec, deps = {}) {
@@ -773,8 +798,16 @@ export async function runCitation(args, exec, deps = {}) {
   if (action === 'validate') {
     const result = validateRecords(records)
     let doiCheck = { warnings: [], checked: [], unverified: [] }
+    let lookup = null
     if (args.check_dois) {
-      doiCheck = await checkDois(result.entries, exec, deps)
+      const snapshot = deps.fetchCrossref ? null : openSnapshot(workspaceRoot(exec), { base: deps.fetchJson, ...snapshotOptions(args) })
+      try {
+        doiCheck = await checkDois(result.entries, exec,
+          snapshot ? { ...deps, fetchCrossref: (doi) => fetchCrossrefWork(doi, exec, snapshot.fetchJson) } : deps)
+      } finally {
+        snapshot?.flush()
+        lookup = snapshot ? snapshot.stats() : null
+      }
     }
     return {
       action,
@@ -784,6 +817,7 @@ export async function runCitation(args, exec, deps = {}) {
       duplicates: result.duplicates,
       doi_checks: doiCheck.checked,
       doi_unverified: doiCheck.unverified,
+      ...(lookup ? { lookup } : {}),
     }
   }
 
@@ -926,6 +960,7 @@ export function apply(ctx) {
       manuscript: { type: 'string', description: 'audit: workspace-relative .tex or .md manuscript, used to find uncited bibliography entries.' },
       max_audit: { type: 'number', description: 'audit: most DOIs to check online, 1-500. Default 100.' },
       check_dois: { type: 'boolean', description: 'Validate DOIs against Crossref (validate action). Adds network calls, one per DOI.' },
+      ...SNAPSHOT_PARAMETERS,
       output_path: { type: 'string', description: 'Workspace-relative path to write the output. For format, writes the bibliography only. For repair, the new .bib (required; the input is never overwritten).' },
       max_repair: { type: 'number', description: 'repair: most records to ground online, 1-100. Default 25.' },
       overwrite: { type: 'boolean', description: 'repair: replace existing output_path/sidecar files. Default false.' },
