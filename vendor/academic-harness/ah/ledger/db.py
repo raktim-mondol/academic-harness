@@ -111,8 +111,10 @@ class Ledger:
             return "evidence-changed"   # an external tool was re-run (or its result went unusable) since the last audit
         if any(ps.get(k) != snap.get(k) for k in ("facts", "sources", "bindings", "glossary", "bib")):
             return "evidence-changed"
-        if ps.get("rubric") != snap.get("rubric") or ps.get("config") != snap.get("config"):
+        if ps.get("rubric") != snap.get("rubric") or ps.get("config") != snap.get("config") or ps.get("criteria") != snap.get("criteria"):
             return "rubric-changed"
+        if f.tier == "TR":
+            return "evidence-changed"   # the model's verdict on unchanged text and criteria is new: it had not been judged before
         if ps.get("tex") != snap.get("tex"):
             return "text-changed"
         return "UNEXPLAINED"

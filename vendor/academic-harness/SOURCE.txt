@@ -25,7 +25,11 @@ Python package modified in this plugin (the vendored tree is maintained here as 
 - Tier TX (ah/external.py): findings of tools that live outside the engine (numbers_audit,
   figure_audit, the citation audit, reporting_check verdicts) read from .ah/external/<tool>.json, with staleness by input hash
   (EXT-00), `ah audit --external`, `ah external plan|status`, and ledger cause `evidence-changed` when a
-  tool is re-run. New checks STAT-01..05, FIG-01..04, CIT-01..06, RPT-01..03, EXT-00; rubric 1.3.0.
+  tool is re-run. New checks STAT-01..05, FIG-01..04, CIT-01..06, RPT-01..03, EXT-00.
+- Tier TR (ah/rubric.py, ah/checks/rubric.py, ah/rubrics/*.yaml): the frozen rubric. Versioned yes/no
+  criteria judged per paragraph by the verifier backend, quote-checked, cached on (criterion, paragraph,
+  model, prompt version), unjudged pairs carried in the ledger; `ah rubric list|run|sheet|admit`,
+  admission against hand labels (Cohen's kappa, precision). New checks RUB-01/02; rubric 1.4.0.
 
 Local DSH patch (ahead of upstream): registry --keys citation-key aliases
 (entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt

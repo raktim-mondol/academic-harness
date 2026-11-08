@@ -105,6 +105,7 @@ export function toolArgv(name, args = {}, cwd) {
       if (files.length) extra.push('--files', files.join(','))
       if (args.evidence) extra.push('--evidence')
       if (args.external) extra.push('--external')
+      if (args.rubric) extra.push('--rubric')
       extra.push('--brief', '--json')
       return ['check', ...extra]
     }
@@ -114,9 +115,32 @@ export function toolArgv(name, args = {}, cwd) {
       if (args.evidence) extra.push('--evidence')
       if (args.no_ledger) extra.push('--no-ledger')
       if (args.external) extra.push('--external')
+      if (args.rubric || args.judge) extra.push('--rubric')
+      if (args.judge) extra.push('--judge')
+      const calls = Number(args.judge_limit)
+      if (args.judge && Number.isInteger(calls) && calls >= 1) extra.push('--judge-limit', String(calls))
       const runs = Number(args.stability_runs)
       if (Number.isInteger(runs) && runs >= 2) extra.push('--stability', String(Math.min(runs, 20)))
       return ['audit', ...extra]
+    }
+    case 'ah_rubric': {
+      const action = String(args.action || 'list').toLowerCase()
+      const ids = strList(args.criterion)
+      if (action === 'list') return ['rubric', 'list']
+      if (action === 'run') {
+        const argv = ['rubric', 'run', ...ids]
+        if (args.judge) argv.push('--judge')
+        const calls = Number(args.judge_limit)
+        if (args.judge && Number.isInteger(calls) && calls >= 1) argv.push('--judge-limit', String(calls))
+        for (const file of strList(args.files)) argv.push('--file', file)
+        return argv
+      }
+      if (action === 'sheet') {
+        if (ids.length !== 1) return { error: 'ah_rubric sheet needs exactly one criterion' }
+        const limit = Number(args.limit)
+        return ['rubric', 'sheet', ids[0], ...(Number.isInteger(limit) && limit >= 1 ? ['--limit', String(limit)] : [])]
+      }
+      return { error: 'ah_rubric action must be list, run, or sheet. Admitting a criterion is the author\'s decision: ah_author action=rubric-admit.' }
     }
     case 'ah_external': {
       const action = String(args.action || 'run').toLowerCase()
@@ -300,6 +324,10 @@ export function toolArgv(name, args = {}, cwd) {
         if (!args.author_type || !args.reason) return { error: 'provenance-fill needs author_type and reason (who is filling)' }
         return ['provenance', 'fill', '--type', String(args.author_type), '--by', String(args.reason), '--yes']
       }
+      if (action === 'rubric-admit') {
+        if (!id || !args.file) return { error: 'rubric-admit needs id (the criterion) and file (the hand-labels YAML)' }
+        return ['rubric', 'admit', id, '--labels', String(args.file), '--yes']
+      }
       if (!id) return { error: 'ah_author needs an id' }
       if (action === 'waive') return ['finding', 'waive', id, '--reason', String(args.reason || ''), '--yes']
       if (action === 'accept') return ['proposals', 'accept', id, '--yes']
@@ -308,7 +336,7 @@ export function toolArgv(name, args = {}, cwd) {
       if (action === 'plan-approve') return ['plan', 'approve', id, '--yes']
       if (action === 'verify') return ['claims', 'verify', id, '--yes']
       if (action === 'decline') return ['review', 'set', id, '--status', 'declined', '--yes']
-      return { error: 'ah_author action must be waive, accept, reject, approve, plan-approve, verify, decline, disclosure-approve, or provenance-fill' }
+      return { error: 'ah_author action must be waive, accept, reject, approve, plan-approve, verify, decline, disclosure-approve, provenance-fill, or rubric-admit' }
     }
     default:
       return { error: `unknown Academic Harness tool: ${name}` }
@@ -366,8 +394,9 @@ export async function executeAh(name, args, exec) {
     bridgeNote = ran.error ? `external: could not run (${ran.error})` : renderExternalRun(ran.summary)
   }
 
-  const timeoutMs = name === 'ah_build' ? BUILD_TIMEOUT_MS
-    : name === 'ah_audit' ? AUDIT_TIMEOUT_MS
+  const askingModel = Boolean(args.judge) || args.action === 'rubric-admit'   // model calls: one per paragraph and criterion
+  const timeoutMs = name === 'ah_build' || askingModel ? BUILD_TIMEOUT_MS
+    : name === 'ah_audit' || name === 'ah_rubric' ? AUDIT_TIMEOUT_MS
     : DEFAULT_TIMEOUT_MS
 
   const finalArgv = SKIP_PROJECT_FLAG.has(name)
@@ -459,6 +488,7 @@ export async function apply(ctx) {
       files: { type: 'array', items: { type: 'string' }, description: 'Files relative to the project or TeX root.' },
       evidence: { type: 'boolean', description: 'Also check numbers in cited clauses against the cited sources.' },
       external: { type: 'string', enum: ['use', 'run'], description: 'Also read the results of the external tools (numbers_audit, figure_audit, citation audit) as tier TX. use reads the stored results and reports stale ones as EXT-00; run first runs the tools again.' },
+      rubric: { type: 'boolean', description: 'Also report the frozen rubric (tier TR) from verdicts already cached. No model calls; paragraphs never judged are not judged here.' },
     },
   })
   register(ctx, {
@@ -469,7 +499,22 @@ export async function apply(ctx) {
       evidence: { type: 'boolean' },
       no_ledger: { type: 'boolean' },
       external: { type: 'string', enum: ['use', 'run'], description: 'Also read the results of the external tools (numbers_audit, figure_audit, citation audit) as tier TX, with ledger states. use reads the stored results and reports stale ones as EXT-00; run first runs the tools again (the citation audit reads Crossref/OpenAlex through the lookup snapshot).' },
+      rubric: { type: 'boolean', description: 'Also report the frozen rubric (tier TR) from verdicts already cached. No model calls. Criteria report at info until the author admits them.' },
+      judge: { type: 'boolean', description: 'Tier TR with model calls for paragraphs that have no cached verdict (needs a verifier: section in ah.yaml). One call per criterion and changed paragraph; unchanged paragraphs are never asked again.' },
+      judge_limit: { type: 'integer', description: 'With judge: most model calls in this run.' },
       stability_runs: { type: 'integer', description: 'Also run the checks N times (2-20) on the unchanged text and report findings that come and go, plus paragraphs without a stable anchor. Exit status 2 when unstable.' },
+    },
+  })
+  register(ctx, {
+    name: 'ah_rubric',
+    description: 'The frozen rubric: fixed yes/no criteria about one paragraph (a defect is present or not), each answer quote-checked and cached so unchanged text always gets the same verdict. action=list (criteria, version, whether admitted), run (judge with judge=true, else report cached verdicts only), sheet (a labelling sheet for one criterion). A criterion reports at info until the author admits it with ah_author action=rubric-admit, after measuring it against their own labels.',
+    parameters: {
+      action: { type: 'string', enum: ['list', 'run', 'sheet'], description: 'Default list.' },
+      criterion: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'Criterion id(s), e.g. RUB-CAUSAL. run: default all; sheet: exactly one.' },
+      judge: { type: 'boolean', description: 'run: ask the model for paragraphs with no cached verdict (needs a verifier: section in ah.yaml).' },
+      judge_limit: { type: 'integer', description: 'run with judge: most model calls.' },
+      files: { type: 'array', items: { type: 'string' }, description: 'run: only paragraphs in these files (relative to the TeX root).' },
+      limit: { type: 'integer', description: 'sheet: most paragraphs listed.' },
     },
   })
   register(ctx, {
@@ -771,11 +816,11 @@ export async function apply(ctx) {
       action: {
         type: 'string',
         required: true,
-        enum: ['waive', 'accept', 'reject', 'approve', 'plan-approve', 'verify', 'decline', 'disclosure-approve', 'provenance-fill'],
+        enum: ['waive', 'accept', 'reject', 'approve', 'plan-approve', 'verify', 'decline', 'disclosure-approve', 'provenance-fill', 'rubric-admit'],
       },
-      id: { type: 'string', description: 'Finding fingerprint, fact id, brief id, plan id, claim id, or review item id.' },
+      id: { type: 'string', description: 'Finding fingerprint, fact id, brief id, plan id, claim id, review item id, or rubric criterion id (rubric-admit).' },
       reason: { type: 'string', description: 'Required for waive (why) and provenance-fill (who is filling, e.g. the author name).' },
-      file: { type: 'string', description: 'Edited disclosure markdown for disclosure-approve.' },
+      file: { type: 'string', description: 'Edited disclosure markdown for disclosure-approve, or the hand-labels YAML for rubric-admit (made with ah_rubric action=sheet).' },
       author_type: { type: 'string', enum: ['human', 'agent', 'mixed', 'unknown'], description: 'For provenance-fill.' },
     },
   })

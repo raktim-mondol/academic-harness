@@ -1,4 +1,5 @@
 description: Thesis. Chapters, publications and contributions are one author-owned record set; each contribution is stated in its chapter and again in the conclusion.
+rubric: [core, empirical]   # bundled criteria sets (ah/rubrics/); the project's own are in rubric/*.yaml
 params:
   conclusion_glob: "*conclusion*"
 sections: [Introduction, Background, Conclusion]

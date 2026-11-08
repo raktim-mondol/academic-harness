@@ -1,0 +1,17 @@
+# Additional criteria for papers that report experiments or measurements.
+criteria:
+  - id: RUB-METHOD-VAGUE
+    version: 1
+    level: minor
+    scope: {files: ["*method*", "*approach*", "*setup*"]}
+    question: >-
+      Does the paragraph describe a step of the procedure with an unspecified quantity (for example "a few",
+      "several", "some", "a small number of", "appropriate") where a number, range or named value would be needed
+      for someone to repeat it?
+  - id: RUB-RESULTS-INTERPRET
+    version: 1
+    level: minor
+    scope: {files: ["*result*", "*experiment*", "*evaluation*"]}
+    question: >-
+      Does the paragraph explain why a result occurred, by giving a mechanism or a cause, instead of only reporting
+      what was observed?

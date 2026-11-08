@@ -51,6 +51,23 @@ A result is trusted only while every file it was computed from has the hash it w
 
 Limits: a run of `numbers_audit` without SciPy is a failure, not an empty result. `reporting_check` stores are only found under the project root, and PaperMemory-paper manuscripts are not part of the project. The verdicts are an agent's recorded judgments with verified quotes, not a compliance statement; RPT-01 starts at minor for that reason. Stability (`ah stability`) does not re-run the external tools; their stored results do not change between runs by construction.
 
+### The frozen rubric (tier TR)
+
+A free-form review asks the model what it notices, so it notices something different each time. A rubric criterion is the opposite: one question, written down, with a version, asked about one paragraph. `ah_audit rubric=true` reports the verdicts already cached (no model calls); `ah_audit judge=true` also asks the model about paragraphs that have none. `ah_rubric` lists, runs and makes labelling sheets for individual criteria.
+
+What makes the answer repeatable:
+
+- **The question is a file.** Defaults ship with the profile (`core` for all prose, `empirical` for methods and results, `grant` for proposals); a project adds or rewords criteria in `rubric/*.yaml` and switches ones off with `criteria: {off: [...]}` in `ah.yaml` (`criteria:` also sets `files`, default `rubric/*.yaml`, `workers`, default 4, and `min_words`, default 12: shorter paragraphs are skipped). A criterion is `{id: RUB-NAME, version, level, question, scope: {files, kinds, min_words}}`. It asks about a **defect** ("yes" = the problem is present), because only a defect has words to quote. Omissions (a missing section or statement) stay with profile rules, which are exact.
+- **A failure must quote the paragraph.** A "yes" counts only if its quote is found in the paragraph (case and whitespace normalised, at least 8 characters per piece). The model gets one corrected retry; a "yes" with no real quote is `unverifiable` and never becomes a finding.
+- **The verdict is cached** on (prompt version, criterion hash, paragraph hash, model). Unchanged text is never asked twice, and a re-run on it returns the same answer by construction. Editing one paragraph asks about that paragraph only. A transport error or an unparseable reply is not cached, so it is asked again next time.
+- **Not being able to ask is not a fix.** A (criterion, paragraph) pair that got no verdict (no model allowed, no cached answer, an error, over `judge_limit`) is carried in the ledger exactly as it was. Only a verdict of "no" on that paragraph closes a finding.
+
+**Levels and admission.** Every criterion reports at **info** and cannot gate until the author has measured it. `ah_rubric action=sheet` lists the paragraphs in scope with their hashes; you label each `yes` (defect present) or `no`; `ah_author action=rubric-admit id=RUB-NAME file=labels.yaml` (CLI: `ah rubric admit RUB-NAME --labels labels.yaml --yes`) runs the model over them and records the agreement in `rubric/admissions.yaml`. Defaults: at least 20 usable labels with at least 5 of each kind, Cohen's kappa at least 0.6 and precision at least 0.8, because a gate that flags text the author considers fine is worse than none. Labels whose paragraph was edited since are skipped, not trusted. An admission is evidence about **this question and this model**: reword the question or change the model and it is void, and the criterion drops back to info (a carried finding too). Without `--yes` the command only reports whether the thresholds are met. `rubric/**` is a protected path, so an agent cannot edit criteria, labels or admissions to admit its own check.
+
+New findings are `RUB-01` (cause `evidence-changed` when the model's first verdict on unchanged text arrives, `text-changed` after an edit, `rubric-changed` after a criterion edit) and `RUB-02` for a malformed criteria file.
+
+Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry is only reused for the same model name, so changing models re-judges everything (and voids admissions). Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).
@@ -64,6 +81,7 @@ On first mount the plugin prepares a local `.venv` next to that vendored tree (v
 | `ah_profile` / `ah_init` / `ah_migrate` | anyone | List document types; scaffold a new project; overlay `ah.yaml` on an existing LaTeX tree (dry-run first; apply needs `confirm`) |
 | `ah_state` / `ah_inventory` / `ah_check` / `ah_audit` / `ah_config` / `ah_catalogue` | anyone | Paper-state card; coverage counts; cheap checks; full audit with ledger; project config; check catalogue |
 | `ah_external` | anyone | Run numbers_audit, figure_audit and the citation audit on the project and store their findings (`.ah/external/`) so `ah_audit external=use` gives them IDs and ledger states; `plan`, `status` |
+| `ah_rubric` | anyone | The frozen rubric (tier TR): `list` criteria, `run` them (with `judge` the model is asked about paragraphs with no cached verdict), `sheet` a labelling sheet. Admitting a criterion is `ah_author action=rubric-admit` |
 | `ah_units` / `ah_fact` / `ah_bind` / `ah_fact_propose` / `ah_sweep` | anyone | Sync `%% @unit` anchors; list/build/check facts; suggest number→fact bindings; propose a new fact; find every use of a value |
 | `ah_source` / `ah_source_search` / `ah_claims` / `ah_claims_sync` / `ah_claims_bind` | anyone | Register/list sources; quote-located passages; claim sidecars; bind a claim to a source or fact |
 | `ah_pack` / `ah_brief_new` / `ah_plan` | anyone | Evidence pack before drafting; draft a brief; propose an outline (author approves) |

@@ -25,6 +25,7 @@ class Profile:
     scaffold: dict = field(default_factory=dict)        # project-relative path -> file text
     scaffold_facts: list = field(default_factory=list)  # fact entries appended to facts.yaml by `ah init`
     rules: list = field(default_factory=list)
+    rubric: list = field(default_factory=list)          # names of bundled criteria sets (ah/rubrics/<name>.yaml)
 
 
 def names() -> list[str]:
@@ -41,7 +42,7 @@ def load(name: str | None) -> Profile | None:
         raise ValueError(f"unknown profile '{name}'; available: generic, {', '.join(names())}")
     raw = yaml.safe_load(f.read_text()) or {}
     return Profile(name, f.parent, raw.get("description", ""), raw.get("params") or {}, raw.get("defaults") or {},
-                   raw.get("sections") or [], raw.get("scaffold") or {}, raw.get("scaffold_facts") or [], raw.get("rules") or [])
+                   raw.get("sections") or [], raw.get("scaffold") or {}, raw.get("scaffold_facts") or [], raw.get("rules") or [], list(raw.get("rubric") or []))
 
 
 def resolve(obj: Any, params: dict) -> Any:

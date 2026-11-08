@@ -44,6 +44,8 @@ def _tiers(a) -> tuple[str, ...]:
         base = DEFAULT_TIERS
         if getattr(a, "evidence", False) or getattr(a, "verify", False):
             base = tuple(t for t in TIERS if t in DEFAULT_TIERS or t == "T3")
+        if getattr(a, "rubric", False) or getattr(a, "judge", False):
+            base = base + ("TR",)
         return base
     t = tuple(x.strip().upper() for x in a.tiers.split(",") if x.strip())
     bad = [x for x in t if x not in TIERS]
@@ -69,6 +71,11 @@ def render_report(rep: dict, limit: int = 25) -> str:
         extra = f"; T3 calls {c.get('t3_calls', 0)} cached {c.get('t3_cached', 0)}" if "t3_calls" in c else ""
         lines.append(f"cost: {c['seconds']}s  {c['mode']}" + (f" ({c['note']})" if c.get("note") else "")
                      + f"; units {c.get('units_changed', '?')}/{c.get('units_total', '?')} rechecked" + extra)
+    if rep.get("rubric_run"):
+        r = rep["rubric_run"]
+        lines.append(f"rubric: {r['criteria']} criteria over {r['units']} units: {r['yes']} failed, {r['no']} passed, {r['unclear']} unclear, "
+                     f"{r['unverifiable']} unverifiable quote(s), {r['unjudged_count']} not judged (carried); model calls {r['calls']} (cached {r['cached']}); "
+                     f"admitted: {', '.join(r['admitted']) or 'none'}")
     if rep.get("external"):
         lines.append("external: " + "; ".join(
             f"{t} {i['status']}" + (f" ({i['findings']})" if i["status"] == "fresh" else "") for t, i in rep["external"]["tools"].items()))
@@ -208,9 +215,10 @@ def cmd_facts(a):
     return EXIT_OK
 
 
-def _backend(a, p):
+def _build_backend(a, p, flag: str | None):
+    """The model backend from `verifier:` in ah.yaml. `flag` is the option that asks for model calls (None: always)."""
     from .verifier.backends import get_backend
-    if not getattr(a, "verify", False):
+    if flag and not getattr(a, flag, False):
         return None
     if getattr(a, "model", None) or getattr(a, "provider", None):
         p.cfg.setdefault("verifier", {}).update({k: v for k, v in (("model", a.model), ("provider", a.provider)) if v})
@@ -219,8 +227,17 @@ def _backend(a, p):
         p.cfg.setdefault("verifier", {})["thinking"] = a.thinking
     b = get_backend(p.cfg)
     if b is None:
-        raise SystemExit("--verify needs a `verifier:` section in ah.yaml (backend: pi|command)")
+        raise SystemExit(f"{'--' + flag if flag else 'this'} needs a `verifier:` section in ah.yaml (backend: pi|http|command)")
     return b
+
+
+def _backend(a, p):
+    return _build_backend(a, p, "verify")
+
+
+def _rubric_backend(a, p):
+    """Model calls for the rubric tier only, so `--judge` does not also send every cited claim to the verifier."""
+    return _build_backend(a, p, "judge")
 
 
 def _t3kw(a):
@@ -251,7 +268,8 @@ def _narrow(rep: dict, files: list[str] | None, brief: bool) -> dict:
 
 def cmd_check(a):
     p = _proj(a)
-    rep = audit(p, _tiers(a), use_ledger=False, backend=_backend(a, p), external=getattr(a, "external", None), **_t3kw(a))
+    rep = audit(p, _tiers(a), use_ledger=False, backend=_backend(a, p), external=getattr(a, "external", None),
+                rubric_backend=_rubric_backend(a, p), rubric_limit=getattr(a, "judge_limit", 0) or 0, **_t3kw(a))
     rep = _narrow(rep, a.files.split(",") if getattr(a, "files", None) else None, getattr(a, "brief", False))
     print(json.dumps(rep, indent=1) if a.json else (render_report(rep, a.limit) if "coverage" in rep else json.dumps(rep, indent=1)))
     return EXIT_OK if rep["gate"]["passed"] else EXIT_FINDINGS
@@ -269,7 +287,8 @@ def cmd_audit(a):
             return EXIT_ERROR
         extra = log_findings(ctx, parse_log(b["log"]))
     rep = audit(p, _tiers(a), use_ledger=not a.no_ledger, extra_findings=extra, backend=_backend(a, p),
-                incremental=getattr(a, "incremental", False), external=getattr(a, "external", None), **_t3kw(a))
+                incremental=getattr(a, "incremental", False), external=getattr(a, "external", None),
+                rubric_backend=_rubric_backend(a, p), rubric_limit=getattr(a, "judge_limit", 0) or 0, **_t3kw(a))
     if a.det_check:
         rep["det01"] = det_check(p, _tiers(a), backend=_backend(a, p))
     if getattr(a, "stability", 0):
@@ -313,6 +332,134 @@ def cmd_stability(a):
     if st["verdict"] == "input-changed":
         return EXIT_ERROR
     return EXIT_OK if st["verdict"] == "stable" and not st["ledger_unexplained"] else EXIT_FINDINGS
+
+
+def _rubric_stats_json(stats: dict) -> dict:
+    return {k: v for k, v in stats.items() if k != "unjudged"}
+
+
+def cmd_rubric(a):
+    import hashlib
+    from .checks.rubric import judge_cached, run_rubric
+    from .rubric import (ADMISSIONS_FILE, admission_failures, agreement, configured_model, in_scope, is_admitted, load_admissions,
+                         load_criteria, load_labels, write_admission)
+    from .verifier.verify import Cache
+    p = _proj(a)
+    crits, problems = load_criteria(p)
+    adm = load_admissions(p)
+    by_id = {c.id: c for c in crits}
+    model = configured_model(p.cfg)
+    for pr in problems:
+        print(f"rubric problem: {pr.message}", file=sys.stderr)
+
+    if a.action == "list":
+        rows = [{"id": c.id, "version": c.version, "level": c.level, "admitted": is_admitted(c, adm, model),
+                 "effective_level": c.level if is_admitted(c, adm, model) else "info", "origin": c.origin, "scope": c.files,
+                 "question": c.question} for c in crits]
+        if a.json:
+            print(json.dumps({"model": model, "criteria": rows, "problems": [pr.message for pr in problems]}, indent=1))
+        else:
+            print(f"rubric: {len(rows)} criteria; model for admissions: {model or '(no verifier configured)'}")
+            for r in rows:
+                print(f"  {r['id']:22} v{r['version']} {'ADMITTED' if r['admitted'] else 'unadmitted':10} reports at {r['effective_level']:6} ({r['origin']})\n      {r['question']}")
+        return EXIT_OK if not problems else EXIT_FINDINGS
+
+    ids = list(a.ids or [])
+    unknown = [i for i in ids if i not in by_id]
+    if unknown:
+        print(f"unknown criterion: {', '.join(unknown)}; `ah rubric list` shows them", file=sys.stderr)
+        return EXIT_ERROR
+
+    if a.action == "run":
+        ctx = build_context(p)
+        backend = _rubric_backend(a, p)
+        findings, stats = run_rubric(ctx, backend, use_cache=not a.no_cache, limit=a.judge_limit or 0, only_files=a.file or None,
+                                     only_criteria=ids or None)
+        out = {"stats": _rubric_stats_json(stats), "findings": [f.to_dict() for f in findings]}
+        if a.json:
+            print(json.dumps(out, indent=1))
+        else:
+            print(f"rubric run: {stats['criteria']} criteria, {stats['pairs']} (criterion, paragraph) pairs; judged {stats['judged']} "
+                  f"(cached {stats['cached']}, model calls {stats['calls']}), not judged {stats['unjudged_count']}; "
+                  f"failed {stats['yes']}, passed {stats['no']}, unclear {stats['unclear']}, unverifiable quote {stats['unverifiable']}")
+            for cid, row in stats["per_criterion"].items():
+                tag = "admitted" if cid in stats["admitted"] else "unadmitted (reports at info)"
+                print(f"  {cid:22} {row['units']:4} paragraphs: {row['yes']} failed, {row['no']} passed, {row['unclear']} unclear, {row['unjudged']} not judged  [{tag}]")
+            for f in findings:
+                print(f"  {f.level:6} {f.ref or f.file}:{f.line or ''} {f.message[:200]}")
+            if stats["unjudged_count"] and backend is None:
+                print("  (paragraphs with no cached verdict were not judged; add --judge to ask the model, with a `verifier:` section in ah.yaml)")
+        gate = set(p.cfg["gate"]["blocking_levels"])
+        return EXIT_FINDINGS if any(f.level in gate for f in findings) else EXIT_OK
+
+    if len(ids) != 1:
+        print(f"ah rubric {a.action} needs exactly one criterion id", file=sys.stderr)
+        return EXIT_ERROR
+    crit = by_id[ids[0]]
+    ctx = build_context(p)
+
+    if a.action == "sheet":
+        units = [u for u in ctx.units if in_scope(crit, u)]
+        if a.limit:
+            units = units[: a.limit]
+        print(f"# Label each paragraph for {crit.id}: {crit.question}\n# label: yes = the defect is present, no = it is not. Leave nothing null.\nlabels:")
+        for u in units:
+            snippet = " ".join(u.norm.split())[:150].replace("\n", " ")
+            print(f"  # {snippet}\n  - {{unit: {unit_ref(u)}, hash: {u.hash}, label: null}}")
+        return EXIT_OK
+
+    if a.action == "admit":
+        if not a.labels:
+            print("ah rubric admit needs --labels FILE (see `ah rubric sheet`)", file=sys.stderr)
+            return EXIT_ERROR
+        labels_path = Path(a.labels)
+        try:
+            labels = load_labels(labels_path)
+        except ValueError as e:
+            print(e, file=sys.stderr)
+            return EXIT_ERROR
+        backend = _build_backend(a, p, None)
+        cache = None if a.no_cache else Cache(p)
+        units = {unit_ref(u): u for u in ctx.units}
+        pairs: list[tuple[bool, bool]] = []
+        skipped = {"missing": [], "stale": [], "not_judged": []}
+        for lab in labels:
+            u = units.get(lab["unit"])
+            if u is None:
+                skipped["missing"].append(lab["unit"])
+            elif lab["hash"] and lab["hash"] != u.hash:
+                skipped["stale"].append(lab["unit"])
+            else:
+                v = judge_cached(crit, u, backend, cache, backend.model)
+                if v is None or v.answer == "error":
+                    skipped["not_judged"].append(lab["unit"])
+                else:
+                    pairs.append((v.answer == "yes", lab["label"]))
+        stats = agreement(pairs)
+        fails = admission_failures(stats, a.min_labels, a.min_per_class, a.min_kappa, a.min_precision)
+        if skipped["not_judged"]:
+            fails.append(f"{len(skipped['not_judged'])} labelled paragraph(s) could not be judged; run again")
+        result = {"criterion": crit.id, "model": backend.model, "agreement": stats, "skipped": skipped, "failures": fails,
+                  "admitted": False, "thresholds": {"min_labels": a.min_labels, "min_per_class": a.min_per_class, "min_kappa": a.min_kappa,
+                                                    "min_precision": a.min_precision}}
+        if not fails and a.yes:
+            sha = hashlib.sha256(labels_path.read_bytes()).hexdigest()[:16]
+            write_admission(p, crit, backend.model, stats, sha)
+            result["admitted"] = True
+        if a.json:
+            print(json.dumps(result, indent=1))
+        else:
+            print(f"{crit.id} vs {len(pairs)} labels ({stats['positives']} defects, {stats['negatives']} fine) with {backend.model}: "
+                  f"kappa {stats['kappa']}, precision {stats['precision']}, recall {stats['recall']}")
+            for k, v in skipped.items():
+                if v:
+                    print(f"  skipped ({k}): {', '.join(v[:6])}{' ...' if len(v) > 6 else ''}")
+            for f in fails:
+                print(f"  NOT ADMITTED: {f}")
+            if not fails:
+                print(f"  admitted: recorded in {ADMISSIONS_FILE}" if a.yes else "  meets the thresholds. Not recorded: pass --yes (an author decision) to admit it.")
+        return EXIT_OK if not fails else EXIT_FINDINGS
+    return EXIT_ERROR
 
 
 def cmd_external(a):
@@ -788,6 +935,9 @@ def main(argv=None) -> int:
         sp.add_argument("--provider", help="override verifier.provider")
         sp.add_argument("--thinking", default=None, help="override thinking level; empty sends no flag")
         sp.add_argument("--file", action="append", help="only claims in this file (relative to the TeX root)")
+        sp.add_argument("--rubric", action="store_true", help="add tier TR: the frozen rubric, from cached verdicts (no model calls)")
+        sp.add_argument("--judge", action="store_true", help="tier TR with model calls for paragraphs that have no cached verdict (implies --rubric)")
+        sp.add_argument("--judge-limit", type=int, default=0, metavar="N", help="most rubric model calls in one run (0 = no cap)")
         sp.add_argument("--external", nargs="?", const="", default=None, metavar="DIR",
                         help="add tier TX: results of external tools (default .ah/external); stale ones are reported as EXT-00")
         if name == "audit":
@@ -809,6 +959,23 @@ def main(argv=None) -> int:
     sp.add_argument("--provider", help="override verifier.provider")
     sp.add_argument("--thinking", default=None, help="override thinking level; empty sends no flag")
     sp.add_argument("--file", action="append", help="only claims in this file (relative to the TeX root)")
+    sp = add("rubric", cmd_rubric, "the frozen rubric: list criteria, run them, make a labelling sheet, admit one against hand labels")
+    sp.add_argument("action", choices=["list", "run", "sheet", "admit"])
+    sp.add_argument("ids", nargs="*", help="criterion ids (sheet and admit take exactly one)")
+    sp.add_argument("--judge", action="store_true", help="run: ask the model for paragraphs with no cached verdict")
+    sp.add_argument("--judge-limit", type=int, default=0, metavar="N")
+    sp.add_argument("--no-cache", action="store_true")
+    sp.add_argument("--file", action="append", help="run: only paragraphs in this file (relative to the TeX root)")
+    sp.add_argument("--limit", type=int, default=0, help="sheet: most paragraphs listed")
+    sp.add_argument("--labels", help="admit: YAML file of hand labels")
+    sp.add_argument("--min-labels", type=int, default=20)
+    sp.add_argument("--min-per-class", type=int, default=5)
+    sp.add_argument("--min-kappa", type=float, default=0.6)
+    sp.add_argument("--min-precision", type=float, default=0.8)
+    sp.add_argument("--yes", action="store_true", help="admit: record the admission (an author decision)")
+    sp.add_argument("--model", help="override verifier.model")
+    sp.add_argument("--provider", help="override verifier.provider")
+    sp.add_argument("--thinking", default=None)
     sp = add("external", cmd_external, "plan what external tools must run on, or show the state of their results")
     sp.add_argument("action", choices=["plan", "status"])
     sp.add_argument("--dir", default=None, help="results directory (default .ah/external)")

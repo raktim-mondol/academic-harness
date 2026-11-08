@@ -1,4 +1,5 @@
 description: Systematic review (PRISMA 2020). Flow arithmetic must close, every checklist item maps to text, standard sections exist.
+rubric: [core]   # bundled criteria sets (ah/rubrics/); the project's own are in rubric/*.yaml
 params:
   abstract_words: 300
 sections: [Introduction, Methods, Results, Discussion, Conclusion]
