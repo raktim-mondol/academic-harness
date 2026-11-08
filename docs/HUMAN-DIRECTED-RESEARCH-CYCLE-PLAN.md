@@ -1,6 +1,6 @@
 # Human-directed research cycle: implementation plan
 
-**Status:** Phases 1–4 implemented; Phase 5 remains proposed. See the changelog and tool documentation for the shipped interface.
+**Status:** Phases 1–5 implemented. See the changelog and tool documentation for the shipped interface.
 
 **Scope:** Safer experiment comparisons, repeated-run summaries, experiment lineage, guided handoffs, and evidence-grounded prior-art and figure reports.
 
@@ -51,7 +51,7 @@ Academic Harness remains a **human-directed research workbench**, not an autonom
 | 2 | Repeated-run summaries | Seed coverage and paired comparisons are reproducible, explain exclusions, and are tested | Medium · implemented |
 | 3 | Read-only experiment branch view | A researcher can trace parent runs and recorded links, including failures and unknowns | Medium · implemented |
 | 4 | Guided human-controlled research cycle | Existing tools are connected with explicit approvals and missing-state reporting | Small–medium · implemented |
-| 5 | Prior-art and figure handoffs | Reports are validated on labeled examples and preserve uncertainty | Medium–large |
+| 5 | Prior-art and figure handoffs | Reports are validated on labeled examples and preserve uncertainty | Medium–large · implemented |
 
 These are relative engineering sizes, not delivery dates. Phase 2 depends on Phase 1's eligibility contract. Phase 3 can begin after Phase 1's data contract is stable. Phase 4 should use the first three phases' actual interfaces. Phase 5 can be developed independently once its evaluation fixtures and provenance boundaries are agreed.
 
@@ -244,6 +244,16 @@ The output may say **“no close overlap found in the searched material”** wit
 - Vision review, if requested and available, is separately labeled as a model interpretation; it never verifies the underlying data or replaces expert review. No automatic image manipulation or manuscript edit.
 
 **Evaluation and exit:** use small synthetic, licensed fixtures with known hashes, multi-source figures, matching/mismatching captions, stale files, missing input, unsupported formats, and misleading visual content. Have a human label the checkable cases, declare thresholds before evaluation, and report errors and abstentions. Tests must establish path confinement, broken-link handling, deterministic joins, and that a read-only report does not modify source records.
+
+### Implemented
+
+**5A — `prior_art`** (new tool, `prior-art.js`). It assembles the report from searches the agent already ran and candidates it already read; it performs no search, makes no model call, and resolves no identifier. It records the query set, providers, access times, caps, and failures; the comparison basis per candidate (full text, abstract only, metadata only, unavailable); the caller's claimed overlap and distinction as assertions; and checks each quotation as a verbatim span of the text supplied for that candidate. It never reports that PaperMemory ran. Its strongest statement is `no_close_overlap_found_in_searched_material`, which always carries coverage limits and the sentence that this is not evidence of novelty; with no successful search it makes no statement. The existing lexical reading is reused only as a cross-check flag. Input is bounded, retrieved text is fenced when rendered, and nothing is written unless `write: true`.
+
+**5B — `figure_audit action=handoff`** (`figure-handoff.js`). It joins one figure and optional caption to declared `analysis_run` / `experiment_run` records. Inventory of what existing artifacts contain: `analysis_run` manifests hash declared outputs and record `written_by_run`; `experiment_log` hashes listed artifacts; a figure is linked only when the caller names it. Therefore the report states the link, whether the figure's current bytes match the recorded hash, the run's recorded execution status, and numbers read from a hashed JSON/CSV/TSV file, and it keeps every declared source. It reads no pixels, runs no vision model, and writes nothing.
+
+**Evaluation and thresholds.** `scripts/fixtures/prior-art-eval.json` holds 12 synthetic cases, labelled by the implementer (an AI assistant) and not by an independent human reviewer, and 10 labelled quotations (clear and partial overlap, different methods, misleading abstract, inaccessible full text, retrieval failure, no candidate, paraphrased quotation, capped search, mistaken claimed overlap). Thresholds were declared in the file before the tool was run: every statement, labelled field, and quotation must agree, with zero novelty claims. Two of the author's labels were wrong on the first run (a typo, and a lexical expectation for a candidate with no abstract); they were corrected in the fixture, recorded under `label_corrections`, and the tool was not changed to fit them. The same run showed the report did not say which text its lexical reading used, so `lexical_basis` was added. A separate test found that a search with no status defaulted to success; `status` is now required. An independent code review of the finished branch then found further defects in Phase 5, all fixed with tests: loosely coerced numbers (`[]`, blank text, hex), unknown compliance shown as not excluded, "no close overlap" stated from unreviewed or merely asserted input, a one-word quotation counted as support, a digest that ignored quotations, unfenced identifier and error text, noisy caption tokenising, and an order-dependent source-path rule. Some `prior-art-eval.json` labels changed as a result and each change is logged under `label_corrections`. The set is small and synthetic, so the results are counts and do not estimate performance on real retrieval output; no held-out set of real retrieval output exists yet. Figure fixtures are synthetic, generated by the test, with known hashes: multi-source figures, stale and missing files, an unsupported format, a path and a symlink escape, a failed run, a compliance exclusion, and unreadable values. The caption check is limited to plain numbers and is advisory. **Open requirement:** the plan asks a human to label the checkable cases; that has not happened, so the agreement counts only show the rules behave as their author intended.
+
+**Not done.** No real-retrieval prior-art corpus and no vision interpretation. Both remain open under the plan's own evaluation requirement.
 
 ## 10. Cross-phase verification and rollout
 

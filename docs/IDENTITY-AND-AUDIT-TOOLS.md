@@ -47,6 +47,48 @@ Local inventory of figure files (dimensions, DPI, mode, format), low-DPI and mis
 
 - Advisory; it does not detect manipulation.
 
+#### `figure_audit action=handoff`
+
+A read-only figure-to-result report. It joins one figure file (and an optional caption) to the generating records you **declare**, using only the existing analysis and experiment ledgers. It writes nothing, calls no model, and never reads pixels.
+
+```
+figure_audit action=handoff figure=out/fig2.png reference="Figure 2"
+  caption="Accuracy was 0.81 (n = 120)."
+  sources=[{kind: "analysis_run", slug: "main", run_id: "a0003", path: "out/metrics.json"},
+           {kind: "experiment_run", slug: "bench", run_id: "x0007"}]
+  values=[{path: "out/metrics.json", format: "json", field: "metrics.acc"}]
+```
+
+| Part | What it reports |
+|---|---|
+| `figure` | present / missing / `unsafe_path` (workspace confinement, symlinks included), current `sha256`, byte count, and `format_state` `supported` or `unsupported` (an unsupported format is hashed but not interpreted) |
+| `sources[]` | every declared link is kept, in order. `link_state` is `resolved`, `unresolved` (no such run), or `not_checked` (bad declaration). A resolved link shows the run's recorded `execution.status`, whether the figure is listed in that run's record and whether its bytes are `current`, `stale`, `not_hashed`, or `not_recorded`, and any compliance exclusion (`excluded_by_compliance` is `null` and a gap is raised when the compliance state is unknown, for example an unresolved analysis link) |
+| `values[]` | numbers read from a machine-readable file you name, with an explicit `format` (`json` dotted `field`, or `csv`/`tsv` header `column` plus zero-based `row`; a UTF-8 BOM is ignored). The located value must be a real number or a plain decimal literal; arrays, blank text, hex strings, booleans, and `null` are `not_checked`. A value is read **only** from a declared source `path` that **every** source naming it confirms by hash; one stale or unhashed record withholds the file, whatever the order |
+| `caption` | advisory only: plain numeric tokens are compared with the extracted values (`matched`, `unmatched`, `ambiguous`). A stated decimal or a percentage matches at its own precision (`0.81`, `81%`); a plain integer is a count and must equal the value. Figure and panel labels, ranges (`3-5`), scientific notation, and names containing a number (`ResNet-50`) are skipped, and `parsed_scope` lists what is not interpreted |
+| `gaps` | everything unconfirmed, in plain words |
+
+What the states do and do not mean:
+
+- A recorded relation is not proof that the figure depicts that data, and a matching hash proves byte identity, not correctness.
+- `execution.status: succeeded` for an `analysis_run` is an exit code of 0. For an `experiment_run` it comes only from linked `analysis_run` records (`experiment_log` does not execute anything), so a run with no link reports `not_recorded`.
+- If a run lists the figure with matching bytes but those bytes existed before the run started (`written_by_run: false`), the report adds a gap: the run cannot be credited with producing it.
+- A figure with no declared source is reported as unlinked, not as matched. Missing data, stale bytes, unsupported formats, and unparsed captions stay `not_checked`, `stale`, or `unknown`.
+
+### `prior_art`
+
+A prior-art triage report for **one** claim. The agent runs the searches (`literature_search`, source adapters, `paper_resolve`, `paper_get`) and records what happened; `prior_art` does not search and does not judge meaning. It keeps four things apart:
+
+- **What was searched:** each search's provider, query, `status` (required: `ok`, `partial`, `failed`, `not_run`), access time, limit, result count, and error. A missing or malformed status is `invalid` and never counted as success. Hitting a result cap, a single provider, a missing access time, and failures are listed under `coverage_limits`.
+- **What each candidate was compared on:** `full_text`, `abstract_only`, `metadata_only`, `full_text_not_checked` (could not be read), or `not_checked` (a level was declared but no text supplied).
+- **Your claimed overlap** (`none`, `partial`, `close`, `unknown`) and distinction, which stay assertions. `support` says whether a claimed overlap has a quotation verified against the text you supplied (`supported_by_verified_quote`), has quotations that are not verbatim (`quotes_not_verified`), or none (`no_quote`).
+- **Quotations:** whitespace-collapsed exact match against the text supplied for that candidate, so a paraphrase, reordering, changed case or punctuation, or a line-break hyphen is `not_verbatim`. The tool never says PaperMemory ran (`papermemory: not_checked_by_this_tool`); use `quote_check` for ingested papers.
+
+Quotation spans must be verbatim **and** at least 4 words and 20 characters (`verbatim_but_too_short` otherwise), because "the" is in every abstract and proves nothing about overlap. A lexical token-overlap reading (the same coverage idea `coscientist_verify` uses, over the title and the abstract if you supply one, with `lexical_basis` saying which) cross-checks your judgement. It raises flags such as `lexical_overlap_high_but_claimed_none_or_unknown` and `claimed_close_but_lexical_overlap_low` for a human to look at; it is not a verdict.
+
+`statement` is one of `not_checked` (no successful search), `overlap_candidates`, `inconclusive` (a candidate is undecided, rests on metadata only, was contradicted by the lexical cross-check while marked `none`, or could not be compared; or searches returned results, or did not say how many, and no candidate was recorded as reviewed), or `no_close_overlap_found_in_searched_material`, whose text always adds that this is not evidence of novelty. Input is bounded to 20 searches, 50 candidates, 10 quotations per candidate, and 200,000 characters of text per candidate. Retrieved text is fenced as untrusted when rendered. It is read-only unless `write: true` with a `slug`, which saves the report (never the candidate text) under `.dsh/prior-art/<slug>/`. The `report_digest` covers the whole report except the clock, so a corrected quotation or distinction is a different report with its own snapshot. Identifiers and provider labels are validated before they reach the unfenced part of the rendering, and search error text is rendered only inside the fence.
+
+**Evaluation.** `scripts/fixtures/prior-art-eval.json` is a small synthetic set labelled by the implementer, not by an independent human reviewer (12 cases and 10 labelled quotations) covering clear and partial overlap, different methods, a misleading abstract, inaccessible full text, retrieval failure, no candidate, a paraphrased quotation, a capped search, and a mistaken claimed overlap. Thresholds were fixed before running: every statement, labelled candidate field, and quotation must agree, with zero novelty claims. The rules are deterministic, so a disagreement is a defect, and the counts do not estimate performance on real retrieval output.
+
 ### `repo_audit`
 
 Static reproducibility checklist (README, LICENSE, environment file, tests, CI, entry points, data availability, release tag) for a local path or an https `repo_url` cloned into a temp dir.

@@ -49,6 +49,7 @@ const toolFiles = {
   coscientist: 'coscientist.js', coscientist_verify: 'coscientist-verify.js', repro_package: 'repro-package.js',
   deep_review: 'deep-review.js', ablation: 'ablation.js', dataset_get: 'dataset-get.js', data_profile: 'data-profile.js',
   runpod_run: 'runpod-run.js', modal_run: 'modal-run.js', vastai_run: 'vastai-run.js',
+  prior_art: 'prior-art.js', figure_audit: 'figure-audit.js',
   ask_user_question: null, ah_check: 'academic-harness.js',
 }
 for (const [tool, file] of Object.entries(toolFiles)) {
@@ -59,7 +60,7 @@ const actionPairs = [
   ['analysis_run', 'plan'], ['analysis_run', 'run'], ['experiment_log', 'start'], ['experiment_log', 'log'],
   ['experiment_log', 'compare'], ['experiment_log', 'best'], ['experiment_log', 'replicates'], ['experiment_log', 'branches'],
   ['coscientist_verify', 'novelty'], ['coscientist', 'trace'], ['provenance_audit', 'rollup'],
-  ['deep_review', 'estimate'], ['repro_package', 'plan'],
+  ['deep_review', 'estimate'], ['repro_package', 'plan'], ['figure_audit', 'handoff'],
 ]
 for (const [tool, action] of actionPairs) {
   assert.ok(new RegExp(`${tool}[^.]*?\\b${action}\\b`).test(entry.prompt), `prompt uses ${tool} ${action}`)
@@ -67,7 +68,10 @@ for (const [tool, action] of actionPairs) {
     assert.ok(PROVENANCE_ACTIONS.includes(action), `${tool} supports action ${action}`)
     continue
   }
-  const actions = /\bACTIONS\s*=\s*\[([\s\S]*?)\]/.exec(read(toolFiles[tool]))?.[1] ?? ''
+  const source = read(toolFiles[tool])
+  const actions = tool === 'figure_audit'
+    ? /action: \{ type: 'string', enum: \[([^\]]*)\]/.exec(source)?.[1] ?? ''
+    : /\bACTIONS\s*=\s*\[([\s\S]*?)\]/.exec(source)?.[1] ?? ''
   assert.ok(new RegExp(`'${action}'`).test(actions), `${tool} supports action ${action}`)
 }
 assert.ok(entry.prompt.includes('baseline_run_id') && entry.prompt.includes('scope_id'), 'uses the shipped Phase 1 contract')

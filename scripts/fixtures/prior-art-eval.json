@@ -1,0 +1,821 @@
+{
+ "description": "Synthetic fixtures for prior_art, labelled by the implementer (an AI assistant), not by an independent human reviewer. Written for this project; no third-party text. Labels were fixed before the tool was run against them. The set is small, so results are reported as counts, not rates.",
+ "thresholds_declared_before_evaluation": {
+  "statement_agreement": "every case",
+  "candidate_state_agreement": "every labelled field",
+  "quote_verification_agreement": "every labelled quote",
+  "false_novelty_claims": 0,
+  "note": "These are deterministic rules, so any disagreement is a defect, not noise. Counts here do not estimate performance on real retrieval output."
+ },
+ "cases": [
+  {
+   "id": "clear_overlap",
+   "category": "clear overlap",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Scaffold contrastive pretraining for graph encoders",
+       "year": 2024,
+       "doi": "10.1000/clear.1"
+      },
+      "provider": "provA",
+      "evidence_level": "full_text",
+      "quotes": [
+       {
+        "quote": "contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction",
+        "location": "Introduction"
+       }
+      ],
+      "overlap": {
+       "claimed": "close",
+       "distinction": "none identified beyond benchmark choice"
+      },
+      "text": "Introduction. We show that contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction across eight benchmarks.\nMethods. Scaffold-level positive pairs are drawn from shared Bemis-Murcko cores.\nResults. Gains are largest with fewer than 500 labelled molecules.",
+      "abstract": "We show that contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction across eight benchmarks."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "overlap_candidates",
+    "candidates": [
+     {
+      "support": "supported_by_verified_quote",
+      "basis": "full_text",
+      "quote_states": [
+       "verified_in_full_text"
+      ],
+      "flags_absent": [
+       "claimed_overlap_without_verified_quote"
+      ],
+      "lexical_min": 0.9,
+      "lexical_basis": "title_abstract"
+     }
+    ]
+   }
+  },
+  {
+   "id": "partial_overlap",
+   "category": "partial overlap",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Atom-level contrastive pretraining",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "abstract",
+      "quotes": [
+       {
+        "quote": "contrastive objective on individual atoms and bonds",
+        "location": "abstract"
+       }
+      ],
+      "overlap": {
+       "claimed": "partial",
+       "distinction": "atoms and bonds, not scaffolds"
+      },
+      "text": "We pretrain graph encoders with a contrastive objective on individual atoms and bonds, then fine-tune for molecular property prediction with limited labels."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "overlap_candidates",
+    "candidates": [
+     {
+      "support": "supported_by_verified_quote",
+      "basis": "abstract_only",
+      "quote_states": [
+       "verified_in_abstract"
+      ],
+      "flags_present": [
+       "compared_on_less_than_full_text"
+      ]
+     }
+    ],
+    "limits_include": [
+     "not compared on full text"
+    ]
+   }
+  },
+  {
+   "id": "different_methods",
+   "category": "different methods",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Fingerprint random forests for toxicity",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "abstract",
+      "quotes": [],
+      "overlap": {
+       "claimed": "none"
+      },
+      "text": "Random forests trained on circular fingerprints give strong baselines for classifying compound toxicity from assay panels."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "no_close_overlap_found_in_searched_material",
+    "candidates": [
+     {
+      "support": "caller_asserts_none",
+      "flags_absent": [
+       "lexical_overlap_high_but_claimed_none_or_unknown"
+      ],
+      "lexical_max": 0.5,
+      "lexical_basis": "title_abstract"
+     }
+    ]
+   }
+  },
+  {
+   "id": "misleading_abstract",
+   "category": "misleading abstract",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Do scaffold contrastive gains survive disjoint splits",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "abstract",
+      "quotes": [],
+      "overlap": {
+       "claimed": "none"
+      },
+      "text": "We study contrastive pretraining of graph encoders on molecular scaffolds and find that it does not improve low-data property prediction; the reported gains vanish once splits are scaffold-disjoint."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "inconclusive",
+    "candidates": [
+     {
+      "flags_present": [
+       "lexical_overlap_high_but_claimed_none_or_unknown"
+      ],
+      "lexical_min": 0.6
+     }
+    ]
+   }
+  },
+  {
+   "id": "inaccessible_full_text",
+   "category": "inaccessible full text",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Paywalled scaffold pretraining study",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "full_text_unavailable",
+      "quotes": [],
+      "overlap": {
+       "claimed": "unknown"
+      }
+     }
+    ]
+   },
+   "expect": {
+    "statement": "inconclusive",
+    "candidates": [
+     {
+      "basis": "full_text_not_checked",
+      "support": "unknown"
+     }
+    ]
+   }
+  },
+  {
+   "id": "full_text_declared_but_absent",
+   "category": "inaccessible full text",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Declared but empty",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "full_text",
+      "quotes": [],
+      "overlap": {
+       "claimed": "none"
+      }
+     }
+    ]
+   },
+   "expect": {
+    "statement": "inconclusive",
+    "candidates": [
+     {
+      "basis": "not_checked"
+     }
+    ]
+   }
+  },
+  {
+   "id": "retrieval_failure",
+   "category": "retrieval failure",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "x",
+      "status": "failed",
+      "error": "HTTP 503"
+     },
+     {
+      "provider": "provB",
+      "query": "x",
+      "status": "not_run"
+     }
+    ],
+    "candidates": []
+   },
+   "expect": {
+    "statement": "not_checked",
+    "candidates": [],
+    "limits_include": [
+     "search 0 on provA failed",
+     "No successful"
+    ]
+   }
+  },
+  {
+   "id": "no_candidate",
+   "category": "no candidate",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 0
+     }
+    ],
+    "candidates": []
+   },
+   "expect": {
+    "statement": "no_close_overlap_found_in_searched_material",
+    "candidates": [],
+    "limits_include": [
+     "only one provider was searched (provA)"
+    ]
+   }
+  },
+  {
+   "id": "paraphrased_quote",
+   "category": "unverifiable claimed overlap",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Scaffold pretraining",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "full_text",
+      "quotes": [
+       {
+        "quote": "Pretraining encoders for graphs with contrastive scaffold pairs helps when labels are scarce",
+        "location": "Introduction"
+       }
+      ],
+      "overlap": {
+       "claimed": "close",
+       "distinction": "x"
+      },
+      "text": "Introduction. We show that contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction across eight benchmarks.\nMethods. Scaffold-level positive pairs are drawn from shared Bemis-Murcko cores.\nResults. Gains are largest with fewer than 500 labelled molecules."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "overlap_candidates",
+    "candidates": [
+     {
+      "support": "quotes_not_verified",
+      "quote_states": [
+       "not_verbatim"
+      ],
+      "flags_present": [
+       "claimed_overlap_without_verified_quote"
+      ]
+     }
+    ],
+    "limits_include": [
+     "no quotation verified"
+    ]
+   }
+  },
+  {
+   "id": "claimed_close_no_quote",
+   "category": "unverifiable claimed overlap",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Scaffold pretraining",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "full_text",
+      "quotes": [],
+      "overlap": {
+       "claimed": "close",
+       "distinction": "x"
+      },
+      "text": "Introduction. We show that contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction across eight benchmarks.\nMethods. Scaffold-level positive pairs are drawn from shared Bemis-Murcko cores.\nResults. Gains are largest with fewer than 500 labelled molecules."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "overlap_candidates",
+    "candidates": [
+     {
+      "support": "no_quote",
+      "flags_present": [
+       "claimed_overlap_without_verified_quote"
+      ]
+     }
+    ]
+   }
+  },
+  {
+   "id": "capped_search",
+   "category": "coverage limit",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 10
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 2
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Coastal fisheries reform",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "full_text",
+      "text": "Fisheries revenue in coastal regions rose after quota reform. Landing prices stabilised across seasons.",
+      "quotes": [],
+      "overlap": {
+       "claimed": "none"
+      }
+     }
+    ]
+   },
+   "expect": {
+    "statement": "no_close_overlap_found_in_searched_material",
+    "candidates": [
+     {
+      "support": "caller_asserts_none",
+      "basis": "full_text"
+     }
+    ],
+    "limits_include": [
+     "reached its result cap (10)"
+    ]
+   }
+  },
+  {
+   "id": "claimed_close_but_unrelated",
+   "category": "caller error cross-check",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Coastal fisheries reform",
+       "year": 2024
+      },
+      "provider": "provA",
+      "evidence_level": "full_text",
+      "quotes": [
+       {
+        "quote": "Landing prices stabilised across seasons.",
+        "location": "p1"
+       }
+      ],
+      "overlap": {
+       "claimed": "close",
+       "distinction": "x"
+      },
+      "text": "Fisheries revenue in coastal regions rose after quota reform. Landing prices stabilised across seasons."
+     }
+    ]
+   },
+   "expect": {
+    "statement": "overlap_candidates",
+    "candidates": [
+     {
+      "support": "supported_by_verified_quote",
+      "flags_present": [
+       "claimed_close_but_lexical_overlap_low"
+      ],
+      "lexical_max": 0.15
+     }
+    ]
+   }
+  },
+  {
+   "id": "results_but_no_candidates",
+   "category": "coverage limit",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "x",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 7
+     }
+    ],
+    "candidates": []
+   },
+   "expect": {
+    "statement": "inconclusive",
+    "candidates": [],
+    "limits_include": [
+     "7 result(s); 0 candidate(s) were recorded as reviewed"
+    ]
+   }
+  },
+  {
+   "id": "metadata_only_none",
+   "category": "unreviewed assertion",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Unread record"
+      },
+      "provider": "provA",
+      "evidence_level": "metadata_only",
+      "overlap": {
+       "claimed": "none"
+      }
+     }
+    ]
+   },
+   "expect": {
+    "statement": "inconclusive",
+    "candidates": [
+     {
+      "basis": "metadata_only",
+      "support": "caller_asserts_none"
+     }
+    ]
+   }
+  },
+  {
+   "id": "trivial_quote",
+   "category": "unverifiable claimed overlap",
+   "input": {
+    "claim": "Contrastive pretraining of graph encoders on molecular scaffolds improves low-data property prediction.",
+    "searches": [
+     {
+      "provider": "provA",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     },
+     {
+      "provider": "provB",
+      "query": "contrastive pretraining graph encoder scaffold low-data property prediction",
+      "status": "ok",
+      "accessed_at": "2026-11-08T01:00:00Z",
+      "limit": 10,
+      "result_count": 3
+     }
+    ],
+    "candidates": [
+     {
+      "ref": {
+       "title": "Some paper"
+      },
+      "provider": "provA",
+      "evidence_level": "abstract",
+      "text": "We propose a new method for molecules.",
+      "quotes": [
+       {
+        "quote": "We propose",
+        "location": "abstract"
+       }
+      ],
+      "overlap": {
+       "claimed": "close",
+       "distinction": "x"
+      }
+     }
+    ]
+   },
+   "expect": {
+    "statement": "overlap_candidates",
+    "candidates": [
+     {
+      "support": "quotes_not_verified",
+      "quote_states": [
+       "verbatim_but_too_short"
+      ],
+      "flags_present": [
+       "claimed_overlap_without_verified_quote"
+      ]
+     }
+    ]
+   }
+  }
+ ],
+ "quote_cases": [
+  {
+   "id": "q_exact",
+   "text": "The model improves recall by 12 percent on held-out data.",
+   "quote": "improves recall by 12 percent",
+   "expect": true
+  },
+  {
+   "id": "q_whitespace",
+   "text": "The model improves\n   recall by 12\tpercent on held-out data.",
+   "quote": "improves recall by 12 percent",
+   "expect": true
+  },
+  {
+   "id": "q_case",
+   "text": "The model improves recall.",
+   "quote": "The Model Improves Recall",
+   "expect": false
+  },
+  {
+   "id": "q_curly",
+   "text": "It was the model’s recall that improved.",
+   "quote": "the model's recall",
+   "expect": false
+  },
+  {
+   "id": "q_across_sentences",
+   "text": "Recall improved. Precision held steady.",
+   "quote": "Recall improved. Precision held steady.",
+   "expect": true
+  },
+  {
+   "id": "q_paraphrase",
+   "text": "Recall improved by twelve percent.",
+   "quote": "recall rose twelve percent",
+   "expect": false
+  },
+  {
+   "id": "q_reordered",
+   "text": "held-out data improved recall",
+   "quote": "recall improved held-out data",
+   "expect": false
+  },
+  {
+   "id": "q_hyphen_break",
+   "text": "the pre-\ntraining stage",
+   "quote": "the pretraining stage",
+   "expect": false
+  },
+  {
+   "id": "q_unicode_nfc",
+   "text": "the café results were strong overall",
+   "quote": "the café results were strong",
+   "expect": true
+  },
+  {
+   "id": "q_empty",
+   "text": "anything",
+   "quote": "   ",
+   "expect": false
+  },
+  {
+   "id": "q_too_short",
+   "text": "We propose a new method.",
+   "quote": "We propose",
+   "expect": false
+  }
+ ],
+ "label_corrections": [
+  "After the first run, two labels were corrected and the tool was not changed to fit them: retrieval_failure expected the lowercase text 'no successful' where the message is 'No successful' (typo); clear_overlap expected a high lexical reading from a candidate that supplied full text but no abstract, which the documented rule scores on the title only, so that case now supplies an abstract. The run also showed the report did not say which text the lexical reading used, so a lexical_basis field was added.",
+  "After an independent code review of the tool, the rules (not only labels) changed and these labels were updated to match, each because the review showed the old behaviour overstated what the input supports: misleading_abstract now expects 'inconclusive' because a 'none' that the lexical cross-check contradicts is not a finding; capped_search now records a reviewed candidate because results with no reviewed candidate are 'inconclusive' (new case results_but_no_candidates); retrieval_failure's needle changed because error text no longer appears in coverage_limits (it is untrusted and rendered inside the fence); q_unicode_nfc uses a longer quote because a verbatim span under 4 words or 20 characters no longer counts (new case q_too_short and trivial_quote); metadata_only_none is new."
+ ]
+}
