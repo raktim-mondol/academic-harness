@@ -1,6 +1,6 @@
-"""Opt-in hosted OpenCode rubric test on sampled COPIED manuscripts, never on originals.
+"""Opt-in hosted rubric test (OpenCode or Claude Code) on sampled COPIED manuscripts, never on originals.
 
-Requires explicit --model and --corpus (writing-compiler-corpus.py results.json).
+Requires explicit --model and --corpus (writing-compiler-corpus.py results.json). --adapter picks the route.
 This measures engineering behavior, not independently labelled rubric accuracy.
 """
 import argparse
@@ -25,8 +25,12 @@ from ah.verifier.backends import get_backend
 import yaml
 
 
+ADAPTERS = {"opencode": ("ah.verifier.opencode", "opencode-v1"), "claude": ("ah.verifier.claude", "claude-v1")}
+
+
 def run():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--adapter", choices=sorted(ADAPTERS), default="opencode")
     ap.add_argument("--corpus", required=True)
     ap.add_argument("--model", required=True)
     ap.add_argument("--switch-model", required=True)
@@ -53,8 +57,9 @@ def run():
     cfg = yaml.safe_load((root / "ah.yaml").read_text())
     cfg["tex"]["prose"] = ["sections/samples.tex"]
     cfg["criteria"] = {"workers": 4}
-    cfg["verifier"] = {"backend": "command", "model": args.model, "revision": "opencode-v1", "response_format": "json-v1", "timeout": 200,
-                       "cmd": [sys.executable, "-m", "ah.verifier.opencode", "--model", args.model]}
+    module, revision = ADAPTERS[args.adapter]
+    cfg["verifier"] = {"backend": "command", "model": args.model, "revision": revision, "response_format": "json-v1", "timeout": 200,
+                       "cmd": [sys.executable, "-m", module, "--model", args.model]}
     def save():
         (root / "ah.yaml").write_text(yaml.safe_dump(cfg))
     save()
