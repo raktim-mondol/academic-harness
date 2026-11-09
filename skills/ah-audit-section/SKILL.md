@@ -12,3 +12,5 @@ Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 3. Separate three things in the report: findings from code (certain), mismatches you verified in a source (quote and locator), and suspicions you could not verify (say so). Do not present a suspicion as a finding.
 4. Do not edit files. Do not re-report a finding that is `waived` or already `decision-needed` (see `ah_findings`).
 5. End with counts by level and the three or four items the author should look at first.
+
+An audit is the checks. Do not add a free review (`deep_review`, `peer-reviewer`) to it as if it were more of the same: its points change from run to run, so report them separately as exploratory, after running `ah_triage` to mark the ones a rule already covers.

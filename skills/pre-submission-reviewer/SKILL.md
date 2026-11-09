@@ -330,3 +330,7 @@ and the delivered review stays free of internal checking rituals.
 
 ### Submission recommendation
 - <Ready to submit | Needs 1-2 days more work | Needs major revision before submission>
+
+## Inside an `ah.yaml` project
+
+This review is exploratory and never gating: run it twice and it raises different points, so it cannot be what decides "done". Only `ah_check` findings do. After it, `ah_triage` shows which comments a rule already covers; a comment that recurs and that a program could recognise becomes a rule with `ah_rule_propose` (the author accepts it). Do not run this review again just to see whether your fixes worked: `ah_check` answers that.

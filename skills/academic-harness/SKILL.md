@@ -42,6 +42,7 @@ Native `ah_*` tools (not MCP, not Pi). Prefer them over shelling out to `ah`. Do
 | Coverage / "are we done" | `ah_inventory`, then `ah_check` / `ah_audit` |
 | Numbers, figures, references (outside the engine) | `ah_external` `run`, then `ah_audit` `external=use` |
 | Which format rules are worth promoting (fixed vs waived) | `ah_precision` |
+| Free-review comments (`deep_review`, referee simulations): which a rule already covers, and turning a recurring one into a rule | `ah_triage`, `ah_rule_propose` (the author accepts) |
 | Fixed yes/no writing criteria (overclaiming, causal wording, ...) | `ah_rubric` `list`/`run`; `ah_audit` `rubric=true` (cached verdicts) or `judge=true` (asks the model) |
 | Anchors, facts macros | `ah_units`, `ah_fact` `build` |
 | Evidence | `ah_source` `add`/`list`, `ah_source_search` |
@@ -51,6 +52,8 @@ Native `ah_*` tools (not MCP, not Pi). Prefer them over shelling out to `ah`. Do
 | Provenance / AI-use | `ah_provenance`, `ah_disclosure` |
 | Profiles / overlay | `ah_profile`, `ah_init`, `ah_migrate`, `ah_config`, `ah_catalogue` |
 
-Author-only (human must have asked this message; DSH confirms): waive, accept/reject a fact, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure. You cannot do those. Call `ah_decision_request` and stop, or `ah_author` after they asked.
+Author-only (human must have asked this message; DSH confirms): waive, accept/reject a fact or a proposed rule, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure. You cannot do those. Call `ah_decision_request` and stop, or `ah_author` after they asked.
+
+Free reviews (`deep_review`, `peer-reviewer`, `pre-submission-reviewer`) are exploratory and never gating: they raise different points on each run. Fix ledger findings (`ah_check`); treat review comments as candidates for promotion to a rule; never rerun a free review just to check that fixes worked.
 
 Numbers from data: `\fact{id}`. Cite only registered sources. Do not invent citations, numbers, or quotes. Done means inventory coverage is complete and this turn introduced no open blocker or major.

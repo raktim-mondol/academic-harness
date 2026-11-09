@@ -21,3 +21,7 @@ specific and actionable, and acknowledge genuine strengths.
 ## Related Supervisor-Skills
 
 For a pre-submission self-audit (macro logic, writing, grammar, LaTeX, figures), use `pre-submission-reviewer`; for deep statistics use `statistical-reviewer`; for citation support use `citation-checker` plus PaperMemory. This brief remains the simulated referee report.
+
+## Inside an `ah.yaml` project
+
+This review is exploratory and never gating: run it twice and it raises different points, so it cannot be what decides "done". Only `ah_check` findings do. After it, `ah_triage` shows which comments a rule already covers; a comment that recurs and that a program could recognise becomes a rule with `ah_rule_propose` (the author accepts it). Do not run this review again just to see whether your fixes worked: `ah_check` answers that.

@@ -10,6 +10,7 @@ import yaml
 from . import briefs as B
 from . import claim_sidecar as CS
 from . import plan as PL
+from . import promote as PM
 from . import proposals as PR
 from . import reviews as RV
 from . import snapshots as SN
@@ -165,12 +166,19 @@ def cmd_review(a):
         if a.action == "import":
             rev = RV.import_review(ctx, Path(a.file), a.id)
             print(f"imported {len(rev['items'])} item(s) as review {a.id}; snapshot {rev['snapshot']}")
+            try:                         # which comments the checks already know about; never blocks the import
+                rows = triage_items(p, ctx, [{"id": it["id"], "text": it["text"]} for it in rev["items"]])
+                RV.record_coverage(p, a.id, rows)
+                tags = {r["id"]: r["tag"] for r in rows}
+            except Exception:
+                tags = {}
             for it in rev["items"]:
-                print(f"  {it['id']} ({it['kind']}): {it['text'][:90]}")
+                print(f"  {it['id']} ({it['kind']}): {it['text'][:90]}" + (f"  [{tags[it['id']]}]" if tags.get(it["id"]) else ""))
         elif a.action == "list":
             for rev in ([RV.load_review(p, a.id)] if a.id else RV.load_all(p)):
                 for it in rev["items"]:
-                    print(f"{it['id']:8} {it['status']:15} {it['kind']:6} units={','.join(it.get('units') or []) or '-':30} {it['text'][:70]}")
+                    print(f"{it['id']:8} {it['status']:15} {it['kind']:6} units={','.join(it.get('units') or []) or '-':30} {it['text'][:70]}"
+                          + (f"  [{it['coverage']}]" if it.get("coverage") else ""))
         elif a.action == "show":
             print(yaml.safe_dump(RV.load_review(p, a.id), sort_keys=False, allow_unicode=True))
         elif a.action == "set":
@@ -305,6 +313,110 @@ def cmd_proposals(a):
     return OK
 
 
+# ---------------- promote a review comment to a rule ----------------
+def _current_findings(p: Project) -> list[dict]:
+    """What the checks report now: the code tiers, plus the open findings the ledger holds for the external and rubric tiers."""
+    from .audit import audit
+    rows = [dict(f, fingerprint=f["fingerprint"]) for f in audit(p, use_ledger=False)["findings"]]
+    db = p.state_dir / "ledger.sqlite"
+    if db.exists():
+        from .ledger.db import Ledger
+        led = Ledger(p)
+        try:
+            for r in led.list(("open", "decision-needed")):
+                if r["tier"] in ("TX", "TR"):
+                    rows.append({"check": r["check_id"], "level": r["level"], "unit": r["ref"], "state": r["state"],
+                                 "message": r["message"], "fingerprint": r["fp"]})
+        finally:
+            led.close()
+    return rows
+
+
+def triage_items(p: Project, ctx, comments: list[dict]) -> list[dict]:
+    return PM.triage(ctx, comments, _current_findings(p))
+
+
+def cmd_rule(a):
+    p = _p(a)
+    try:
+        if a.action == "propose":
+            r = PM.propose(build_context(p), _load_json_arg(a), by="agent")
+            if r["kind"] == "pattern":
+                print(f"proposed rule {r['id']}: it fires on {r['fires_on_units']} unit(s) now"
+                      + "".join(f"\n  {h['unit']}: \"{h['match']}\"" for h in r["fires_now"]))
+            else:
+                print(f"proposed criterion {r['id']} (example in {r['example_unit']})")
+            print(f"The author accepts it with `ah rule accept {r['id']}`. Until then it checks nothing.")
+        elif a.action == "list":
+            rows = PM.list_pending(p)
+            for r in rows:
+                body = r.get("rule") or r.get("criterion") or {}
+                print(f"{r['id']:24} {r['kind']:10} {str(body.get('pattern') or body.get('question'))[:70]}")
+            if not rows:
+                print("(none pending)")
+        elif a.action == "show":
+            print(yaml.safe_dump(next(r for r in PM.list_pending(p) if r["id"] == a.id), sort_keys=False, allow_unicode=True))
+        elif a.action == "accept":
+            if not a.id:
+                raise PM.PromoteError("accept needs a rule id")
+            if not human(a, f"Accept rule {a.id} into the project's checks"):
+                return ERR
+            r = PM.accept(build_context(p), a.id)
+            print(f"accepted {r['id']} into {r['file']}; it is checked on every run from now on")
+        elif a.action == "reject":
+            if not human(a, f"Reject rule proposal {a.id}"):
+                return ERR
+            PM.reject(p, a.id)
+            print(f"rejected {a.id}")
+        elif a.action == "test":
+            rules, problems = PM.load_rules(p)
+            ctx = build_context(p)
+            for key, msg in problems:
+                print(f"PRM-02 {msg}")
+            for rule in rules:
+                rx, bad = PM.check_rule(rule)
+                fire = PM.firing(ctx, rule, rx)
+                print(f"{rule['id']:24} fixtures ok, fires on {len({r for r, _ in fire})} unit(s)")
+            print(f"{len(rules)} promoted rule(s), {len(problems)} problem(s)")
+            return FINDINGS if problems else OK
+    except StopIteration:
+        print(f"error: no pending proposal '{a.id}'", file=sys.stderr)
+        return ERR
+    except (PM.PromoteError, ValueError, KeyError, TypeError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return ERR
+    return OK
+
+
+def cmd_triage(a):
+    """Tag review comments as covered-by:<rule>, same-unit:<rule> or exploratory. Reads nothing from a model."""
+    p = _p(a)
+    try:
+        ctx = build_context(p)
+        if a.review:
+            rev = RV.load_review(p, a.review)
+            if rev is None:
+                raise ValueError(f"no review '{a.review}'")
+            comments = [{"id": it["id"], "text": it["text"], "units": it.get("units") or []} for it in rev["items"]]
+        else:
+            data = _load_json_arg(a)
+            comments = data if isinstance(data, list) else data.get("comments") or []
+        rows = triage_items(p, ctx, comments)
+        if a.review and a.write:
+            RV.record_coverage(p, a.review, rows)
+        if a.json:
+            print(json.dumps({"comments": rows, "summary": PM.summarize(rows)}, indent=1))
+        else:
+            for r in rows:
+                print(f"{str(r['id']):12} {r['tag']}" + ("" if r["located"] else "  (could not find the passage)"))
+            s = PM.summarize(rows)
+            print(f"{s['comments']} comment(s): {s['covered']} covered, {s['same-unit']} same-unit, {s['exploratory']} exploratory ({s['unlocated']} unlocated)")
+    except (PM.PromoteError, ValueError, KeyError, TypeError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return ERR
+    return OK
+
+
 def register(sub, add):
     sp = add("brief", cmd_brief, "briefs: what a unit must do")
     sp.add_argument("action", choices=["new", "list", "show", "check", "approve"])
@@ -342,3 +454,14 @@ def register(sub, add):
     sp.add_argument("action", choices=["list", "show", "accept", "reject"])
     sp.add_argument("id", nargs="?")
     sp.add_argument("--yes", action="store_true")
+    sp = add("rule", cmd_rule, "promote a review comment to a rule the checks run every time (the author accepts it)")
+    sp.add_argument("action", choices=["propose", "list", "show", "accept", "reject", "test"])
+    sp.add_argument("id", nargs="?")
+    sp.add_argument("--data", dest="json_arg")
+    sp.add_argument("--spec-file")
+    sp.add_argument("--yes", action="store_true")
+    sp = add("triage", cmd_triage, "tag review comments: already covered by a rule, or exploratory")
+    sp.add_argument("--data", dest="json_arg", help="JSON list of {id, text, quote}")
+    sp.add_argument("--spec-file")
+    sp.add_argument("--review", help="an imported review id instead of --data")
+    sp.add_argument("--write", action="store_true", help="store the tag on each review item")
