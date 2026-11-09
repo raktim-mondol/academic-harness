@@ -33,7 +33,7 @@ DEFAULTS: dict[str, Any] = {
     "absence": [],        # [{id, terms: [..], files: [glob], where: ..., unit: id}]
     "levels": {},         # {CHECK-ID: blocker|major|minor|info|off}
     "limits": {"lines_soft": 400, "lines_hard": 800, "para_words_soft": 180, "para_words_hard": 250},
-    "gate": {"blocking_levels": ["blocker", "major"], "max_loops": 3, "mode": "new", "verify_touched": False},   # mode new: only findings this prompt introduced
+    "gate": {"blocking_levels": ["blocker", "major"], "max_loops": 3, "mode": "new", "verify_touched": False, "judge_touched": False},   # mode new: only findings this prompt introduced
     "protected": [],      # extra globs (relative to the project root) an agent may not write
     "briefs": "briefs",   # one YAML per brief (design 8.2); tool-managed
     "claims_dir": "claims",   # claim sidecars (design 6.3); tool-managed
@@ -45,6 +45,7 @@ DEFAULTS: dict[str, Any] = {
     "lexicons": {},       # {name: regex} extra or replacement style lexicons for must_not / hedging
     "style": {},          # {lints: [names]|[], level: info|minor, format: {cite, percent, spelling, heading_case, eg_comma, sentence_max_words, ...}}; empty = all code lints at info
     "criteria": {"files": ["rubric/*.yaml"], "off": [], "workers": 4, "min_words": 12},  # frozen rubric (tier TR): extra criteria files, ids to switch off
+    "done": {"require": [], "lookups_max_age_days": 30},   # the single done/fail/incomplete answer: components that must have been checked, and how old the registry snapshot may be
     "external": {"required": []},  # tools whose results (.ah/external/<tool>.json) must exist: numbers_audit, figure_audit, citation
     "data_policy": "open",  # open | restricted | local (design 13.3)
     "data_policy_allow": [],  # named providers permitted when restricted

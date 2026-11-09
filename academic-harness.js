@@ -123,6 +123,13 @@ export function toolArgv(name, args = {}, cwd) {
       if (Number.isInteger(runs) && runs >= 2) extra.push('--stability', String(Math.min(runs, 20)))
       return ['audit', ...extra]
     }
+    case 'ah_done': {
+      const argv = ['done']
+      if (args.judge) argv.push('--judge')
+      const calls = Number(args.judge_limit)
+      if (args.judge && Number.isInteger(calls) && calls >= 1) argv.push('--judge-limit', String(calls))
+      return argv
+    }
     case 'ah_precision': {
       const argv = ['precision']
       const checks = strList(args.checks)
@@ -481,6 +488,10 @@ export async function executeAh(name, args, exec) {
   if (name === 'ah_plan' && String(args.action || '').toLowerCase() === 'propose' && r.code === 0) {
     return { text: `${(r.out || '').trim()}\nLeave new .tex unwritten until the author approves.`, code: 0 }
   }
+  if (name === 'ah_done') {
+    // 0 pass, 1 fail, 3 incomplete: all three are answers, not errors
+    if ([0, 1, 3].includes(r.code)) return { text: (r.out || '').trim() || '(no output)', code: r.code === 3 ? 1 : r.code }
+  }
   if (name === 'ah_rule_propose' && r.code === 0) {
     return { text: `${(r.out || '').trim()}\nStop and let the author decide: ah_author action=accept id=<the rule id> adds it to the project's checks. Until then nothing is checked.`, code: 0 }
   }
@@ -838,6 +849,14 @@ export async function apply(ctx) {
           },
         },
       },
+    },
+  })
+  register(ctx, {
+    name: 'ah_done',
+    description: 'The one answer to "is this document done": pass, fail or incomplete. Reads the rule tiers, the external results and the rubric (cached verdicts) when the project has them, then reports each component: findings at a blocking level, open findings from admitted rubric criteria, stale or missing external results, new findings with no cause, and a registry snapshot older than the limit. incomplete means nothing failed but something that matters was not looked at (for example admitted criteria with no verdict: pass judge=true). It does not mean the science is sound. Updates the ledger like ah_audit.',
+    parameters: {
+      judge: { type: 'boolean', description: 'Also ask the model about paragraphs that have no cached verdict for an admitted criterion (model calls).' },
+      judge_limit: { type: 'number', description: 'Most rubric model calls in this run.' },
     },
   })
   register(ctx, {
