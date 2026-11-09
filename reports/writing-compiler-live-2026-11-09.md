@@ -59,3 +59,13 @@ These are still open in the live plan; this report does not claim them.
 
 - Hosted-model cost was kept small on purpose: the rubric ran on the shorter paper only, `deep_review` ran once on one section, and the agent sessions used the cheap model. That is one model: how a stronger or a different model behaves on the same scenarios is untested.
 - The numbers above for the agent sessions come from the session log and my own re-runs of the engine on the same workspace, not from the agent's say-so.
+
+## Follow-up: the three "not fixed" items (same day)
+
+| Item | What was done | Evidence |
+|---|---|---|
+| Agent edited meaning to clear info `NUM-001` | A post-edit note now says when an edit made a number disappear and what to do instead; the prompt and `ah-fix-findings` say never to reword a number away | 4 engine tests (fires on a reworded number, once, not on a kept or moved number; mutation-checked). Not yet re-run with a model |
+| Rubric precision | Criteria reworded; new optional `quote_pattern` (a "yes" must quote words of the kind the criterion names); `RUB-GENERAL` and `RUB-SUPERLATIVE` at version 3 | 73 paragraphs hand-labelled by me before seeing the new verdicts (one paper, one labeller). `RUB-SUPERLATIVE`: kappa 0.88, precision 1.0, recall 0.8 (5 defects). `RUB-GENERAL`: kappa 0.41, precision 0.33, recall 0.67 (3 defects). **Not admitted**: both samples have fewer than the 5 defects admission needs for `RUB-GENERAL`; `RUB-SUPERLATIVE` meets the thresholds on a sample this small, which is not enough to trust, and admission is the author's call (`ah rubric admit --yes`) |
+| Agent did its own read instead of `deep_review` | Prompt and `deep-review` skill: call the tool, one section is supported (80 s, 5 calls), say so and ask if you think it is wrong | Text tests only. Not yet re-run with a model |
+
+On the `RUB-GENERAL` labels: on reading the model's flags I think three of my "no" labels were too strict (`every dump location`, `regardless of whether performed by human or machine`, `no prior work`), so the measured precision understates the criterion. I have not recomputed it: relabelling after seeing the verdicts would flatter the result, and the criterion still needs a larger, independently labelled sample before anyone admits it.
