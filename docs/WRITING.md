@@ -426,6 +426,7 @@ Verified against Pele's own 761-example upstream corpus: every valid example ren
 
 ## Related
 
+- [Live test plan for the writing compiler](WRITING-LIVE-TEST.md) — what to look for when running phases 0–6 for real.
 - [Papers and evidence](PAPERS.md) — PDFs, PaperMemory, and paper agents.
 - [Research](RESEARCH.md) — reviews, hypothesis tournaments, and policy records.
 - [Workspace](WORKSPACE.md#scientific-results) — `scientific_result` cards and the notebook.
