@@ -58,7 +58,10 @@ def model_fn(prompt: str) -> str:
 
 
 def fake(fn=model_fn, model: str = "m1") -> FakeBackend:
-    return FakeBackend(fn, model)
+    from ah.verifier.backends import configured_identity
+    backend = FakeBackend(fn, model)
+    backend._identity = configured_identity({"verifier": {"backend": "http", "url": "http://127.0.0.1:9/v1", "model": model}})
+    return backend
 
 
 def configure_model(root: Path, model: str = "m1") -> None:
@@ -133,7 +136,7 @@ def test_a_failure_needs_a_verified_quote(project_dir):
     ctx = build_context(Project(str(project_dir)))
     seq = iter([json.dumps({"answer": "yes", "quote": "invented", "note": ""}), json.dumps({"answer": "yes", "quote": "every benchmark we examined", "note": "ok"})])
     corrected = fake(lambda prompt: next(seq))
-    findings, stats = run_rubric(ctx, corrected, only_files=["sections/04_experiments/index.tex"], only_criteria=["RUB-GENERAL"], limit=1)
+    findings, stats = run_rubric(ctx, corrected, only_files=["sections/04_experiments/index.tex"], only_criteria=["RUB-GENERAL"], limit=2)
     assert len([f for f in findings if f.check == "RUB-01"]) == 1 and corrected.calls == 2, "the corrected quote is accepted"
 
 

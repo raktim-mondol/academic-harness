@@ -21,6 +21,30 @@ A fix loop only converges when the same text gives the same findings. `ah_audit 
 
 It also counts paragraphs with no `%% @unit` anchor. Such a paragraph is keyed by a hash of its text, so any edit to it re-keys every finding it carries and the ledger reports them as fixed and new at once. Run `ah_units` (`ah units sync`) before relying on the ledger; the post-edit hook does this for edits made through the agent.
 
+### Reading TeX: what the scanner understands
+
+The engine does not run TeX to read a document. One static scanner (`ah/tex/scan.py`) finds every citation, reference, label and input for every check, and a differential test compiles small projects with `latexmk` and compares its answers with what TeX actually did (`tests/test_tex_oracle.py`, 20 cases; it runs where TeX is installed and is skipped elsewhere).
+
+| Read as TeX does | Constructs |
+|---|---|
+| Inputs | `\input{f}` and `\input f`, `\include`, `\subfile`, `\import` / `\subimport` (inputs inside an imported file resolve against its directory), `\InputIfFileExists` (a missing file is not an error) |
+| Citations | `\cite` and the natbib and biblatex families (`\citep`, `\textcite`, `\footcite`, `\Cite`, `\supercite`, ...), multi-cites (`\cites{a}{b}`, `\parencites(see)[p. 2]{a}[b]{c}`), `\nocite{..}` and `\nocite{*}` (in the bibliography on purpose, so not "never cited") |
+| References | `\ref`, `\eqref`, `\autoref`, `\cref` / `\Cref`, `\vref`, `\pageref`, `\nameref`, `\labelcref`, ranges (`\crefrange{a}{b}`), `\hyperref[label]{..}` |
+| Labels | `\label{..}` and `label=` in the options of `lstlisting`, `minted`, `\lstinputlisting` |
+| Not markup | `%` comments, `\iffalse ... \fi` and the dead branch of `\iftrue ... \else ... \fi`, the `comment` environment, `\verb`, the bodies of `verbatim`, `lstlisting`, `minted`, `alltt`. A `\fi` inside a comment or a listing ends nothing |
+| Wrapper macros | `\newcommand{\figref}[1]{Fig.~\ref{#1}}` (also `\def\x#1{..}`): the *uses* carry the keys, so `\figref{fig:a}` is a reference to `fig:a`, and `\sect{intro}` over `\input{sections/#1}` reads `sections/intro`. The placeholder in the definition is never a citation, label or file |
+| The end of the document | `\end{document}` in a file read through `\input` or `\include` ends the document: later inputs and the text after it never reach the page (`TEX-09`). `\subfile` and projects that load `standalone` handle their own end |
+
+What it does not do, and says so: a path built from a macro or a parameter (`\input{sections/\chapter}`) is `TEX-06` (info), never guessed, and the files it loads are not audited. A wrapper macro with an optional first argument, a wrapper that calls another wrapper, macros defined in a `.sty` or class file, and conditionals other than `\iffalse` / `\iftrue` are not expanded. Files excluded by `\includeonly` are still audited (their labels still resolve in TeX through the `.aux`). A command used without the package that defines it (natbib's `\citep` under biblatex) is a TeX error that `audit --build` reports, not something the scanner can see.
+
+Measured on 20 real manuscripts compiled from copies (originals untouched): against TeX's own record the scanner agrees on the files read 20 of 20, citations 19, labels 19 and undefined references 20. The exceptions are a manuscript that cites with `\citep` under biblatex (TeX recorded none) and a label a package generates. Its text covers 93.6% to 99.5% (median 98%) of the distinct words in each PDF once the rendered bibliography and code listings are set aside; what remains is hyphenation, math macros (`\kmax`), `\today` and author blocks. The old scanner raised 19 false blocker `TEX-02` findings on this set; they are gone. The text of a document and the PDF are two views, and a paragraph produced by a macro (a `\newcommand` whose body is prose) is read only where it is written.
+
+### The build: pages, overfull boxes, missing glyphs
+
+`ah build` and `ah audit --build` compile the view and read the log. `TEX-01` (blocker) is a TeX error mapped to its paragraph; `TEX-04` (minor) is one overfull-box finding per paragraph ("the text runs 45pt into the margin at worst"), keyed without a line number so it survives edits above it; `TEX-07` (minor) lists characters missing from the font, which print as blanks; `TEX-08` (major) fires when the page count exceeds `build: {max_pages: N}` in `ah.yaml`. The page count is also printed by `ah build`.
+
+A box is tied to a paragraph by the line it starts on and the first words TeX prints after the warning. The open-file stack in the log is only a hint: TeX reports the last paragraph of an included file after that file's closing parenthesis, so the stack names the parent. When two paragraphs match equally the box stays a document-level `TEX-04` instead of being guessed. A build is opt-in and is not part of `ah done`; a page limit is checked when you build.
+
 ### Frozen registry lookups
 
 Crossref and OpenAlex answers drive the reference findings (`citation action=audit`, `integrity_check`). Asked again each time, a timeout, a rate limit or a quiet upstream edit changes the findings while the manuscript is the same. Both tools now read through a lookup snapshot, `.ah/cache/lookups.json` in the workspace:
@@ -53,20 +77,104 @@ Limits: a run of `numbers_audit` without SciPy is a failure, not an empty result
 
 ### The frozen rubric (tier TR)
 
+#### Reliability, OpenCode and Claude Code as verifiers (rule set 1.9.0 and later)
+
+Only a verified `yes` or valid `no` resolves a paragraph/criterion pair. `unclear`,
+`unverifiable`, failed calls and exhausted budgets remain **unresolved**. They
+carry earlier findings rather than marking them fixed. An admitted unresolved
+pair makes completion INCOMPLETE unless an existing failure already makes it
+FAIL. An admitted defect matters even at info. Unadmitted criteria stay advisory.
+Admission scoring refuses unresolved labels instead of treating them as negatives.
+
+Uncertain semantic answers are cached so replay does not spend again. To ask
+again deliberately, use `ah rubric run --judge --retry-unresolved --judge-limit 10`
+(or `retry_unresolved: true` on the native rubric/audit/done tool). `--no-cache`
+still reruns all selected pairs. `judge_limit` limits actual backend invocations,
+including quote-correction attempts, across workers. Reports retain known token
+totals and `usage_complete`; unknown usage is not evidence of zero cost.
+Pi transport retries must be `0` (now the default); rerun failed pairs explicitly
+instead of hiding extra requests inside one budgeted invocation. Provider-side
+retries outside the adapter's visibility cannot be counted by the engine.
+
+Verifier evidence now uses a versioned fingerprint of the complete effective
+configuration: backend, route/provider/model, inference settings and command
+arguments/revision. Display labels are not cache keys. Old cache keys are not
+reused; old admissions require remeasurement under protocol 2, not an automatic
+conversion. Admissions changing model, endpoint, question or protocol are shown
+as invalidated. Re-admission remains the author's decision. Command admission
+also requires an explicit model and adapter revision.
+
+For OpenCode V2, configure the **same explicit model** in both places:
+
+```yaml
+verifier:
+  backend: command
+  model: openai/gpt-6.1-sol # example: select an available model explicitly
+  revision: opencode-v1
+  response_format: json-v1
+  timeout: 200
+  cmd: [python3, -m, ah.verifier.opencode, --model, openai/gpt-6.1-sol]
+```
+
+Run using the installed engine's Python, or set `PYTHONPATH` to this checkout's
+`vendor/academic-harness`. The adapter reads the prompt from stdin, uses a fresh
+temporary OpenCode project and a one-step tool-denied verifier, and parses text,
+usage and terminal status from OpenCode JSON events. It never selects DeepSeek
+implicitly. OpenCode owns authentication; no key belongs in `ah.yaml`. This is
+a verifier bridge, **not** native OpenCode host enforcement of protected paths
+or author approvals. Temperature control is not claimed for this command route.
+Project/global OpenCode instructions may still supplement the verifier context.
+
+For **Claude Code** as the verifier, use the same `json-v1` command route with the full model id (an alias such as `sonnet` is refused, because the answer would change when the alias moves):
+
+```yaml
+verifier:
+  backend: command
+  model: claude-sonnet-5-5
+  revision: claude-v1
+  response_format: json-v1
+  timeout: 200
+  cmd: [python3, -m, ah.verifier.claude, --model, claude-sonnet-5-5]
+```
+
+Each prompt is one `claude -p` call in safe mode, in an empty directory, with no tools, MCP servers, hooks, CLAUDE.md or session file. Only a finished one-turn answer from exactly that model is accepted; anything else is an error and is never cached. Claude Code exposes no temperature, so a re-run can answer differently: the route is repeatable through the verdict cache, not through the model. Models differ, and the difference reaches completion: on 84 (criterion, paragraph) pairs from real manuscripts, GPT-6.1-sol and Sonnet 5.5 agreed on 83, Haiku 5.5 and Sonnet 5.5 on 79; Haiku answered `unclear` on 4 pairs (each would leave an admitted criterion INCOMPLETE) and gave one `yes` the other two rejected. That is agreement between models, not accuracy; admission against your own labels is still the only measure.
+
+Plain-text command backends remain supported with unknown token usage. An
+opt-in `json-v1` adapter returns
+`{version: 1, model: "…", text: "…", usage: {input: 12, output: 3}}`, with optional
+`error`; a mismatched model or malformed envelope is an error, not a verdict.
+
+**Recovery:** preserve old `.ah` history. After upgrading, run a bounded fresh
+rubric audit on a copy (`--judge --judge-limit N`), then arrange independent
+labelling and author re-admission as needed. A prior falsely fixed defect may
+reopen as a regression; history is not rewritten. Old logs do not necessarily
+contain enough evidence to identify every falsely fixed decision automatically.
+
 A free-form review asks the model what it notices, so it notices something different each time. A rubric criterion is the opposite: one question, written down, with a version, asked about one paragraph. `ah_audit rubric=true` reports the verdicts already cached (no model calls); `ah_audit judge=true` also asks the model about paragraphs that have none. `ah_rubric` lists, runs and makes labelling sheets for individual criteria.
 
 What makes the answer repeatable:
 
 - **The question is a file.** Defaults ship with the profile (`core` for all prose, `empirical` for methods and results, `grant` for proposals); a project adds or rewords criteria in `rubric/*.yaml` and switches ones off with `criteria: {off: [...]}` in `ah.yaml` (`criteria:` also sets `files`, default `rubric/*.yaml`, `workers`, default 4, and `min_words`, default 12: shorter paragraphs are skipped). A criterion is `{id: RUB-NAME, version, level, question, quote_pattern, scope: {files, kinds, min_words}}`. `quote_pattern` is optional: a regular expression the words a "yes" quotes must match, so a verdict that quotes unrelated words (the model drifting from "universal wording" to any strong claim) is `unverifiable` and never a finding. It asks about a **defect** ("yes" = the problem is present), because only a defect has words to quote. Omissions (a missing section or statement) stay with profile rules, which are exact.
 - **A failure must quote the paragraph.** A "yes" counts only if its quote is found in the paragraph (case and whitespace normalised, at least 8 characters per piece). The model gets one corrected retry; a "yes" with no real quote is `unverifiable` and never becomes a finding.
-- **The verdict is cached** on (prompt version, criterion hash, paragraph hash, model). Unchanged text is never asked twice, and a re-run on it returns the same answer by construction. Editing one paragraph asks about that paragraph only. A transport error or an unparseable reply is not cached, so it is asked again next time.
-- **Not being able to ask is not a fix.** A (criterion, paragraph) pair that got no verdict (no model allowed, no cached answer, an error, over `judge_limit`) is carried in the ledger exactly as it was. Only a verdict of "no" on that paragraph closes a finding.
+- **The verdict is cached** on (prompt version, criterion hash, paragraph hash, verifier fingerprint). Unchanged text is never asked twice with the same effective verifier, and a re-run returns the same answer by construction. Editing one paragraph asks about that paragraph only. A transport error or an unparseable reply is not cached, so it is asked again next time.
+- **Not being able to decide is not a fix.** A (criterion, paragraph) pair with no resolving verdict (no model allowed, no cached answer, an error, budget exhaustion, unclear or unverifiable) carries its existing finding. Only a verdict of "no" on that in-scope paragraph closes it automatically.
 
 **Levels and admission.** Every criterion reports at **info** and cannot gate until the author has measured it. `ah_rubric action=sheet` lists the paragraphs in scope with their hashes; you label each `yes` (defect present) or `no`; `ah_author action=rubric-admit id=RUB-NAME file=labels.yaml` (CLI: `ah rubric admit RUB-NAME --labels labels.yaml --yes`) runs the model over them and records the agreement in `rubric/admissions.yaml`. Defaults: at least 20 usable labels with at least 5 of each kind, Cohen's kappa at least 0.6 and precision at least 0.8, because a gate that flags text the author considers fine is worse than none. Labels whose paragraph was edited since are skipped, not trusted. An admission is evidence about **this question and this model**: reword the question or change the model and it is void, and the criterion drops back to info (a carried finding too). Without `--yes` the command only reports whether the thresholds are met. `rubric/**` is a protected path, so an agent cannot edit criteria, labels or admissions to admit its own check.
 
+**Why a finding stopped being reported.** A rubric finding disappears for different reasons, and only one is a model saying "no". The ledger
+records `fixed_reason` when it closes a finding: `verdict-no` (the model answered no, on the paragraph as it is now), `unit-gone` (the paragraph
+was deleted, or rewritten with no anchor), `criterion-off` (the criterion was switched off or removed), `out-of-scope` (its scope no longer covers
+the paragraph), and for other tiers `text-changed`, `evidence-changed`, `rules-changed` or `check-passes`. `ah finding show` prints it, an audit
+shows `closed because: {...}`, and when findings were closed because a criterion went away `ah done` says so in the rubric line ("no model verdict"),
+because switching a criterion off makes the document pass and a reader should know that is what happened. A run that was told which criteria or
+files to ask makes no claim about the ones it skipped. A finding that is *carried* over an unusable answer (unclear, unverifiable, error, over
+budget) ends with a note saying it is the earlier assessment, because after an edit it may quote words that are no longer in the paragraph. A waived
+finding stays waived and a finding handed to the author stays handed over when the model later answers `unclear`; a waived one then leaves the
+document INCOMPLETE, a handed-over one leaves it FAIL.
+
 New findings are `RUB-01` (cause `evidence-changed` when the model's first verdict on unchanged text arrives, `text-changed` after an edit, `rubric-changed` after a criterion edit) and `RUB-02` for a malformed criteria file.
 
-Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry is only reused for the same model name, so changing models re-judges everything (and voids admissions). Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
+Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry requires the same verifier fingerprint, so changing a model or route re-judges the affected evidence and voids incompatible admissions. Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. A command backend can itself make network calls: a local subprocess is not proof that its model runs locally. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
 
 ### Format and consistency rules (ACR-*, FMT-*)
 
@@ -127,7 +235,35 @@ Five reports are too many to read, and "no blockers" is not an answer if the run
 
 What it does not mean: pass says the code tiers found nothing blocking, every admitted criterion was asked and found nothing, the external results are current for this text and the registry answers are recent. It does not say the science is right, that unadmitted criteria or advisory rules are satisfied, or that a free review would raise nothing.
 
+Migration and audit JSON include input-graph coverage: roots, audited files,
+supporting TeX, unreachable files, unresolved literal inputs and cycles.
+`appendix/` and arbitrary included prose directories are no longer silently
+dropped when a project also has `sections/`. `UNIT-04` (major) reports included
+prose outside `tex.prose`; `UNIT-03` still reports substantial prose in an
+unparsed build root. Dynamic TeX inputs remain a static-analysis limit. Profile
+selection is heuristic: `profile_inference` in the migration JSON lists every profile with the keywords that matched and whether it qualifies,
+and says why one was chosen. When two specific profiles both fit (a systematic review that is also a proposal) the result is `generic`, not the first
+one in a list; a grant needs a structural signal (a heading that names the proposal, aims, work packages or budget), not the word "budget" in a
+paragraph. An explicit `--profile` always wins.
+
+`migrate` is a dry run unless `--apply`, and a dry run writes nothing. `--apply` writes the overlay (`ah.yaml`, empty facts, sources, glossary,
+outline) and, unless `--no-sync`, adds a `%% @unit` anchor comment above each paragraph and builds the fact macro file; the text of the author's
+files is never changed by that (`--no-sync` leaves them byte-identical). A second `--apply` refuses because the overlay exists and changes nothing;
+`--force` rewrites the overlay without stacking anchors.
+The state card now reads cached rubric and external results like `ah done`,
+without model calls, including carried findings.
+
 **The stop gate** now reads the same tiers: the baseline, the post-edit note and the stop check include the external results when the project has them (tier TX) and the rubric from cached verdicts (only an admitted criterion can then show a finding above info). Set `gate: {judge_touched: true}` (with a `verifier:` backend) and the stop check also judges the files this turn changed against the admitted criteria, so model calls are bounded by what the agent touched and cached verdicts. EXT-00 is left out of the stop gate: any edit makes a stored external result stale and the agent cannot run those tools from the hook, so staleness is reported by `ah_done` instead. Unadmitted rubric hints (info) are not put in post-edit notes.
+
+### Which hosts enforce the guard, and what it stops
+
+The paper-state card, the protected-path guard, the post-edit check and the stop gate are one engine (`ah hook userprompt|pre|post|stop`) behind three host adapters: **Claude Code** (settings from `ah hooks-config`), **DSH** (this plugin, with native approval prompts through `ah_author`) and **Pi**. **OpenCode has no host adapter.** `ah.verifier.opencode` lets an OpenCode model answer rubric questions, but OpenCode does not call the guard, does not stop on the gate and does not ask for author approvals; do not treat an OpenCode session as protected.
+
+An agent's shell cannot, whatever the host: write a protected path (evidence, state, the definition of facts and rules, and the host's own hook settings `.claude/settings.json`), by redirect or by command, though it can read them (`cat facts/facts.yaml 2>&1`); do an author's act (waive a finding, accept or reject a fact or a rule, approve a brief, plan or disclosure, verify a claim, decline a review item, set or fill provenance, admit a criterion, `migrate --force`, anything with `--yes`); or answer the engine's "type yes" through a terminal (`script`, `unbuffer`, `expect`, `pty.spawn`; a terminal's `isatty()` cannot tell a person from a program). The agent asks instead with `ah finding decide`, and the author decides outside the agent (in a terminal, with `! ah finding waive ... --yes` in Claude Code, or `ah_author` in DSH). If the engine itself fails (a typo in `ah.yaml`), `pre` denies Write, Edit and Bash with the reason, reads still work, and the other hooks fail open; `AH_NO_ENFORCE=1` turns enforcement off.
+
+This is a speed bump for a cooperative agent, not a sandbox: a shell can still do what the guard does not read (a script that builds a protected path at run time). The guard stops mistakes and shortcuts; where an act must be a person's, use the host's own approval (DSH `ah_author`) or run the agent in a sandbox.
+
+Verified in real sessions, not only unit tests (`scripts/claude-host-test`, Claude Code 2.1.319): headless scenarios with Haiku 5.5 and Sonnet 5.5, and the terminal UI driven through tmux (14 checks) with Haiku 5.5. Held: a protected edit and a shell append are denied and the file is byte-identical; the author's acts are denied with the reason; an edit that adds an unbound number gets the post-edit note, the Stop hook blocks and re-enters the model, the model hands the finding to the author and the gate stops steering; Claude Code's own approval dialog still appears for an allowed edit ("No" leaves the file untouched); a protected edit gets no dialog at all; and the author waives the finding from inside the session with `!`. Not run: DSH and Pi sessions in this pass (the shared engine code is covered by the tests, and the DSH adapter by `scripts/test-academic-harness.mjs`).
 
 ### Installation and activation
 

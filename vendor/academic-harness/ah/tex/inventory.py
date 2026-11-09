@@ -12,7 +12,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .text import (RE_CITE, RE_FACT, RE_LABEL, RE_REF, sentences, strip_comments)
+from .scan import cites, labels, markup_view, refs
+from .text import (RE_CITE, RE_FACT, RE_LABEL, RE_REF, sentences)
 from .units import Unit
 
 MONTHS = r"(?:January|February|March|April|May|June|July|August|September|October|November|December)"
@@ -85,22 +86,19 @@ def extract_numbers(sentence: str, has_cite: bool, sent_idx: int) -> list[Num]:
     return out
 
 
-def inventory_unit(u: Unit) -> UnitInv:
-    body = strip_comments(u.raw)
+def inventory_unit(u: Unit, table: dict | None = None) -> UnitInv:
+    body = markup_view(u.raw)       # what TeX executes: a number or \\cite inside a code listing or \\verb is not a claim
     inv = UnitInv(u, [])
     inv.sentences = sentences(body)
     for i, s in enumerate(inv.sentences):
         has_cite = bool(RE_CITE.search(s))
-        for m in RE_CITE.finditer(s):
-            for k in (x.strip() for x in m.group(1).split(",")):
-                if k:
-                    inv.cites.append((k, i))
+        inv.cites += [(k, i) for k, _ in cites(s, table)]
         inv.nums += extract_numbers(s, has_cite, i)
-    inv.refs = [x.strip() for m in RE_REF.finditer(body) for x in m.group(1).split(",") if x.strip()]
-    inv.labels = [m.group(1).strip() for m in RE_LABEL.finditer(body)]
+    inv.refs = [k for k, _ in refs(body, table)]
+    inv.labels = [k for k, _ in labels(body, table)]
     inv.facts_used = [m.group(1).strip() for m in RE_FACT.finditer(body)]
     return inv
 
 
-def inventory(units: list[Unit]) -> list[UnitInv]:
-    return [inventory_unit(u) for u in units]
+def inventory(units: list[Unit], table: dict | None = None) -> list[UnitInv]:
+    return [inventory_unit(u, table) for u in units]

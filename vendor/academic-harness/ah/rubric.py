@@ -31,6 +31,26 @@ ADMISSIONS_FILE = "rubric/admissions.yaml"
 LABELS_DIR = "rubric/labels"
 ID_RE = re.compile(r"^RUB-[A-Z0-9][A-Z0-9-]*$")
 KINDS = ("para", "float", "display")
+ADMISSION_PROTOCOL = 2
+
+
+def criteria_config(project) -> tuple[dict, list[Problem]]:
+    raw = project.cfg.get("criteria")
+    raw = {} if raw is None else raw                       # a bare `criteria:` key is "nothing configured", not an error
+    defaults = {"files": ["rubric/*.yaml"], "off": [], "workers": 4, "min_words": 12}
+    problems = []
+    if not isinstance(raw, dict):
+        return defaults, [Problem("ah.yaml", "criteria:layout", "ah.yaml: criteria must be a mapping")]
+    out = dict(defaults, **{str(k): v for k, v in raw.items() if v is not None})      # a null value means "not given"
+    for k in ("files", "off"):
+        if not isinstance(out[k], list) or not all(isinstance(x, str) and x for x in out[k]):
+            problems.append(Problem("ah.yaml", f"criteria:{k}", f"ah.yaml: criteria.{k} must be a list of strings"))
+            out[k] = defaults[k]
+    for k, minimum in (("workers", 1), ("min_words", 0)):
+        if type(out[k]) is not int or out[k] < minimum:
+            problems.append(Problem("ah.yaml", f"criteria:{k}", f"ah.yaml: criteria.{k} must be an integer >= {minimum}"))
+            out[k] = defaults[k]
+    return out, problems
 
 
 @dataclass
@@ -78,31 +98,41 @@ def _parse(raw: dict, origin: str, defaults: dict) -> Criterion | str:
     if level not in LEVEL_ORDER:
         return f"{cid}: level must be one of {', '.join(LEVEL_ORDER)}"
     version = raw.get("version", 1)
-    if not isinstance(version, int) or version < 1:
+    if type(version) is not int or version < 1:
         return f"{cid}: version must be a positive integer"
-    scope = raw.get("scope") or {}
-    files = scope.get("files") or ["*"]
-    kinds = tuple(scope.get("kinds") or ["para"])
+    scope = raw.get("scope")
+    scope = {} if scope is None else scope                 # `scope:` with nothing under it is the default scope
+    if not isinstance(scope, dict):
+        return f"{cid}: scope must be a mapping"
+    files = scope.get("files")
+    files = ["*"] if files is None else files
+    kinds = scope.get("kinds")
+    kinds = ["para"] if kinds is None else kinds
     if isinstance(files, str):
         files = [files]
-    if not all(isinstance(g, str) for g in files) or any(k not in KINDS for k in kinds):
+    if (not isinstance(files, list) or not files or not all(isinstance(g, str) and g for g in files)
+            or not isinstance(kinds, list) or not kinds or any(k not in KINDS for k in kinds)):
         return f"{cid}: scope.files must be globs and scope.kinds from {', '.join(KINDS)}"
+    words = scope.get("min_words")
+    words = defaults["min_words"] if words is None else words
+    if type(words) is not int or words < 0:
+        return f"{cid}: scope.min_words must be a nonnegative integer"
     qp = str(raw.get("quote_pattern") or "")
     if qp:
         try:
             re.compile(qp, re.I)
         except re.error as e:
             return f"{cid}: quote_pattern does not compile ({e})"
-    return Criterion(cid, version, q, level, list(files), kinds, int(scope.get("min_words", defaults["min_words"])), origin, qp)
+    return Criterion(cid, version, q, level, list(files), tuple(kinds), words, origin, qp)
 
 
 def load_criteria(project) -> tuple[list[Criterion], list[Problem]]:
     """Bundled sets named by the profile, then the project's own files; a later definition of an id replaces an earlier
     one (so a project can reword a bundled criterion), but two in the same layer are a mistake."""
-    cfg = project.cfg.get("criteria") or {}
-    defaults = {"min_words": int(cfg.get("min_words", 12))}
+    cfg, config_problems = criteria_config(project)
+    defaults = {"min_words": cfg["min_words"]}
     by_id: dict[str, Criterion] = {}
-    problems: list[Problem] = []
+    problems: list[Problem] = list(config_problems)
 
     def layer(items: list[tuple[str, object]]):
         seen: set[str] = set()
@@ -117,6 +147,8 @@ def load_criteria(project) -> tuple[list[Criterion], list[Problem]]:
             for raw in rows:
                 got = _parse(raw if isinstance(raw, dict) else {}, origin, defaults)
                 if isinstance(got, str):
+                    if isinstance(raw, dict):
+                        by_id.pop(str(raw.get("id", "")), None)  # an invalid override is not the bundled question
                     problems.append(Problem(origin, f"invalid:{origin}:{got[:60]}", f"{origin}: {got}"))
                     continue
                 if got.id in seen:
@@ -132,18 +164,39 @@ def load_criteria(project) -> tuple[list[Criterion], list[Problem]]:
     layer(profile_items)
     skip = {(project.root / ADMISSIONS_FILE).resolve()}
     project_items = []
-    for pattern in cfg.get("files") or ["rubric/*.yaml"]:
-        for f in sorted(project.root.glob(pattern)):
+    for pattern in cfg["files"]:
+        try:
+            matched = sorted(project.root.glob(pattern))
+        except (ValueError, NotImplementedError) as e:
+            problems.append(Problem("ah.yaml", f"criteria:glob:{pattern}", f"ah.yaml: invalid criteria.files glob: {e}"))
+            continue
+        for f in matched:
             if f.is_file() and f.resolve() not in skip:
                 project_items.append((f.relative_to(project.root).as_posix(), _read(f)))
     layer(project_items)
     off = set(cfg.get("off") or [])
+    problems.extend(admission_problems(project))
     return sorted((c for c in by_id.values() if c.id not in off), key=lambda c: c.id), problems
 
 
 def load_admissions(project) -> dict[str, dict]:
     data = _read(project.root / ADMISSIONS_FILE) if (project.root / ADMISSIONS_FILE).is_file() else {}
-    return dict(data.get("admitted") or {}) if isinstance(data, dict) else {}
+    rows = data.get("admitted", {}) if isinstance(data, dict) else {}
+    return {k: v for k, v in rows.items() if isinstance(v, dict)} if isinstance(rows, dict) else {}
+
+
+def admission_problems(project) -> list[Problem]:
+    path = project.root / ADMISSIONS_FILE
+    if not path.exists():
+        return []
+    data = _read(path)
+    rows = data.get("admitted") if isinstance(data, dict) else None
+    if not isinstance(rows, dict):
+        return [Problem(ADMISSIONS_FILE, "admissions:layout", f"{ADMISSIONS_FILE}: expected an admitted mapping")]
+    return [Problem(ADMISSIONS_FILE, f"admissions:{key}", f"{ADMISSIONS_FILE}: {key} needs a valid question_hash, model and verifier identity")
+            for key, row in rows.items() if not isinstance(row, dict) or not ID_RE.fullmatch(str(key))
+            or not isinstance(row.get("question_hash"), str) or not isinstance(row.get("model"), str)
+            or (row.get("protocol") == ADMISSION_PROTOCOL and not isinstance(row.get("identity"), str))]
 
 
 def configured_model(cfg: dict) -> str | None:
@@ -153,20 +206,22 @@ def configured_model(cfg: dict) -> str | None:
     if kind in ("pi", "http"):
         return v.get("model") or None
     if kind == "command":
-        return " ".join(v.get("cmd") or [])[:60] or None
+        return v.get("model") or "command"
     return None
 
 
-def is_admitted(crit: Criterion, admissions: dict, model: str | None) -> bool:
+def is_admitted(crit: Criterion, admissions: dict, model: str | None, identity: str | None = None) -> bool:
     """An admission is evidence about THIS question and THIS model; changing either voids it."""
     a = admissions.get(crit.id)
-    return bool(a) and model is not None and a.get("question_hash") == crit.qhash() and a.get("model") == model
+    return (bool(a) and model is not None and a.get("question_hash") == crit.qhash() and a.get("model") == model
+            and a.get("protocol") == ADMISSION_PROTOCOL and identity is not None and a.get("identity") == identity)
 
 
 def admitted_ids(project) -> list[str]:
     """Criteria whose admission still holds for the configured model (so the only ones that may report above info)."""
     adm, model = load_admissions(project), configured_model(project.cfg)
-    return [c.id for c in load_criteria(project)[0] if is_admitted(c, adm, model)]
+    from .verifier.backends import configured_identity
+    return [c.id for c in load_criteria(project)[0] if is_admitted(c, adm, model, configured_identity(project.cfg))]
 
 
 def criteria_digest(project) -> str:
@@ -232,12 +287,14 @@ def admission_failures(stats: dict, min_labels: int, min_per_class: int, min_kap
     return out
 
 
-def write_admission(project, crit: Criterion, model: str, stats: dict, labels_sha: str, by: str = "author") -> Path:
+def write_admission(project, crit: Criterion, model: str, stats: dict, labels_sha: str, by: str = "author", identity: str | None = None) -> Path:
     path = project.root / ADMISSIONS_FILE
     data = _read(path) if path.is_file() else {}
     data = data if isinstance(data, dict) else {}
     admitted = dict(data.get("admitted") or {})
     admitted[crit.id] = {
+        "protocol": ADMISSION_PROTOCOL,
+        "identity": identity,
         "question_hash": crit.qhash(), "version": crit.version, "model": model, "kappa": stats["kappa"], "precision": stats["precision"],
         "recall": stats["recall"], "n": stats["n"], "positives": stats["positives"], "negatives": stats["negatives"],
         "labels_sha": labels_sha, "admitted_at": date.today().isoformat(), "by": by,
@@ -253,9 +310,13 @@ def load_labels(path: Path) -> list[dict]:
     if isinstance(data, Exception) or not isinstance(data, dict) or not isinstance(data.get("labels"), list):
         raise ValueError(f"{path}: expected a top-level `labels:` list of {{unit, hash, label: yes|no}}")
     out = []
+    seen = set()
     for i, row in enumerate(data["labels"]):
         label = str(row.get("label")).strip().lower() if isinstance(row, dict) else ""
         if label not in ("yes", "no") or not row.get("unit"):
             raise ValueError(f"{path}: label {i} needs a unit and label: yes|no (yes = the defect is present)")
+        if not isinstance(row["unit"], str) or row["unit"] in seen:
+            raise ValueError(f"{path}: label {i} has an invalid or duplicated unit")
+        seen.add(row["unit"])
         out.append({"unit": str(row["unit"]), "hash": str(row.get("hash") or ""), "label": label == "yes"})
     return out

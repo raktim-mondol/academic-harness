@@ -85,8 +85,13 @@ def build_state(project: Project, max_facts: int = 40, max_keys: int = 40, max_f
     anchored = sum(1 for u in ctx.units if u.uid)
     out.append(f"Structure: {len(ctx.units)} units in {len(ctx.parsed)} files, {anchored} anchored.")
     out.append(f"Protected paths: {', '.join(project.protected_globs()[:12])}")
-    rep = audit(project, use_ledger=False)
-    blocking = [f for f in rep["findings"] if f["level"] in rep["gate"]["levels"]]
+    from .checks.base import DEFAULT_TIERS
+    from .rubric import load_criteria
+    from .done import external_results
+    tiers = DEFAULT_TIERS + (("TR",) if any(load_criteria(project)) else ())
+    rep = audit(project, tiers, use_ledger=False,
+                external=True if external_results(project) or project.cfg.get("external", {}).get("required") else None)
+    blocking = [f for f in rep["findings"] if f["level"] in rep["gate"]["levels"] and f["state"] in ("open", "decision-needed")]
     out.append("")
     out.append(f"Gate now: {'PASS' if rep['gate']['passed'] else 'FAIL'} ({len(blocking)} blocking, {sum(rep['counts'].values())} open). "
                "You are only held to findings your own edits introduce.")

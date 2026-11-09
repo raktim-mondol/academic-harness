@@ -7,7 +7,10 @@ from collections import Counter
 from pathlib import Path
 
 from ..context import Context, unit_ref
-from ..tex.text import (HEADING_CMDS, RE_ANCHOR, RE_LABEL, RE_REF, find_envs, strip_comments)
+from ..tex.scan import inputs as scan_inputs
+from ..tex.scan import labels as scan_labels
+from ..tex.scan import markup_view, refs as scan_refs
+from ..tex.text import (HEADING_CMDS, RE_ANCHOR, find_envs, strip_comments)
 from .base import Finding, make
 
 SECTION_PREFIX = {"section": "sec", "subsection": "sec", "subsubsection": "sec", "paragraph": "sec",
@@ -61,6 +64,13 @@ def check_t0(ctx: Context) -> list[Finding]:
                 f"{rel} is the build root but holds {words} words of prose, and no check reads a root file: "
                 f"move the text into section files that the root \\input{{}}s (then `ah units sync`)")
 
+    # ---- included prose not selected by tex.prose ----
+    from ..tex.units import parse_file
+    for rel in ctx.project.input_coverage()["omitted"]:
+        parsed = parse_file(ctx.project, ctx.project.tex_root / rel)
+        if any(u.words >= 12 for u in parsed.units):
+            add("UNIT-04", None, rel, None, "coverage:omitted", f"{rel} is included from a view but excluded from tex.prose; add it to audit coverage")
+
     # ---- file size (LAT-02) ----
     lim = cfg["limits"]
     for pf in ctx.parsed:
@@ -79,16 +89,15 @@ def check_t0(ctx: Context) -> list[Finding]:
 
     # ---- labels: placement (LAT-06), prefix (LAT-07) ----
     for u in ctx.units:
-        body = strip_comments(u.raw)
-        for m in RE_LABEL.finditer(body):
-            lab = m.group(1).strip()
-            before = re.sub(r"\s+", " ", body[: m.start()]).strip()
+        body = markup_view(u.raw)
+        for lab, at in scan_labels(body, ctx.wrappers):
+            before = re.sub(r"\s+", " ", body[: at]).strip()
             after_heading = re.search(r"\\(" + HEADING_CMDS + r")(?:\[[^\]]*\])?\{[^}]*\}\s*(?:\\label\{[^}]*\}\s*)*$", before)
             at_start = not re.sub(r"(\\label\{[^}]*\}\s*)", "", before)
             in_caption = u.kind == "float" or re.search(r"\\(?:caption|item)\b[^\n]*$", before)
             in_display = u.kind == "display"
             if u.kind == "para" and not (after_heading or at_start or in_caption):
-                add("LAT-06", unit_ref(u), u.file, u.start + body[: m.start()].count("\n"), f"label:{lab}",
+                add("LAT-06", unit_ref(u), u.file, u.start + body[: at].count("\n"), f"label:{lab}",
                     f"\\label{{{lab}}} sits in running prose, not next to a heading")
             expected = None
             if u.kind == "float":
@@ -109,36 +118,49 @@ def check_t0(ctx: Context) -> list[Finding]:
     # ---- TEX-02 / TEX-03: static label and reference integrity ----
     label_files: dict[str, list[str]] = {}
     for rel, text in ctx.tex_texts.items():
-        for m in RE_LABEL.finditer(text):
-            label_files.setdefault(m.group(1).strip(), []).append(rel)
+        for lab, _ in scan_labels(text, ctx.wrappers):
+            label_files.setdefault(lab, []).append(rel)
     for lab, files in sorted(label_files.items()):
         if len(files) > 1:
             add("TEX-03", None, files[0], None, f"label:{lab}", f"label '{lab}' is defined {len(files)} times ({', '.join(sorted(set(files)))})")
     seen_ref = set()
     for rel, text in sorted(ctx.tex_texts.items()):
-        for m in RE_REF.finditer(text):
-            for r in (x.strip() for x in m.group(1).split(",")):
-                if r and r not in label_files and (rel, r) not in seen_ref:
-                    seen_ref.add((rel, r))
-                    ln = text.count("\n", 0, m.start()) + 1
-                    ref = next((unit_ref(u) for u in ctx.units if u.file == rel and u.start <= ln <= u.end), None)
-                    add("TEX-02", ref, rel, ln, f"ref:{r}", f"\\ref{{{r}}} has no matching \\label")
+        for r, at in scan_refs(text, ctx.wrappers):
+            if r not in label_files and (rel, r) not in seen_ref:
+                seen_ref.add((rel, r))
+                ln = text.count("\n", 0, at) + 1
+                ref = next((unit_ref(u) for u in ctx.units if u.file == rel and u.start <= ln <= u.end), None)
+                add("TEX-02", ref, rel, ln, f"ref:{r}", f"\\ref{{{r}}} has no matching \\label")
 
     # ---- TEX-05: \\input of a file that does not exist (a misplaced new file shows up here) ----
     from pathlib import Path as _P
-    from ..tex.text import RE_INPUT
     texroot = ctx.project.tex_root
     seen_in = set()
     for rel, text in sorted(ctx.tex_texts.items()):
         base = (texroot / rel).parent
-        for inc in RE_INPUT.findall(text):
-            cand = inc if inc.endswith(".tex") else inc + ".tex"
-            if any((b / cand).is_file() for b in (texroot, base)) or (rel, inc) in seen_in:
+        for inp in scan_inputs(text, ctx.wrappers):
+            ln = text.count("\n", 0, inp.pos) + 1
+            ref = next((unit_ref(u) for u in ctx.units if u.file == rel and u.start <= ln <= u.end), None)
+            if inp.dynamic:           # \input{sections/#1}: the files it loads are never read by a check
+                if (rel, inp.path) not in seen_in:
+                    seen_in.add((rel, inp.path))
+                    add("TEX-06", ref, rel, ln, f"dyn:{inp.path}", f"\\input path '{inp.path}' is built by a macro, so the files it loads cannot be audited")
                 continue
-            seen_in.add((rel, inc))
-            ln = next((text.count("\n", 0, m.start()) + 1 for m in RE_INPUT.finditer(text) if m.group(1) == inc), None)
-            ref = next((unit_ref(u) for u in ctx.units if u.file == rel and ln and u.start <= ln <= u.end), None)
-            add("TEX-05", ref, rel, ln, f"input:{inc}", f"\\input{{{inc}}} names a file that does not exist (looked under {texroot.name}/)")
+            cand = inp.path if inp.path.endswith(".tex") else inp.path + ".tex"
+            dirs = ([texroot / inp.base] if inp.base else []) + [texroot, base]
+            if inp.optional or any((b / cand).is_file() for b in dirs) or (rel, inp.path) in seen_in:
+                continue
+            seen_in.add((rel, inp.path))
+            add("TEX-05", ref, rel, ln, f"input:{inp.path}", f"\\input{{{inp.path}}} names a file that does not exist (looked under {texroot.name}/)")
+
+    # ---- TEX-09: \\end{document} in a file that is read before the document is meant to end ----
+    g = getattr(ctx, "graph", None) or {}
+    if g.get("ended") and (g.get("never_read") or g.get("text_after_end", 0) >= 5):
+        e, later = g["ended"], g.get("never_read") or []
+        said = ([f"{len(later)} later input(s) are never read: {', '.join(later[:5])}{' ...' if len(later) > 5 else ''}"] if later else []) \
+            + ([f"{g['text_after_end']} words of text after it are never typeset"] if g.get("text_after_end") else [])
+        add("TEX-09", next((unit_ref(u) for u in ctx.units if u.file == e["file"] and u.start <= e["line"] <= u.end), None), e["file"], e["line"],
+            f"enddoc:{e['file']}", f"\\end{{document}} in {e['file']} ends the document early: " + "; ".join(said))
 
     # ---- LAT-11: TeX files outside the TeX root are almost always misplaced new files ----
     import os

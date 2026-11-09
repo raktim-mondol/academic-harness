@@ -26,13 +26,18 @@ from .project import Project
 from .tex.units import sync_project
 
 EDIT_TOOLS = ("Write", "Edit", "MultiEdit")
+MUTATING_TOOLS = EDIT_TOOLS + ("NotebookEdit", "Bash")      # what the guard exists to check; reading stays possible when the engine is broken
 
 
 def log(ev: str, **kw) -> None:
+    """Best effort: a debug log that cannot be written must never decide whether the guard runs."""
     path = os.environ.get("AH_LOG")
     if path:
-        with open(path, "a") as f:
-            f.write(json.dumps({"t": int(time.time() * 1000), "ev": ev, **kw}) + "\n")
+        try:
+            with open(path, "a") as f:
+                f.write(json.dumps({"t": int(time.time() * 1000), "ev": ev, **kw}) + "\n")
+        except (OSError, TypeError, ValueError):
+            pass
 
 
 def find_root(start: str) -> Path | None:
@@ -69,7 +74,7 @@ def current_findings(project: Project, judge_files: list[str] | None = None) -> 
     from .checks.base import DEFAULT_TIERS
     from .done import external_results
     from .rubric import admitted_ids, load_criteria
-    tiers = DEFAULT_TIERS + (("TR",) if load_criteria(project)[0] else ())
+    tiers = DEFAULT_TIERS + (("TR",) if any(load_criteria(project)) else ())
     kw: dict = {}
     if judge_files and "TR" in tiers and project.cfg["gate"].get("judge_touched"):
         from .verifier.backends import get_backend
@@ -379,10 +384,19 @@ def main(event: str) -> int:
         return 0
     try:
         out = handle(event, data)
-    except Exception as e:                        # a hook must not break the agent's session: report on stderr and allow
+    except Exception as e:                        # a hook must not break the agent's session: report on stderr and allow ...
         print(f"ah hook {event}: {e!r}", file=sys.stderr)
         log("hook_error", event=event, error=repr(e)[:200])
-        return 0
+        out = None
+        tool = data.get("tool_name", "") if isinstance(data, dict) else ""
+        if (event == "pre" and tool in MUTATING_TOOLS and os.environ.get("AH_NO_ENFORCE") != "1"
+                and find_root(os.path.abspath((data.get("cwd") if isinstance(data, dict) else None) or os.getcwd())) is not None):
+            # ... except the guard itself. "The engine failed" is not "this is allowed": a typo in ah.yaml would otherwise switch protection
+            # off without anyone noticing. Reading still works, so the session can be used to see what is wrong.
+            out = {"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason":
+                   f"AH guard: this {tool} call could not be checked because the engine failed ({type(e).__name__}: {str(e)[:160]}). Nothing was run. "
+                   "The author needs to repair the project (for example a typo in ah.yaml; `ah check` shows the error). "
+                   "AH_NO_ENFORCE=1 works without the guard."}}
     if out:
         print(json.dumps(out))
     return 0

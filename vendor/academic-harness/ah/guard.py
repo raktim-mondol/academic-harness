@@ -72,12 +72,20 @@ def anchors_lost(before: str, after: str) -> list[str]:
     return [a for a in anchor_ids(before) if a not in kept]
 
 
-WRITE_VERB = re.compile(r"(>>?|\btee\b|\bsed\s+-[a-zA-Z]*i|\brm\b|\bmv\b|\bcp\b|\binstall\b|\btruncate\b|\bchmod\b|\bchown\b|\bdd\b|\bsqlite3\b|\bgit\s+(checkout|restore|reset|clean|stash)\b)")
+WRITE_VERB = re.compile(r"(\btee\b|\bsed\s+-[a-zA-Z]*i|\brm\b|\bmv\b|\bcp\b|\binstall\b|\btruncate\b|\bchmod\b|\bchown\b|\bdd\b|\bsqlite3\b|\bgit\s+(checkout|restore|reset|clean|stash)\b)")
 INTERPRETER = re.compile(r"\b(python[0-9.]*|perl|ruby|node|bash|sh)\b")
-SCRIPT_WRITE = re.compile(r"""(write\(|['"]w[b+]?['"]|['"]a[b+]?['"]|os\.remove|unlink|shutil|rename\(|writeFile|appendFile|>\s*['"]?[\w./-])""")
+SCRIPT_WRITE = re.compile(r"""(write\(|['"]w[b+]?['"]|['"]a[b+]?['"]|os\.remove|unlink|shutil|rename\(|writeFile|appendFile)""")   # redirects are REDIRECT's job
+
+
+# `>`, `>>`, `2>`, `&>`, `>|`: the word after it is written. `2>&1` and `>&2` duplicate a descriptor and write nothing.
+REDIRECT = re.compile(r"(?:\d*>>?|&>>?|>\|)\s*([^\s;|&<>()]+)")
 
 
 def bash_writes_protected(cmd: str, globs: list[str], root: str, cwd: str) -> str | None:
+    for m in REDIRECT.finditer(cmd):                     # redirecting INTO a protected file is a write whatever else the command does
+        rel = rel_to_root(root, cwd, m.group(1).strip("\"'"))
+        if rel is not None and is_protected(rel, globs):
+            return rel
     mentions: list[str] = []
     for tok in re.split(r"""[\s;|&()<>'",=]+""", cmd):
         if not tok or tok.startswith("-"):
@@ -85,34 +93,45 @@ def bash_writes_protected(cmd: str, globs: list[str], root: str, cwd: str) -> st
         rel = rel_to_root(root, cwd, tok)
         if rel and is_protected(rel, globs):
             mentions.append(rel)
-    for m in re.finditer(r">>?\s*([^\s;|&]+)", cmd):
-        rel = rel_to_root(root, cwd, m.group(1).strip("\"'"))
-        if rel is not None and is_protected(rel, globs):
-            mentions.append(rel)
     if not mentions:
         return None
-    if WRITE_VERB.search(cmd):
+    if WRITE_VERB.search(cmd):                           # a protected path named next to a command that writes (a bare `>` is not one: it writes its target)
         return mentions[0]
     if INTERPRETER.search(cmd) and SCRIPT_WRITE.search(cmd):
         return mentions[0]
     return None
 
 
+# Acts the engine reserves for a person (they ask for --yes or a terminal). The agent asks the author with `ah finding decide`.
+# Keep this in step with the CLI: tests/test_guard_coverage.py fails when a terminal-confirmed act has no entry here.
+HUMAN_ONLY: tuple[tuple[str, str], ...] = (
+    (r"\bfinding\s+waive\b", "waiving a finding is the author's decision"),
+    (r"\bproposals\s+(accept|reject)\b", "accepting or rejecting a fact proposal is the author's decision"),
+    (r"\bbrief\s+approve\b", "approving a brief is the author's decision"),
+    (r"\bplan\s+approve\b", "approving an outline plan is the author's decision"),
+    (r"\bclaims\s+verify\b", "verifying a claim is the author's decision"),
+    (r"\breview\s+set\b[^;|&]*--status[\s=]+declined\b", "declining a reviewer's point is the author's decision"),
+    (r"\brule\s+(accept|reject)\b", "accepting or rejecting a rule is the author's decision"),
+    (r"\bdisclosure\s+approve\b", "approving the AI-use disclosure is the author's decision"),
+    (r"\bprovenance\s+(set|fill)\b", "provenance records who wrote the text, and relabelling it changes the AI-use disclosure"),
+    (r"\bprovenance\s+record\b[^;|&]*--type[\s=]+(human|mixed|unknown)\b", "an agent records its own work as agent-written, not as the author's"),
+    (r"\bmigrate\b[^;|&]*--force\b", "overwriting the project configuration is the author's decision"),
+    (r"\bah\b[^;|&]*--yes\b", "--yes confirms on the author's behalf"),
+)
+# A terminal wrapped around the engine answers its "type yes" prompt without the author (isatty() cannot tell the difference).
+PTY_WRAPPER = re.compile(r"(?:^|[;&|(]\s*|\bsudo\s+|\bexec\s+)(?:script\s+-[A-Za-z]*[cqe]|unbuffer\b|expect\s+(?:-c\b|-f\b|<<)|pexpect\b)"
+                         r"|\bpty\.spawn\b|\bsocat\b[^;|&]*\bpty\b")
+RUNS_ENGINE = re.compile(r"\bah\b")
+
+
 def bash_is_human_only(cmd: str) -> str | None:
-    if re.search(r"\bfinding\s+waive\b", cmd):
-        return "waiving a finding is the author's decision"
-    if re.search(r"\bproposals\s+(accept|reject)\b", cmd):
-        return "accepting or rejecting a fact proposal is the author's decision"
-    if re.search(r"\bbrief\s+approve\b", cmd):
-        return "approving a brief is the author's decision"
-    if re.search(r"\bplan\s+approve\b", cmd):
-        return "approving an outline plan is the author's decision"
-    if re.search(r"\bclaims\s+verify\b", cmd):
-        return "verifying a claim is the author's decision"
-    if re.search(r"\breview\s+set\b[^;|&]*--status[\s=]+declined\b", cmd):
-        return "declining a reviewer's point is the author's decision"
-    if re.search(r"\bah\b[^;|&]*--yes\b", cmd) or "AH_ASSUME_YES" in cmd:
+    for pattern, why in HUMAN_ONLY:
+        if re.search(pattern, cmd):
+            return why
+    if "AH_ASSUME_YES" in cmd:
         return "--yes confirms on the author's behalf"
+    if PTY_WRAPPER.search(cmd) and RUNS_ENGINE.search(cmd):
+        return "a terminal cannot be allocated to answer the author's confirmation"
     return None
 
 

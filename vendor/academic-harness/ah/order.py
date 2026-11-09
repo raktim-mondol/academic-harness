@@ -11,24 +11,9 @@ from .tex.units import Unit
 
 def reading_order(ctx: Context) -> list[str]:
     """Files in the order they are first \\input from the views (depth first, textual order)."""
-    out: list[str] = []
-    seen: set[str] = set()
-
-    def visit(rel: str):
-        if rel in seen or rel not in ctx.tex_texts:
-            return
-        seen.add(rel)
-        out.append(rel)
-        base = Path(rel).parent
-        for inc in RE_INPUT.findall(ctx.tex_texts[rel]):
-            cand = inc if inc.endswith(".tex") else inc + ".tex"
-            for c in (str(Path(cand)), str(base / cand)):
-                if c in ctx.tex_texts:
-                    visit(c)
-                    break
-
-    for v in ctx.project.view_files():
-        visit(ctx.project.rel(v))
+    from .tex.inputs import input_graph
+    out = input_graph(ctx.tex_texts, [ctx.project.rel(v) for v in ctx.project.view_files()])["reachable"]
+    seen = set(out)
     for rel in sorted(ctx.tex_texts):       # files no view reaches still get a place, after the rest
         if rel not in seen:
             out.append(rel)

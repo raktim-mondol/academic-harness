@@ -7,23 +7,24 @@ from __future__ import annotations
 
 import re
 
+# The citation, reference, label and input patterns live in scan.py with the rest of the scanner; they are re-exported here because most
+# of the engine imports them from this module. Read their matches through scan.cite_keys / ref_labels / inputs, not group(1).
+from .scan import RE_CITE, RE_INPUT, RE_LABEL, RE_NOCITE, RE_REF, cite_keys, drop_dead_blocks, ref_labels  # noqa: F401
+
 FLOAT_ENVS = ("figure", "figure*", "table", "table*", "longtable", "tikzpicture", "tabularx",
               "tabular", "algorithm", "lstlisting", "verbatim")
 DISPLAY_ENVS = ("equation", "equation*", "align", "align*", "gather", "gather*")
 HEADING_CMDS = r"(?:part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?"
 
 RE_COMMENT = re.compile(r"(?<!\\)%.*$", re.M)
-RE_CITE = re.compile(r"\\(?:cite[a-zA-Z]*|textcite|parencite|autocite)\*?(?:\[[^\]]*\]){0,2}\{([^}]*)\}")
-RE_REF = re.compile(r"\\(?:ref|eqref|autoref|cref|Cref|pageref|nameref)\{([^}]*)\}")
-RE_LABEL = re.compile(r"\\label\{([^}]*)\}")
 RE_FACT = re.compile(r"\\fact\{([^}]*)\}")
-RE_INPUT = re.compile(r"\\(?:input|include)\{([^}]*)\}")
 RE_ANCHOR = re.compile(r"^\s*%%\s*@unit\s+(\S+)(?:\s+h=([0-9a-f]+))?\s*$")
 
 
 def strip_comments(text: str) -> str:
-    """Remove % comments but keep every newline, so line numbers still match the source."""
-    return RE_COMMENT.sub("", text)
+    """Remove % comments and what TeX never reads (the dead branch of \\iffalse / \\iftrue, the comment environment), but keep every
+    newline, so line numbers still match the source. Verbatim text is left in: it is typeset, so it stays a unit."""
+    return drop_dead_blocks(RE_COMMENT.sub("", text))
 
 
 def find_envs(text: str, names=FLOAT_ENVS + DISPLAY_ENVS):

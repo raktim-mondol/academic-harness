@@ -117,6 +117,7 @@ export function toolArgv(name, args = {}, cwd) {
       if (args.external) extra.push('--external')
       if (args.rubric || args.judge) extra.push('--rubric')
       if (args.judge) extra.push('--judge')
+      if (args.judge && args.retry_unresolved) extra.push('--retry-unresolved')
       const calls = Number(args.judge_limit)
       if (args.judge && Number.isInteger(calls) && calls >= 1) extra.push('--judge-limit', String(calls))
       const runs = Number(args.stability_runs)
@@ -126,6 +127,7 @@ export function toolArgv(name, args = {}, cwd) {
     case 'ah_done': {
       const argv = ['done']
       if (args.judge) argv.push('--judge')
+      if (args.judge && args.retry_unresolved) argv.push('--retry-unresolved')
       const calls = Number(args.judge_limit)
       if (args.judge && Number.isInteger(calls) && calls >= 1) argv.push('--judge-limit', String(calls))
       return argv
@@ -147,6 +149,7 @@ export function toolArgv(name, args = {}, cwd) {
       if (action === 'run') {
         const argv = ['rubric', 'run', ...ids]
         if (args.judge) argv.push('--judge')
+        if (args.judge && args.retry_unresolved) argv.push('--retry-unresolved')
         const calls = Number(args.judge_limit)
         if (args.judge && Number.isInteger(calls) && calls >= 1) argv.push('--judge-limit', String(calls))
         for (const file of strList(args.files)) argv.push('--file', file)
@@ -569,6 +572,7 @@ export async function apply(ctx) {
       rubric: { type: 'boolean', description: 'Also report the frozen rubric (tier TR) from verdicts already cached. No model calls. Criteria report at info until the author admits them.' },
       judge: { type: 'boolean', description: 'Tier TR with model calls for paragraphs that have no cached verdict (needs a verifier: section in ah.yaml). One call per criterion and changed paragraph; unchanged paragraphs are never asked again.' },
       judge_limit: { type: 'integer', description: 'With judge: most model calls in this run.' },
+      retry_unresolved: { type: 'boolean', description: 'With judge: explicitly retry cached unclear/unverifiable rubric answers.' },
       stability_runs: { type: 'integer', description: 'Also run the checks N times (2-20) on the unchanged text and report findings that come and go, plus paragraphs without a stable anchor. Exit status 2 when unstable.' },
     },
   })
@@ -589,6 +593,7 @@ export async function apply(ctx) {
       criterion: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'Criterion id(s), e.g. RUB-CAUSAL. run: default all; sheet: exactly one.' },
       judge: { type: 'boolean', description: 'run: ask the model for paragraphs with no cached verdict (needs a verifier: section in ah.yaml).' },
       judge_limit: { type: 'integer', description: 'run with judge: most model calls.' },
+      retry_unresolved: { type: 'boolean', description: 'With judge: explicitly retry cached unclear/unverifiable answers.' },
       files: { type: 'array', items: { type: 'string' }, description: 'run: only paragraphs in these files (relative to the TeX root).' },
       limit: { type: 'integer', description: 'sheet: most paragraphs listed.' },
     },
@@ -859,6 +864,7 @@ export async function apply(ctx) {
     parameters: {
       judge: { type: 'boolean', description: 'Also ask the model about paragraphs that have no cached verdict for an admitted criterion (model calls).' },
       judge_limit: { type: 'number', description: 'Most rubric model calls in this run.' },
+      retry_unresolved: { type: 'boolean', description: 'With judge: explicitly retry cached unclear/unverifiable answers.' },
     },
   })
   register(ctx, {

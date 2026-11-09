@@ -13,19 +13,36 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from ..context import Context, unit_ref
-from ..rubric import Criterion, configured_model, in_scope, is_admitted, load_admissions, load_criteria
-from ..verifier.backends import Backend
+from ..rubric import Criterion, configured_model, criteria_config, in_scope, is_admitted, load_admissions, load_criteria
+from ..verifier.backends import Backend, configured_identity
 from ..verifier.verify import Cache, norm_text
 from ..util import sha1
 from .base import Finding, make
 
-RUBRIC_PROMPT_VERSION = "r1"
+RUBRIC_PROMPT_VERSION = "r2"
 MIN_QUOTE = 8          # characters; a shorter span proves nothing
 ANSWERS = ("yes", "no", "unclear")
+DETERMINATE = ("yes", "no")
+
+
+class Budget:
+    """Reserve an actual backend invocation before spending, including correction attempts."""
+    def __init__(self, limit=0):
+        if type(limit) is not int or limit < 0:
+            raise ValueError("judge_limit must be a nonnegative integer")
+        self.limit, self.used, self.lock = limit, 0, threading.Lock()
+
+    def reserve(self):
+        with self.lock:
+            if self.limit and self.used >= self.limit:
+                return False
+            self.used += 1
+            return True
 
 TEMPLATE = """You review ONE paragraph of a manuscript against ONE criterion. You have no tools and no other knowledge: judge only the paragraph.
 
@@ -87,6 +104,7 @@ class Verdict:
     calls: int = 0
     tokens_in: int = 0
     tokens_out: int = 0
+    usage_complete: bool = True
 
     def body(self) -> dict:
         return {"answer": self.answer, "quote": self.quote, "note": self.note}
@@ -96,18 +114,22 @@ def cache_key(c: Criterion, unit_hash: str, model: str) -> str:
     return sha1("|".join(["rubric", RUBRIC_PROMPT_VERSION, c.qhash(), unit_hash, model]))
 
 
-def judge(c: Criterion, text: str, backend: Backend) -> Verdict:
+def judge(c: Criterion, text: str, backend: Backend, budget: Budget | None = None) -> Verdict:
     """One criterion, one paragraph. Two attempts at most; a reply that cannot be used twice is an error and is not remembered."""
     prompt = build_prompt(c, text)
     calls = tin = tout = 0
     parsed = None
+    usage_complete = True
     for attempt in range(2):
+        if budget is not None and not budget.reserve():
+            return Verdict("budget", calls=calls, tokens_in=tin, tokens_out=tout, usage_complete=usage_complete)
         comp = backend.complete(prompt if attempt == 0 else prompt + CORRECTION)
         calls += 1
+        usage_complete &= "input" in comp.usage and "output" in comp.usage
         tin += comp.usage.get("input", 0)
         tout += comp.usage.get("output", 0)
         if comp.error:
-            return Verdict("error", error=comp.error, calls=calls, tokens_in=tin, tokens_out=tout)
+            return Verdict("error", error=comp.error, calls=calls, tokens_in=tin, tokens_out=tout, usage_complete=usage_complete)
         parsed = parse_reply(comp.text)
         if parsed is None:
             continue
@@ -115,38 +137,41 @@ def judge(c: Criterion, text: str, backend: Backend) -> Verdict:
             break
         # a "yes" whose quote is not in the paragraph: ask once more, then give up on it
         if attempt == 1:
-            return Verdict("unverifiable", parsed["quote"][:300], parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout)
+            return Verdict("unverifiable", parsed["quote"][:300], parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout, usage_complete=usage_complete)
     if parsed is None:
-        return Verdict("error", error="unparseable-reply", calls=calls, tokens_in=tin, tokens_out=tout)
+        return Verdict("error", error="unparseable-reply", calls=calls, tokens_in=tin, tokens_out=tout, usage_complete=usage_complete)
     if parsed["answer"] == "yes" and c.quote_pattern and not re.search(c.quote_pattern, parsed["quote"], re.I):
         # the criterion names the kind of words that show the defect; a quote without any of them is the model drifting
-        return Verdict("unverifiable", parsed["quote"][:300], parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout)
-    return Verdict(parsed["answer"], parsed["quote"] if parsed["answer"] == "yes" else "", parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout)
+        return Verdict("unverifiable", parsed["quote"][:300], parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout, usage_complete=usage_complete)
+    return Verdict(parsed["answer"], parsed["quote"] if parsed["answer"] == "yes" else "", parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout, usage_complete=usage_complete)
 
 
-def judge_cached(c: Criterion, unit, backend: Backend | None, cache: Cache | None, model: str | None, peek_only: bool = False) -> Verdict | None:
+def judge_cached(c: Criterion, unit, backend: Backend | None, cache: Cache | None, model: str | None, peek_only: bool = False,
+                 budget: Budget | None = None, retry_unresolved: bool = False) -> Verdict | None:
     """The cached verdict, else (with a backend) a fresh one. None means this pair could not be judged now."""
     if model and cache is not None:
         hit = cache.get(cache_key(c, unit.hash, model))
-        if hit:
+        if hit and (not retry_unresolved or hit.get("answer") in DETERMINATE):
             return Verdict(hit["answer"], hit.get("quote", ""), hit.get("note", ""), cached=True)
     if backend is None or peek_only:
         return None
-    v = judge(c, unit.norm, backend)
-    if v.answer != "error" and cache is not None:
-        cache.put(cache_key(c, unit.hash, backend.model), v.body())
+    v = judge(c, unit.norm, backend, budget)
+    if v.answer not in ("error", "budget") and cache is not None:
+        cache.put(cache_key(c, unit.hash, backend.identity), v.body())
     return v
 
 
 def run_rubric(ctx: Context, backend: Backend | None = None, use_cache: bool = True, limit: int = 0,
-               only_files: list[str] | None = None, only_criteria: list[str] | None = None, **_unused) -> tuple[list[Finding], dict]:
+                only_files: list[str] | None = None, only_criteria: list[str] | None = None, retry_unresolved: bool = False, **_unused) -> tuple[list[Finding], dict]:
     """Findings (RUB-01 per failed pair, RUB-02 per malformed file) and stats. `stats["unjudged"]` lists the
     (criterion, unit) pairs that got no verdict, for the audit to carry forward. `limit` caps the model calls."""
     project, cfg = ctx.project, ctx.cfg
     crits, problems = load_criteria(project)
+    budget = Budget(limit)
     if only_criteria:
         crits = [c for c in crits if c.id in set(only_criteria)]
     model = backend.model if backend is not None else configured_model(cfg)
+    identity = backend.identity if backend is not None else configured_identity(cfg)
     admissions = load_admissions(project)
     out: list[Finding] = []
     for pr in problems:
@@ -154,34 +179,37 @@ def run_rubric(ctx: Context, backend: Backend | None = None, use_cache: bool = T
         if f:
             out.append(f)
     stats: dict = {"criteria": len(crits), "units": 0, "pairs": 0, "judged": 0, "cached": 0, "calls": 0, "tokens_in": 0, "tokens_out": 0,
-                   "yes": 0, "no": 0, "unclear": 0, "unverifiable": 0, "errors": 0, "unjudged_count": 0, "model": model,
-                   "admitted": [], "per_criterion": {}}
-    cache = Cache(project) if use_cache else None
+                    "identity": identity, "usage_complete": True, "resolved": 0, "unresolved_count": 0, "unresolved_reasons": {},
+                    "yes": 0, "no": 0, "unclear": 0, "unverifiable": 0, "errors": 0, "unjudged_count": 0, "model": model,
+                    "admitted": [], "invalidated_admissions": [], "per_criterion": {}}
+    cache = Cache(project, readonly=backend is None) if use_cache else None
     pairs = [(c, u) for c in crits for u in ctx.units if in_scope(c, u) and (not only_files or u.file in only_files)]
     stats["pairs"] = len(pairs)
     stats["units"] = len({unit_ref(u) for _, u in pairs})
     for c in crits:
-        stats["per_criterion"][c.id] = {"units": 0, "yes": 0, "no": 0, "unclear": 0, "unverifiable": 0, "unjudged": 0}
-        if is_admitted(c, admissions, model):
+        stats["per_criterion"][c.id] = {"units": 0, "yes": 0, "no": 0, "unclear": 0, "unverifiable": 0, "unjudged": 0, "unresolved": 0}
+        if is_admitted(c, admissions, model, identity):
             stats["admitted"].append(c.id)
+        elif c.id in admissions:
+            stats["invalidated_admissions"].append(c.id)
 
     verdicts: dict[tuple[str, str], Verdict] = {}
     misses = []
     for c, u in pairs:
         stats["per_criterion"][c.id]["units"] += 1
-        v = judge_cached(c, u, backend, cache, model, peek_only=True)
+        v = judge_cached(c, u, backend, cache, identity, peek_only=True, retry_unresolved=retry_unresolved)
         if v is not None:
             verdicts[(c.id, unit_ref(u))] = v
         else:
             misses.append((c, u))
     if backend is not None and misses:
-        todo = misses[:limit] if limit else misses
+        todo = misses
 
         def job(item):
             c, u = item
-            return (c.id, unit_ref(u)), judge_cached(c, u, backend, cache, model)
+            return (c.id, unit_ref(u)), judge_cached(c, u, backend, cache, identity, budget=budget, retry_unresolved=retry_unresolved)
 
-        with ThreadPoolExecutor(max_workers=max(1, int((cfg.get("criteria") or {}).get("workers", 4)))) as ex:
+        with ThreadPoolExecutor(max_workers=criteria_config(project)[0]["workers"]) as ex:
             for key, v in ex.map(job, todo):
                 if v is not None:
                     verdicts[key] = v
@@ -192,16 +220,26 @@ def run_rubric(ctx: Context, backend: Backend | None = None, use_cache: bool = T
         ref = unit_ref(u)
         v = verdicts.get((c.id, ref))
         row = stats["per_criterion"][c.id]
-        if v is None or v.answer == "error":
+        if v is not None:
+            stats["calls"] += v.calls
+            stats["tokens_in"] += v.tokens_in
+            stats["tokens_out"] += v.tokens_out
+            stats["usage_complete"] &= v.usage_complete
+            stats["cached"] += int(v.cached)
+        if v is None or v.answer not in DETERMINATE:
             unjudged.add((c.id, ref))
+            row["unresolved"] += 1
+            reason = v.answer if v else "missing"
+            stats["unresolved_reasons"][reason] = stats["unresolved_reasons"].get(reason, 0) + 1
+        if v is None or v.answer == "error":
             row["unjudged"] += 1
             stats["errors"] += int(v is not None)
             continue
+        if v.answer == "budget":
+            row["unjudged"] += 1
+            continue
         stats["judged"] += 1
-        stats["cached"] += int(v.cached)
-        stats["calls"] += v.calls
-        stats["tokens_in"] += v.tokens_in
-        stats["tokens_out"] += v.tokens_out
+        stats["resolved"] += int(v.answer in DETERMINATE)
         stats[v.answer] += 1
         row[v.answer] += 1
         if v.answer != "yes":
@@ -213,5 +251,10 @@ def run_rubric(ctx: Context, backend: Backend | None = None, use_cache: bool = T
         f.level = (over or by_id[c.id].level) if c.id in stats["admitted"] else "info"
         out.append(f)
     stats["unjudged"] = unjudged
+    stats["verdict_no"] = {(c.id, unit_ref(u)) for c, u in pairs if (verdicts.get((c.id, unit_ref(u))) or Verdict("")).answer == "no"}
+    stats["pair_set"] = {(c.id, unit_ref(u)) for c, u in pairs}
     stats["unjudged_count"] = len(unjudged)
+    stats["unresolved_count"] = len(unjudged)
+    if cache:
+        cache.close()
     return out, stats

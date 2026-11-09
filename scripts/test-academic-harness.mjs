@@ -142,6 +142,10 @@ ok('ah_precision ignores nonsense thresholds', JSON.stringify(toolArgv('ah_preci
 ok('ah_rubric list argv', JSON.stringify(toolArgv('ah_rubric', {})) === JSON.stringify(['rubric', 'list']))
 ok('ah_rubric run argv with criteria, judge and files', JSON.stringify(toolArgv('ah_rubric', { action: 'run', criterion: ['RUB-CAUSAL', 'RUB-GENERAL'], judge: true, judge_limit: 3, files: ['a.tex'] })) === JSON.stringify(['rubric', 'run', 'RUB-CAUSAL', 'RUB-GENERAL', '--judge', '--judge-limit', '3', '--file', 'a.tex']))
 ok('ah_rubric run without judge asks nothing', !toolArgv('ah_rubric', { action: 'run' }).includes('--judge'))
+for (const tool of ['ah_rubric', 'ah_audit', 'ah_done']) {
+  ok(`${tool} deliberate unresolved retry`, toolArgv(tool, { action: 'run', judge: true, retry_unresolved: true }).includes('--retry-unresolved'))
+  ok(`${tool} retry does not enable judging`, !toolArgv(tool, { action: 'run', retry_unresolved: true }).includes('--retry-unresolved'))
+}
 ok('ah_rubric sheet needs one criterion', Boolean(toolArgv('ah_rubric', { action: 'sheet' }).error) && JSON.stringify(toolArgv('ah_rubric', { action: 'sheet', criterion: 'RUB-CAUSAL', limit: 20 })) === JSON.stringify(['rubric', 'sheet', 'RUB-CAUSAL', '--limit', '20']))
 ok('ah_rubric has no admit action', /ah_author action=rubric-admit/.test(toolArgv('ah_rubric', { action: 'admit' }).error || ''))
 ok('ah_author rubric-admit argv', JSON.stringify(toolArgv('ah_author', { action: 'rubric-admit', id: 'RUB-CAUSAL', file: 'labels.yaml' })) === JSON.stringify(['rubric', 'admit', 'RUB-CAUSAL', '--labels', 'labels.yaml', '--yes']))

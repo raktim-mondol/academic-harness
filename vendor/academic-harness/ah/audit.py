@@ -6,6 +6,7 @@ identical findings list (DET-01) and every new finding carries a stated cause.
 from __future__ import annotations
 
 import time
+import sqlite3
 from collections import Counter
 
 from . import RUBRIC_VERSION, __version__
@@ -38,14 +39,15 @@ def run_checks(ctx: Context, tiers: tuple[str, ...] = DEFAULT_TIERS, extra: list
         if t == "TR":
             from .checks.rubric import run_rubric
             fr, rs = run_rubric(ctx, rubric_backend, use_cache=t3kw.get("use_cache", True), limit=rubric_limit,
-                                only_files=t3kw.get("only_files"), only_criteria=rubric_criteria)
+                                only_files=t3kw.get("only_files"), only_criteria=rubric_criteria,
+                                retry_unresolved=t3kw.get("retry_unresolved", False))
             found += fr
             if rubric_stats is not None:
                 rubric_stats.update(rs)
             continue
         if t == "T3":
             from .checks.t3_evidence import run_t3
-            f3, stats = run_t3(ctx, backend, **t3kw)
+            f3, stats = run_t3(ctx, backend, **{k: v for k, v in t3kw.items() if k != "retry_unresolved"})
             found += f3
             if evidence is not None:
                 evidence.update(stats)
@@ -73,6 +75,7 @@ def coverage(ctx: Context) -> dict:
         "bindings": len(ctx.bindings),
         "bib_entries": len(ctx.bib),
         "registry_sources": len(ctx.registry),
+        "input_scope": ctx.project.input_coverage(),
     }
 
 
@@ -100,15 +103,21 @@ def _carry_t3(led: Ledger, unit_hashes: dict[str, str], prev_h: dict, changed: s
     return out
 
 
+CARRIED_NOTE = " [carried: the model gave no usable answer on the current text, so this is the earlier assessment, not a judgement of the text as it is now]"
+
+
 def _carry_tr(project: Project, unjudged: set[tuple[str, str]], admitted: list[str]) -> list[Finding]:
     """Open rubric findings on (criterion, unit) pairs that got no verdict this run (no backend, no cached answer, an error,
     over the call budget). Not being able to ask is not a fix. A criterion that is no longer admitted falls back to info."""
     if not unjudged or not (project.state_dir / "ledger.sqlite").exists():
         return []
-    led = Ledger(project)
+    led = sqlite3.connect(f"file:{project.state_dir / 'ledger.sqlite'}?mode=ro", uri=True)
+    led.row_factory = sqlite3.Row
     try:
-        return [Finding(r["check_id"], r["level"] if r["key"] in admitted else "info", r["ref"], r["file"], None, r["key"], r["message"], "TR")
-                for r in led.list(("open", "decision-needed")) if r["tier"] == "TR" and r["check_id"] == "RUB-01" and (r["key"], r["ref"]) in unjudged]
+        return [Finding(r["check_id"], r["level"] if r["key"] in admitted else "info", r["ref"], r["file"], None, r["key"],
+                        r["message"].replace(CARRIED_NOTE, "") + CARRIED_NOTE, "TR")
+                for r in led.execute("SELECT * FROM findings WHERE state IN ('open','decision-needed','waived') ORDER BY check_id,file,ref,key")
+                if r["tier"] == "TR" and r["check_id"] == "RUB-01" and (r["key"], r["ref"]) in unjudged]
     finally:
         led.close()
 
@@ -119,10 +128,12 @@ def _carry_tx(project: Project, tools: set[str]) -> list[Finding]:
     if not tools or not (project.state_dir / "ledger.sqlite").exists():
         return []
     checks = {c for t in tools for c in TOOL_CHECKS[t]}
-    led = Ledger(project)
+    led = sqlite3.connect(f"file:{project.state_dir / 'ledger.sqlite'}?mode=ro", uri=True)
+    led.row_factory = sqlite3.Row
     try:
         return [Finding(r["check_id"], r["level"], r["ref"], r["file"], None, r["key"], r["message"], "TX")
-                for r in led.list(("open", "decision-needed")) if r["tier"] == "TX" and r["check_id"] in checks]
+                for r in led.execute("SELECT * FROM findings WHERE state IN ('open','decision-needed','waived') ORDER BY check_id,file,ref,key")
+                if r["tier"] == "TX" and r["check_id"] in checks]
     finally:
         led.close()
 
@@ -145,8 +156,7 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
         extra_findings = list(extra_findings or []) + ext.findings
         tiers = tiers + ("TX",)
         snap = dict(snap, external=ext.digest)
-        if use_ledger:
-            carried_tx = _carry_tx(project, ext.carry_tools)
+        carried_tx = _carry_tx(project, ext.carry_tools)
     mode, note, changed = "full", "", None
     carried: list[Finding] = []
     if incremental:
@@ -169,8 +179,9 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
     rubric_stats: dict = {}
     findings = run_checks(ctx, tiers, extra_findings, backend, evidence, rubric_backend=rubric_backend, rubric_stats=rubric_stats,
                           rubric_limit=rubric_limit, rubric_criteria=rubric_criteria, **t3kw) + carried + carried_tx
-    if "TR" in tiers and use_ledger:
-        findings += _carry_tr(project, rubric_stats.get("unjudged", set()), rubric_stats.get("admitted", []))
+    if "TR" in tiers:
+        carried_tr = _carry_tr(project, rubric_stats.get("unjudged", set()), rubric_stats.get("admitted", []))
+        findings += carried_tr
     gate_levels = set(project.cfg["gate"]["blocking_levels"])
     report: dict = {
         "engine": __version__, "rubric": RUBRIC_VERSION, "project": project.cfg["project"],
@@ -188,22 +199,29 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
     if ext is not None:
         report["external"] = ext.report()
     if "TR" in tiers:
-        report["rubric_run"] = {k: v for k, v in rubric_stats.items() if k != "unjudged"}   # (report["rubric"] is the engine's rubric VERSION)
+        report["rubric_run"] = {k: v for k, v in rubric_stats.items() if k not in ("unjudged", "verdict_no", "pair_set")}   # (report["rubric"] is the engine's rubric VERSION)
+        report["rubric_run"]["carried"] = [f.fingerprint() for f in carried_tr]
     states: dict[str, dict] = {}
     if use_ledger:
         led = Ledger(project)
         last = led.last_run()
         run_id = led.next_run_id()
         prev = last[1] if last else None
-        rec = led.reconcile(run_id, findings, set(tiers), unit_hashes, prev, snap)
+        full_rubric = "TR" in tiers and bool(rubric_stats) and not rubric_criteria and not t3kw.get("only_files")      # a narrowed run says nothing about pairs it skipped
+        rec = led.reconcile(run_id, findings, set(tiers), unit_hashes, prev, snap,
+                            rubric={"criteria": set(rubric_stats.get("per_criterion", {})), "pairs": rubric_stats.get("pair_set", set()),
+                                    "no": rubric_stats.get("verdict_no", set())} if full_rubric else None)
         for r in led.list():
             states[r["fp"]] = {"state": r["state"], "cause": r["cause"], "regression": bool(r["regression"]), "first_seen": r["first_seen"]}
         vcfg = project.cfg.get("verifier") or {}
         manifest = {"run": run_id, "engine": __version__, "snapshot": snap, "tiers_run": list(tiers), "unit_hashes": unit_hashes,
                     "coverage": report["coverage"], "stats": rec["stats"],
                     "verifier": {"backend": vcfg.get("backend"), "model": vcfg.get("model"),
-                                 "provider": vcfg.get("provider")} if vcfg.get("backend") or vcfg.get("model") else None}
-        report.update(run=run_id, ledger=rec["stats"], new_causes=Counter(rec["causes"].values()))
+                                  "provider": vcfg.get("provider")} if vcfg.get("backend") or vcfg.get("model") else None}
+        from .verifier.backends import configured_identity
+        manifest["verifier_identity"] = configured_identity(project.cfg)
+        manifest["assessment_protocol"] = 2
+        report.update(run=run_id, ledger=rec["stats"], new_causes=Counter(rec["causes"].values()), fixed_by=rec["fixed_by"])
         out = []
         for f in findings:
             d = f.to_dict()
