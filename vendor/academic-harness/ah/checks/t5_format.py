@@ -21,11 +21,13 @@ maths are replaced by a placeholder (not deleted) so that removing them can neve
 from __future__ import annotations
 
 import fnmatch
+import os
 import re
 from collections import Counter, defaultdict
+from dataclasses import dataclass
 
 from ..context import Context, unit_ref
-from ..tex.text import RE_CITE, RE_LABEL, RE_REF, sentences
+from ..tex.text import RE_CITE, RE_INPUT, RE_LABEL, RE_REF, sentences
 from ..util import sha1
 from .base import Finding, make
 
@@ -46,8 +48,19 @@ KNOWN_ACRONYMS = {
     "US", "UK", "EU", "UN", "USA", "PDF", "URL", "HTML", "HTTP", "HTTPS", "XML", "JSON", "CSV", "SQL", "CPU", "GPU", "RAM", "ROM",
     "DNA", "RNA", "PCR", "MRI", "CT", "ID", "OK", "TV", "PC", "CEO", "PhD", "ISO", "IEEE", "ACM", "NASA", "WHO", "GDP", "USB",
     "ASCII", "UTF", "API", "OS", "IP", "TCP", "UDP", "LAN", "WAN", "GPS", "LED", "LCD", "AC", "DC", "SI", "FAQ", "PIN", "SMS",
-    "CLI", "GUI", "SDK", "DOI", "JSONL", "YAML", "TOML", "SSH", "TTL", "CI", "IO", "SSD", "HDD", "BIOS", "KB", "MB", "GB", "TB",
+    "AI", "CLI", "GUI", "SDK", "DOI", "JSONL", "YAML", "TOML", "SSH", "TTL", "CI", "IO", "SSD", "HDD", "BIOS", "KB", "MB", "GB", "TB",
+    # file formats: named, never expanded
+    "NPY", "NPZ", "PNG", "JPG", "JPEG", "GIF", "TIFF", "TIF", "SVG", "EPS", "TXT", "ZIP", "TAR", "GZ", "HDF", "TSV", "XLSX", "XLS",
+    "DOCX", "PPTX", "ODT", "MP3", "MP4", "WAV", "BAM", "SAM", "VCF", "BED", "GTF", "GFF", "FASTA", "FASTQ", "PDB", "SDF", "RDF",
+    "OWL", "PKL", "ONNX", "LMDB", "TFRECORD", "PARQUET", "AVRO", "BIB", "TEX", "MD", "RST", "IPYNB",
 }
+# What follows an acronym and says it is a name, a format or a container rather than jargon to expand.
+RE_NAMED_AFTER = re.compile(r"^(?:/[A-Z]{2,8})*s?\s+(?:paper|papers|system|systems|framework|frameworks|benchmark|benchmarks|dataset|datasets|"
+                            r"library|libraries|toolkit|package|project|suite|corpus|codebase|repository|platform|plugin|team|consortium|"
+                            r"files?|formats?|arrays?|archives?|images?|exports?|signals?|family|families|data|database|databases|portal|software|tools?|GPUs?|CPUs?|servers?|clusters?|instances?|conference|journal)\b")
+RE_ID = re.compile(r"\b([A-Z]{2,8})-\d")
+# "BIB, NUM, and PRF signals": every acronym in a list shares the noun that follows the list
+RE_ACR_LIST = re.compile(r"\b((?:[A-Z]{2,8}s?(?:\s*,\s*(?:and\s+|or\s+)?|\s+(?:and|or)\s+))+[A-Z]{2,8}s?)\b")
 ROMAN = {"II", "III", "IV", "VI", "VII", "VIII", "IX", "XI", "XII", "XIII", "XIV", "XV", "XX", "XXI"}
 SMALL = {"a", "an", "the", "of", "and", "or", "for", "in", "on", "to", "by", "with", "via", "per", "at", "as", "vs", "from", "into", "over", "under", "nor", "but", "is", "are"}
 HOLE = " ¤ "          # maths, references, urls, code: something was here
@@ -57,6 +70,7 @@ RE_MATH = re.compile(r"\$\$.*?\$\$|\$[^$]*\$|\\\(.*?\\\)|\\\[.*?\\\]", re.S)
 RE_HREF = re.compile(r"\\href\{[^}]*\}\{([^}]*)\}")
 RE_URLCMD = re.compile(r"\\(?:url|doi|path)\{[^}]*\}")
 RE_FOOTCMD = re.compile(r"\\[a-zA-Z]+\*?(?:\[[^\]]*\])*")
+RE_ENV = re.compile(r"\\(?:begin|end)\{[^}]*\}(?:\{[^}]*\}|\[[^\]]*\])*")
 RE_CODE = re.compile(r"\\(?:texttt|code|lstinline|verb\*?|path|file)\{[^{}]*\}|\\verb(.).*?\1")
 RE_RUNIN = re.compile(r"\\(?:paragraph|subparagraph|subsubsection|subsection|section|chapter)\*?(?:\[[^\]]*\])?\{([^{}]*)\}")
 
@@ -71,6 +85,8 @@ def prose(norm: str) -> str:
     s = RE_REF.sub(HOLE, s)
     s = RE_RUNIN.sub(r" \1. ", s)            # a heading is not the start of the sentence that follows it
     s = RE_LABEL.sub(" ", s)
+    s = RE_ENV.sub(" ", s)                    # \begin{tabular}{ll}: the arguments must not run into the first cell
+    s = s.replace("&", " ").replace("\\\\", " ")
     s = s.replace("\\%", "%").replace("\\&", "&").replace("~", " ").replace("\\,", " ").replace("\\ ", " ").replace("\\-", "")
     s = RE_FOOTCMD.sub(" ", s)
     s = re.sub(r"[{}]", "", s)
@@ -106,9 +122,123 @@ def settings(cfg: dict) -> dict:
     return s
 
 
+# ------------------------------------------------------------ reading order
+
+@dataclass
+class Seg:
+    """A stretch of text in reading order: a paragraph unit, or a heading that stands on its own (not a unit)."""
+    pos: tuple
+    file: str
+    line: int
+    text: str                    # prose view
+    unit: object | None          # the unit itself (None for a heading on its own)
+    anchor: object | None        # the unit a finding is attached to: itself, or the first paragraph after a heading
+    level: str | None = None     # heading level, for headings
+    raw_heading: str = ""
+
+
+def reading_order(ctx: Context):
+    """Position of (file, line) in the document as it is read: from each view, through every \\input in the order it
+    appears. Files reached from no view follow, in name order. Returns pos(file, line) -> sortable tuple."""
+    texts = ctx.tex_texts
+    spans: dict[str, list[tuple[int, int, int]]] = defaultdict(list)
+    seen: set[str] = set()
+    counter = [0]
+
+    def resolve(cur: str, inc: str) -> str | None:
+        cand = inc if inc.endswith(".tex") else inc + ".tex"
+        for c in (os.path.normpath(os.path.join(os.path.dirname(cur), cand)), os.path.normpath(cand)):
+            if c in texts:
+                return c
+        return None
+
+    def expand(f: str, depth: int = 0):
+        if f in seen or f not in texts or depth > 50:
+            return
+        seen.add(f)
+        text, cur = texts[f], 1
+        for m in RE_INPUT.finditer(text):
+            line = text.count("\n", 0, m.start()) + 1
+            spans[f].append((cur, line, counter[0]))
+            counter[0] += 1
+            child = resolve(f, m.group(1))
+            if child:
+                expand(child, depth + 1)
+            cur = line + 1
+        spans[f].append((cur, 10 ** 9, counter[0]))
+        counter[0] += 1
+
+    for v in ctx.project.view_files():
+        expand(ctx.project.rel(v))
+    for f in sorted(texts):
+        expand(f)
+
+    def pos(file: str, line: int) -> tuple:
+        for lo, hi, i in spans.get(file, []):
+            if lo <= line <= hi:
+                return (i, line)
+        return (counter[0], file, line)
+    return pos
+
+
+RE_DOC_BODY = re.compile(r"\\begin\{document\}(.*?)(?:\\end\{document\}|$)", re.S)
+RE_STRUCTURE_LINE = re.compile(r"^\s*\\(?:input|include|maketitle|tableofcontents|bibliography|bibliographystyle|printbibliography|newpage|clearpage|appendix)\b")
+
+
+def view_prose(ctx: Context, pos) -> list[Seg]:
+    """Paragraphs written in a main file itself (often the abstract and introduction). The engine makes units only from
+    prose files, so without this an acronym defined in main.tex looks undefined."""
+    out = []
+    for v in ctx.project.view_files():
+        rel = ctx.project.rel(v)
+        text = ctx.tex_texts.get(rel, "")
+        m = RE_DOC_BODY.search(text)
+        if not m:
+            continue
+        offset = text.count("\n", 0, m.start(1))
+        line_no, buf, start = offset + 1, [], None
+        for line in m.group(1).split("\n") + [""]:
+            if line.strip() and not RE_STRUCTURE_LINE.match(line):
+                start = start or line_no
+                buf.append(line)
+            elif buf:
+                body = " ".join(buf)
+                if len(re.findall(r"[A-Za-z]{2,}", body)) >= 5:
+                    out.append(Seg(pos(rel, start), rel, start, prose(body), None, None))
+                buf, start = [], None
+            line_no += 1
+    return out
+
+
+def segments(ctx: Context, units: list, pos) -> list[Seg]:
+    segs = [Seg(pos(u.file, u.start), u.file, u.start, prose(u.norm), u, u) for u in units]
+    # tables and figures are read too: a term used only in a table is still used, and captions define acronyms
+    segs += [Seg(pos(u.file, u.start), u.file, u.start, prose(u.norm), u, u) for u in ctx.units if u.kind == "float"]
+    segs += view_prose(ctx, pos)
+    by_file: dict[str, list] = defaultdict(list)
+    for u in units:
+        by_file[u.file].append(u)
+    for rel, text in ctx.tex_texts.items():
+        for m in RE_HEADING.finditer(text):
+            line = text.count("\n", 0, m.start()) + 1
+            inside = next((u for u in by_file.get(rel, []) if u.start <= line <= u.end), None)
+            after = inside or min((u for u in by_file.get(rel, []) if u.start > line), key=lambda u: u.start, default=None)
+            title = re.sub(r"\s+", " ", m.group(2)).strip()
+            segs.append(Seg(pos(rel, line), rel, line, prose(title) if inside is None else "", inside, after, m.group(1), title))
+    return sorted(segs, key=lambda g: g.pos)
+
+
+def add_at(hits: "Hits", check: str, seg: Seg, key: str, message: str):
+    """A finding at a segment: on its unit; for a heading on its own, on the first paragraph after it, at the heading's line."""
+    if seg.anchor is not None:
+        hits.add(check, seg.anchor, key, message, line=seg.line)
+    else:
+        hits.add(check, None, key, message, line=seg.line, file=seg.file)
+
+
 # ---------------------------------------------------------------- acronyms
 
-ACR = re.compile(r"\b([A-Z]{2,8})(s?)\b(?!-\d)")        # PRF-03 is an identifier, not an acronym
+ACR = re.compile(r"(?<![\w-])([A-Z]{2,8})(s?)\b(?!-[A-Za-z0-9])")   # PRF-03, CTX-M, cryo-EM: identifiers and compound names
 DEF_AFTER = re.compile(r"\(([A-Z]{2,8})s?\)")                 # long form (ABC)
 DEF_BEFORE = re.compile(r"\b([A-Z]{2,8})s?\s*\(([^()]{3,90})\)")   # ABC (long form)
 
@@ -123,22 +253,48 @@ def initials_match(acr: str, words: list[str]) -> bool:
     return "".join(letters) == acr or "".join(all_letters) == acr
 
 
+def _subseq(part: str, word: str) -> bool:
+    it = iter(word)
+    return all(ch in it for ch in part)
+
+
+def letters_inside(acr: str, words: list[str]) -> bool:
+    """Antimicrobial resistance (AMR), eXplainable AI (XAI): every word gives at least one letter, in order; the first word
+    gives the first letter from anywhere in it, each later word from its own first letter."""
+    a, ws = acr.lower(), [w.lower() for w in words]
+    if not ws or a[0] not in ws[0]:
+        return False
+
+    def ok(i: int, j: int) -> bool:
+        if j == len(ws):
+            return i == len(a)
+        if i == len(a) or (j > 0 and ws[j][0] != a[i]):
+            return False
+        return any(_subseq(a[i:k], ws[j]) and ok(k, j + 1) for k in range(i + 1, len(a) + 1))
+    return ok(0, 0)
+
+
 def long_form_before(acr: str, text_before: str) -> bool:
     words = [part for w in re.findall(r"[A-Za-z][A-Za-z-]*", text_before) for part in w.split("-") if part]    # "short-term" is two parts
     n = len(acr)
     for take in range(n, n + 4):
         if take <= len(words) and initials_match(acr, words[-take:]):
             return True
-    return False
+    return any(letters_inside(acr, words[-take:]) for take in range(2, n + 1) if take <= len(words))
 
 
 def check_acronyms(ctx: Context, st: dict, hits: Hits, units: list):
     known = KNOWN_ACRONYMS | set(st["acronyms_known"])
-    defs: dict[str, list[tuple[int, int]]] = defaultdict(list)      # acronym -> [(unit index, offset)]
+    segs = [g for g in st["_segments"] if g.text]          # headings count too: an acronym first seen in a heading is first seen there
+    ids = {m for text in ctx.tex_texts.values() for m in RE_ID.findall(text)}   # PRF-03 makes PRF a family of identifiers
+    titled = {m for e in ctx.bib.values() for m in re.findall(r"\b([A-Z]{2,8})s?\b", e.fields.get("title", ""))}   # BERT, MIMIC: cited works
+    defs: dict[str, list[tuple[int, int]]] = defaultdict(list)      # acronym -> [(segment index, offset)]
     uses: dict[str, list[tuple[int, int]]] = defaultdict(list)
-    plain_uses: Counter = Counter()                                   # uses in a sentence that cites nothing
-    for i, u in enumerate(units):
-        s = prose(u.norm)
+    plain_uses: Counter = Counter()                                   # uses in prose, in a sentence that cites nothing
+    prose_first: dict[str, tuple[int, int]] = {}                      # first use outside a table or figure
+    named: set[str] = set()                                           # seen as "the X paper", "X files", "X signals"
+    for i, g in enumerate(segs):
+        s = g.text
         spans: set[tuple[int, int]] = set()
         for m in DEF_AFTER.finditer(s):
             if long_form_before(m.group(1), s[: m.start()]):
@@ -150,30 +306,43 @@ def check_acronyms(ctx: Context, st: dict, hits: Hits, units: list):
                 defs[m.group(1)].append((i, m.start()))
                 spans.add((m.start(1), m.end(1)))
         cited = [(m.start(), m.end()) for m in re.finditer(r"[^.!?]*‡[^.!?]*", s)]       # the stretches of text that cite a source
+        for m in RE_ACR_LIST.finditer(s):
+            if RE_NAMED_AFTER.match(s[m.end():]):
+                named.update(re.findall(r"[A-Z]{2,8}", m.group(1)))
         for m in ACR.finditer(s):
             a = m.group(1)
             if (m.start(1), m.end(1)) in spans or a in ROMAN:
                 continue
             uses[a].append((i, m.start()))
-            if not any(lo <= m.start() < hi for lo, hi in cited):
-                plain_uses[a] += 1
+            if RE_NAMED_AFTER.match(s[m.end(1):]):
+                named.add(a)
+            in_float = g.unit is not None and g.unit.kind == "float"
+            if not in_float:
+                prose_first.setdefault(a, (i, m.start()))
+                if not any(lo <= m.start() < hi for lo, hi in cited):
+                    plain_uses[a] += 1
     redefine_ok = st["acronym_redefine_in"]
     for a in sorted(set(defs) | set(uses)):
         d, ux = sorted(defs.get(a, [])), sorted(uses.get(a, []))
-        if ux and (not d or ux[0] < d[0]):
-            # never defined: a name that only ever appears next to a citation is the cited work's name (ACE, SICA), not jargon
-            if d or (a not in known and plain_uses[a] > 0):
-                u = units[ux[0][0]]
-                why = (f"is used in {u.file} before it is defined" if d else "is used but never defined")
-                hits.add("ACR-01", u, f"{'before' if d else 'undefined'}:{a}",
-                         f"{a} {why}: write the full term once with {a} in brackets, then use {a}")
+        # a table or figure lists abbreviations by convention (hardware, tools, gene families): it counts as a use, and a
+        # caption can define, but an acronym that appears only there is not reported as undefined
+        first = prose_first.get(a)
+        if first and (not d or first < d[0]):
+            # never defined is only reported for jargon: not a known term, not an identifier family (PRF in PRF-03), not a name
+            # ("the STAIR paper", "NPY files", a word in a cited title), and not a word that only ever appears beside a citation
+            jargon = a not in known and a not in ids and a not in named and a not in titled and plain_uses[a] > 0
+            if d or jargon:
+                g = segs[first[0]]
+                where = f"the heading '{g.raw_heading}'" if g.level else g.file
+                why = (f"is used in {where} before it is defined" if d else "is used but never defined")
+                add_at(hits, "ACR-01" if d else "ACR-03", g, f"{'before' if d else 'undefined'}:{a}",
+                       f"{a} {why}: write the full term once with {a} in brackets, then use {a}")
         if len(d) >= 2:
-            first_file = units[d[0][0]].file.lower()
-            if not any(fnmatch.fnmatch(first_file, g.lower()) for g in redefine_ok):
-                u = units[d[1][0]]
-                hits.add("ACR-01", u, f"twice:{a}", f"{a} is defined again here; it was already defined in {units[d[0][0]].file}")
+            first_file = segs[d[0][0]].file.lower()
+            if not any(fnmatch.fnmatch(first_file, gl.lower()) for gl in redefine_ok):
+                add_at(hits, "ACR-01", segs[d[1][0]], f"twice:{a}", f"{a} is defined again here; it was already defined in {segs[d[0][0]].file}")
         if d and not ux:
-            hits.add("ACR-02", units[d[0][0]], f"unused:{a}", f"{a} is defined but never used again; the full term is enough")
+            add_at(hits, "ACR-02", segs[d[0][0]], f"unused:{a}", f"{a} is defined but never used again; the full term is enough")
 
 
 # ------------------------------------------------------------------- units
@@ -220,6 +389,8 @@ def check_percent(ctx: Context, st: dict, hits: Hits, units: list):
 # --------------------------------------------------------------- citations
 
 PLAIN_CITE = re.compile(r"\\cite\*?(?:\[[^\]]*\]){0,2}\{")
+# \citet is narrative ("Smith et al. (2020) show"), so it mixes with \cite and \citep alike; only two parenthetical forms conflict
+NATBIB_PAREN = re.compile(r"\\(citep|citealp|Citep|citeyearpar)\*?(?:\[[^\]]*\]){0,2}\{")
 NATBIB = re.compile(r"\\(citep|citet|citealp|citealt|citeauthor|citeyear|citeyearpar|Citep|Citet)\*?(?:\[[^\]]*\]){0,2}\{")
 PAREN = re.compile(r"\\(?:cite|citep|parencite|autocite)\*?(?:\[[^\]]*\]){0,2}\{[^}]*\}")
 
@@ -228,8 +399,10 @@ def check_cite_commands(ctx: Context, st: dict, hits: Hits, units: list):
     found: list[tuple[object, str]] = []
     counts: Counter = Counter()
     first: dict[str, int] = {}
+    want = st["cite"]
     for i, u in enumerate(units):
-        for kind, n in (("cite", len(PLAIN_CITE.findall(u.norm))), ("natbib", len(NATBIB.findall(u.norm)))):
+        n_nat = len(NATBIB.findall(u.norm)) if want != "any" else len(NATBIB_PAREN.findall(u.norm))
+        for kind, n in (("cite", len(PLAIN_CITE.findall(u.norm))), ("natbib", n_nat)):
             if n:
                 counts[kind] += n
                 first.setdefault(kind, i)
@@ -240,8 +413,8 @@ def check_cite_commands(ctx: Context, st: dict, hits: Hits, units: list):
         if k in flagged:
             msg = ("plain \\cite is used, but the document is set up for \\citep and \\citet" if want == "natbib"
                    else "\\citep/\\citet are used, but the document is set up for plain \\cite" if want == "cite"
-                   else ("plain \\cite is mixed with \\citep/\\citet; this is the less used form" if k == "cite"
-                         else "\\citep/\\citet are mixed with plain \\cite; this is the less used form"))
+                   else ("plain \\cite is mixed with \\citep for parenthetical citations; this is the less used form" if k == "cite"
+                         else "\\citep is mixed with plain \\cite for parenthetical citations; this is the less used form"))
             hits.add("FMT-03", u, f"cite:{k}", msg)
 
 
@@ -282,11 +455,14 @@ RE_CAPTION = re.compile(r"\\caption(?:\[[^\]]*\])?\{")
 
 
 def check_floats(ctx: Context, st: dict, hits: Hits, units: list):
-    refs_at: dict[str, int] = {}
-    for i, inv in enumerate(ctx.inv):
+    pos = st["_pos"]
+    refs_at: dict[str, tuple] = {}
+    for inv in ctx.inv:
         for r in inv.refs:
-            refs_at.setdefault(r, i)
-    index = {unit_ref(inv.unit): i for i, inv in enumerate(ctx.inv)}
+            here = pos(inv.unit.file, inv.unit.start)
+            if r not in refs_at or here < refs_at[r]:
+                refs_at[r] = here                               # the first mention in reading order
+    index = {unit_ref(inv.unit): pos(inv.unit.file, inv.unit.start) for inv in ctx.inv}
     for inv in ctx.inv:
         u = inv.unit
         m = RE_FLOAT_ENV.search(u.raw)
@@ -321,33 +497,21 @@ def heading_case(text: str) -> str | None:
 
 
 def check_headings(ctx: Context, st: dict, hits: Hits, units: list):
-    by_file: dict[str, list] = defaultdict(list)
-    for u in units:
-        by_file[u.file].append(u)
-    found: list[tuple[str, tuple, str, str, int]] = []      # level, (unit or None, file), case, text, line
-    for rel in sorted(ctx.tex_texts):                      # every file: a file of headings alone has no units
-        text = ctx.tex_texts[rel]
-        for m in RE_HEADING.finditer(text):
-            case = heading_case(m.group(2))
-            if case is None:
-                continue
-            line = text.count("\n", 0, m.start()) + 1
-            unit = next((u for u in by_file.get(rel, []) if u.start <= line <= u.end), None)      # a heading on its own is not a unit
-            found.append((m.group(1), (unit, rel), case, re.sub(r"\s+", " ", m.group(2)).strip(), line))
+    found = [(g, heading_case(g.raw_heading)) for g in st["_segments"] if g.level]
     want = st["heading_case"]
-    for level in sorted({f[0] for f in found}):
-        rows = [f for f in found if f[0] == level]
+    for level in sorted({g.level for g, _ in found}):
+        rows = [(g, case) for g, case in found if g.level == level and case]
         counts: Counter = Counter()
         first: dict[str, int] = {}
-        for i, (_, _, case, _, _) in enumerate(rows):
+        for i, (_, case) in enumerate(rows):
             counts[case] += 1
             first.setdefault(case, i)
         flagged = ({"title"} if want == "sentence" else {"sentence"} if want == "title" else minority(counts, first)) & set(counts)
-        for _, (unit, rel), case, text, line in rows:
+        for g, case in rows:
             if case in flagged:
                 expected = want if want != "any" else ("sentence" if case == "title" else "title")
-                hits.add("FMT-06", unit, f"head:{level}:{re.sub(r'[^a-z0-9]+', ' ', text.lower()).strip()[:60]}",
-                         f"heading '{text}' is in {case} case; the {level} headings are otherwise in {expected} case", line, rel)
+                add_at(hits, "FMT-06", g, f"head:{level}:{re.sub(r'[^a-z0-9]+', ' ', g.raw_heading.lower()).strip()[:60]}",
+                       f"heading '{g.raw_heading}' is in {case} case; the {level} headings are otherwise in {expected} case")
 
 
 # ---------------------------------------------------------------- spelling
@@ -534,7 +698,9 @@ RULES = [check_acronyms, check_units, check_percent, check_cite_commands, check_
 
 def check_format(ctx: Context) -> list[Finding]:
     st = settings(ctx.cfg)
-    units = [u for u in ctx.units if u.kind == "para"]
+    pos = reading_order(ctx)
+    units = sorted((u for u in ctx.units if u.kind == "para"), key=lambda u: pos(u.file, u.start))
+    st["_pos"], st["_segments"] = pos, segments(ctx, units, pos)
     hits = Hits(ctx)
     for rule in RULES:
         rule(ctx, st, hits, units)

@@ -55,8 +55,9 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "STY-01": ("T5", "minor", "Style pattern lint (brief must-not/hedging, or document lint)"),
     # Format and consistency rules (checks/t5_format.py). All start at info: promote one in ah.yaml `levels:` after
     # `ah precision` shows how often the author fixes what it flags and how often they waive it.
-    "ACR-01": ("T5", "info", "Acronym used before it is defined, never defined, or defined twice"),
+    "ACR-01": ("T5", "info", "Acronym used before its definition, or defined twice"),
     "ACR-02": ("T5", "info", "Acronym defined but never used again"),
+    "ACR-03": ("T5", "info", "Acronym used but never defined (cannot tell jargon from a name: lowest precision of the format rules)"),
     "FMT-01": ("T5", "info", "Number and unit separated by an ordinary space (can break across a line)"),
     "FMT-02": ("T5", "info", "Percent sign and the word 'percent' both used"),
     "FMT-03": ("T5", "info", "Citation commands mixed or different from the declared style (\\cite against \\citep/\\citet)"),
