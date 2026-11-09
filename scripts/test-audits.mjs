@@ -8,6 +8,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { apply as applyStat, runStatAudit } from '../stat-audit.js'
+import { runNumbersAudit } from '../numbers-audit.js'
 import { apply as applyFigure, runFigureAudit } from '../figure-audit.js'
 import { apply as applyPdf, parseTeiReferences, runPdfReferences } from '../pdf-references.js'
 import { apply as applyRepo, runRepoAudit } from '../repo-audit.js'
@@ -69,6 +70,17 @@ if (pythonReady) {
   assert.ok(issues.includes('grim_inconsistent'))
   assert.equal(data.summary.grim_flagged, 1)
   assert.ok(!data.rows.some((row) => row.context?.includes('F(2, 45)')), 'consistent statistics stay unflagged')
+
+  // A whole number after `P =` / `p =` is a count (patches, predictors) unless the text calls it a p-value.
+  const counts = await runNumbersAudit({ text: 'The image is cut into $P = 12$ patches, and the model has p = 8 predictors.' }, {})
+  assert.deepEqual(counts.rows.filter((row) => row.kind === 'p_value'), [], 'integer counts are not p-values')
+  const real = await runNumbersAudit({ text: 'The p-value was p = 12, and a second one was p = 1.5.' }, {})
+  assert.equal(real.rows.filter((row) => row.kind === 'p_value').length, 2, 'a stated p-value out of range, or any decimal out of range, is still flagged')
+  // GRIM reads a mean only when it is written `M =` / `mean =`; a sentence like "Mean agreement was 3.47" is not parsed.
+  const written = await runNumbersAudit({ text: 'Agreement was high (M = 3.47, N = 10 raters).', grim: true }, {})
+  assert.equal(written.rows.filter((row) => row.kind === 'grim').length, 1, 'M = 3.47 with N = 10 cannot be an integer-scale mean')
+  const prose = await runNumbersAudit({ text: 'Mean agreement was 3.47 (n = 10 raters).', grim: true }, {})
+  assert.equal(prose.rows.filter((row) => row.kind === 'grim').length, 0, 'the prose form is not parsed')
 } else {
   console.log('skip: scipy not available, stat_audit helper assertions skipped')
 }
