@@ -222,6 +222,8 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
     blocking = [d for d in live if d["level"] in gate_levels]
     report["gate"] = {"passed": not blocking, "blocking": len(blocking), "levels": sorted(gate_levels)}
     report["report_hash"] = report_hash(findings)
+    from .done import done_status
+    report["done"] = done_status(project, report)
     cost = report["cost"]
     cost["seconds"] = round(time.perf_counter() - t0, 3)
     if evidence:

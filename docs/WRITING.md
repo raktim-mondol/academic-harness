@@ -111,6 +111,24 @@ What is and is not evidence here. The rules ship with labelled fixture cases, on
 
 What this does not do: it does not decide whether a comment is *right*, only whether a program can recognise the thing it names. Most review comments (an argument that is weak, a missing baseline) cannot be recognised by a pattern; they stay exploratory. A pattern is checked against one sentence and your negative examples, not against a labelled corpus, so a promoted pattern is a lead with a recorded origin, at `info`, until the author has watched it for a while (`ah_precision checks=["PRM-*"]` shows fixed against waived for it, as for the format rules). Never run another free review only to see whether the fixes worked; the ledger answers that.
 
+### Done: one answer (`ah_done`)
+
+Five reports are too many to read, and "no blockers" is not an answer if the run never looked at the external tools or asked the rubric anything. `ah_done` (CLI `ah done`; every `ah audit` report also ends with it, and the paper-state card shows it) folds the tiers into **pass**, **fail** or **incomplete**, with the component that decides:
+
+| Component | Fails when | Not checked when |
+|---|---|---|
+| `findings` | an open finding at a blocking level (blocker and major by default), in any tier but EXT-00 | |
+| `rubric` | an open finding from an **admitted** criterion, at any level (the old gate only sees the criterion's level) | an admitted criterion has paragraphs with no verdict, or the run did not read the rubric |
+| `external` | an external result is stale, unreadable or required-and-missing (EXT-00) | results exist (or are required) but the run did not read them |
+| `unexplained` | a new finding has no cause (a harness fault; needs the ledger) | |
+| `lookups` | the oldest answer in `.ah/cache/lookups.json` is older than `done.lookups_max_age_days` (default 30, 0 = never), or the file is unreadable | no registry lookups are recorded |
+
+**fail** if any component fails; otherwise **incomplete** if a component that matters was not checked; otherwise **pass**. A component is "required" when it has something to check (admitted criteria exist, external results exist or are listed in `external.required`) or is named in `done.require: [external, rubric, lookups]` in `ah.yaml`. `ah done` reads the rubric (cached verdicts) and the external results by itself when the project has them; it asks the model only with `judge=true`. Exit codes: 0 pass, 1 fail, 3 incomplete. A report narrowed to some files (`ah_check files=...`) carries no answer: a part cannot say the whole is done.
+
+What it does not mean: pass says the code tiers found nothing blocking, every admitted criterion was asked and found nothing, the external results are current for this text and the registry answers are recent. It does not say the science is right, that unadmitted criteria or advisory rules are satisfied, or that a free review would raise nothing.
+
+**The stop gate** now reads the same tiers: the baseline, the post-edit note and the stop check include the external results when the project has them (tier TX) and the rubric from cached verdicts (only an admitted criterion can then show a finding above info). Set `gate: {judge_touched: true}` (with a `verifier:` backend) and the stop check also judges the files this turn changed against the admitted criteria, so model calls are bounded by what the agent touched and cached verdicts. EXT-00 is left out of the stop gate: any edit makes a stored external result stale and the agent cannot run those tools from the hook, so staleness is reported by `ah_done` instead. Unadmitted rubric hints (info) are not put in post-edit notes.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).
@@ -125,6 +143,7 @@ On first mount the plugin prepares a local `.venv` next to that vendored tree (v
 | `ah_state` / `ah_inventory` / `ah_check` / `ah_audit` / `ah_config` / `ah_catalogue` | anyone | Paper-state card; coverage counts; cheap checks; full audit with ledger; project config; check catalogue |
 | `ah_external` | anyone | Run numbers_audit, figure_audit and the citation audit on the project and store their findings (`.ah/external/`) so `ah_audit external=use` gives them IDs and ledger states; `plan`, `status` |
 | `ah_precision` | anyone | For the format rules (ACR-*, FMT-*): findings you fixed against findings you waived, a precision estimate per rule, and whether there are enough decisions to consider promoting one. Read-only |
+| `ah_done` | anyone | Pass, fail or incomplete for the whole document, with each deciding component (see "Done: one answer"). Updates the ledger like `ah_audit`; `judge=true` asks the model about admitted criteria with no verdict |
 | `ah_triage` / `ah_rule_propose` | anyone | Tag free-review comments `covered-by` / `same-unit` / `exploratory` against the existing checks; draft a rule (a pattern or a rubric criterion) from a comment. A proposal checks nothing until the author accepts it |
 | `ah_rubric` | anyone | The frozen rubric (tier TR): `list` criteria, `run` them (with `judge` the model is asked about paragraphs with no cached verdict), `sheet` a labelling sheet. Admitting a criterion is `ah_author action=rubric-admit` |
 | `ah_units` / `ah_fact` / `ah_bind` / `ah_fact_propose` / `ah_sweep` | anyone | Sync `%% @unit` anchors; list/build/check facts; suggest number→fact bindings; propose a new fact; find every use of a value |

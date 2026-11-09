@@ -39,7 +39,8 @@ Native `ah_*` tools (not MCP, not Pi). Prefer them over shelling out to `ah`. Do
 
 | Need | Tool |
 |---|---|
-| Coverage / "are we done" | `ah_inventory`, then `ah_check` / `ah_audit` |
+| Coverage | `ah_inventory`, then `ah_check` / `ah_audit` |
+| "Is it done" (one answer: pass, fail or incomplete) | `ah_done` |
 | Numbers, figures, references (outside the engine) | `ah_external` `run`, then `ah_audit` `external=use` |
 | Which format rules are worth promoting (fixed vs waived) | `ah_precision` |
 | Free-review comments (`deep_review`, referee simulations): which a rule already covers, and turning a recurring one into a rule | `ah_triage`, `ah_rule_propose` (the author accepts) |
@@ -56,4 +57,4 @@ Author-only (human must have asked this message; DSH confirms): waive, accept/re
 
 Free reviews (`deep_review`, `peer-reviewer`, `pre-submission-reviewer`) are exploratory and never gating: they raise different points on each run. Fix ledger findings (`ah_check`); treat review comments as candidates for promotion to a rule; never rerun a free review just to check that fixes worked.
 
-Numbers from data: `\fact{id}`. Cite only registered sources. Do not invent citations, numbers, or quotes. Done means inventory coverage is complete and this turn introduced no open blocker or major.
+Numbers from data: `\fact{id}`. Cite only registered sources. Do not invent citations, numbers, or quotes. Done means inventory coverage is complete and this turn introduced no open blocker or major. For the document as a whole ask `ah_done`: it says pass, fail or incomplete and names the component that decides (findings, admitted rubric criteria, external results, findings with no cause, the age of the registry snapshot). "Incomplete" is not a pass: something that matters was not looked at, so say so instead of reporting it as done. It is not a verdict on the science.

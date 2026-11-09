@@ -92,6 +92,12 @@ def build_state(project: Project, max_facts: int = 40, max_keys: int = 40, max_f
                "You are only held to findings your own edits introduce.")
     for f in blocking[:max_findings]:
         out.append(f"- {f['check']} {f['unit'] or f['file'] or '-'}: {f['message'][:130]}")
+    d = rep.get("done")
+    if d and d["status"] != "pass":
+        why = [c for c in d["components"] if c["status"] == "fail" or (c["status"] == "not-checked" and c["required"])]
+        out.append(f"Done: {d['status'].upper()}. " + " ".join(f"[{c['id']}] {c['detail']}" for c in why[:4]))
+    elif d:
+        out.append("Done: PASS (every component checked in this view passed; `ah done` also reads the rubric and external results).")
     if unit:
         from .briefs import get_brief, pack
         from .order import heading_of, neighbours, summary

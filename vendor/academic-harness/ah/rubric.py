@@ -153,6 +153,12 @@ def is_admitted(crit: Criterion, admissions: dict, model: str | None) -> bool:
     return bool(a) and model is not None and a.get("question_hash") == crit.qhash() and a.get("model") == model
 
 
+def admitted_ids(project) -> list[str]:
+    """Criteria whose admission still holds for the configured model (so the only ones that may report above info)."""
+    adm, model = load_admissions(project), configured_model(project.cfg)
+    return [c.id for c in load_criteria(project)[0] if is_admitted(c, adm, model)]
+
+
 def criteria_digest(project) -> str:
     """Everything that decides what the rubric asks and what it may gate; "" when the project has no rubric."""
     try:

@@ -101,6 +101,9 @@ def render_report(rep: dict, limit: int = 25) -> str:
         lines.append(f"  ... {len(live) - shown} more (use --json or --limit)")
     g = rep["gate"]
     lines.append(f"\ngate: {'PASS' if g['passed'] else 'FAIL'}  ({g['blocking']} blocking at levels {g['levels']})")
+    if rep.get("done"):
+        from .done import render
+        lines += render(rep["done"])
     return "\n".join(lines)
 
 
@@ -257,9 +260,11 @@ def _narrow(rep: dict, files: list[str] | None, brief: bool) -> dict:
         rep["checks_fired"] = dict(Counter(f["check"] for f in live))
         blocking = [f for f in live if f["level"] in rep["gate"]["levels"]]
         rep["gate"] = dict(rep["gate"], passed=not blocking, blocking=len(blocking))
+        rep.pop("done", None)       # computed over the whole document; a narrowed view cannot say the document is done
     if brief:
         ext = {"external": {t: i["status"] for t, i in rep["external"]["tools"].items()}} if rep.get("external") else {}
-        rep = {**ext, "gate": rep["gate"], "counts": rep["counts"], "tiers": rep["tiers"],
+        done = {"done": {k: rep["done"][k] for k in ("status", "failing", "incomplete_because")}} if rep.get("done") else {}
+        rep = {**ext, **done, "gate": rep["gate"], "counts": rep["counts"], "tiers": rep["tiers"],
                "findings": [{"fp": f["fingerprint"], "check": f["check"], "level": f["level"], "unit": f["unit"], "file": f["file"],
                              "line": f["line"], "state": f["state"], "message": f["message"][:240]} for f in rep["findings"]
                             if f["state"] in ("open", "decision-needed")]}
@@ -273,6 +278,27 @@ def cmd_check(a):
     rep = _narrow(rep, a.files.split(",") if getattr(a, "files", None) else None, getattr(a, "brief", False))
     print(json.dumps(rep, indent=1) if a.json else (render_report(rep, a.limit) if "coverage" in rep else json.dumps(rep, indent=1)))
     return EXIT_OK if rep["gate"]["passed"] else EXIT_FINDINGS
+
+
+def cmd_done(a):
+    """The one answer. Reads the rubric (cached verdicts) when the project has criteria and the external results when they exist,
+    so "pass" never comes from a run that did not look. Exit 0 pass, 1 fail, 3 incomplete."""
+    from .done import external_results
+    from .rubric import load_criteria
+    p = _proj(a)
+    if not getattr(a, "tiers", None):
+        if load_criteria(p)[0]:
+            a.rubric = True
+        if getattr(a, "external", None) is None and (external_results(p) or (p.cfg.get("external") or {}).get("required")):
+            a.external = ""
+    rep = audit(p, _tiers(a), use_ledger=True, backend=_backend(a, p), external=getattr(a, "external", None),
+                rubric_backend=_rubric_backend(a, p), rubric_limit=getattr(a, "judge_limit", 0) or 0, **_t3kw(a))
+    from .done import render
+    if a.json:
+        print(json.dumps({"done": rep["done"], "gate": rep["gate"], "counts": rep["counts"], "run": rep.get("run"), "tiers": rep["tiers"]}, indent=1))
+    else:
+        print("\n".join(render(rep["done"])))
+    return {"pass": EXIT_OK, "fail": EXIT_FINDINGS, "incomplete": 3}[rep["done"]["status"]]
 
 
 def cmd_audit(a):
@@ -966,7 +992,8 @@ def main(argv=None) -> int:
     add("inventory", cmd_inventory, "counts of units, numbers, citations")
     sp = add("facts", cmd_facts, "build or check facts and the macro file")
     sp.add_argument("action", choices=["build", "check", "list"])
-    for name, fn, h in (("check", cmd_check, "run checks, no ledger"), ("audit", cmd_audit, "run checks and reconcile with the ledger")):
+    for name, fn, h in (("check", cmd_check, "run checks, no ledger"), ("audit", cmd_audit, "run checks and reconcile with the ledger"),
+                        ("done", cmd_done, "is the document done: pass, fail or incomplete (reads every tier that has results)")):
         sp = add(name, fn, h)
         sp.add_argument("--tiers", help="comma list from " + ",".join(TIERS))
         sp.add_argument("--limit", type=int, default=25)

@@ -58,8 +58,26 @@ def save_state(project: Project, sid: str, st: dict) -> None:
     f.write_text(json.dumps(st))
 
 
-def current_findings(project: Project) -> list[dict]:
-    rep = audit(project, use_ledger=False)
+def current_findings(project: Project, judge_files: list[str] | None = None) -> list[dict]:
+    """What the checks report now, for the baseline, the post-edit note and the stop gate.
+
+    Beyond the default tiers it reads the external results when the project has them (tier TX) and the rubric from cached
+    verdicts (tier TR, so only an ADMITTED criterion can show a finding above info). With `gate.judge_touched` and a verifier
+    configured, `judge_files` (the files this turn changed) are also judged against the admitted criteria, so cost is bounded
+    by what the agent touched. EXT-00 (an external result went stale) is left to `ah done`: an edit always makes the stored
+    result stale, and the agent cannot run the external tools from here."""
+    from .checks.base import DEFAULT_TIERS
+    from .done import external_results
+    from .rubric import admitted_ids, load_criteria
+    tiers = DEFAULT_TIERS + (("TR",) if load_criteria(project)[0] else ())
+    kw: dict = {}
+    if judge_files and "TR" in tiers and project.cfg["gate"].get("judge_touched"):
+        from .verifier.backends import get_backend
+        backend, admitted = get_backend(project.cfg), admitted_ids(project)
+        if backend is not None and admitted:
+            kw = {"rubric_backend": backend, "rubric_criteria": admitted, "only_files": judge_files}
+    rep = audit(project, tiers, use_ledger=False, external=True if external_results(project) else None, **kw)
+    rep["findings"] = [f for f in rep["findings"] if f["check"] != "EXT-00"]
     return [{"fp": f["fingerprint"], "check": f["check"], "level": f["level"], "unit": f["unit"], "file": f["file"], "line": f["line"],
              "state": f["state"], "message": f["message"]} for f in rep["findings"] if f["state"] in ("open", "decision-needed")]
 
@@ -239,7 +257,7 @@ def handle(event: str, data: dict) -> dict | None:
         fresh = G.new_findings(set(st["baseline"]), fs)
         # The format rules (ACR-*, FMT-*) are advisory until the author promotes one: they are in the audit, not in an agent's
         # turn, where a low-precision hint ("define this acronym") would only make it rewrite text that was fine.
-        fresh = [f for f in fresh if not (f["level"] == "info" and f["check"].startswith(("ACR-", "FMT-")))]
+        fresh = [f for f in fresh if not (f["level"] == "info" and f["check"].startswith(("ACR-", "FMT-", "RUB-")))]
         log("post_edit_check", path=rel, via=tool, total=len(fs), new=[f"{f['check']}:{f['level']}" for f in fresh])
         save_state(project, sid, st)
         if not fresh:
@@ -257,7 +275,7 @@ def handle(event: str, data: dict) -> dict | None:
             return None
         sync_project(project)
         levels = project.cfg["gate"]["blocking_levels"]
-        blocking = G.new_findings(set(st["baseline"]), current_findings(project), levels)
+        blocking = G.new_findings(set(st["baseline"]), current_findings(project, resolve_touched(project, st["touched"])), levels)
         log("before_settle", loops=st["loops"], blocking=len(blocking), touched=st["touched"])
         if not blocking:
             if project.cfg["gate"].get("verify_touched") and not st.get("t3_done"):

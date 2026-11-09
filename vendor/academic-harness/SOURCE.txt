@@ -33,6 +33,9 @@ Python package modified in this plugin (the vendored tree is maintained here as 
 - ah/checks/t5_format.py: thirteen format and consistency rules (ACR-01/02, FMT-01..11), all at info, advisory
   in hooks; `ah precision` (fixed against waived per rule, from the ledger). Rubric 1.5.0. Reading order through
   \input, main-file prose, tables, captions and headings; ACR-03 split from ACR-01. Rubric 1.6.0.
+- ah/done.py: report["done"] (pass | fail | incomplete over findings, rubric, external, unexplained, lookups), `ah done`
+  (exit 0/1/3), `done:` and `gate.judge_touched` in ah.yaml, the line in `ah audit` and the state card; hooks.current_findings
+  now reads TX and the rubric (cached; judged on touched files with gate.judge_touched), EXT-00 excluded.
 - ah/promote.py, ah/checks/t5_promoted.py: promote a review comment to a rule. `ah rule propose|list|show|accept|reject|test`
   (a pattern rule PRM-01/02 in rules/promoted.yaml, or a rubric criterion in rubric/promoted.yaml; the author accepts),
   `ah triage` (covered-by / same-unit / exploratory against the current findings), coverage tags on review items
