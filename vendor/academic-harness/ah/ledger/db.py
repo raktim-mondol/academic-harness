@@ -198,3 +198,29 @@ class Ledger:
         self.db.commit()
         r = self.db.execute("SELECT * FROM disclosures ORDER BY id DESC LIMIT 1").fetchone()
         return dict(r)
+
+
+def read_states(project: Project, unit_hashes: dict[str, str]) -> dict[str, str]:
+    """What the author has decided, for callers that audit without the ledger (the stop gate, the status card): fingerprint ->
+    'waived' or 'decision-needed'. Read-only, and empty when there is no ledger, so a hook never creates or changes one. A waiver tied to
+    a paragraph lapses when that paragraph's text changes, exactly as reconcile() treats it."""
+    path = project.state_dir / "ledger.sqlite"
+    if not path.is_file():
+        return {}
+    try:
+        db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        db.row_factory = sqlite3.Row
+        try:
+            out: dict[str, str] = {}
+            for r in db.execute("SELECT fp, state FROM findings WHERE state IN ('waived','decision-needed')"):
+                if r["state"] == "waived":
+                    c = db.execute("SELECT condition FROM decisions WHERE fp=? AND kind='waive' ORDER BY id DESC LIMIT 1", (r["fp"],)).fetchone()
+                    cond = json.loads(c["condition"]) if c and c["condition"] else {}
+                    if cond.get("type") == "unit_hash" and unit_hashes.get(cond.get("ref")) not in (None, cond.get("hash")):
+                        continue
+                out[r["fp"]] = r["state"]
+            return out
+        finally:
+            db.close()
+    except sqlite3.Error:
+        return {}

@@ -315,3 +315,57 @@ def test_post_edit_notes_leave_out_unadmitted_rubric_hints():
     import inspect
     from ah import hooks
     assert '"RUB-"' in inspect.getsource(hooks.handle)
+
+
+def test_a_pass_says_what_the_author_waived(project_dir):
+    """Found live: `ah done` returned PASS after two blockers were waived and said nothing about them."""
+    from ah.audit import audit
+    from ah.cli import main
+    from ah.done import done_status
+    from ah.project import Project
+    p = Project(str(project_dir))
+    rep = audit(p, use_ledger=True)
+    blockers = [f for f in rep["findings"] if f["level"] in rep["gate"]["levels"]]
+    assert blockers
+    for f in blockers:
+        assert main(["finding", "waive", f["fingerprint"][:8], "--by", "author", "--reason", "known", "--yes", "--project", str(project_dir)]) == 0
+    status = done_status(p, audit(p, use_ledger=True))
+    findings = next(c for c in status["components"] if c["id"] == "findings")
+    assert status["status"] == "pass" and findings["status"] == "ok"
+    assert f"{len(blockers)} waived by the author" in findings["detail"]
+
+
+def _waive_every_blocker(project_dir):
+    from ah.audit import audit
+    from ah.cli import main
+    p = Project(str(project_dir))
+    rep = audit(p, use_ledger=True)
+    blockers = [f for f in rep["findings"] if f["level"] in rep["gate"]["levels"]]
+    for f in blockers:
+        assert main(["finding", "waive", f["fingerprint"][:8], "--by", "author", "--reason", "known", "--yes", "--project", str(project_dir)]) == 0
+    return p, blockers
+
+
+def test_the_state_card_and_the_stateless_audit_see_what_the_author_waived(project_dir):
+    """Found live: after two waivers `ah done` said PASS while the status card shown to the model still said Gate FAIL, because the
+    card audits without the ledger and every finding came back `open`."""
+    from ah.audit import audit
+    from ah.state import build_state
+    p, blockers = _waive_every_blocker(project_dir)
+    card = build_state(p)
+    assert "Gate now: PASS" in card and "Done: FAIL" not in card
+    rep = audit(p, use_ledger=False)
+    assert rep["gate"]["passed"] and {f["state"] for f in rep["findings"] if f["fingerprint"] in {b["fingerprint"] for b in blockers}} == {"waived"}
+
+
+def test_a_waiver_tied_to_a_paragraph_lapses_in_the_stateless_audit_when_the_paragraph_changes(project_dir):
+    from ah.audit import audit
+    p, blockers = _waive_every_blocker(project_dir)
+    ref = next(b for b in blockers if b["check"] == "TEX-02")
+    before = {f["fingerprint"]: f["state"] for f in audit(p, use_ledger=False)["findings"]}
+    assert before[ref["fingerprint"]] == "waived"
+    intro = project_dir / "src/sections/01_introduction/index.tex"
+    assert "Our method proves that" in intro.read_text()          # the paragraph holding the waived \ref
+    intro.write_text(intro.read_text().replace("Our method proves that", "Our method shows that"))
+    after = {f["fingerprint"]: f["state"] for f in audit(p, use_ledger=False)["findings"]}
+    assert after[ref["fingerprint"]] == "open", "editing the paragraph the waiver was written for brings the finding back"

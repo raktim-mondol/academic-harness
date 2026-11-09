@@ -58,23 +58,6 @@ def save_state(project: Project, sid: str, st: dict) -> None:
     f.write_text(json.dumps(st))
 
 
-def handed_to_author(project: Project) -> set[str]:
-    """Fingerprints the agent handed to the author (`ah finding decide`): the ledger is the only place that records it. Read-only, and
-    empty when there is no ledger yet, so a hook never creates or changes one."""
-    import sqlite3
-    path = project.state_dir / "ledger.sqlite"
-    if not path.is_file():
-        return set()
-    try:
-        db = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-        try:
-            return {r[0] for r in db.execute("SELECT fp FROM findings WHERE state='decision-needed'")}
-        finally:
-            db.close()
-    except sqlite3.Error:
-        return set()
-
-
 def current_findings(project: Project, judge_files: list[str] | None = None) -> list[dict]:
     """What the checks report now, for the baseline, the post-edit note and the stop gate.
 
@@ -95,10 +78,6 @@ def current_findings(project: Project, judge_files: list[str] | None = None) -> 
             kw = {"rubric_backend": backend, "rubric_criteria": admitted, "only_files": judge_files}
     rep = audit(project, tiers, use_ledger=False, external=True if external_results(project) else None, **kw)
     rep["findings"] = [f for f in rep["findings"] if f["check"] != "EXT-00"]
-    handed = handed_to_author(project)
-    for f in rep["findings"]:
-        if f["fingerprint"] in handed:
-            f["state"] = "decision-needed"                  # this audit ran without the ledger, so every finding came back `open`
     return [{"fp": f["fingerprint"], "check": f["check"], "level": f["level"], "unit": f["unit"], "file": f["file"], "line": f["line"],
              "state": f["state"], "message": f["message"]} for f in rep["findings"] if f["state"] in ("open", "decision-needed")]
 
