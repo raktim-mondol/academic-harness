@@ -126,6 +126,7 @@ class Project:
             pass
         out += [f"{self.cfg['briefs']}/**", f"{self.cfg['claims_dir']}/**", f"{self.cfg['reviews']}/**",
                 f"{self.cfg.get('plans', 'plans')}/**", self.cfg["outline"]]
+        out += ["rules/**"]       # promoted rules: the author accepted each one, an agent must not add or loosen one
         out += ["rubric/**"]      # criteria, hand labels and admissions are the author's: an agent must not admit its own check
         out += list(self.cfg.get("protected") or [])
         out += profiles.protected_files(self)
@@ -149,4 +150,8 @@ class Project:
         digest = criteria_digest(self)
         if digest:                      # only when a rubric exists, so projects without one keep their old snapshot
             snap["criteria"] = digest
+        from .promote import rules_digest
+        rd = rules_digest(self)
+        if rd:
+            snap["rules"] = rd
         return snap

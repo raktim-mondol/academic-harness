@@ -76,6 +76,8 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "ARG-05": ("T5", "info", "Planned outline section is still unwritten"),
     "PLN-01": ("T5", "blocker", "New prose file not in the approved outline or an approved brief"),
     "PLN-02": ("T5", "major", "Approved outline changed outside ah plan approve"),
+    "PRM-01": ("T5", "info", "A rule promoted from a review comment matched (the author accepted the rule; it ships with its own fixtures)"),
+    "PRM-02": ("T5", "major", "A promoted rule is broken: it does not compile, or one of its own fixtures fails"),
     "REV-01": ("T5", "major", "Review item marked addressed but no mapped unit changed"),
     "REV-02": ("T5", "info", "Review item still open"),
     "REV-03": ("T5", "info", "Unit changed since the review snapshot but belongs to no item"),

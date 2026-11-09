@@ -3658,6 +3658,9 @@ function text(value) {
   return [{ type: 'text', text: value }]
 }
 
+/** A free review notices different things each run, so it is never the definition of done. */
+export const EXPLORATORY_NOTE = 'Exploratory, never gating: a re-run of this review will raise different points. In an ah.yaml project only ah_check findings decide what is left; ah_triage shows which of these comments a rule already covers, and ah_rule_propose turns a recurring one into a rule.'
+
 function renderReviewSummary(value) {
   const lines = []
   const state = value.state || 'SUCCEEDED'
@@ -3676,6 +3679,7 @@ function renderReviewSummary(value) {
   lines.push(`Questions for authors: ${value.questions ?? 0}; flagged citations: ${value.flagged_citations?.total ?? 0}`)
   if (value.job_id) lines.push(`Live progress: background job ${value.job_id} — expand it in the session header jobs panel.`)
   lines.push(`Stored under ${value.dir}. Full report: action "show" section "markdown"; findings are advisory.`)
+  lines.push(EXPLORATORY_NOTE)
   return text(lines.join('\n'))
 }
 
@@ -3821,7 +3825,7 @@ function renderDeepReview(value) {
       )
       const shown = value.comments?.length ?? 0
       const window = shown ? `showing ${value.offset + 1}–${value.offset + shown}` : 'none matched'
-      return text([`${value.total} comment(s), ${window}:`, ...lines].join('\n'))
+      return text([`${value.total} comment(s), ${window}:`, ...lines, EXPLORATORY_NOTE].join('\n'))
     }
     if (value.section === 'questions') {
       return text((value.questions || []).map((question) => `${question.number}. ${question.question}`).join('\n') || 'No questions stored.')

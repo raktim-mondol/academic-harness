@@ -86,6 +86,19 @@ def import_review(ctx: Context, src: Path, rid: str) -> dict:
     return rev
 
 
+def record_coverage(p: Project, rid: str, rows: list[dict]) -> None:
+    """Store the triage tag on each item: where the comment stands against the checks that already exist."""
+    rev = load_review(p, rid)
+    if rev is None:
+        raise ValueError(f"no review '{rid}'")
+    by_id = {r["id"]: r for r in rows}
+    for it in rev["items"]:
+        r = by_id.get(it["id"])
+        if r:
+            it["coverage"] = r["tag"]
+    save_review(p, rev)
+
+
 def set_item(p: Project, item_id: str, units: list[str] | None = None, status: str | None = None, response: str | None = None) -> dict:
     rid = item_id.rsplit(".", 1)[0]
     rev = load_review(p, rid)

@@ -35,6 +35,18 @@ reporting-guideline verdict.
 
 `deep_review` findings are advisory criticism. It does not decide acceptance and
 does not replace the user's judgment.
+
+In an `ah.yaml` project a deep review is **exploratory and never gating**. It
+re-draws its own sample each run (one unchanged manuscript closed nine findings
+and opened six on a re-run), so it cannot define "done"; only `ah_check` can.
+Use it to find leads: `ah_triage source=deep_review deep_review_key=<key>` tags
+each comment `covered-by:<rule>` (a rule already fires on that paragraph and
+names the same thing), `same-unit:<rule>` (a rule fires there, the link is not
+evident) or `exploratory` (nothing fires). Fix the covered ones through
+`ah_check`. A comment that recurs across rounds and that a program could
+recognise (a fixed phrase, a missing unit, a form that should never appear)
+is a candidate for a rule: `ah_rule_propose`, then the author accepts it with
+`ah_author`. Never run another round only to confirm that fixes worked.
 For the stored-round-to-author-response handoff use `rebuttal-experiments`; for
 an audit of reruns, protocols, references, and code alignment use
 `integrity-audit`. Neither replaces the review or author decisions.

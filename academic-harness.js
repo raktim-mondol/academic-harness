@@ -311,6 +311,17 @@ export function toolArgv(name, args = {}, cwd) {
       const entry = { id: args.id, kind: args.kind, ...(args.spec && typeof args.spec === 'object' ? args.spec : {}) }
       return ['propose', '--data', JSON.stringify(entry), '--why', String(args.why)]
     }
+    case 'ah_rule_propose': {
+      const spec = {}
+      for (const k of ['kind', 'id', 'comment', 'span', 'why', 'pattern', 'flags', 'message', 'question', 'level', 'source', 'negatives', 'files', 'kinds']) {
+        if (args[k] !== undefined && args[k] !== null && args[k] !== '') spec[k] = args[k]
+      }
+      return ['rule', 'propose', '--data', JSON.stringify(spec)]
+    }
+    case 'ah_triage': {
+      if (args.review) return ['triage', '--review', String(args.review), ...(args.write ? ['--write'] : []), '--json']
+      return ['triage', '--data', JSON.stringify(Array.isArray(args.comments) ? args.comments : []), '--json']
+    }
     case 'ah_init':
       return ['init', String(args.dir || cwd || '.'), ...(args.profile ? ['--profile', String(args.profile)] : [])]
     case 'ah_migrate': {
@@ -340,8 +351,9 @@ export function toolArgv(name, args = {}, cwd) {
       }
       if (!id) return { error: 'ah_author needs an id' }
       if (action === 'waive') return ['finding', 'waive', id, '--reason', String(args.reason || ''), '--yes']
-      if (action === 'accept') return ['proposals', 'accept', id, '--yes']
-      if (action === 'reject') return ['proposals', 'reject', id, '--yes']
+      const isRule = /^(PRM|RUB)-/.test(id)       // a promoted rule or criterion; fact ids cannot contain a dash
+      if (action === 'accept') return isRule ? ['rule', 'accept', id, '--yes'] : ['proposals', 'accept', id, '--yes']
+      if (action === 'reject') return isRule ? ['rule', 'reject', id, '--yes'] : ['proposals', 'reject', id, '--yes']
       if (action === 'approve') return ['brief', 'approve', id, '--yes']
       if (action === 'plan-approve') return ['plan', 'approve', id, '--yes']
       if (action === 'verify') return ['claims', 'verify', id, '--yes']
@@ -375,6 +387,15 @@ async function runBridge(root, args, exec) {
   return { summary: await runExternal({ root, plan, tools, exec, args }) }
 }
 
+/** The comments of a stored deep_review round, as ah_triage takes them. Questions, claims and checklist items are not comments on a passage. */
+export async function deepReviewComments(cwd, key, round = null) {
+  const { readDeepReviewRound } = await import('./rebuttal-store.js')      // loaded on demand: it imports this file
+  const got = readDeepReviewRound(cwd, key, round)
+  return got.items
+    .filter((it) => it.kind === 'weakness' || it.kind === 'comment')
+    .map((it) => ({ id: it.native_id, text: it.text || '', quote: it.quote || '' }))
+}
+
 export async function executeAh(name, args, exec) {
   const cwd = workspaceRoot(exec)
   if (name === 'ah_external' && String(args.action || 'run').toLowerCase() === 'run') {
@@ -388,7 +409,15 @@ export async function executeAh(name, args, exec) {
       code: failed ? 1 : 0,
     }
   }
-  const mapped = toolArgv(name, args, cwd)
+  let toolArgs = args
+  if (name === 'ah_triage' && String(args.source || '') === 'deep_review') {
+    try {
+      toolArgs = { ...args, comments: await deepReviewComments(cwd, args.deep_review_key, args.deep_review_round), review: undefined }
+    } catch (e) {
+      return { error: `ah_triage could not read the deep_review round: ${e.message}` }
+    }
+  }
+  const mapped = toolArgv(name, toolArgs, cwd)
   if (mapped && mapped.error) return { error: mapped.error }
 
   let root = findAhRoot(cwd) || cwd
@@ -451,6 +480,21 @@ export async function executeAh(name, args, exec) {
   }
   if (name === 'ah_plan' && String(args.action || '').toLowerCase() === 'propose' && r.code === 0) {
     return { text: `${(r.out || '').trim()}\nLeave new .tex unwritten until the author approves.`, code: 0 }
+  }
+  if (name === 'ah_rule_propose' && r.code === 0) {
+    return { text: `${(r.out || '').trim()}\nStop and let the author decide: ah_author action=accept id=<the rule id> adds it to the project's checks. Until then nothing is checked.`, code: 0 }
+  }
+  if (name === 'ah_triage' && r.code === 0) {
+    try {
+      const got = JSON.parse(r.out)
+      const lines = (got.comments || []).map((c) => `${c.id}  ${c.tag}${c.located ? '' : '  (could not find the passage)'}`)
+      const sm = got.summary || {}
+      lines.push(`${sm.comments} comment(s): ${sm.covered} covered by a rule, ${sm['same-unit']} with a rule firing on the same paragraph, ${sm.exploratory} exploratory (${sm.unlocated} not located).`)
+      lines.push('covered-by = a rule fires on that paragraph and names the same thing; same-unit = a rule fires on that paragraph but the link is not evident (read it); exploratory = no rule fires there. Only the first is known to the checks; none of these gate. A recurring exploratory comment that a program could recognise: ah_rule_propose.')
+      return { text: lines.join('\n'), code: 0 }
+    } catch {
+      /* fall through to the raw output */
+    }
   }
   if (name === 'ah_fact_propose' && r.code === 0) {
     return { text: `${(r.out || '').trim()}\nStop and let the author decide; do not type the number meanwhile.`, code: 0 }
@@ -797,6 +841,36 @@ export async function apply(ctx) {
     },
   })
   register(ctx, {
+    name: 'ah_rule_propose',
+    description: 'Promote a free-review comment into a rule that the checks run every time. Give the comment, the exact words in the manuscript it is about (span), and either a regular expression (kind=pattern; it is tested against that sentence, must not match your negatives, and is refused if it fires on too many paragraphs) or a yes/no question about a defect (kind=criterion; joins the frozen rubric at info). It writes a proposal only; you cannot add it to the project, the author accepts it with ah_author. Propose only what a program can recognise without judgement; leave the rest as exploratory.',
+    parameters: {
+      kind: { type: 'string', enum: ['pattern', 'criterion'], description: 'Default pattern.' },
+      id: { type: 'string', required: true, description: 'PRM-NAME for a pattern, RUB-NAME for a criterion (capitals, digits, dashes).' },
+      comment: { type: 'string', required: true, description: 'The review comment this comes from.' },
+      span: { type: 'string', required: true, description: 'The manuscript words the comment points at, copied exactly.' },
+      why: { type: 'string', required: true, description: 'Why a program can decide this without judgement.' },
+      pattern: { type: 'string', description: 'Regular expression (pattern kind). It sees the text a reader sees: commands gone, citations as a placeholder.' },
+      message: { type: 'string', description: 'What the finding says (pattern kind).' },
+      question: { type: 'string', description: 'A yes/no question about a defect, ending in ? (criterion kind).' },
+      negatives: { type: 'json', description: 'Sentences the pattern must NOT match.' },
+      level: { type: 'string', enum: ['info', 'minor', 'major', 'blocker'], description: 'Default info for a pattern; a rule gates only once the author raises it.' },
+      files: { type: 'json', description: 'File globs the rule applies to; default all.' },
+      source: { type: 'string', description: 'Where the comment came from, e.g. deep_review:round-2:c-7.' },
+    },
+  })
+  register(ctx, {
+    name: 'ah_triage',
+    description: 'Say which free-review comments the checks already cover. For each comment, covered-by:<rule> (a rule fires on that paragraph and names the same thing), same-unit:<rule> (a rule fires there, link not evident) or exploratory (nothing fires). source=deep_review reads a stored round (deep_review_key, optional deep_review_round); review=<id> reads an imported ah_review; comments is a list of {id, text, quote}. Reads no model. Nothing it returns gates.',
+    parameters: {
+      source: { type: 'string', enum: ['deep_review', 'ah_review', 'text'] },
+      deep_review_key: { type: 'string', description: 'deep_review store key (16 hex) or the manuscript path.' },
+      deep_review_round: { type: 'string', description: 'Round number or run id; default the latest.' },
+      review: { type: 'string', description: 'An imported ah_review id.' },
+      write: { type: 'boolean', description: 'With review: store the tag on each review item.' },
+      comments: { type: 'json', description: 'source=text: [{id, text, quote}].' },
+    },
+  })
+  register(ctx, {
     name: 'ah_fact_propose',
     description: 'Propose a new fact when the text needs a number the project does not define. It is computed from the data first. You cannot add it to the facts file; the author accepts it via ah_author.',
     parameters: {
@@ -830,7 +904,7 @@ export async function apply(ctx) {
   })
   register(ctx, {
     name: 'ah_author',
-    description: 'Author-only Academic Harness acts. The assistant must not call this unless the human explicitly asked in this message. DSH will ask the human to confirm before it runs.',
+    description: 'Author-only Academic Harness acts (accept/reject also decide a proposed rule: use its PRM-/RUB- id). The assistant must not call this unless the human explicitly asked in this message. DSH will ask the human to confirm before it runs.',
     parameters: {
       action: {
         type: 'string',

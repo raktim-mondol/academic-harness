@@ -25,7 +25,9 @@ def check_t5(ctx: Context) -> list[Finding]:
                 f.level = d["level"]
             out.append(f)
     from .t5_format import check_format
+    from .t5_promoted import check_promoted
     from .t5_style import check_style
     out += check_style(ctx)
     out += check_format(ctx)
+    out += check_promoted(ctx)
     return out
