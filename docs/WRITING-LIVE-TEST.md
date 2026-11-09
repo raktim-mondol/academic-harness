@@ -1,11 +1,12 @@
 # Live test plan: the writing compiler (phases 0–6)
 
-What to look for when you run the writing checks for real, on a real manuscript, with a real model and the real registries. The automated suites (294 engine tests, 103 JS test files) include stub models, hand-written external results and faked networks. They check behavior but cannot establish that the checks are *useful*, that real services behave as assumed, or that an agent in a real session uses the tools correctly. That is what this plan is for.
+What to look for when you run the writing checks for real, on a real manuscript, with a real model and the real registries. The automated suites (486 engine tests, 20 of which compile real LaTeX when TeX is installed, and 103 JS test files) include stub models, hand-written external results and faked networks. They check behavior but cannot establish that the checks are *useful*, that real services behave as assumed, or that an agent in a real session uses the tools correctly. That is what this plan is for.
 
 This is a scenario checklist, not a claim that every scenario has passed.
 Recorded runs: [DeepSeek-host report](../reports/writing-compiler-live-2026-11-09.md),
 [initial OpenCode findings](../reports/writing-compiler-opencode-2026-11-09.md),
-and [post-fix corpus/OpenCode verification](../reports/writing-compiler-reliability-2026-11-09.md).
+and [post-fix corpus/OpenCode verification](../reports/writing-compiler-reliability-2026-11-09.md),
+and [the Claude Code host, real-LaTeX and second-model follow-up](../reports/writing-compiler-claude-host-tex-2026-11-09.md).
 Treat every unrecorded expectation below as a hypothesis.
 
 ### Post-fix regression requirements
@@ -18,6 +19,8 @@ Treat every unrecorded expectation below as a hypothesis.
 - Include prose under `appendix/` and a custom folder alongside `sections/`; inspect coverage and plant a defect there.
 - Test valid YAML with invalid field types and malformed admissions: deterministic diagnostics, no traceback or silent pass.
 - Compare source-checkout behavior with a fresh installed package; leave the everyday host and original manuscripts untouched.
+- Run `tests/test_tex_oracle.py` where TeX is installed after any change to `ah/tex/scan.py`: it compiles each case and compares what TeX read, cited, labelled and referenced with what the scanner believes. A scanner change that is not checked against TeX is a guess.
+- Run `scripts/claude-host-test` after any change to the guard or the hooks (S15). A hook that is correct in a unit test can still not be called, or be called and fail open, in the real host.
 
 Opt-in runners: `scripts/writing-compiler-corpus.py` (copied sources only),
 `scripts/writing-compiler-live.py` (explicit hosted model, sampled paragraphs),
@@ -302,11 +305,24 @@ Drive the test DSH instance through its web UI. For each, record whether the age
 - Handles the hook hand-off after `max_loops` by reporting, not looping forever.
 - Long session: the paper-state card and the done line stay in sync after context compaction.
 
+### S15. Host behaviour: is the hook called, and does the denial reach the model? (needs the host)
+
+Unit tests call `ah hook pre|post|stop` with a payload they wrote. A host decides whether to call it, with what, and what it does with the answer. `scripts/claude-host-test` drives real Claude Code sessions (headless with the full hook event stream, and the terminal UI through tmux) inside a bubblewrap sandbox and checks, on the files as well as the hook decisions:
+
+- a protected edit and a shell append are denied and the file is byte-identical; reading the same file with `2>&1` is not denied;
+- every author's act (waive, `rule accept`, `disclosure approve`, `provenance set`, a command wrapped in `script`) is denied with its reason, and nothing is recorded;
+- an edit that adds an unbound number gets the post-edit note, the Stop hook blocks and re-enters the model, the model answers with `ah finding decide`, and the gate stops steering;
+- the host's own approval dialog still appears for an allowed edit and "No" means no; a protected edit never reaches a dialog;
+- the author's `! ah finding waive ... --yes` inside the session works and `ah done` reflects it;
+- no hook crashed or printed a traceback (a failing hook is read by a host as "allow").
+
+Repeat with a stronger and a weaker model: a model that obeys "stop if blocked" literally stops after one denial, which is the right behaviour but changes what a scenario proves. DSH and Pi have their own adapters; run the same intent there (a protected write, an author's act, an edit that raises a blocker) and record what the host does. OpenCode has no adapter: confirm that nothing is enforced there and that the docs say so.
+
 ### S14. Concurrency and robustness
 
 - Two sessions auditing the same project: the ledger and the snapshot do not corrupt (watch for "database is locked").
 - Very large manuscript (50+ files): time for `ah_audit`, `ah_audit stability_runs=3`, `ah_done`. Record seconds.
-- Unusual LaTeX: `\input` chains, `\include`, macros that wrap paragraphs, `\newcommand` heavy preambles, a bilingual document, an `\iffalse` block. Do units and rules behave?
+- Unusual LaTeX: `\input` chains, `\include`, `\subfile`, `\import`, macros that wrap paragraphs, `\newcommand` heavy preambles, a bilingual document, an `\iffalse` block. The scanner's constructs are checked against real TeX (`tests/test_tex_oracle.py`); on your own manuscript compile a copy and compare (the method is in the follow-up report). A path built by a macro is `TEX-06`; an `\end{document}` in an included file is `TEX-09`.
 - Non-ASCII text (accents, Greek letters, CJK in a bilingual paper): the prose view and the quote check must not mangle or reject.
 - Windows line endings; a file with a BOM.
 

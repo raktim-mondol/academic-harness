@@ -21,6 +21,30 @@ A fix loop only converges when the same text gives the same findings. `ah_audit 
 
 It also counts paragraphs with no `%% @unit` anchor. Such a paragraph is keyed by a hash of its text, so any edit to it re-keys every finding it carries and the ledger reports them as fixed and new at once. Run `ah_units` (`ah units sync`) before relying on the ledger; the post-edit hook does this for edits made through the agent.
 
+### Reading TeX: what the scanner understands
+
+The engine does not run TeX to read a document. One static scanner (`ah/tex/scan.py`) finds every citation, reference, label and input for every check, and a differential test compiles small projects with `latexmk` and compares its answers with what TeX actually did (`tests/test_tex_oracle.py`, 20 cases; it runs where TeX is installed and is skipped elsewhere).
+
+| Read as TeX does | Constructs |
+|---|---|
+| Inputs | `\input{f}` and `\input f`, `\include`, `\subfile`, `\import` / `\subimport` (inputs inside an imported file resolve against its directory), `\InputIfFileExists` (a missing file is not an error) |
+| Citations | `\cite` and the natbib and biblatex families (`\citep`, `\textcite`, `\footcite`, `\Cite`, `\supercite`, ...), multi-cites (`\cites{a}{b}`, `\parencites(see)[p. 2]{a}[b]{c}`), `\nocite{..}` and `\nocite{*}` (in the bibliography on purpose, so not "never cited") |
+| References | `\ref`, `\eqref`, `\autoref`, `\cref` / `\Cref`, `\vref`, `\pageref`, `\nameref`, `\labelcref`, ranges (`\crefrange{a}{b}`), `\hyperref[label]{..}` |
+| Labels | `\label{..}` and `label=` in the options of `lstlisting`, `minted`, `\lstinputlisting` |
+| Not markup | `%` comments, `\iffalse ... \fi` and the dead branch of `\iftrue ... \else ... \fi`, the `comment` environment, `\verb`, the bodies of `verbatim`, `lstlisting`, `minted`, `alltt`. A `\fi` inside a comment or a listing ends nothing |
+| Wrapper macros | `\newcommand{\figref}[1]{Fig.~\ref{#1}}` (also `\def\x#1{..}`): the *uses* carry the keys, so `\figref{fig:a}` is a reference to `fig:a`, and `\sect{intro}` over `\input{sections/#1}` reads `sections/intro`. The placeholder in the definition is never a citation, label or file |
+| The end of the document | `\end{document}` in a file read through `\input` or `\include` ends the document: later inputs and the text after it never reach the page (`TEX-09`). `\subfile` and projects that load `standalone` handle their own end |
+
+What it does not do, and says so: a path built from a macro or a parameter (`\input{sections/\chapter}`) is `TEX-06` (info), never guessed, and the files it loads are not audited. A wrapper macro with an optional first argument, a wrapper that calls another wrapper, macros defined in a `.sty` or class file, and conditionals other than `\iffalse` / `\iftrue` are not expanded. Files excluded by `\includeonly` are still audited (their labels still resolve in TeX through the `.aux`). A command used without the package that defines it (natbib's `\citep` under biblatex) is a TeX error that `audit --build` reports, not something the scanner can see.
+
+Measured on 20 real manuscripts compiled from copies (originals untouched): against TeX's own record the scanner agrees on the files read 20 of 20, citations 19, labels 19 and undefined references 20. The exceptions are a manuscript that cites with `\citep` under biblatex (TeX recorded none) and a label a package generates. Its text covers 93.6% to 99.5% (median 98%) of the distinct words in each PDF once the rendered bibliography and code listings are set aside; what remains is hyphenation, math macros (`\kmax`), `\today` and author blocks. The old scanner raised 19 false blocker `TEX-02` findings on this set; they are gone. The text of a document and the PDF are two views, and a paragraph produced by a macro (a `\newcommand` whose body is prose) is read only where it is written.
+
+### The build: pages, overfull boxes, missing glyphs
+
+`ah build` and `ah audit --build` compile the view and read the log. `TEX-01` (blocker) is a TeX error mapped to its paragraph; `TEX-04` (minor) is one overfull-box finding per paragraph ("the text runs 45pt into the margin at worst"), keyed without a line number so it survives edits above it; `TEX-07` (minor) lists characters missing from the font, which print as blanks; `TEX-08` (major) fires when the page count exceeds `build: {max_pages: N}` in `ah.yaml`. The page count is also printed by `ah build`.
+
+A box is tied to a paragraph by the line it starts on and the first words TeX prints after the warning. The open-file stack in the log is only a hint: TeX reports the last paragraph of an included file after that file's closing parenthesis, so the stack names the parent. When two paragraphs match equally the box stays a document-level `TEX-04` instead of being guessed. A build is opt-in and is not part of `ah done`; a page limit is checked when you build.
+
 ### Frozen registry lookups
 
 Crossref and OpenAlex answers drive the reference findings (`citation action=audit`, `integrity_check`). Asked again each time, a timeout, a rate limit or a quiet upstream edit changes the findings while the manuscript is the same. Both tools now read through a lookup snapshot, `.ah/cache/lookups.json` in the workspace:
@@ -53,7 +77,7 @@ Limits: a run of `numbers_audit` without SciPy is a failure, not an empty result
 
 ### The frozen rubric (tier TR)
 
-#### Reliability and OpenCode (rule set 1.9.0)
+#### Reliability, OpenCode and Claude Code as verifiers (rule set 1.9.0 and later)
 
 Only a verified `yes` or valid `no` resolves a paragraph/criterion pair. `unclear`,
 `unverifiable`, failed calls and exhausted budgets remain **unresolved**. They
@@ -100,6 +124,20 @@ implicitly. OpenCode owns authentication; no key belongs in `ah.yaml`. This is
 a verifier bridge, **not** native OpenCode host enforcement of protected paths
 or author approvals. Temperature control is not claimed for this command route.
 Project/global OpenCode instructions may still supplement the verifier context.
+
+For **Claude Code** as the verifier, use the same `json-v1` command route with the full model id (an alias such as `sonnet` is refused, because the answer would change when the alias moves):
+
+```yaml
+verifier:
+  backend: command
+  model: claude-sonnet-5-5
+  revision: claude-v1
+  response_format: json-v1
+  timeout: 200
+  cmd: [python3, -m, ah.verifier.claude, --model, claude-sonnet-5-5]
+```
+
+Each prompt is one `claude -p` call in safe mode, in an empty directory, with no tools, MCP servers, hooks, CLAUDE.md or session file. Only a finished one-turn answer from exactly that model is accepted; anything else is an error and is never cached. Claude Code exposes no temperature, so a re-run can answer differently: the route is repeatable through the verdict cache, not through the model. Models differ, and the difference reaches completion: on 84 (criterion, paragraph) pairs from real manuscripts, GPT-6.1-sol and Sonnet 5.5 agreed on 83, Haiku 5.5 and Sonnet 5.5 on 79; Haiku answered `unclear` on 4 pairs (each would leave an admitted criterion INCOMPLETE) and gave one `yes` the other two rejected. That is agreement between models, not accuracy; admission against your own labels is still the only measure.
 
 Plain-text command backends remain supported with unknown token usage. An
 opt-in `json-v1` adapter returns
@@ -197,6 +235,16 @@ The state card now reads cached rubric and external results like `ah done`,
 without model calls, including carried findings.
 
 **The stop gate** now reads the same tiers: the baseline, the post-edit note and the stop check include the external results when the project has them (tier TX) and the rubric from cached verdicts (only an admitted criterion can then show a finding above info). Set `gate: {judge_touched: true}` (with a `verifier:` backend) and the stop check also judges the files this turn changed against the admitted criteria, so model calls are bounded by what the agent touched and cached verdicts. EXT-00 is left out of the stop gate: any edit makes a stored external result stale and the agent cannot run those tools from the hook, so staleness is reported by `ah_done` instead. Unadmitted rubric hints (info) are not put in post-edit notes.
+
+### Which hosts enforce the guard, and what it stops
+
+The paper-state card, the protected-path guard, the post-edit check and the stop gate are one engine (`ah hook userprompt|pre|post|stop`) behind three host adapters: **Claude Code** (settings from `ah hooks-config`), **DSH** (this plugin, with native approval prompts through `ah_author`) and **Pi**. **OpenCode has no host adapter.** `ah.verifier.opencode` lets an OpenCode model answer rubric questions, but OpenCode does not call the guard, does not stop on the gate and does not ask for author approvals; do not treat an OpenCode session as protected.
+
+An agent's shell cannot, whatever the host: write a protected path (evidence, state, the definition of facts and rules, and the host's own hook settings `.claude/settings.json`), by redirect or by command, though it can read them (`cat facts/facts.yaml 2>&1`); do an author's act (waive a finding, accept or reject a fact or a rule, approve a brief, plan or disclosure, verify a claim, decline a review item, set or fill provenance, admit a criterion, `migrate --force`, anything with `--yes`); or answer the engine's "type yes" through a terminal (`script`, `unbuffer`, `expect`, `pty.spawn`; a terminal's `isatty()` cannot tell a person from a program). The agent asks instead with `ah finding decide`, and the author decides outside the agent (in a terminal, with `! ah finding waive ... --yes` in Claude Code, or `ah_author` in DSH). If the engine itself fails (a typo in `ah.yaml`), `pre` denies Write, Edit and Bash with the reason, reads still work, and the other hooks fail open; `AH_NO_ENFORCE=1` turns enforcement off.
+
+This is a speed bump for a cooperative agent, not a sandbox: a shell can still do what the guard does not read (a script that builds a protected path at run time). The guard stops mistakes and shortcuts; where an act must be a person's, use the host's own approval (DSH `ah_author`) or run the agent in a sandbox.
+
+Verified in real sessions, not only unit tests (`scripts/claude-host-test`, Claude Code 2.1.319): headless scenarios with Haiku 5.5 and Sonnet 5.5, and the terminal UI driven through tmux (14 checks) with Haiku 5.5. Held: a protected edit and a shell append are denied and the file is byte-identical; the author's acts are denied with the reason; an edit that adds an unbound number gets the post-edit note, the Stop hook blocks and re-enters the model, the model hands the finding to the author and the gate stops steering; Claude Code's own approval dialog still appears for an allowed edit ("No" leaves the file untouched); a protected edit gets no dialog at all; and the author waives the finding from inside the session with `!`. Not run: DSH and Pi sessions in this pass (the shared engine code is covered by the tests, and the DSH adapter by `scripts/test-academic-harness.mjs`).
 
 ### Installation and activation
 
