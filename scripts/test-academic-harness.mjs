@@ -137,6 +137,8 @@ ok('ah_audit judge implies --rubric and adds --judge', (() => { const a = toolAr
 ok('ah_audit judge_limit needs judge', !toolArgv('ah_audit', { judge_limit: 5 }).includes('--judge-limit') && toolArgv('ah_audit', { judge: true, judge_limit: 5 }).join(' ').includes('--judge-limit 5'))
 ok('ah_audit without rubric has no rubric flags', !toolArgv('ah_audit', {}).some((a) => /rubric|judge/.test(a)))
 ok('ah_check rubric adds --rubric', toolArgv('ah_check', { rubric: true }).includes('--rubric'))
+ok('ah_precision argv', JSON.stringify(toolArgv('ah_precision', {})) === JSON.stringify(['precision']) && JSON.stringify(toolArgv('ah_precision', { checks: ['FMT-08', 'ACR-*'], min_decisions: 5, min_precision: 0.8 })) === JSON.stringify(['precision', '--checks', 'FMT-08,ACR-*', '--min-decisions', '5', '--min-precision', '0.8']))
+ok('ah_precision ignores nonsense thresholds', JSON.stringify(toolArgv('ah_precision', { min_decisions: 0, min_precision: 7 })) === JSON.stringify(['precision']))
 ok('ah_rubric list argv', JSON.stringify(toolArgv('ah_rubric', {})) === JSON.stringify(['rubric', 'list']))
 ok('ah_rubric run argv with criteria, judge and files', JSON.stringify(toolArgv('ah_rubric', { action: 'run', criterion: ['RUB-CAUSAL', 'RUB-GENERAL'], judge: true, judge_limit: 3, files: ['a.tex'] })) === JSON.stringify(['rubric', 'run', 'RUB-CAUSAL', 'RUB-GENERAL', '--judge', '--judge-limit', '3', '--file', 'a.tex']))
 ok('ah_rubric run without judge asks nothing', !toolArgv('ah_rubric', { action: 'run' }).includes('--judge'))
@@ -370,6 +372,8 @@ try {
       const rubric = spawnSync(ah, ['rubric', 'list', '--project', paper, '--json'], { encoding: 'utf8', timeout: 60_000 })
       let listed = null
       try { listed = JSON.parse(rubric.stdout) } catch { /* reported below */ }
+      const fmtCheck = spawnSync(ah, ['catalogue', '--json'], { encoding: 'utf8', timeout: 60_000 })
+      ok('the installed engine knows the format rules', fmtCheck.status === 0 && /FMT-08/.test(fmtCheck.stdout) && /ACR-01/.test(fmtCheck.stdout), (fmtCheck.stderr || fmtCheck.stdout).slice(0, 200))
       ok('the installed engine ships the bundled rubric criteria', rubric.status === 0 && listed?.criteria?.some((c) => c.id === 'RUB-CAUSAL' && c.admitted === false && c.effective_level === 'info'), (rubric.stderr || rubric.stdout).slice(0, 240))
       const hook = spawnSync(ah, ['hook', 'pre'], {
         encoding: 'utf8',

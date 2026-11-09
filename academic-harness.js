@@ -123,6 +123,16 @@ export function toolArgv(name, args = {}, cwd) {
       if (Number.isInteger(runs) && runs >= 2) extra.push('--stability', String(Math.min(runs, 20)))
       return ['audit', ...extra]
     }
+    case 'ah_precision': {
+      const argv = ['precision']
+      const checks = strList(args.checks)
+      if (checks.length) argv.push('--checks', checks.join(','))
+      const decisions = Number(args.min_decisions)
+      if (Number.isInteger(decisions) && decisions >= 1) argv.push('--min-decisions', String(decisions))
+      const precision = Number(args.min_precision)
+      if (precision > 0 && precision <= 1) argv.push('--min-precision', String(precision))
+      return argv
+    }
     case 'ah_rubric': {
       const action = String(args.action || 'list').toLowerCase()
       const ids = strList(args.criterion)
@@ -503,6 +513,15 @@ export async function apply(ctx) {
       judge: { type: 'boolean', description: 'Tier TR with model calls for paragraphs that have no cached verdict (needs a verifier: section in ah.yaml). One call per criterion and changed paragraph; unchanged paragraphs are never asked again.' },
       judge_limit: { type: 'integer', description: 'With judge: most model calls in this run.' },
       stability_runs: { type: 'integer', description: 'Also run the checks N times (2-20) on the unchanged text and report findings that come and go, plus paragraphs without a stable anchor. Exit status 2 when unstable.' },
+    },
+  })
+  register(ctx, {
+    name: 'ah_precision',
+    description: 'How well the format and consistency rules (ACR-*, FMT-*) are doing on THIS document, from the author\'s own decisions: per rule, findings fixed against findings waived, a precision estimate, and whether there are enough decisions to consider promoting a rule from info to minor. Read-only. Promoting a rule is the author editing `levels:` in ah.yaml; you cannot.',
+    parameters: {
+      checks: { oneOf: [{ type: 'string' }, { type: 'array', items: { type: 'string' } }], description: 'Check ids or globs, e.g. FMT-08 or FMT-*. Default ACR-* and FMT-*.' },
+      min_decisions: { type: 'integer', description: 'Decisions (fixed + waived) needed before a verdict. Default 10.' },
+      min_precision: { type: 'number', description: 'Precision needed to suggest promoting a rule, 0-1. Default 0.9.' },
     },
   })
   register(ctx, {

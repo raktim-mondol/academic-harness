@@ -68,6 +68,32 @@ New findings are `RUB-01` (cause `evidence-changed` when the model's first verdi
 
 Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry is only reused for the same model name, so changing models re-judges everything (and voids admissions). Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
 
+### Format and consistency rules (ACR-*, FMT-*)
+
+Asked to "check the formatting", a reviewer notices something different each time. These thirteen rules are the part of that job with an exact answer. They read the paragraphs of the LaTeX source (comments gone; citations, references, maths and code spans replaced by a placeholder, never deleted, so removing them cannot make two words look adjacent) and need no model.
+
+| Check | Flags |
+|---|---|
+| ACR-01 | an acronym used before it is defined, used but never defined, or defined twice (a second definition in the abstract is expected). A definition is "long form (ABC)" or "ABC (long form)" **whose initials spell the acronym**; identifiers such as `PRF-03`, code spans, a few hundred common terms and any acronym that only appears in sentences that cite a source (a cited system's name) are not flagged |
+| ACR-02 | an acronym that is defined and never used again |
+| FMT-01 | a number and an unambiguous unit (`ms`, `GB`, `kHz`, ...) separated by an ordinary space, so they can break across a line; write `5~ms` or `\SI{5}{ms}` |
+| FMT-02 | both `%` and the word "percent" |
+| FMT-03 | plain `\cite` mixed with `\citep`/`\citet`, or different from the declared style |
+| FMT-04 | a parenthetical citation before the full stop in some places and after it in others (a narrative citation, "Smith et al. \cite{x} showed", is neither) |
+| FMT-05 | a figure or table with no `\label`, never referred to, or (if declared) appearing before it is first mentioned |
+| FMT-06 | sentence-case and title-case headings mixed within a heading level (short headings and those with proper nouns cannot be told apart and are left alone) |
+| FMT-07 | US and UK spelling mixed (`color`/`colour`, `normalize`/`normalise`, `modeling`/`modelling`, ...) |
+| FMT-08 | a repeated word ("the the"; "that that" and "had had" are allowed) |
+| FMT-09 | one term written in several forms (`dataset`, `data set`, `data-set`; `email`/`e-mail`), or a glossary term with `variants:` (forms the glossary lists as `banned` stay COH-01's) |
+| FMT-10 | `e.g.,` with the comma in some places and without in others |
+| FMT-11 | a sentence longer than `sentence_max_words` (default 60) |
+
+Two kinds of rule. A **fact about one place** (a repeated word, a long sentence). A **consistency rule over the document** (spelling, `%`, citation commands, `e.g.,`): which form is right is the author's choice, so the rule flags the *minority* form, the one that disagrees with the rest (on a tie, the one that appeared later). Declare the form and it flags whatever departs from it. Settings live under `style.format` in `ah.yaml` (or a profile's defaults): `cite: natbib|cite|any`, `percent: symbol|word|any`, `spelling: us|uk|any`, `heading_case: sentence|title|any`, `eg_comma: yes|no|any`, `sentence_max_words`, `figure_refs_before`, `acronyms_known: [...]`, `acronym_redefine_in: [globs]`.
+
+**Every one ships at info.** They appear in `ah_audit` and the ledger, but not in the agent's post-edit note and not in the gate, so a low-precision hint never makes an agent rewrite text that was fine. Promote one for your document with `levels: {FMT-08: minor}` in `ah.yaml`, or silence it with `off`. `ah_precision` (CLI `ah precision`) is how to decide: for each rule it counts the findings you **fixed** (the text changed and the finding went away) against those you **waived** (you said the text was fine), gives a precision estimate, and says "consider promoting" only after at least 10 decisions at 0.9 or better. That is your evidence, on your text.
+
+What is and is not evidence here. The rules ship with 75 labelled fixture cases, one that must fire and one that must stay silent per behaviour. I wrote both the rules and the cases, so that is regression evidence (a rule that changes breaks a case), not a measure of accuracy. On one real 169-paragraph manuscript (a copy of `paper/rsi-local`) the first run gave 65 findings; reading them exposed four kinds of false positive (check identifiers such as `PRF-03`, names of cited systems, a run-in `\paragraph{...}` heading counted into the sentence after it, and `catalogue`), which were fixed, leaving 18. By my reading 8 were right (two tables never referred to, three sentences of 62 to 82 words, three genuinely undefined acronyms) and 10 were not (check-family names such as BIB and NUM used as plain words, and file formats such as NPY). The fixes were made on that same paper, so this is not a held-out result, and ACR-01 is the weakest rule on text that names many systems: add those names to `acronyms_known`. Headings are not units, so FMT-06 findings are at file level, and acronyms in headings are not checked. Reading order for ACR-01 is the order of the prose files.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).
@@ -81,6 +107,7 @@ On first mount the plugin prepares a local `.venv` next to that vendored tree (v
 | `ah_profile` / `ah_init` / `ah_migrate` | anyone | List document types; scaffold a new project; overlay `ah.yaml` on an existing LaTeX tree (dry-run first; apply needs `confirm`) |
 | `ah_state` / `ah_inventory` / `ah_check` / `ah_audit` / `ah_config` / `ah_catalogue` | anyone | Paper-state card; coverage counts; cheap checks; full audit with ledger; project config; check catalogue |
 | `ah_external` | anyone | Run numbers_audit, figure_audit and the citation audit on the project and store their findings (`.ah/external/`) so `ah_audit external=use` gives them IDs and ledger states; `plan`, `status` |
+| `ah_precision` | anyone | For the format rules (ACR-*, FMT-*): findings you fixed against findings you waived, a precision estimate per rule, and whether there are enough decisions to consider promoting one. Read-only |
 | `ah_rubric` | anyone | The frozen rubric (tier TR): `list` criteria, `run` them (with `judge` the model is asked about paragraphs with no cached verdict), `sheet` a labelling sheet. Admitting a criterion is `ah_author action=rubric-admit` |
 | `ah_units` / `ah_fact` / `ah_bind` / `ah_fact_propose` / `ah_sweep` | anyone | Sync `%% @unit` anchors; list/build/check facts; suggest number→fact bindings; propose a new fact; find every use of a value |
 | `ah_source` / `ah_source_search` / `ah_claims` / `ah_claims_sync` / `ah_claims_bind` | anyone | Register/list sources; quote-located passages; claim sidecars; bind a claim to a source or fact |

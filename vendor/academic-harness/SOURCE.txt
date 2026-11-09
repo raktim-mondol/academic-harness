@@ -30,6 +30,8 @@ Python package modified in this plugin (the vendored tree is maintained here as 
   criteria judged per paragraph by the verifier backend, quote-checked, cached on (criterion, paragraph,
   model, prompt version), unjudged pairs carried in the ledger; `ah rubric list|run|sheet|admit`,
   admission against hand labels (Cohen's kappa, precision). New checks RUB-01/02; rubric 1.4.0.
+- ah/checks/t5_format.py: thirteen format and consistency rules (ACR-01/02, FMT-01..11), all at info, advisory
+  in hooks; `ah precision` (fixed against waived per rule, from the ledger). Rubric 1.5.0.
 
 Local DSH patch (ahead of upstream): registry --keys citation-key aliases
 (entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt

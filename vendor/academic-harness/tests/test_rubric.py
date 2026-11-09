@@ -146,7 +146,8 @@ def test_an_unadmitted_criterion_reports_at_info_and_cannot_gate(project_dir):
     assert all("every benchmark we examined" in f["message"] and f["unit"] and f["file"] == "sections/04_experiments/index.tex" for f in found)
     assert rep["rubric_run"]["yes"] == 2 and rep["rubric_run"]["admitted"] == []
     assert not any(f["level"] in ("blocker", "major") for f in found)
-    assert rep["rubric"] == "1.4.0", "the engine's rubric version is still there, not the run's stats"
+    from ah import RUBRIC_VERSION
+    assert rep["rubric"] == RUBRIC_VERSION, "the engine's rubric version is still there, not the run's stats"
 
 
 def test_an_unchanged_paragraph_is_never_asked_twice(project_dir):

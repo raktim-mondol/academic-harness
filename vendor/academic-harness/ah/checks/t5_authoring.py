@@ -24,6 +24,8 @@ def check_t5(ctx: Context) -> list[Finding]:
             if d["check"] not in (cfg.get("levels") or {}):
                 f.level = d["level"]
             out.append(f)
+    from .t5_format import check_format
     from .t5_style import check_style
     out += check_style(ctx)
+    out += check_format(ctx)
     return out
