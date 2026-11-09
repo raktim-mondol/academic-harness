@@ -97,21 +97,8 @@ def _load_yaml(p: Path, key: str):
 
 
 def _reachable(project: Project, texts: dict[str, str]) -> set[str]:
-    seen, stack = set(), [project.rel(p) for p in project.view_files()]
-    while stack:
-        cur = stack.pop()
-        if cur in seen or cur not in texts:
-            continue
-        seen.add(cur)
-        base = Path(cur).parent
-        for inc in RE_INPUT.findall(texts[cur]):
-            cand = inc if inc.endswith(".tex") else inc + ".tex"
-            for c in ((base / cand).as_posix(), Path(cand).as_posix()):
-                c = str(Path(c))
-                if c in texts:
-                    stack.append(c)
-                    break
-    return seen
+    from .tex.inputs import input_graph
+    return set(input_graph(texts, [project.rel(p) for p in project.view_files()])["reachable"])
 
 
 def build_context(project: Project) -> Context:

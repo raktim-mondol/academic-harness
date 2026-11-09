@@ -50,8 +50,10 @@ def _iter_tex(root: Path) -> list[Path]:
 
 
 def _guess_profile(texts: list[str]) -> str:
-    blob = "\n".join(texts).lower()
+    blob = strip_comments("\n".join(texts)).lower()
     for name, keys in PROFILE_HINTS:
+        if name == "grant/proposal" and not re.search(r"\\(?:title|(?:sub)*section)\*?\{[^}]*(?:proposal|specific aims|work packages|budget)", blob):
+            continue
         if sum(1 for k in keys if k in blob) >= (2 if name != "paper/journal-empirical" else 1):
             return name
     return "generic"
@@ -62,10 +64,16 @@ def _prose_globs(root: Path, views: list[str], tex_files: list[Path]) -> list[st
     view_set = set(views)
     globs = []
     for dirname, glob in (("sections", "sections/**/*.tex"), ("chapters", "chapters/**/*.tex"),
-                          ("appendices", "appendices/**/*.tex"), ("paper/chapters", "paper/chapters/**/*.tex"),
+                          ("appendices", "appendices/**/*.tex"), ("appendix", "appendix/**/*.tex"),
+                          ("paper/chapters", "paper/chapters/**/*.tex"), ("paper/appendix", "paper/appendix/**/*.tex"),
                           ("paper/appendices", "paper/appendices/**/*.tex")):
         if any(r == dirname or r.startswith(dirname + "/") for r in rels):
             globs.append(glob)
+    from .tex.inputs import input_graph, supporting_file
+    texts = {_rel(root, p): strip_comments(p.read_text(errors="replace")) for p in tex_files}
+    for rel in input_graph(texts, views)["reachable"]:
+        if rel not in view_set and not supporting_file(rel, texts[rel]) and not any((root / rel).match(g) for g in globs):
+            globs.append(rel)
     if globs:
         return globs
     others = [r for r in rels if r not in view_set and not r.startswith("macros/")]
@@ -132,6 +140,13 @@ def scan(root: Path) -> dict[str, Any]:
     texts = [(p.read_text(errors="replace") if p.stat().st_size < 2_000_000 else "") for p in tex_files]
     profile = _guess_profile(texts)
     prose = _prose_globs(root, views, tex_files)
+    from .tex.inputs import input_graph, supporting_file
+    text_map = {_rel(root, p): strip_comments(t) for p, t in zip(tex_files, texts)}
+    graph = input_graph(text_map, views)
+    covered = sorted({p.relative_to(root).as_posix() for g in prose for p in root.glob(g) if p.is_file()})
+    scope = dict(graph, audited=covered, roots=views,
+                 supporting=sorted(r for r in graph["reachable"] if supporting_file(r, text_map[r])),
+                 unreachable=sorted(set(text_map) - set(graph["reachable"])))
     inputs = []
     for p, t in zip(tex_files, texts):
         if _rel(root, p) in views:
@@ -152,6 +167,8 @@ def scan(root: Path) -> dict[str, Any]:
         "tex_files": [_rel(root, p) for p in tex_files],
         "prose_globs": prose,
         "profile": profile,
+        "coverage": scope,
+        "profile_inference": {"selected": profile, "note": "Heuristic only; select --profile explicitly when ambiguous."},
         "inputs_from_views": inputs,
         "literals": lits,
         "literal_repeats": [{"text": t, "pct": pct, "n": n} for (t, pct), n in counts.most_common()],
@@ -164,7 +181,7 @@ def _outline(scan_res: dict) -> dict:
     sections = []
     root = Path(scan_res["root"])
     for rel in scan_res["tex_files"]:
-        if rel in scan_res["views"] or not rel.startswith("sections/"):
+        if rel in scan_res["views"] or rel not in scan_res.get("coverage", {}).get("audited", []):
             continue
         purpose = Path(rel).stem.replace("_", " ")
         p = root / rel
@@ -252,6 +269,10 @@ def plan(root: Path, *, profile: str | None = None, dest: Path | None = None, fa
                 continue  # init-only prose; migrate keeps the author's files
             writes.setdefault(rel, text)
     warnings = []
+    if scan_res.get("coverage", {}).get("unresolved"):
+        warnings.append("some input files could not be resolved; inspect scan.coverage.unresolved before trusting coverage")
+    if scan_res["profile"] == "generic" and not profile:
+        warnings.append("document profile is ambiguous; using generic (select --profile explicitly)")
     if scan_res["has_ah_yaml"] and dest == Path(scan_res["root"]).resolve():
         warnings.append("ah.yaml already exists; --apply needs --force to overwrite it")
     if not scan_res["bib"]:
@@ -269,7 +290,7 @@ def plan(root: Path, *, profile: str | None = None, dest: Path | None = None, fa
         recs.insert(0, "Binding rewrites prose: each repeated literal becomes \\fact{id}. Review the diff.")
     return {
         "scan": {k: scan_res[k] for k in ("root", "name", "views", "documentclass", "bib", "prose_globs",
-                                          "profile", "tex_files", "has_ah_yaml") if k in scan_res},
+                                           "profile", "tex_files", "has_ah_yaml", "coverage", "profile_inference") if k in scan_res},
         "profile": prof,
         "dest": str(dest),
         "writes": {k: {"bytes": len(v), "sha1": sha1(v, 12)} for k, v in writes.items()},

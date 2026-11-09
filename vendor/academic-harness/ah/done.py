@@ -85,19 +85,26 @@ def done_status(project: Project, rep: dict, now: datetime | None = None) -> dic
 
     # rubric
     run = rep.get("rubric_run") or {}
-    from .rubric import admitted_ids
+    from .rubric import admitted_ids, load_criteria
     admitted = admitted_ids(project)
+    rubric_problems = load_criteria(project)[1]
     need_rubric = "rubric" in st["require"] or bool(admitted)
     if "TR" in tiers:
-        adm = run.get("admitted") or admitted
-        bad = [f for f in live if f["check"] == "RUB-01" and f.get("level") != "info" and f["unit"] is not None]
-        unjudged = sum((run.get("per_criterion") or {}).get(cid, {}).get("unjudged", 0) for cid in adm)
-        if bad:
-            comps.append(_c("rubric", "fail", f"{len(bad)} open finding(s) from admitted criteria: " + ", ".join(sorted({f['message'].split(':')[0] for f in bad}))))
+        adm = sorted(set(run.get("admitted") or []) | set(admitted))
+        bad = [f for f in live if f["check"] == "RUB-01" and f.get("key") in adm and f["unit"] is not None]
+        unjudged = sum((run.get("per_criterion") or {}).get(cid, {}).get("unresolved",
+                      (run.get("per_criterion") or {}).get(cid, {}).get("unjudged", 1)) for cid in adm)
+        if rubric_problems:
+            comps.append(_c("rubric", "fail", f"{len(rubric_problems)} rubric configuration problem(s): " + "; ".join(p.message for p in rubric_problems[:3])))
+        elif bad:
+            comps.append(_c("rubric", "fail", f"{len(bad)} open finding(s) from admitted criteria: " + ", ".join(sorted({f['key'] for f in bad}))
+                            + (f"; {unjudged} unresolved pair(s)" if unjudged else "")))
         elif unjudged:
-            comps.append(_c("rubric", "not-checked", f"{unjudged} paragraph(s) have no verdict from an admitted criterion (run with judge=true)", True))
+            comps.append(_c("rubric", "not-checked", f"{unjudged} paragraph(s) have no verdict resolving an admitted criterion (missing, unclear, unverifiable or failed; judge missing pairs or explicitly retry unresolved)", True))
         else:
             comps.append(_c("rubric", "ok", f"{len(adm)} admitted criteria, no open finding" if adm else "no admitted criterion, so the rubric does not gate"))
+    elif rubric_problems:
+        comps.append(_c("rubric", "fail", "; ".join(p.message for p in rubric_problems[:3])))
     elif need_rubric:
         comps.append(_c("rubric", "not-checked", f"{len(admitted)} admitted criteria exist but this run did not read the rubric (rubric=true)" if admitted
                         else "required, but this run did not read the rubric", True))
@@ -140,6 +147,10 @@ def done_status(project: Project, rep: dict, now: datetime | None = None) -> dic
     else:
         comps.append(_c("lookups", "ok", f"{snap['entries']} registry answer(s), oldest {snap['age_days']} days (limit {maxd or 'none'})"))
 
+    if run.get("invalidated_admissions"):
+        for comp in comps:
+            if comp["id"] == "rubric":
+                comp["detail"] += "; admissions invalidated (remeasure with the author): " + ", ".join(run["invalidated_admissions"])
     failing = [c for c in comps if c["status"] == "fail"]
     missing = [c for c in comps if c["status"] == "not-checked" and c["required"]]
     status = "fail" if failing else ("incomplete" if missing else "pass")

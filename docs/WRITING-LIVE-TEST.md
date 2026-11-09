@@ -1,8 +1,29 @@
 # Live test plan: the writing compiler (phases 0–6)
 
-What to look for when you run the writing checks for real, on a real manuscript, with a real model and the real registries. The automated tests (234 engine tests, 103 JS test files) use fakes: a stub model, hand-written external results, a faked network. They prove the code does what it says. They cannot show that the checks are *useful*, that the real services behave as assumed, or that an agent in a real session uses the tools correctly. That is what this plan is for.
+What to look for when you run the writing checks for real, on a real manuscript, with a real model and the real registries. The automated suites (294 engine tests, 103 JS test files) include stub models, hand-written external results and faked networks. They check behavior but cannot establish that the checks are *useful*, that real services behave as assumed, or that an agent in a real session uses the tools correctly. That is what this plan is for.
 
-Nothing here has been run against a real hosted model, a live Crossref/OpenAlex, a real `deep_review` round, or a long agent session. Treat every "expected" below as a hypothesis, and record what you actually saw.
+This is a scenario checklist, not a claim that every scenario has passed.
+Recorded runs: [DeepSeek-host report](../reports/writing-compiler-live-2026-11-09.md),
+[initial OpenCode findings](../reports/writing-compiler-opencode-2026-11-09.md),
+and [post-fix corpus/OpenCode verification](../reports/writing-compiler-reliability-2026-11-09.md).
+Treat every unrecorded expectation below as a hypothesis.
+
+### Post-fix regression requirements
+
+- Pin the Python import path as well as the model: a bundled venv may contain an older installed engine. Record `ah.__file__` and `RUBRIC_VERSION`.
+- Test `yes -> unclear/unverifiable/error` on an admitted pair: keep the finding, never `fixed`. Test a clean document with admitted uncertainty: exit 3, not PASS.
+- Test admission with uncertain labels: refuse it; do not count uncertainty as a negative label.
+- Switch model arguments beyond character 60, endpoint, adapter revision and command argument boundaries: evidence identity must change. Legacy admissions require remeasurement.
+- Exhaust a small request budget with invalid quotes under concurrent workers: count every attempt and never exceed the budget.
+- Include prose under `appendix/` and a custom folder alongside `sections/`; inspect coverage and plant a defect there.
+- Test valid YAML with invalid field types and malformed admissions: deterministic diagnostics, no traceback or silent pass.
+- Compare source-checkout behavior with a fresh installed package; leave the everyday host and original manuscripts untouched.
+
+Opt-in runners: `scripts/writing-compiler-corpus.py` (copied sources only),
+`scripts/writing-compiler-live.py` (explicit hosted model, sampled paragraphs),
+and `scripts/writing-compiler-external-live.mjs` (real external tools on scratch
+copies). Keep corpus manifests and raw outputs private: they contain local paths
+and manuscript excerpts. These runners do not measure independent rubric accuracy.
 
 Design background: [WRITING.md](WRITING.md) (what each tier does) and the plan it implements ("a writing compiler": the same text gives the same findings, so a fix loop converges).
 

@@ -61,6 +61,13 @@ def check_t0(ctx: Context) -> list[Finding]:
                 f"{rel} is the build root but holds {words} words of prose, and no check reads a root file: "
                 f"move the text into section files that the root \\input{{}}s (then `ah units sync`)")
 
+    # ---- included prose not selected by tex.prose ----
+    from ..tex.units import parse_file
+    for rel in ctx.project.input_coverage()["omitted"]:
+        parsed = parse_file(ctx.project, ctx.project.tex_root / rel)
+        if any(u.words >= 12 for u in parsed.units):
+            add("UNIT-04", None, rel, None, "coverage:omitted", f"{rel} is included from a view but excluded from tex.prose; add it to audit coverage")
+
     # ---- file size (LAT-02) ----
     lim = cfg["limits"]
     for pf in ctx.parsed:

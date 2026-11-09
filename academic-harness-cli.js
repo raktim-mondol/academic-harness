@@ -29,7 +29,7 @@ const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['
 export const LOG = '[academic-harness] ah'
 export const MIN_AH_VERSION = '0.1.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh12'
+const BUNDLE_REV = 'dsh13'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 

@@ -76,7 +76,10 @@ def render_report(rep: dict, limit: int = 25) -> str:
         r = rep["rubric_run"]
         lines.append(f"rubric: {r['criteria']} criteria over {r['units']} units: {r['yes']} failed, {r['no']} passed, {r['unclear']} unclear, "
                      f"{r['unverifiable']} unverifiable quote(s), {r['unjudged_count']} not judged (carried); model calls {r['calls']} (cached {r['cached']}); "
-                     f"admitted: {', '.join(r['admitted']) or 'none'}")
+                      f"admitted: {', '.join(r['admitted']) or 'none'}")
+        lines.append(f"rubric unresolved: {r.get('unresolved_count', 0)} {r.get('unresolved_reasons', {})}; usage complete: {r.get('usage_complete', False)}")
+        if r.get("invalidated_admissions"):
+            lines.append("admissions need remeasurement (identity/protocol/question changed): " + ", ".join(r["invalidated_admissions"]))
     if rep.get("external"):
         lines.append("external: " + "; ".join(
             f"{t} {i['status']}" + (f" ({i['findings']})" if i["status"] == "fresh" else "") for t, i in rep["external"]["tools"].items()))
@@ -222,13 +225,13 @@ def cmd_facts(a):
 def _build_backend(a, p, flag: str | None):
     """The model backend from `verifier:` in ah.yaml. `flag` is the option that asks for model calls (None: always)."""
     from .verifier.backends import get_backend
-    if flag and not getattr(a, flag, False):
-        return None
     if getattr(a, "model", None) or getattr(a, "provider", None):
         p.cfg.setdefault("verifier", {}).update({k: v for k, v in (("model", a.model), ("provider", a.provider)) if v})
         p.cfg["verifier"].setdefault("backend", "pi")
     if getattr(a, "thinking", None) is not None:
         p.cfg.setdefault("verifier", {})["thinking"] = a.thinking
+    if flag and not getattr(a, flag, False):
+        return None
     b = get_backend(p.cfg)
     if b is None:
         raise SystemExit(f"{'--' + flag if flag else 'this'} needs a `verifier:` section in ah.yaml (backend: pi|http|command)")
@@ -246,7 +249,7 @@ def _rubric_backend(a, p):
 
 def _t3kw(a):
     return {"use_cache": not getattr(a, "no_cache", False), "limit": getattr(a, "limit_claims", 0) or 0,
-            "only_files": getattr(a, "file", None) or None}
+            "only_files": getattr(a, "file", None) or None, "retry_unresolved": getattr(a, "retry_unresolved", False)}
 
 
 def _narrow(rep: dict, files: list[str] | None, brief: bool) -> dict:
@@ -288,7 +291,7 @@ def cmd_done(a):
     from .rubric import load_criteria
     p = _proj(a)
     if not getattr(a, "tiers", None):
-        if load_criteria(p)[0]:
+        if any(load_criteria(p)):
             a.rubric = True
         if getattr(a, "external", None) is None and (external_results(p) or (p.cfg.get("external") or {}).get("required")):
             a.external = ""
@@ -416,6 +419,7 @@ def cmd_rubric(a):
     from .rubric import (ADMISSIONS_FILE, admission_failures, agreement, configured_model, in_scope, is_admitted, load_admissions,
                          load_criteria, load_labels, write_admission)
     from .verifier.verify import Cache
+    from .verifier.backends import configured_identity
     p = _proj(a)
     crits, problems = load_criteria(p)
     adm = load_admissions(p)
@@ -425,8 +429,8 @@ def cmd_rubric(a):
         print(f"rubric problem: {pr.message}", file=sys.stderr)
 
     if a.action == "list":
-        rows = [{"id": c.id, "version": c.version, "level": c.level, "admitted": is_admitted(c, adm, model),
-                 "effective_level": c.level if is_admitted(c, adm, model) else "info", "origin": c.origin, "scope": c.files,
+        rows = [{"id": c.id, "version": c.version, "level": c.level, "admitted": is_admitted(c, adm, model, configured_identity(p.cfg)),
+                 "effective_level": c.level if is_admitted(c, adm, model, configured_identity(p.cfg)) else "info", "origin": c.origin, "scope": c.files,
                  "question": c.question} for c in crits]
         if a.json:
             print(json.dumps({"model": model, "criteria": rows, "problems": [pr.message for pr in problems]}, indent=1))
@@ -446,7 +450,7 @@ def cmd_rubric(a):
         ctx = build_context(p)
         backend = _rubric_backend(a, p)
         findings, stats = run_rubric(ctx, backend, use_cache=not a.no_cache, limit=a.judge_limit or 0, only_files=a.file or None,
-                                     only_criteria=ids or None)
+                                      only_criteria=ids or None, retry_unresolved=getattr(a, "retry_unresolved", False))
         out = {"stats": _rubric_stats_json(stats), "findings": [f.to_dict() for f in findings]}
         if a.json:
             print(json.dumps(out, indent=1))
@@ -508,8 +512,8 @@ def cmd_rubric(a):
             elif lab["hash"] and lab["hash"] != u.hash:
                 skipped["stale"].append(lab["unit"])
             else:
-                v = judge_cached(crit, u, backend, cache, backend.model)
-                if v is None or v.answer == "error":
+                v = judge_cached(crit, u, backend, cache, backend.identity)
+                if v is None or v.answer not in ("yes", "no"):
                     skipped["not_judged"].append(lab["unit"])
                 else:
                     pairs.append((v.answer == "yes", lab["label"]))
@@ -517,12 +521,19 @@ def cmd_rubric(a):
         fails = admission_failures(stats, a.min_labels, a.min_per_class, a.min_kappa, a.min_precision)
         if skipped["not_judged"]:
             fails.append(f"{len(skipped['not_judged'])} labelled paragraph(s) could not be judged; run again")
+        if problems:
+            fails.append("rubric configuration has errors; repair them before admitting a criterion")
+        if (p.cfg.get("verifier") or {}).get("backend") == "command" and not (p.cfg.get("verifier") or {}).get("revision"):
+            fails.append("command-backend admission requires verifier.revision and an explicit verifier.model")
+        if (p.cfg.get("verifier") or {}).get("backend") == "command" and not (p.cfg.get("verifier") or {}).get("model"):
+            if not any("command-backend" in f for f in fails):
+                fails.append("command-backend admission requires an explicit verifier.model")
         result = {"criterion": crit.id, "model": backend.model, "agreement": stats, "skipped": skipped, "failures": fails,
                   "admitted": False, "thresholds": {"min_labels": a.min_labels, "min_per_class": a.min_per_class, "min_kappa": a.min_kappa,
                                                     "min_precision": a.min_precision}}
         if not fails and a.yes:
             sha = hashlib.sha256(labels_path.read_bytes()).hexdigest()[:16]
-            write_admission(p, crit, backend.model, stats, sha)
+            write_admission(p, crit, backend.model, stats, sha, identity=backend.identity)
             result["admitted"] = True
         if a.json:
             print(json.dumps(result, indent=1))
@@ -1017,6 +1028,7 @@ def main(argv=None) -> int:
         sp.add_argument("--rubric", action="store_true", help="add tier TR: the frozen rubric, from cached verdicts (no model calls)")
         sp.add_argument("--judge", action="store_true", help="tier TR with model calls for paragraphs that have no cached verdict (implies --rubric)")
         sp.add_argument("--judge-limit", type=int, default=0, metavar="N", help="most rubric model calls in one run (0 = no cap)")
+        sp.add_argument("--retry-unresolved", action="store_true", help="explicitly rejudge cached unclear/unverifiable answers (with --judge)")
         sp.add_argument("--external", nargs="?", const="", default=None, metavar="DIR",
                         help="add tier TX: results of external tools (default .ah/external); stale ones are reported as EXT-00")
         if name == "audit":
@@ -1047,6 +1059,7 @@ def main(argv=None) -> int:
     sp.add_argument("ids", nargs="*", help="criterion ids (sheet and admit take exactly one)")
     sp.add_argument("--judge", action="store_true", help="run: ask the model for paragraphs with no cached verdict")
     sp.add_argument("--judge-limit", type=int, default=0, metavar="N")
+    sp.add_argument("--retry-unresolved", action="store_true", help="run: rejudge cached uncertain answers with --judge")
     sp.add_argument("--no-cache", action="store_true")
     sp.add_argument("--file", action="append", help="run: only paragraphs in this file (relative to the TeX root)")
     sp.add_argument("--limit", type=int, default=0, help="sheet: most paragraphs listed")

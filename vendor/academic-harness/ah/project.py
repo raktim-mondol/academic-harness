@@ -118,6 +118,19 @@ class Project:
     def bib_files(self) -> list[Path]:
         return [self.tex_root / b for b in self.cfg["tex"]["bib"] if (self.tex_root / b).exists()]
 
+    def input_coverage(self) -> dict:
+        from .tex.inputs import input_graph, supporting_file
+        from .tex.text import strip_comments
+        texts = {self.rel(p): strip_comments(p.read_text(errors="replace")) for p in self.all_tex_files()}
+        views = [self.rel(p) for p in self.view_files()]
+        graph = input_graph(texts, views)
+        audited = sorted(self.rel(p) for p in self.prose_files())
+        supporting = sorted(r for r in graph["reachable"] if supporting_file(r, texts[r]))
+        excluded = set(views) | set(audited) | set(supporting)
+        return dict(graph, audited=audited, roots=views, supporting=supporting,
+                    omitted=sorted(set(graph["reachable"]) - excluded),
+                    unreachable=sorted(set(texts) - set(graph["reachable"])))
+
     def protected_globs(self) -> list[str]:
         """Paths an agent must not write (design 10.4): evidence, state, definitions of facts and rules."""
         out = ["sources/**", "archive/**", ".ah/**", "ah.yaml", self.cfg["facts"], self.cfg["bindings"], self.cfg["glossary"], self.cfg["sources"]]

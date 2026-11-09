@@ -273,7 +273,7 @@ def test_the_state_card_shows_the_answer(project_dir):
     assert "Done: FAIL" in build_state(Project(str(project_dir)))
     open_gate(project_dir)
     write_result(Project(str(project_dir)), "numbers_audit", [])
-    assert "Done: INCOMPLETE" in build_state(Project(str(project_dir)))
+    assert "Done: PASS" in build_state(Project(str(project_dir))), "state reads current external results just like ah done"
 
 
 # ---------------------------------------------------------------- the stop gate reads TX and admitted TR

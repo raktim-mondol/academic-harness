@@ -104,13 +104,21 @@ class Result:
 
 
 class Cache:
-    def __init__(self, project: Project):
-        project.state_dir.mkdir(parents=True, exist_ok=True)
-        self.db = sqlite3.connect(project.state_dir / "verdicts.sqlite", check_same_thread=False)
-        self.db.execute("CREATE TABLE IF NOT EXISTS v (k TEXT PRIMARY KEY, body TEXT)")
+    def __init__(self, project: Project, readonly: bool = False):
+        path = project.state_dir / "verdicts.sqlite"
+        self.db = None
+        if readonly:
+            if path.is_file():
+                self.db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False)
+        else:
+            project.state_dir.mkdir(parents=True, exist_ok=True)
+            self.db = sqlite3.connect(path, check_same_thread=False)
+            self.db.execute("CREATE TABLE IF NOT EXISTS v (k TEXT PRIMARY KEY, body TEXT)")
         self.lock = threading.Lock()
 
     def get(self, k: str):
+        if self.db is None:
+            return None
         with self.lock:
             r = self.db.execute("SELECT body FROM v WHERE k=?", (k,)).fetchone()
         return json.loads(r[0]) if r else None
@@ -120,16 +128,21 @@ class Cache:
             self.db.execute("INSERT OR REPLACE INTO v VALUES (?,?)", (k, json.dumps(body)))
             self.db.commit()
 
+    def close(self):
+        if self.db is not None:
+            self.db.close()
+
 
 def _one(claim_text: str, claim_numbers: list[str], passages: list[Passage], backend: Backend, cache: Cache | None,
          variant: int) -> Result:
     prompt = build_prompt(claim_text, passages, reverse=bool(variant))
-    key = sha1("|".join([PROMPT_VERSION, backend.model, str(variant), claim_text, *[p.text for p in passages]]))
+    key = sha1("|".join(["evidence-v2", PROMPT_VERSION, backend.identity, str(variant), claim_text, *[p.text for p in passages]]))
     if cache is not None:
         hit = cache.get(key)
         if hit:
             r = Result(**hit)
             r.cached, r.calls = True, 0
+            r.tokens_in = r.tokens_out = 0
             return r
     usage_in = usage_out = calls = 0
     parsed, bad_quote = None, False

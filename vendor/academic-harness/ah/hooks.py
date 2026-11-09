@@ -69,7 +69,7 @@ def current_findings(project: Project, judge_files: list[str] | None = None) -> 
     from .checks.base import DEFAULT_TIERS
     from .done import external_results
     from .rubric import admitted_ids, load_criteria
-    tiers = DEFAULT_TIERS + (("TR",) if load_criteria(project)[0] else ())
+    tiers = DEFAULT_TIERS + (("TR",) if any(load_criteria(project)) else ())
     kw: dict = {}
     if judge_files and "TR" in tiers and project.cfg["gate"].get("judge_touched"):
         from .verifier.backends import get_backend

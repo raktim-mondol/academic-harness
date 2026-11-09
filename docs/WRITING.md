@@ -53,20 +53,79 @@ Limits: a run of `numbers_audit` without SciPy is a failure, not an empty result
 
 ### The frozen rubric (tier TR)
 
+#### Reliability and OpenCode (rule set 1.9.0)
+
+Only a verified `yes` or valid `no` resolves a paragraph/criterion pair. `unclear`,
+`unverifiable`, failed calls and exhausted budgets remain **unresolved**. They
+carry earlier findings rather than marking them fixed. An admitted unresolved
+pair makes completion INCOMPLETE unless an existing failure already makes it
+FAIL. An admitted defect matters even at info. Unadmitted criteria stay advisory.
+Admission scoring refuses unresolved labels instead of treating them as negatives.
+
+Uncertain semantic answers are cached so replay does not spend again. To ask
+again deliberately, use `ah rubric run --judge --retry-unresolved --judge-limit 10`
+(or `retry_unresolved: true` on the native rubric/audit/done tool). `--no-cache`
+still reruns all selected pairs. `judge_limit` limits actual backend invocations,
+including quote-correction attempts, across workers. Reports retain known token
+totals and `usage_complete`; unknown usage is not evidence of zero cost.
+Pi transport retries must be `0` (now the default); rerun failed pairs explicitly
+instead of hiding extra requests inside one budgeted invocation. Provider-side
+retries outside the adapter's visibility cannot be counted by the engine.
+
+Verifier evidence now uses a versioned fingerprint of the complete effective
+configuration: backend, route/provider/model, inference settings and command
+arguments/revision. Display labels are not cache keys. Old cache keys are not
+reused; old admissions require remeasurement under protocol 2, not an automatic
+conversion. Admissions changing model, endpoint, question or protocol are shown
+as invalidated. Re-admission remains the author's decision. Command admission
+also requires an explicit model and adapter revision.
+
+For OpenCode V2, configure the **same explicit model** in both places:
+
+```yaml
+verifier:
+  backend: command
+  model: openai/gpt-6.1-sol # example: select an available model explicitly
+  revision: opencode-v1
+  response_format: json-v1
+  timeout: 200
+  cmd: [python3, -m, ah.verifier.opencode, --model, openai/gpt-6.1-sol]
+```
+
+Run using the installed engine's Python, or set `PYTHONPATH` to this checkout's
+`vendor/academic-harness`. The adapter reads the prompt from stdin, uses a fresh
+temporary OpenCode project and a one-step tool-denied verifier, and parses text,
+usage and terminal status from OpenCode JSON events. It never selects DeepSeek
+implicitly. OpenCode owns authentication; no key belongs in `ah.yaml`. This is
+a verifier bridge, **not** native OpenCode host enforcement of protected paths
+or author approvals. Temperature control is not claimed for this command route.
+Project/global OpenCode instructions may still supplement the verifier context.
+
+Plain-text command backends remain supported with unknown token usage. An
+opt-in `json-v1` adapter returns
+`{version: 1, model: "…", text: "…", usage: {input: 12, output: 3}}`, with optional
+`error`; a mismatched model or malformed envelope is an error, not a verdict.
+
+**Recovery:** preserve old `.ah` history. After upgrading, run a bounded fresh
+rubric audit on a copy (`--judge --judge-limit N`), then arrange independent
+labelling and author re-admission as needed. A prior falsely fixed defect may
+reopen as a regression; history is not rewritten. Old logs do not necessarily
+contain enough evidence to identify every falsely fixed decision automatically.
+
 A free-form review asks the model what it notices, so it notices something different each time. A rubric criterion is the opposite: one question, written down, with a version, asked about one paragraph. `ah_audit rubric=true` reports the verdicts already cached (no model calls); `ah_audit judge=true` also asks the model about paragraphs that have none. `ah_rubric` lists, runs and makes labelling sheets for individual criteria.
 
 What makes the answer repeatable:
 
 - **The question is a file.** Defaults ship with the profile (`core` for all prose, `empirical` for methods and results, `grant` for proposals); a project adds or rewords criteria in `rubric/*.yaml` and switches ones off with `criteria: {off: [...]}` in `ah.yaml` (`criteria:` also sets `files`, default `rubric/*.yaml`, `workers`, default 4, and `min_words`, default 12: shorter paragraphs are skipped). A criterion is `{id: RUB-NAME, version, level, question, quote_pattern, scope: {files, kinds, min_words}}`. `quote_pattern` is optional: a regular expression the words a "yes" quotes must match, so a verdict that quotes unrelated words (the model drifting from "universal wording" to any strong claim) is `unverifiable` and never a finding. It asks about a **defect** ("yes" = the problem is present), because only a defect has words to quote. Omissions (a missing section or statement) stay with profile rules, which are exact.
 - **A failure must quote the paragraph.** A "yes" counts only if its quote is found in the paragraph (case and whitespace normalised, at least 8 characters per piece). The model gets one corrected retry; a "yes" with no real quote is `unverifiable` and never becomes a finding.
-- **The verdict is cached** on (prompt version, criterion hash, paragraph hash, model). Unchanged text is never asked twice, and a re-run on it returns the same answer by construction. Editing one paragraph asks about that paragraph only. A transport error or an unparseable reply is not cached, so it is asked again next time.
-- **Not being able to ask is not a fix.** A (criterion, paragraph) pair that got no verdict (no model allowed, no cached answer, an error, over `judge_limit`) is carried in the ledger exactly as it was. Only a verdict of "no" on that paragraph closes a finding.
+- **The verdict is cached** on (prompt version, criterion hash, paragraph hash, verifier fingerprint). Unchanged text is never asked twice with the same effective verifier, and a re-run returns the same answer by construction. Editing one paragraph asks about that paragraph only. A transport error or an unparseable reply is not cached, so it is asked again next time.
+- **Not being able to decide is not a fix.** A (criterion, paragraph) pair with no resolving verdict (no model allowed, no cached answer, an error, budget exhaustion, unclear or unverifiable) carries its existing finding. Only a verdict of "no" on that in-scope paragraph closes it automatically.
 
 **Levels and admission.** Every criterion reports at **info** and cannot gate until the author has measured it. `ah_rubric action=sheet` lists the paragraphs in scope with their hashes; you label each `yes` (defect present) or `no`; `ah_author action=rubric-admit id=RUB-NAME file=labels.yaml` (CLI: `ah rubric admit RUB-NAME --labels labels.yaml --yes`) runs the model over them and records the agreement in `rubric/admissions.yaml`. Defaults: at least 20 usable labels with at least 5 of each kind, Cohen's kappa at least 0.6 and precision at least 0.8, because a gate that flags text the author considers fine is worse than none. Labels whose paragraph was edited since are skipped, not trusted. An admission is evidence about **this question and this model**: reword the question or change the model and it is void, and the criterion drops back to info (a carried finding too). Without `--yes` the command only reports whether the thresholds are met. `rubric/**` is a protected path, so an agent cannot edit criteria, labels or admissions to admit its own check.
 
 New findings are `RUB-01` (cause `evidence-changed` when the model's first verdict on unchanged text arrives, `text-changed` after an edit, `rubric-changed` after a criterion edit) and `RUB-02` for a malformed criteria file.
 
-Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry is only reused for the same model name, so changing models re-judges everything (and voids admissions). Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
+Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry requires the same verifier fingerprint, so changing a model or route re-judges the affected evidence and voids incompatible admissions. Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. A command backend can itself make network calls: a local subprocess is not proof that its model runs locally. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
 
 ### Format and consistency rules (ACR-*, FMT-*)
 
@@ -126,6 +185,16 @@ Five reports are too many to read, and "no blockers" is not an answer if the run
 **fail** if any component fails; otherwise **incomplete** if a component that matters was not checked; otherwise **pass**. A component is "required" when it has something to check (admitted criteria exist, external results exist or are listed in `external.required`) or is named in `done.require: [external, rubric, lookups]` in `ah.yaml`. `ah done` reads the rubric (cached verdicts) and the external results by itself when the project has them; it asks the model only with `judge=true`. Exit codes: 0 pass, 1 fail, 3 incomplete. A report narrowed to some files (`ah_check files=...`) carries no answer: a part cannot say the whole is done.
 
 What it does not mean: pass says the code tiers found nothing blocking, every admitted criterion was asked and found nothing, the external results are current for this text and the registry answers are recent. It does not say the science is right, that unadmitted criteria or advisory rules are satisfied, or that a free review would raise nothing.
+
+Migration and audit JSON include input-graph coverage: roots, audited files,
+supporting TeX, unreachable files, unresolved literal inputs and cycles.
+`appendix/` and arbitrary included prose directories are no longer silently
+dropped when a project also has `sections/`. `UNIT-04` (major) reports included
+prose outside `tex.prose`; `UNIT-03` still reports substantial prose in an
+unparsed build root. Dynamic TeX inputs remain a static-analysis limit. Profile
+selection is heuristic: inspect it and use `--profile` explicitly when needed.
+The state card now reads cached rubric and external results like `ah done`,
+without model calls, including carried findings.
 
 **The stop gate** now reads the same tiers: the baseline, the post-edit note and the stop check include the external results when the project has them (tier TX) and the rubric from cached verdicts (only an admitted criterion can then show a finding above info). Set `gate: {judge_touched: true}` (with a `verifier:` backend) and the stop check also judges the files this turn changed against the admitted criteria, so model calls are bounded by what the agent touched and cached verdicts. EXT-00 is left out of the stop gate: any edit makes a stored external result stale and the agent cannot run those tools from the hook, so staleness is reported by `ah_done` instead. Unadmitted rubric hints (info) are not put in post-edit notes.
 
