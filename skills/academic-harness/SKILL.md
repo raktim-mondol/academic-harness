@@ -41,6 +41,7 @@ Native `ah_*` tools (not MCP, not Pi). Prefer them over shelling out to `ah`. Do
 |---|---|
 | Coverage / "are we done" | `ah_inventory`, then `ah_check` / `ah_audit` |
 | Numbers, figures, references (outside the engine) | `ah_external` `run`, then `ah_audit` `external=use` |
+| Which format rules are worth promoting (fixed vs waived) | `ah_precision` |
 | Fixed yes/no writing criteria (overclaiming, causal wording, ...) | `ah_rubric` `list`/`run`; `ah_audit` `rubric=true` (cached verdicts) or `judge=true` (asks the model) |
 | Anchors, facts macros | `ah_units`, `ah_fact` `build` |
 | Evidence | `ah_source` `add`/`list`, `ah_source_search` |

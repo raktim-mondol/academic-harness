@@ -43,7 +43,7 @@ DEFAULTS: dict[str, Any] = {
     "plans": "plans",         # outline proposals; author approves with `ah plan approve`
     "claims_policy": {"require_binding": False},
     "lexicons": {},       # {name: regex} extra or replacement style lexicons for must_not / hedging
-    "style": {},          # {lints: [names]|[], level: info|minor}; empty = all code lints at info
+    "style": {},          # {lints: [names]|[], level: info|minor, format: {cite, percent, spelling, heading_case, eg_comma, sentence_max_words, ...}}; empty = all code lints at info
     "criteria": {"files": ["rubric/*.yaml"], "off": [], "workers": 4, "min_words": 12},  # frozen rubric (tier TR): extra criteria files, ids to switch off
     "external": {"required": []},  # tools whose results (.ah/external/<tool>.json) must exist: numbers_audit, figure_audit, citation
     "data_policy": "open",  # open | restricted | local (design 13.3)

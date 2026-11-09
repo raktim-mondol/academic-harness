@@ -237,6 +237,9 @@ def handle(event: str, data: dict) -> dict | None:
             pass
         fs = current_findings(project)
         fresh = G.new_findings(set(st["baseline"]), fs)
+        # The format rules (ACR-*, FMT-*) are advisory until the author promotes one: they are in the audit, not in an agent's
+        # turn, where a low-precision hint ("define this acronym") would only make it rewrite text that was fine.
+        fresh = [f for f in fresh if not (f["level"] == "info" and f["check"].startswith(("ACR-", "FMT-")))]
         log("post_edit_check", path=rel, via=tool, total=len(fs), new=[f"{f['check']}:{f['level']}" for f in fresh])
         save_state(project, sid, st)
         if not fresh:

@@ -338,6 +338,51 @@ def _rubric_stats_json(stats: dict) -> dict:
     return {k: v for k, v in stats.items() if k != "unjudged"}
 
 
+def cmd_precision(a):
+    """What the author's own decisions say about each format rule: fixed (they changed the text) against waived (they said it was fine)."""
+    import fnmatch
+    from collections import Counter, defaultdict
+    p = _proj(a)
+    if not (p.state_dir / "ledger.sqlite").exists():
+        print("no ledger yet: run `ah audit`, then fix or waive what the rules flag")
+        return EXIT_OK
+    led = Ledger(p)
+    try:
+        rows = led.list()
+    finally:
+        led.close()
+    pats = [x.strip() for x in (a.checks or "ACR-*,FMT-*").split(",") if x.strip()]
+    by: dict[str, Counter] = defaultdict(Counter)
+    for r in rows:
+        if any(fnmatch.fnmatch(r["check_id"], pt) for pt in pats):
+            by[r["check_id"]][r["state"]] += 1
+    out = []
+    for cid in sorted(by):
+        c = by[cid]
+        decided = c["fixed"] + c["waived"]
+        precision = round(c["fixed"] / decided, 3) if decided else None
+        level = (p.cfg.get("levels") or {}).get(cid) or CATALOGUE[cid][1]
+        if decided < a.min_decisions:
+            verdict = "too few decisions"
+        elif precision >= a.min_precision:
+            verdict = f"consider promoting: levels: {{{cid}: minor}} in ah.yaml"
+        else:
+            verdict = "keep at info: too many of its findings were waived"
+        out.append({"check": cid, "level": level, "open": c["open"] + c["decision-needed"], "fixed": c["fixed"], "waived": c["waived"],
+                    "decided": decided, "precision": precision, "verdict": verdict})
+    if a.json:
+        print(json.dumps({"min_decisions": a.min_decisions, "min_precision": a.min_precision, "checks": out}, indent=1))
+        return EXIT_OK
+    if not out:
+        print("no findings from these checks in the ledger yet")
+        return EXIT_OK
+    print(f"{'check':8} {'level':6} {'open':>5} {'fixed':>6} {'waived':>7} {'precision':>10}  verdict (needs {a.min_decisions} decisions at {a.min_precision})")
+    for r in out:
+        print(f"{r['check']:8} {r['level']:6} {r['open']:5} {r['fixed']:6} {r['waived']:7} {'-' if r['precision'] is None else r['precision']:>10}  {r['verdict']}")
+    print("fixed means the finding went away after the text changed, which is an estimate of a true positive; waived means the author said the text was fine.")
+    return EXIT_OK
+
+
 def cmd_rubric(a):
     import hashlib
     from .checks.rubric import judge_cached, run_rubric
@@ -959,6 +1004,10 @@ def main(argv=None) -> int:
     sp.add_argument("--provider", help="override verifier.provider")
     sp.add_argument("--thinking", default=None, help="override thinking level; empty sends no flag")
     sp.add_argument("--file", action="append", help="only claims in this file (relative to the TeX root)")
+    sp = add("precision", cmd_precision, "per format rule: how many findings the author fixed against how many they waived")
+    sp.add_argument("--checks", help="comma list of check ids or globs (default ACR-*,FMT-*)")
+    sp.add_argument("--min-decisions", type=int, default=10)
+    sp.add_argument("--min-precision", type=float, default=0.9)
     sp = add("rubric", cmd_rubric, "the frozen rubric: list criteria, run them, make a labelling sheet, admit one against hand labels")
     sp.add_argument("action", choices=["list", "run", "sheet", "admit"])
     sp.add_argument("ids", nargs="*", help="criterion ids (sheet and admit take exactly one)")
