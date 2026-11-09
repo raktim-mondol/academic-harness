@@ -46,6 +46,21 @@ def check_t0(ctx: Context) -> list[Finding]:
             continue
         add("UNIT-02", None, rel, None, "unreachable", f"{rel} is not input from any view")
 
+    # ---- UNIT-03: prose inside a view file is never parsed into units, so no check reads it ----
+    min_words = int(cfg.get("tex", {}).get("view_prose_words", 150))
+    for v in ctx.project.view_files():
+        try:
+            from ..tex.units import parse_file
+            parsed = parse_file(ctx.project, v)
+        except Exception:
+            continue
+        words = sum(u.words for u in parsed.units if u.kind == "para")
+        if words >= min_words:
+            rel = ctx.project.rel(v)
+            add("UNIT-03", None, rel, None, "view-prose",
+                f"{rel} is the build root but holds {words} words of prose, and no check reads a root file: "
+                f"move the text into section files that the root \\input{{}}s (then `ah units sync`)")
+
     # ---- file size (LAT-02) ----
     lim = cfg["limits"]
     for pf in ctx.parsed:

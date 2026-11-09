@@ -113,8 +113,12 @@ function sessionModel(agent) {
   return h?.model || h?.route?.model || agent?.options?.model || undefined
 }
 
-function withFooter(text) {
-  const body = String(text || '').trim()
+// The engine's card is written for Claude Code, where `ah` is a shell command. On DSH the agent has native ah_* tools
+// and no `ah` on PATH, so that sentence sent the model looking for a binary that is not there (observed live).
+const SHELL_SENTENCE = /^Harness commands run in your shell as `ah \.\.\.`[^\n]*\n?/m
+
+export function withFooter(text) {
+  const body = String(text || '').replace(SHELL_SENTENCE, '').trim()
   if (!body) return DSH_STATE_FOOTER
   if (body.includes('On DeepSeek Harness use native ah_* tools')) return body
   return `${body}\n\n${DSH_STATE_FOOTER}`

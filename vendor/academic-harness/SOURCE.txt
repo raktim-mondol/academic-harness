@@ -41,6 +41,9 @@ Python package modified in this plugin (the vendored tree is maintained here as 
   `ah triage` (covered-by / same-unit / exploratory against the current findings), coverage tags on review items
   at `ah review import`. rules/** protected; the rules digest joins the snapshot (cause rubric-changed). Rubric 1.7.0.
 
+- ah/checks/t0_structure.py UNIT-03 (prose in a build-root file is unread), ah/checks/t1_numeric.py NUM-004 skips
+  signed percentages; found on real manuscripts in the first live run.
+
 Local DSH patch (ahead of upstream): registry --keys citation-key aliases
 (entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt
 sources so AH copies stay byte-identical to the sender's raw document.

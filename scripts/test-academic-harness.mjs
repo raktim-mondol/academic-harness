@@ -35,7 +35,7 @@ const {
   DSH_STATE_FOOTER,
 } = await import('../academic-harness-cli.js')
 const { toolArgv, truncate } = await import('../academic-harness.js')
-const { mapDshTool, parseHookStdout, isHandoffMessage, gateDecision } = await import('../academic-harness-hooks.js')
+const { mapDshTool, parseHookStdout, isHandoffMessage, gateDecision, withFooter } = await import('../academic-harness-hooks.js')
 
 // ── vendor ────────────────────────────────────────────────────────────────
 
@@ -223,6 +223,8 @@ ok('truncate long', truncate('x'.repeat(10), 4).includes('more characters'))
   ok('gate continue is not handoff', !isHandoffMessage('AH gate (attempt 1/3): your edits introduced blocking findings.'))
   const cont = gateDecision({ decision: 'block', reason: 'AH gate (attempt 1/3): blockers' })
   ok('gateDecision continue', cont.kind === 'continue')
+  const card = withFooter('Paper state: 3 open.\nHarness commands run in your shell as `ah ...` (for example `ah check`). Finding ids are 8 characters.\nNext: fix.')
+  ok('DSH card does not send the model to a shell command', !/run in your shell/.test(card) && /native ah_\* tools/.test(card) && /Paper state: 3 open\./.test(card) && /Next: fix\./.test(card), card)
   const ho = gateDecision({ systemMessage: 'AH gate: stopped after 3 attempts\nThe author decides what to do next.' })
   ok('gateDecision handoff', ho.kind === 'handoff' && /STOP/.test(ho.text))
   const ho2 = gateDecision({ systemMessage: 'AH gate: stopped after 3 attempts\nThe author decides what to do next.' }, { alreadyHandedOff: true })

@@ -161,11 +161,17 @@ def handle(event: str, data: dict) -> dict | None:
 
     if event == "userprompt":
         st = load_state(project, sid)
-        st.update(loops=0, touched=[])
-        st["baseline"] = [f["fp"] for f in current_findings(project)]
-        st["hashes"], st["reported"] = prose_hashes(project), []
-        st["unit_hashes"] = unit_hashes(project) if project.cfg["gate"].get("verify_touched") else {}
-        log("baseline", findings=len(st["baseline"]))
+        if st.get("touched") and not st.get("settled", True):
+            # The host entered this turn again (a question was answered, a message was queued). The edits already made
+            # are still this turn's: keep the baseline and the touched list, or the blockers they introduced become
+            # "already there" and the stop gate says nothing. Found live on DSH.
+            log("baseline_kept", touched=st["touched"])
+        else:
+            st.update(loops=0, touched=[], settled=False)
+            st["baseline"] = [f["fp"] for f in current_findings(project)]
+            st["hashes"], st["reported"] = prose_hashes(project), []
+            st["unit_hashes"] = unit_hashes(project) if project.cfg["gate"].get("verify_touched") else {}
+            log("baseline", findings=len(st["baseline"]))
         out = None
         if os.environ.get("AH_NO_STATE") != "1":
             text = card(project)
@@ -278,6 +284,8 @@ def handle(event: str, data: dict) -> dict | None:
         blocking = G.new_findings(set(st["baseline"]), current_findings(project, resolve_touched(project, st["touched"])), levels)
         log("before_settle", loops=st["loops"], blocking=len(blocking), touched=st["touched"])
         if not blocking:
+            st["settled"] = True
+            save_state(project, sid, st)
             if project.cfg["gate"].get("verify_touched") and not st.get("t3_done"):
                 st["t3_done"] = True
                 save_state(project, sid, st)
@@ -293,6 +301,8 @@ def handle(event: str, data: dict) -> dict | None:
         mx = int(project.cfg["gate"].get("max_loops", 3))
         if st["loops"] >= mx:
             log("HANDOFF", loops=st["loops"], blocking=len(blocking))
+            st["settled"] = True
+            save_state(project, sid, st)
             return {"systemMessage": f"AH gate: stopped after {st['loops']} attempts with {len(blocking)} blocking finding(s) the agent's edits introduced:\n"
                                      f"{G.format_findings(blocking)}\nThe author decides what to do next."}
         st["loops"] += 1

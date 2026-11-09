@@ -14,6 +14,7 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "TEX-04": ("T0", "minor", "Overfull boxes in the build log"),
     "UNIT-01": ("T0", "minor", "Unit anchor missing, duplicated, orphaned"),
     "UNIT-02": ("T0", "major", "File not reachable from any view"),
+    "UNIT-03": ("T0", "major", "A view file holds prose that no check reads"),
     "TEX-02": ("T0", "blocker", "Reference to an undefined label"),
     "TEX-03": ("T0", "major", "Duplicate label"),
     "LAT-02": ("T0", "minor", "File longer than the soft line limit"),
