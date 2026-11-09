@@ -19,8 +19,14 @@ metadata:
 > `critic: false` makes none. `pdf2md`, `status`, `show`, `compare`, and `list`
 > make no model call; `estimate` is optional.
 
-Use this skill for a full-manuscript critique produced by an external multi-pass
-engine. It is not a fast proofread, not a systematic-review ledger, and not a
+Use this skill for a critique produced by an external multi-pass engine: the whole
+manuscript, or one file or section when you pass `path`. When the user asks for a deep
+review or a free-form review, call the `deep_review` tool; do not stand in with your
+own reading of the text (seen live: the model read two sections itself and called the
+tool "the wrong instrument" for a small scope; one section is a supported scope, a
+round took about 80 seconds and 5 model calls). If you think the tool is wrong for the
+request, say so and ask first.
+It is not a fast proofread, not a systematic-review ledger, and not a
 reporting-guideline verdict.
 
 ## Choose the right reviewer

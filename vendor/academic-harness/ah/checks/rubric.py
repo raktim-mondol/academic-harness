@@ -118,6 +118,9 @@ def judge(c: Criterion, text: str, backend: Backend) -> Verdict:
             return Verdict("unverifiable", parsed["quote"][:300], parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout)
     if parsed is None:
         return Verdict("error", error="unparseable-reply", calls=calls, tokens_in=tin, tokens_out=tout)
+    if parsed["answer"] == "yes" and c.quote_pattern and not re.search(c.quote_pattern, parsed["quote"], re.I):
+        # the criterion names the kind of words that show the defect; a quote without any of them is the model drifting
+        return Verdict("unverifiable", parsed["quote"][:300], parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout)
     return Verdict(parsed["answer"], parsed["quote"] if parsed["answer"] == "yes" else "", parsed["note"], calls=calls, tokens_in=tin, tokens_out=tout)
 
 

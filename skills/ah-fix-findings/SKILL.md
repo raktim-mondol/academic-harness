@@ -10,7 +10,7 @@ Academic Harness on DeepSeek Harness. Native `ah_*` tools. Pi is not required.
 1. Run `ah_check` (add `files` to narrow). Work through blockers, then majors, then minors.
 2. For each finding read the unit it names, then fix by cause:
    - **STALE-01 / NUM-003 / NUM-004**: the number is wrong or from an old basis. Get the current value with `ah_fact`, replace the literal with `\fact{...}`, and run `ah_sweep` on the old value so no copy is left elsewhere. A hit that is a legitimate mention of the old basis ("the 62 retained after the audit") is not an error: do not change it; report it to the author as a candidate waiver.
-   - **NUM-001**: a literal that should be a fact. Bind it with `\fact{...}` if a fact exists; otherwise leave it and list it for the author.
+   - **NUM-001**: a literal that should be a fact. Bind it with `\fact{...}` if a fact exists; otherwise leave it and list it for the author. It is info and optional. Never clear it by rewording the number away ("100%" to "complete", dropping a specific example, merging sentences): that changes what the paper claims to make a lint quiet. The post-edit note tells you when an edit made a number disappear.
    - **BIB-01/02**: fix the key or remove the claim; never invent an entry.
    - **COH-01/02/03**: use the canonical term, a source in scope, or restore the mirrored fact.
    - **EXT-00**: an external check (numbers_audit, figure_audit, citation audit) is stale, unreadable, or was required and never ran. It is not a text problem: run `ah_external`, then `ah_audit external=use`. Never edit around it and never delete the result file to make it go away.

@@ -472,3 +472,52 @@ def test_the_rubric_tier_gives_the_same_findings_every_time_with_a_cache(project
         again = run_checks(build_context(Project(str(project_dir))), ("TR",), rubric_backend=b)
         assert report_hash(again) == report_hash(first)
     assert b.calls == calls, "four more runs asked nothing"
+
+
+# ---- quote_pattern: the words a "yes" quotes must be the kind the criterion names ----------------------------------
+
+def _crit(pattern: str = "") -> Criterion:
+    return Criterion("RUB-T", 1, "Does the paragraph claim something is the best?", "minor", ["*"], ("para",), 1, "test", pattern)
+
+
+def _judge(crit: Criterion, quote: str, text: str):
+    from ah.checks.rubric import judge
+    backend = FakeBackend(lambda prompt: json.dumps({"answer": "yes", "quote": quote, "note": "n"}), "m")
+    return judge(crit, text, backend)
+
+
+def test_a_yes_quoting_a_trigger_word_counts():
+    v = _judge(_crit(r"\b(best|first)\b"), "the best method", "We show the best method on this set.")
+    assert v.answer == "yes" and v.quote == "the best method"
+
+
+def test_a_yes_that_quotes_other_words_is_unverifiable_not_a_finding():
+    """Seen live: the model flagged 'necessitates multi-image fusion' for a criterion about universal words."""
+    v = _judge(_crit(r"\b(always|every|all)\b"), "necessitates multi-image fusion", "This necessitates multi-image fusion in practice.")
+    assert v.answer == "unverifiable"
+
+
+def test_without_a_pattern_nothing_changes():
+    assert _judge(_crit(""), "necessitates multi-image fusion", "This necessitates multi-image fusion in practice.").answer == "yes"
+
+
+def test_the_pattern_is_part_of_the_criterion_identity_and_must_compile():
+    assert _crit("a").qhash() != _crit("b").qhash() != _crit("").qhash()
+    from ah.rubric import _parse
+    got = _parse({"id": "RUB-BAD", "question": "Is this a long enough question to pass the check?", "quote_pattern": "("}, "t", {"min_words": 1})
+    assert isinstance(got, str) and "does not compile" in got
+
+
+def test_the_bundled_universal_and_superlative_criteria_carry_a_pattern():
+    from ah.rubric import load_criteria
+    import tempfile
+    from ah.project import Project
+    # the bundled set is read through any project that names the core set; here the file is read directly
+    data = yaml.safe_load((Path(__file__).resolve().parents[1] / "ah" / "rubrics" / "core.yaml").read_text())
+    by_id = {c["id"]: c for c in data["criteria"]}
+    for cid in ("RUB-GENERAL", "RUB-SUPERLATIVE"):
+        assert by_id[cid]["version"] == 3 and by_id[cid].get("quote_pattern")
+    assert re.search(by_id["RUB-GENERAL"]["quote_pattern"], "in all cases", re.I)
+    assert not re.search(by_id["RUB-GENERAL"]["quote_pattern"], "necessitates multi-image fusion", re.I)
+    assert re.search(by_id["RUB-SUPERLATIVE"]["quote_pattern"], "the first fully automated", re.I)
+    assert not re.search(by_id["RUB-SUPERLATIVE"]["quote_pattern"], "requires novel methodological developments", re.I)

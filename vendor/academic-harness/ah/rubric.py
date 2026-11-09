@@ -43,10 +43,14 @@ class Criterion:
     kinds: tuple[str, ...]
     min_words: int
     origin: str
+    quote_pattern: str = ""     # optional: a "yes" counts only if the words it quotes match this regular expression
 
     def qhash(self) -> str:
         """What the model is asked. Level, scope and admission do not change an answer, so they are not in it."""
-        return sha1(canonical_json({"id": self.id, "version": self.version, "question": " ".join(self.question.split())}), 16)
+        d = {"id": self.id, "version": self.version, "question": " ".join(self.question.split())}
+        if self.quote_pattern:
+            d["quote_pattern"] = self.quote_pattern        # it decides which "yes" answers count, so it is part of the criterion
+        return sha1(canonical_json(d), 16)
 
 
 @dataclass
@@ -83,7 +87,13 @@ def _parse(raw: dict, origin: str, defaults: dict) -> Criterion | str:
         files = [files]
     if not all(isinstance(g, str) for g in files) or any(k not in KINDS for k in kinds):
         return f"{cid}: scope.files must be globs and scope.kinds from {', '.join(KINDS)}"
-    return Criterion(cid, version, q, level, list(files), kinds, int(scope.get("min_words", defaults["min_words"])), origin)
+    qp = str(raw.get("quote_pattern") or "")
+    if qp:
+        try:
+            re.compile(qp, re.I)
+        except re.error as e:
+            return f"{cid}: quote_pattern does not compile ({e})"
+    return Criterion(cid, version, q, level, list(files), kinds, int(scope.get("min_words", defaults["min_words"])), origin, qp)
 
 
 def load_criteria(project) -> tuple[list[Criterion], list[Problem]]:

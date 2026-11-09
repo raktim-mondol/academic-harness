@@ -9,14 +9,21 @@ criteria:
       Does the paragraph state a causal relationship (for example "causes", "leads to", "drives", "results in") for
       something the paragraph itself presents only as a correlation, an association, or an observed co-occurrence?
   - id: RUB-GENERAL
-    version: 1
+    version: 3
     level: minor
+    quote_pattern: '\b(always|never|every|everywhere|all|any|none|no|universal(?:ly)?|in all cases|completely|entirely|regardless|without exception|invariably|inherently)\b'
     question: >-
-      Does the paragraph claim a result holds universally or in general (for example "always", "in all cases",
-      "every", "universally") when the evidence the paragraph itself describes covers only a limited set of cases?
+      A universal word is required, and you must quote it; reasoning that goes a little past the data ("suggests",
+      "may", "likely") is not a defect. With that rule: does the paragraph use an explicit universal or unqualified
+      word ("always", "never", "in all cases", "every", "all", "universally", "any", "none", "completely") about a
+      result or method, when the evidence the paragraph itself describes covers only a limited set of cases?
   - id: RUB-SUPERLATIVE
-    version: 1
+    version: 3
     level: minor
+    quote_pattern: '\b(first|only|best|most|state[- ]of[- ]the[- ]art|outperform\w*|unprecedented|superior|largest|highest|leading)\b'
     question: >-
-      Does the paragraph make a novelty or superlative claim (for example "first", "best", "state of the art",
-      "outperforms all") without any comparison, citation or measurement in the same paragraph that backs it?
+      Quote the claim. Describing a need ("requires novel developments"), using "optimal" or "novel" as an ordinary
+      technical adjective, or naming a ranking that the paragraph itself measures, is not a defect. With that rule:
+      does the paragraph claim that this work, method or result is the first, the only, the best, the most (adopted,
+      validated, accurate), state of the art, or better than all alternatives, without any comparison, citation or
+      measurement in the same paragraph that backs the claim?
