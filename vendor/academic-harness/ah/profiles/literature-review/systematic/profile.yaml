@@ -17,7 +17,7 @@ scaffold:
     # An n/a needs a reason of at least three words.
     items: {}
 rules:
-  - {id: sections, kind: sections, required: [Introduction, "Methods", "Results", "Discussion", "Conclusion|Conclusions"]}
+  - {id: sections, kind: sections, required: [Introduction, "Methods|Methodology", "Results", "Discussion", "Conclusion|Conclusions"]}
   - id: prisma_flow
     kind: identities
     expr:

@@ -241,6 +241,23 @@ def add_at(hits: "Hits", check: str, seg: Seg, key: str, message: str):
 ACR = re.compile(r"(?<![\w-])([A-Z]{2,8})(s?)\b(?!-[A-Za-z0-9])")   # PRF-03, CTX-M, cryo-EM: identifiers and compound names
 DEF_AFTER = re.compile(r"\(([A-Z]{2,8})s?\)")                 # long form (ABC)
 DEF_BEFORE = re.compile(r"\b([A-Z]{2,8})s?\s*\(([^()]{3,90})\)")   # ABC (long form)
+DEF_EQ = re.compile(r"\b([A-Z]{2,8})s?\s*=\s*([a-z][A-Za-z-]*(?:\s+[A-Za-z][A-Za-z-]*){1,8})")   # ABC = long form (a caption's list of abbreviations)
+
+
+def initials_in_order(acr: str, words: list[str]) -> bool:
+    """AUC = area under the receiver operating characteristic curve: the letters are the initials of some of the words, in order,
+    starting with the first word."""
+    parts = [p for w in words for p in w.split("-") if p]
+    if not parts or parts[0][0].upper() != acr[0]:
+        return False
+    at = 0
+    for ch in acr:
+        while at < len(parts) and parts[at][0].upper() != ch:
+            at += 1
+        if at == len(parts):
+            return False
+        at += 1
+    return True
 
 
 def initials_match(acr: str, words: list[str]) -> bool:
@@ -303,6 +320,11 @@ def check_acronyms(ctx: Context, st: dict, hits: Hits, units: list):
         for m in DEF_BEFORE.finditer(s):
             inner = re.findall(r"[A-Za-z][A-Za-z-]*", m.group(2))
             if initials_match(m.group(1), inner):
+                defs[m.group(1)].append((i, m.start()))
+                spans.add((m.start(1), m.end(1)))
+        for m in DEF_EQ.finditer(s):
+            inner = re.findall(r"[A-Za-z][A-Za-z-]*", m.group(2))
+            if initials_match(m.group(1), inner) or initials_in_order(m.group(1), inner):
                 defs[m.group(1)].append((i, m.start()))
                 spans.add((m.start(1), m.end(1)))
         cited = [(m.start(), m.end()) for m in re.finditer(r"[^.!?]*‡[^.!?]*", s)]       # the stretches of text that cite a source
