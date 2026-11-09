@@ -251,6 +251,8 @@ def run_rubric(ctx: Context, backend: Backend | None = None, use_cache: bool = T
         f.level = (over or by_id[c.id].level) if c.id in stats["admitted"] else "info"
         out.append(f)
     stats["unjudged"] = unjudged
+    stats["verdict_no"] = {(c.id, unit_ref(u)) for c, u in pairs if (verdicts.get((c.id, unit_ref(u))) or Verdict("")).answer == "no"}
+    stats["pair_set"] = {(c.id, unit_ref(u)) for c, u in pairs}
     stats["unjudged_count"] = len(unjudged)
     stats["unresolved_count"] = len(unjudged)
     if cache:

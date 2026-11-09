@@ -86,7 +86,8 @@ def render_report(rep: dict, limit: int = 25) -> str:
     lines.append(f"open findings: {len(live)}  by level: {rep['counts']}")
     lines.append(f"by check: {rep['checks_fired']}")
     if "ledger" in rep:
-        lines.append(f"ledger: {rep['ledger']}  causes of new findings: {rep['new_causes']}")
+        lines.append(f"ledger: {rep['ledger']}  causes of new findings: {rep['new_causes']}"
+                     + (f"  closed because: {rep['fixed_by']}" if rep.get("fixed_by") else ""))
         if rep.get("unexplained"):
             lines.append(f"!! UNEXPLAINED new findings (harness bug): {rep['unexplained']}")
     shown = 0
@@ -365,7 +366,7 @@ def cmd_stability(a):
 
 
 def _rubric_stats_json(stats: dict) -> dict:
-    return {k: v for k, v in stats.items() if k != "unjudged"}
+    return {k: v for k, v in stats.items() if k not in ("unjudged", "verdict_no", "pair_set")}
 
 
 def cmd_precision(a):

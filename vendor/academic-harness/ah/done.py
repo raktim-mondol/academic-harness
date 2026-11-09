@@ -151,6 +151,13 @@ def done_status(project: Project, rep: dict, now: datetime | None = None) -> dic
         for comp in comps:
             if comp["id"] == "rubric":
                 comp["detail"] += "; admissions invalidated (remeasure with the author): " + ", ".join(run["invalidated_admissions"])
+    by = rep.get("fixed_by") or {}
+    moved = by.get("criterion-off", 0) + by.get("out-of-scope", 0)
+    if moved:                       # closed because the question went away, not because a model said no: the reader should know the difference
+        for comp in comps:
+            if comp["id"] == "rubric":
+                comp["detail"] += (f"; {moved} finding(s) closed in this run because a criterion was switched off or no longer covers the paragraph "
+                                   "(no model verdict)")
     failing = [c for c in comps if c["status"] == "fail"]
     missing = [c for c in comps if c["status"] == "not-checked" and c["required"]]
     status = "fail" if failing else ("incomplete" if missing else "pass")

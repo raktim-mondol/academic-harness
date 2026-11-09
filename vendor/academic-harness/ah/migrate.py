@@ -1,8 +1,10 @@
 """Bring an existing LaTeX tree onto Academic Harness (design §4, §15 Phase 9).
 
-Default is an in-place overlay: write ``ah.yaml`` and empty facts/sources/glossary, leave
-the author's files where they are. Fact macros are optional (D2). Binding literals into
-``\\fact{}`` rewrites prose and needs ``--yes``.
+Default is an in-place overlay: write ``ah.yaml`` and empty facts/sources/glossary. Unless
+``--no-sync`` is given it then adds a ``%% @unit`` anchor comment above each paragraph and builds
+the fact macro file; the text of the author's files is never changed by that. Fact macros are
+optional (D2). Binding literals into ``\\fact{}`` rewrites prose and needs ``--bind-facts --yes``.
+A second apply refuses (the overlay exists) unless ``--force``.
 """
 from __future__ import annotations
 
@@ -51,14 +53,32 @@ def _iter_tex(root: Path) -> list[Path]:
     return out
 
 
-def _guess_profile(texts: list[str]) -> str:
+def _infer_profile(texts: list[str]) -> dict:
+    """Which profile fits, why, and which others competed. Heuristic only: an ambiguous document gets `generic`, never a guess."""
     blob = strip_comments("\n".join(texts)).lower()
+    cands = []
     for name, keys in PROFILE_HINTS:
-        if name == "grant/proposal" and not re.search(r"\\(?:title|(?:sub)*section)\*?\{[^}]*(?:proposal|specific aims|work packages|budget)", blob):
-            continue
-        if sum(1 for k in keys if k in blob) >= (2 if name != "paper/journal-empirical" else 1):
-            return name
-    return "generic"
+        matched = [k for k in keys if k in blob]
+        needed = 2 if name != "paper/journal-empirical" else 1
+        structural = name != "grant/proposal" or bool(re.search(r"\\(?:title|(?:sub)*section)\*?\{[^}]*(?:proposal|specific aims|work packages|budget)", blob))
+        cands.append({"profile": name, "matched": matched, "needed": needed, "structural_signal": structural,
+                      "qualifies": structural and len(matched) >= needed})
+    specific = [c for c in cands if c["qualifies"] and c["profile"] != "paper/journal-empirical"]
+    weak = [c for c in cands if c["qualifies"] and c["profile"] == "paper/journal-empirical"]
+    if len(specific) >= 2:      # a systematic review that is also a proposal: say so instead of picking the first in a list
+        selected, ambiguous = "generic", True
+        why = "several profiles match (" + ", ".join(c["profile"] for c in specific) + ")"
+    elif specific or weak:
+        selected, ambiguous = (specific or weak)[0]["profile"], False
+        why = "matched " + ", ".join(repr(k) for k in (specific or weak)[0]["matched"])
+    else:
+        selected, ambiguous, why = "generic", False, "no profile matched"
+    return {"selected": selected, "ambiguous": ambiguous, "reason": why, "candidates": cands,
+            "note": "Heuristic only; select --profile explicitly when ambiguous."}
+
+
+def _guess_profile(texts: list[str]) -> str:
+    return _infer_profile(texts)["selected"]
 
 
 def _prose_globs(root: Path, views: list[str], tex_files: list[Path]) -> list[str]:
@@ -140,7 +160,8 @@ def scan(root: Path) -> dict[str, Any]:
     bibs = [p for p in sorted(root.rglob("*.bib"))
             if not any(part in IGNORE_DIRS or part in SKIP_PARTS for part in p.relative_to(root).parts)]
     texts = [(p.read_text(errors="replace") if p.stat().st_size < 2_000_000 else "") for p in tex_files]
-    profile = _guess_profile(texts)
+    inference = _infer_profile(texts)
+    profile = inference["selected"]
     prose = _prose_globs(root, views, tex_files)
     from .tex.inputs import input_graph, supporting_file
     text_map = {_rel(root, p): strip_comments(t) for p, t in zip(tex_files, texts)}
@@ -170,7 +191,7 @@ def scan(root: Path) -> dict[str, Any]:
         "prose_globs": prose,
         "profile": profile,
         "coverage": scope,
-        "profile_inference": {"selected": profile, "note": "Heuristic only; select --profile explicitly when ambiguous."},
+        "profile_inference": inference,
         "inputs_from_views": inputs,
         "literals": lits,
         "literal_repeats": [{"text": t, "pct": pct, "n": n} for (t, pct), n in counts.most_common()],
@@ -274,7 +295,8 @@ def plan(root: Path, *, profile: str | None = None, dest: Path | None = None, fa
     if scan_res.get("coverage", {}).get("unresolved"):
         warnings.append("some input files could not be resolved; inspect scan.coverage.unresolved before trusting coverage")
     if scan_res["profile"] == "generic" and not profile:
-        warnings.append("document profile is ambiguous; using generic (select --profile explicitly)")
+        inf = scan_res.get("profile_inference") or {}
+        warnings.append(f"{inf.get('reason', 'no profile matched')}: using generic (select --profile explicitly)")
     if scan_res["has_ah_yaml"] and dest == Path(scan_res["root"]).resolve():
         warnings.append("ah.yaml already exists; --apply needs --force to overwrite it")
     if not scan_res["bib"]:

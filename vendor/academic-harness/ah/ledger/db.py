@@ -17,7 +17,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY AUTOINCREMENT, manifest TEXT NOT NULL, report_hash TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS findings (
   fp TEXT PRIMARY KEY, check_id TEXT, tier TEXT, level TEXT, state TEXT, ref TEXT, file TEXT, key TEXT,
-  message TEXT, cause TEXT, first_seen INTEGER, last_seen INTEGER, regression INTEGER DEFAULT 0, fixed_in INTEGER);
+  message TEXT, cause TEXT, first_seen INTEGER, last_seen INTEGER, regression INTEGER DEFAULT 0, fixed_in INTEGER, fixed_reason TEXT);
 CREATE TABLE IF NOT EXISTS decisions (id INTEGER PRIMARY KEY AUTOINCREMENT, fp TEXT, kind TEXT, by TEXT, reason TEXT, condition TEXT, run_id INTEGER);
 CREATE TABLE IF NOT EXISTS provenance (
   unit TEXT PRIMARY KEY, author_type TEXT NOT NULL, model TEXT, brief_id TEXT, by_whom TEXT,
@@ -37,6 +37,12 @@ class Ledger:
         self.db = sqlite3.connect(project.state_dir / "ledger.sqlite")
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        if "fixed_reason" not in {r["name"] for r in self.db.execute("PRAGMA table_info(findings)")}:      # a ledger from before closures were explained
+            try:
+                self.db.execute("ALTER TABLE findings ADD COLUMN fixed_reason TEXT")
+                self.db.commit()
+            except sqlite3.OperationalError:                                                                # another process added it first
+                pass
 
     def close(self):
         self.db.close()
@@ -52,10 +58,13 @@ class Ledger:
 
     # ---- reconcile ----
     def reconcile(self, run_id: int, findings: list[Finding], tiers_run: set[str], unit_hashes: dict[str, str],
-                  prev: dict | None, snapshot: dict, causes_enabled: bool = True) -> dict:
+                  prev: dict | None, snapshot: dict, causes_enabled: bool = True, rubric: dict | None = None) -> dict:
+        """`rubric` (a full rubric run only): {"criteria": ids that were loaded, "pairs": (criterion, unit) pairs asked about,
+        "no": the pairs that got a valid "no"}. It lets a closed rubric finding say whether the model said no or the criterion went away."""
         cur = {f.fingerprint(): f for f in findings}
         stats = {"new": 0, "unchanged": 0, "fixed": 0, "regressed": 0, "waived": 0, "reopened": 0}
         causes: dict[str, str] = {}
+        fixed_by: dict[str, int] = {}
         rows = {r["fp"]: r for r in self.db.execute("SELECT * FROM findings")}
 
         for fp, f in cur.items():
@@ -89,10 +98,38 @@ class Ledger:
             if fp in cur or r["state"] not in ("open", "decision-needed"):
                 continue
             if r["tier"] in tiers_run:
-                self.db.execute("UPDATE findings SET state='fixed', fixed_in=? WHERE fp=?", (run_id, fp))
+                why = self._fix_reason(r, unit_hashes, prev, snapshot, rubric)
+                self.db.execute("UPDATE findings SET state='fixed', fixed_in=?, fixed_reason=? WHERE fp=?", (run_id, why, fp))
                 stats["fixed"] += 1
+                fixed_by[why] = fixed_by.get(why, 0) + 1
         self.db.commit()
-        return {"stats": stats, "causes": causes}
+        return {"stats": stats, "causes": causes, "fixed_by": fixed_by}
+
+    def _fix_reason(self, r: sqlite3.Row, unit_hashes: dict, prev: dict | None, snap: dict, rubric: dict | None) -> str:
+        """Why a finding stopped being reported. Only `verdict-no` and `check-passes` mean the check itself found the text fine; the rest say
+        the finding went away because the paragraph or the question did, which is not the same evidence."""
+        ref = r["ref"]
+        if rubric is not None and r["tier"] == "TR" and r["check_id"] == "RUB-01":
+            pair = (r["key"], ref)
+            if r["key"] not in rubric["criteria"]:
+                return "criterion-off"
+            if ref and ref not in unit_hashes:
+                return "unit-gone"
+            if pair in rubric["no"]:
+                return "verdict-no"
+            if pair not in rubric["pairs"]:
+                return "out-of-scope"
+            return "check-passes"
+        if ref and ref not in unit_hashes:
+            return "unit-gone"               # deleted, or rewritten with no anchor (an unanchored paragraph is keyed by its text)
+        if ref and prev and ref in prev.get("unit_hashes", {}) and prev["unit_hashes"][ref] != unit_hashes.get(ref):
+            return "text-changed"
+        ps = (prev or {}).get("snapshot", {})
+        if any(ps.get(k) != snap.get(k) for k in ("facts", "sources", "bindings", "glossary", "bib")):
+            return "evidence-changed"
+        if ps.get("rubric") != snap.get("rubric") or ps.get("config") != snap.get("config") or ps.get("rules") != snap.get("rules"):
+            return "rules-changed"
+        return "check-passes"
 
     def _cause(self, f: Finding, prev: dict | None, unit_hashes: dict, snap: dict, tiers_run: set[str]) -> str:
         if prev is None:
