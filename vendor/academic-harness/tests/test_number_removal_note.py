@@ -54,3 +54,11 @@ def test_keeping_or_moving_a_number_is_silent(project_dir):
     _ev(project_dir, "userprompt")
     intro.write_text(intro.read_text().replace("The pilot study reached 87\\% agreement between the two independent annotators.", "Between the two independent annotators the pilot study reached 87\\% agreement."))
     assert "disappear" not in _note(_post(project_dir))
+
+
+def test_a_list_marker_is_not_a_number(project_dir):
+    intro = _intro(project_dir)
+    intro.write_text(intro.read_text() + "\nThe study aims to (1) detect the shift, (2) classify its cause, and (3) report it to the operators of each site.\n")
+    _ev(project_dir, "userprompt")
+    intro.write_text(intro.read_text().replace("(1) detect the shift, (2) classify its cause, and (3) report it", "first detect the shift, then classify its cause, and finally report it"))
+    assert "disappear" not in _note(_post(project_dir))

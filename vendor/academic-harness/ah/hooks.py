@@ -108,6 +108,12 @@ def unit_hashes(project: Project) -> dict[str, str]:
     return {unit_ref(u): u.hash for u in load_units(project)[0]}
 
 
+def _is_enumerator(n) -> bool:
+    """A list marker such as "(3)" in "(1) detect, (2) classify, (3) report" is not a claim, so rewording it is not a lost number."""
+    import re
+    return not n.pct and n.value == int(n.value) and 0 < n.value <= 20 and bool(re.search(r"(?<![\w.])\(\s*%s\s*\)" % re.escape(n.text), n.ctx or ""))
+
+
 def prose_numbers(project: Project) -> dict[str, dict[str, int]]:
     """The numbers written in each prose file (literal, cited or bound; not years, labels, dates or 0-2), counted by token.
     Lets the post-edit check see an edit that made a number disappear."""
@@ -118,7 +124,7 @@ def prose_numbers(project: Project) -> dict[str, dict[str, int]]:
     out: dict[str, Counter] = {}
     for i in inventory(load_units(project)[0]):
         for n in i.nums:
-            if n.cls in ("literal", "cited", "bound"):
+            if n.cls in ("literal", "cited", "bound") and not _is_enumerator(n):
                 out.setdefault(i.unit.file, Counter())[f"{n.text}{'%' if n.pct else ''}"] += 1
     return {f: dict(c) for f, c in out.items()}
 

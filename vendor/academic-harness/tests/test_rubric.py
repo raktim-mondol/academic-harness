@@ -451,6 +451,13 @@ def test_the_cli_judges_replays_and_lists(project_dir, tmp_path, capsys):
     assert main(["rubric", "sheet", "RUB-GENERAL", "--project", str(project_dir), "--limit", "2"]) == 0
     sheet = capsys.readouterr().out
     assert "label: null" in sheet and sheet.count("unit:") == 2
+    assert "verdicts are not shown" in sheet
+    # a limit samples through the whole document, not its first paragraphs
+    import re
+    assert main(["rubric", "sheet", "RUB-GENERAL", "--project", str(project_dir)]) == 0
+    everything = re.findall(r"- \{unit: (\S+),", capsys.readouterr().out)
+    got = re.findall(r"- \{unit: (\S+),", sheet)
+    assert len(got) == 2 and (len(everything) <= 2 or got[-1] != everything[1]), "the second paragraph listed is not simply the second in the document"
     assert main(["rubric", "run", "RUB-NOPE", "--project", str(project_dir)]) == 2
 
 
