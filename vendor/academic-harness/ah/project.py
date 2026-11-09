@@ -133,7 +133,8 @@ class Project:
 
     def protected_globs(self) -> list[str]:
         """Paths an agent must not write (design 10.4): evidence, state, definitions of facts and rules."""
-        out = ["sources/**", "archive/**", ".ah/**", "ah.yaml", self.cfg["facts"], self.cfg["bindings"], self.cfg["glossary"], self.cfg["sources"]]
+        out = ["sources/**", "archive/**", ".ah/**", "ah.yaml", self.cfg["facts"], self.cfg["bindings"], self.cfg["glossary"], self.cfg["sources"],
+               ".claude/settings.json", ".claude/settings.local.json"]      # the hooks themselves: an agent that rewrites them switches the guard off
         try:
             out.append(self.macros_file().resolve().relative_to(self.root).as_posix())
         except ValueError:
