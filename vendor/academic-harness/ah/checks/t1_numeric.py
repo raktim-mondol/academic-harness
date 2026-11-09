@@ -144,6 +144,8 @@ def check_t1(ctx: Context) -> list[Finding]:
         u = i.unit
         text = _plain(u.raw, fs)
         for m in PCT_FRAC.finditer(text):
+            if _signed(text, m.start()):
+                continue            # "+10.4% (1/1000)" is a change with a rate beside it, not a share of a total
             pct_s, a, b = m.group(1), int(m.group(2)), int(m.group(3))
             _recon(add, u, text, m, pct_s, a, b)
         for m in FRAC_PCT.finditer(text):
@@ -193,6 +195,20 @@ def check_t1(ctx: Context) -> list[Finding]:
                         f"'{t}' is a superseded value of fact '{fid}' (now {fs.facts[fid].variants[f.default_variant()]['plain']})"
                         f"{': ' + sup['note'] if sup.get('note') else ''}")
     return out
+
+
+def _signed(text: str, pos: int) -> bool:
+    """True when the number at `pos` carries a sign (+, -, minus, plus-minus), which makes it a change or an
+    error, not a proportion. A hyphen between two digits is a range ("5-10%"), not a sign."""
+    i = pos - 1
+    while i >= 0 and text[i] == " ":
+        i -= 1
+    if i < 0 or text[i] not in "+-\u2212\u00b1\u2013":
+        return False
+    j = i - 1
+    while j >= 0 and text[j] == " ":
+        j -= 1
+    return not (text[i] in "-\u2013" and j >= 0 and text[j].isdigit())
 
 
 def _recon(add, u, text, m, pct_s, a, b):

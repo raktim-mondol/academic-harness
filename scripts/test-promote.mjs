@@ -89,3 +89,8 @@ if (probe.status !== 0) {
   } finally { ws.cleanup() }
 }
 console.log('promote: ok')
+
+// Live: given the choice, the model imported the report with ah_review, which drops each comment's quote, so triage could not find 13 of 15 passages.
+assert.match(EXPLORATORY_NOTE, /ah_triage source=deep_review/)
+assert.match(readFileSync(resolve(HERE, '..', 'deep-review.js'), 'utf8'), /ah_triage source=deep_review deep_review_key=\$\{key\}/, 'a finished review names the exact triage call')
+console.log('deep_review points at the triage call that keeps quotes OK')
