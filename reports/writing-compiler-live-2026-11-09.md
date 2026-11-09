@@ -71,3 +71,26 @@ These are still open in the live plan; this report does not claim them.
 On the `RUB-GENERAL` labels: on reading the model's flags I think three of my "no" labels were too strict (`every dump location`, `regardless of whether performed by human or machine`, `no prior work`), so the measured precision understates the criterion. I have not recomputed it: relabelling after seeing the verdicts would flatter the result, and the criterion still needs a larger, independently labelled sample before anyone admits it.
 
 One side effect seen in the live re-run: the number-removal note also fires when a list marker like `(3)` is replaced, because `NUM-001` already counts such markers as numbers. The agent handled it correctly, but a marker is not a claim; excluding enumerators is a candidate refinement.
+
+## Round 2: the "not run" list (same day)
+
+One tester, one model (`deepseek-flash`), copies of the same two manuscripts plus planted errors. Real SciPy and Pillow, real Crossref/OpenAlex; the outage was simulated with a network-less namespace (`unshare -rn`).
+
+| Scenario | Result |
+|---|---|
+| Planted `t(28) = 2.1, p = 0.9` | `STAT-01`. The same test with `p = 0.045`, and prose that mentions "t-SNE" and "the p parameter", gave nothing |
+| Planted `M = 3.47, N = 10` | `STAT-02`, only when written as `M =` or `mean =` (a sentence such as "Mean agreement was 3.47" is not parsed; the audit does not say so, a limit worth knowing) |
+| 72-DPI image, an exact copy of another figure | `FIG-01`, `FIG-02`; both are only checked if the manuscript includes them |
+| Fix the p-value, do not rerun | `EXT-00` (major); `STAT-01` carried, not marked fixed. After the rerun it is fixed and `EXT-00` is gone |
+| Truncated result file; required tool never run; SciPy hidden | `EXT-00` "unreadable"; `EXT-00` "has not been run"; the run reports the error and leaves the previous result file untouched |
+| Lookup snapshot: online, warm, offline | 31 findings each time, byte-identical; the warm run took 1 s against 5.6 s cold |
+| Offline, a reference never seen | `CIT-06` unverified, not a finding about the DOI. Back online it resolved to four `CIT-04` mismatches with cause `evidence-changed`, nothing `UNEXPLAINED` |
+| One entry aged 40 days; two audits at once; `{not json`; a version-99 file | Only the aged entry was fetched again; the file stayed valid; the corrupt file was rebuilt; the version-99 file was left alone. No `mailto` or key in the file |
+| Format rules on the two real drafts | Every finding that fired on the small paper was right (`ACR-01` 2/2, `ACR-02` 5/5, `FMT-07` 2/2, `FMT-09` 1/1, `FMT-11` 3/3). Seven rules never fired; an independent count of the text showed nothing for them to find (no "percent" words, one citation style, every `e.g.` with its comma, no repeated words) |
+| **Fix loop** | Four planted findings (two blockers, a duplicate label, `EVD-04`). One instruction, one turn, 36 tool calls. Three were cleared, `EVD-04` was recorded as a decision request, and the stop gate saw 0 blocking. Final state: 1 `decision-needed`, 0 unexplained, `ah done` FAIL for that reason, the agent said so and named what it needs (source texts for ten citations) |
+
+What the fix loop also showed: the agent **deleted** the three planted paragraphs (a figure reference to a figure that does not exist, a citation to a key that does not exist, two placeholder figures) instead of asking. It said so and gave the reason, but removing text to clear a blocker is a choice a person may want to make. It also tried to read the ledger with `sqlite3`; the protected-path guard blocked it, as intended.
+
+Fixed in round 2: `numbers_audit` read `$P = 12$` and `p = 8` as p-values out of range (F9); `ACR-03` ignored `CDR = cancer detection rate` (F4); `PRF-01` rejected `Methodology` (F3); the number-removal note fired on list markers (listed above as a side effect); `ah rubric sheet` now samples through the document, shows whole paragraphs and no model verdicts.
+
+Still open: a larger sample labelled by someone other than the tester before any rubric criterion is admitted (blind sheets are in `~/rubric-labelling/`); `PRF-01` and other profile rules remain stricter than some venues; F10/F13 (the agent proposing a rule at the wrong level, misreporting a level) are model behaviour and untouched; a stronger or different model is untested; nothing was run on the original manuscripts.
