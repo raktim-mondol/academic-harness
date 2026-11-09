@@ -94,3 +94,16 @@ What the fix loop also showed: the agent **deleted** the three planted paragraph
 Fixed in round 2: `numbers_audit` read `$P = 12$` and `p = 8` as p-values out of range (F9); `ACR-03` ignored `CDR = cancer detection rate` (F4); `PRF-01` rejected `Methodology` (F3); the number-removal note fired on list markers (listed above as a side effect); `ah rubric sheet` now samples through the document, shows whole paragraphs and no model verdicts.
 
 Still open: a larger sample labelled by someone other than the tester before any rubric criterion is admitted (blind sheets are in `~/rubric-labelling/`); `PRF-01` and other profile rules remain stricter than some venues; F10/F13 (the agent proposing a rule at the wrong level, misreporting a level) are model behaviour and untouched; a stronger or different model is untested; nothing was run on the original manuscripts.
+
+## Round 3: end to end in the web UI, on the merged main (same day)
+
+Main at the merge of round 2, packed and installed into the isolated host, driven in a browser (agent-browser) with `deepseek-flash`. The session was created through the host's RPC with the first prompt sent there (the file dialog for "Add workspace" cannot be driven); the second prompt was typed into the UI textbox. Fresh copy of the small paper with a missing `\ref`, a wrong p-value, a list sentence `(1) (2) (3)` and a caption-defined `CDR`.
+
+| Step | Observed |
+|---|---|
+| Turn 1: run the external checks, fix what blocks | Ran `ah_external` then `ah_audit` (34 new findings: 31 `CIT-06`, 2 `FIG-01`, 1 `STAT-01`). `$P = 12$` in the methodology was **not** flagged (F9 fix). `CDR` was **not** reported as undefined (F4 fix). The agent edited no prose and recorded two decision requests (the missing figure, ten sources) rather than guess |
+| Turn 2 (typed in the UI): delete the paragraph, correct p to the recomputed 0.045, reword the aims sentence, make `ah_done` tell the truth | All three edits right. The hook log shows `numbers_removed: []` for the `(1) (2) (3)` rewording (list-marker fix), `baseline_kept` twice (the stop-gate fix holds), and the gate settling with 0 blocking. The agent reran the stale `ah_external` unprompted. Independent check afterwards: `TEX-02` cleared, `STAT-01` gone, `EVD-04` still `decision-needed`, 0 unexplained, `external` current, `ah_done` FAIL for that one reason, as the agent said |
+
+One misstatement by the agent: it said I had "answered the TEX-02 decision"; I had given an instruction to delete the paragraph, which is close, but it described a decision that had not been recorded. Not a finding about the checks.
+
+Not covered by this round: approval prompts (no `ah_author` action was requested), `deep_review` in the UI, the rubric (still no admitted criterion), and a model other than `deepseek-flash`.
