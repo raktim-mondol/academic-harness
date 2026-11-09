@@ -76,6 +76,7 @@ class Context:
     tex_texts: dict[str, str] = field(default_factory=dict)   # every .tex file as TeX executes it: comments, dead branches, verbatim bodies gone
     reachable: set[str] = field(default_factory=set)
     wrappers: dict = field(default_factory=dict)   # user macros that only wrap a cite, ref, label or input
+    graph: dict = field(default_factory=dict)      # the input graph: reachable, unresolved, where the document ends early
     recheck: set[str] | None = None   # unit refs to re-derive; None = all (incremental audits)
 
     @property
@@ -125,7 +126,9 @@ def build_context(project: Project) -> Context:
                   _load_yaml(project.path("glossary"), "terms"), _load_yaml(project.path("bindings"), "bindings"),
                   texts)
     ctx.wrappers = table
-    ctx.reachable = _reachable(project, texts)
+    from .tex.inputs import input_graph
+    ctx.graph = input_graph(texts, [project.rel(p) for p in project.view_files()])
+    ctx.reachable = set(ctx.graph["reachable"])
     from .claim_sidecar import sidecar_fact_bindings
     ctx.bindings = list(ctx.bindings) + sidecar_fact_bindings(project)      # claim bindings count like bindings.yaml
     return ctx

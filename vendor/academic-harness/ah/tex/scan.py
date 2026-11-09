@@ -269,6 +269,7 @@ class Input:
     base: str | None = None    # a directory the imported file's own relative inputs are resolved against (\\import)
     optional: bool = False     # \\InputIfFileExists: a missing file is not an error
     dynamic: bool = False      # the path is built by a macro or a parameter, so it cannot be resolved here
+    subfile: bool = False      # read through \\subfile: that file's own \\end{document} does not end the document
 
 
 RE_INPUT = re.compile(
@@ -286,7 +287,7 @@ def inputs(text: str, table: dict[str, "Wrapper"] | None = None) -> list[Input]:
     for m in RE_INPUT.finditer(text):
         if m.group("p") is not None:
             path = m.group("p").strip()
-            out.append(Input(path, m.start(), None, m.group("c1") == "InputIfFileExists", _is_dynamic(path)))
+            out.append(Input(path, m.start(), None, m.group("c1") == "InputIfFileExists", _is_dynamic(path), m.group("c1") in ("subfile", "subfileinclude")))
         elif m.group("b") is not None:
             path = m.group("b").strip()
             out.append(Input(path, m.start(), None, False, _is_dynamic(path)))

@@ -130,3 +130,15 @@ case("nocite-star", {
     "main.tex": PRE + "\\begin{document}\nText \\cite{k1}.\n\\nocite{*}\n\\bibliographystyle{plain}\\bibliography{refs}\n\\end{document}\n",
     "refs.bib": BIB},
     "\\nocite{*} cites every entry")
+
+
+case("end-document-in-a-section", {
+    "main.tex": PRE + "\\begin{document}\n\\input{sections/a}\n\\input{sections/b}\n\\input{sections/c}\n\\end{document}\n",
+    "sections/a.tex": LOREM + " Alpha.\n", "sections/b.tex": LOREM + " Beta.\n\\end{document}\n", "sections/c.tex": LOREM + " Gamma.\n"},
+    "a section file ends the document; c.tex is never typeset (found in a real manuscript)")
+
+case("end-document-with-subfiles", {
+    "main.tex": PRE + "\\usepackage{subfiles}\n\\begin{document}\n\\subfile{sections/a}\n\\subfile{sections/b}\n\\end{document}\n",
+    "sections/a.tex": "\\documentclass[../main.tex]{subfiles}\n\\begin{document}\n" + LOREM + " Alpha.\n\\end{document}\n",
+    "sections/b.tex": "\\documentclass[../main.tex]{subfiles}\n\\begin{document}\n" + LOREM + " Beta.\n\\end{document}\n"},
+    "subfiles end their own document, not the main one")

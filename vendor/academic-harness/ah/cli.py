@@ -576,9 +576,12 @@ def cmd_build(a):
         print("build:", b["error"], file=sys.stderr)
         return EXIT_ERROR
     parsed = parse_log(b["log"])
-    print(json.dumps(parsed, indent=1) if a.json else f"build {'PDF produced' if b['ok'] else 'FAILED'}: {len(parsed['errors'])} TeX errors (TeX continues past 'ignored' ones), "
+    limit = (p.cfg.get("build") or {}).get("max_pages")
+    pages = f", {parsed['pages']} page(s)" + (f" (limit {limit})" if limit else "") if parsed.get("pages") else ""
+    print(json.dumps(parsed, indent=1) if a.json else f"build {'PDF produced' if b['ok'] else 'FAILED'}{pages}: {len(parsed['errors'])} TeX errors (TeX continues past 'ignored' ones), "
           f"{len(parsed['undefined_refs'])} undefined refs, {len(parsed['undefined_cites'])} undefined cites, "
-          f"{len(parsed['duplicate_destinations'])} duplicate destinations, {len(parsed['undefined_facts'])} undefined facts, {parsed['overfull']} overfull")
+          f"{len(parsed['duplicate_destinations'])} duplicate destinations, {len(parsed['undefined_facts'])} undefined facts, {parsed['overfull']} overfull, "
+          f"{len(parsed['missing_characters'])} missing glyph(s)")
     return EXIT_OK if b["ok"] else EXIT_FINDINGS
 
 

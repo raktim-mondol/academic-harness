@@ -210,3 +210,33 @@ def test_an_optional_input_is_not_missing_and_a_macro_built_path_is_reported(pro
     dyn = findings(project_dir, "TEX-06")
     assert len(dyn) == 1 and dyn[0]["level"] == "info" and "mysection" in dyn[0]["message"] and "cannot be audited" in dyn[0]["message"], dyn
     assert not [f for f in dyn if "#1" in f["message"]], "a wrapper's placeholder is read through its uses, not reported"
+
+
+# ---------------------------------------------------------------- where the document ends
+def test_a_document_ended_by_an_included_file_never_reads_what_follows():
+    t = {"main.tex": "\\begin{document}\n\\input{a}\n\\input{b}\nTrailing words in the parent file here.\n\\end{document}",
+         "a.tex": "text a\n\\end{document}", "b.tex": "B"}
+    g = input_graph(t, ["main.tex"])
+    assert g["reachable"] == ["main.tex", "a.tex"] and g["ended"] == {"file": "a.tex", "line": 2}
+    assert g["never_read"] == ["b.tex"] and g["text_after_end"] >= 6
+
+
+def test_an_ordinary_end_of_document_is_silent():
+    g = input_graph({"main.tex": "\\begin{document}\n\\input{a}\n\\end{document}", "a.tex": "text"}, ["main.tex"])
+    assert g["ended"]["file"] == "main.tex" and not g["never_read"] and g["text_after_end"] == 0
+
+
+def test_subfiles_and_standalone_handle_their_own_end():
+    sub = {"main.tex": "\\begin{document}\n\\subfile{a}\n\\input{b}\n\\end{document}", "a.tex": "A\n\\end{document}", "b.tex": "B"}
+    assert input_graph(sub, ["main.tex"])["reachable"] == ["main.tex", "a.tex", "b.tex"]
+    std = {"main.tex": "\\usepackage{standalone}\n\\begin{document}\n\\input{a}\n\\input{b}\n\\end{document}", "a.tex": "A\n\\end{document}", "b.tex": "B"}
+    g = input_graph(std, ["main.tex"])
+    assert g["reachable"] == ["main.tex", "a.tex", "b.tex"] and not g["never_read"]
+
+
+def test_the_early_end_is_a_finding_and_a_normal_project_has_none(project_dir):
+    assert not findings(project_dir, "TEX-09")
+    sec = project_dir / "src/sections/03_method/index.tex"
+    sec.write_text(sec.read_text() + "\n\\end{document}\n")
+    f = findings(project_dir, "TEX-09")
+    assert len(f) == 1 and f[0]["level"] == "major" and "03_method" in f[0]["message"] and "never read" in f[0]["message"], f

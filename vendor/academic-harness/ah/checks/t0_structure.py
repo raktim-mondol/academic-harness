@@ -153,6 +153,15 @@ def check_t0(ctx: Context) -> list[Finding]:
             seen_in.add((rel, inp.path))
             add("TEX-05", ref, rel, ln, f"input:{inp.path}", f"\\input{{{inp.path}}} names a file that does not exist (looked under {texroot.name}/)")
 
+    # ---- TEX-09: \\end{document} in a file that is read before the document is meant to end ----
+    g = getattr(ctx, "graph", None) or {}
+    if g.get("ended") and (g.get("never_read") or g.get("text_after_end", 0) >= 5):
+        e, later = g["ended"], g.get("never_read") or []
+        said = ([f"{len(later)} later input(s) are never read: {', '.join(later[:5])}{' ...' if len(later) > 5 else ''}"] if later else []) \
+            + ([f"{g['text_after_end']} words of text after it are never typeset"] if g.get("text_after_end") else [])
+        add("TEX-09", next((unit_ref(u) for u in ctx.units if u.file == e["file"] and u.start <= e["line"] <= u.end), None), e["file"], e["line"],
+            f"enddoc:{e['file']}", f"\\end{{document}} in {e['file']} ends the document early: " + "; ".join(said))
+
     # ---- LAT-11: TeX files outside the TeX root are almost always misplaced new files ----
     import os
     root, texroot = ctx.project.root.resolve(), ctx.project.tex_root.resolve()
