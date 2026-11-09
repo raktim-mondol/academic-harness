@@ -48,20 +48,33 @@ LONG, MEDIUM = words(70), words(30)
 CASES = [
     # ---- ACR-01 / ACR-02
     Case("ACR-01", "used before its definition", ["Our NLP system is fast.", "Natural language processing (NLP) is common."], True, "before:NLP"),
-    Case("ACR-01", "never defined", ["The CNN model reached high accuracy on the task.", "The CNN model was trained for ten epochs on the data."], True, "undefined:CNN"),
+    Case("ACR-03", "never defined", ["The CNN model reached high accuracy on the task.", "The CNN model was trained for ten epochs on the data."], True, "undefined:CNN"),
     Case("ACR-01", "defined twice", ["Natural language processing (NLP) is common. NLP is used.", "Natural language processing (NLP) is defined again here."], True, "twice:NLP"),
-    Case("ACR-01", "initials that do not spell it are no definition", ["The Big Cats (XYZ) are discussed here in this paragraph."], True, "undefined:XYZ"),
+    Case("ACR-03", "initials that do not spell it are no definition", ["The Big Cats (XYZ) are discussed here in this paragraph."], True, "undefined:XYZ"),
     Case("ACR-01", "defined then used", ["Natural language processing (NLP) is common. NLP is used widely."], False),
     Case("ACR-01", "reverse definition", ["NLP (natural language processing) is common. NLP is used."], False),
     Case("ACR-01", "plural of a defined acronym", ["Large language models (LLMs) are common. LLMs are used."], False),
     Case("ACR-01", "hyphenated long form", ["Long short-term memory (LSTM) is old. An LSTM is used."], False),
-    Case("ACR-01", "well-known acronyms need none", ["The PDF file and the URL are shown here for the reader."], False),
-    Case("ACR-01", "roman numerals are not acronyms", ["Part II of the study and Part III are described below in detail."], False),
-    Case("ACR-01", "declared as known", ["The BERT encoder is used here for the embeddings."], False, fmt={"acronyms_known": ["BERT"]}),
-    Case("ACR-01", "a check identifier is not an acronym", ["Findings PRF-03 and BIB-01 were the most common in the whole audit."], False),
-    Case("ACR-01", "a cited system's name", ["Gated consolidation lets ACE grow an evolving context over time~\\cite{a}."], False),
-    Case("ACR-01", "the same name with no citation anywhere is jargon", ["Gated consolidation lets ACE grow an evolving context over time.", "The ACE context is rewritten by the reflector after every task."], True, "undefined:ACE"),
-    Case("ACR-01", "common computing terms", ["Run the CLI and read the JSONL log written by the tool in the folder."], False),
+    Case("ACR-03", "well-known acronyms need none", ["The PDF file and the URL are shown here for the reader."], False),
+    Case("ACR-03", "roman numerals are not acronyms", ["Part II of the study and Part III are described below in detail."], False),
+    Case("ACR-03", "declared as known", ["The BERT encoder is used here for the embeddings."], False, fmt={"acronyms_known": ["BERT"]}),
+    Case("ACR-03", "a check identifier is not an acronym", ["Findings PRF-03 and BIB-01 were the most common in the whole audit."], False),
+    Case("ACR-03", "a cited system's name", ["Gated consolidation lets ACE grow an evolving context over time~\\cite{a}."], False),
+    Case("ACR-03", "the same name with no citation anywhere is jargon", ["Gated consolidation lets ACE grow an evolving context over time.", "The ACE context is rewritten by the reflector after every task."], True, "undefined:ACE"),
+    Case("ACR-03", "common computing terms", ["Run the CLI and read the JSONL log written by the tool in the folder."], False),
+    Case("ACR-03", "an identifier family named on its own", ["All nine documents have BIB, NUM, and PRF signals; most have PRF-03 findings in the audit."], False),
+    Case("ACR-03", "a named paper", ["We read the full text of the STAIR paper and two related reports in the corpus."], False),
+    Case("ACR-03", "file formats", ["It also supplies many CSV files and three NPY/NPZ arrays for the routing study."], False),
+    Case("ACR-03", "jargon is still jargon", ["The proposals cover drug repurposing, LLM metacognition, and causal inference."], True, "undefined:LLM"),
+    Case("ACR-01", "defined in a figure caption", ["\\begin{figure}\n\\includegraphics{x}\n\\caption{The pipeline uses doubly robust (DR) estimation.}\n\\label{fig:p}\n\\end{figure}",
+         "As Figure~\\ref{fig:p} shows, DR estimation is used in every one of the experiments."], False),
+    Case("ACR-01", "letters inside the words", ["Explainable AI (XAI) is the topic of this section. XAI methods are used."], False),
+    Case("ACR-03", "hyphenated compounds are names", ["We retrieve cryo-EM structures and screen CTX-M enzymes in every experiment here."], False),
+    Case("ACR-02", "used again only in a table", ["Whole genome sequencing (WGS) is planned for every isolate in the study.",
+         "\\begin{table}\n\\caption{Costs}\n\\begin{tabular}{ll}WGS & 120\\\\\\end{tabular}\n\\label{tab:c}\n\\end{table}", "Table~\\ref{tab:c} lists the costs of each step here."], False),
+    Case("ACR-03", "an acronym that only appears in a table", ["The compute budget is listed in the table below for every stage.",
+         "\\begin{table}\n\\caption{Compute}\n\\begin{tabular}{ll}GPU type & RTX 4090\\\\\\end{tabular}\n\\label{tab:g}\n\\end{table}", "Table~\\ref{tab:g} lists the hardware for each step here."], False),
+    Case("ACR-03", "a name followed by a resource noun", ["We download macroeconomic series from the FRED database and the IMF data portal."], False),
     Case("ACR-02", "defined and never used again", ["Natural language processing (NLP) is common in many applications today."], True, "unused:NLP"),
     Case("ACR-02", "defined and used", ["Natural language processing (NLP) is common. NLP is used widely."], False),
     # ---- FMT-01
@@ -81,6 +94,8 @@ CASES = [
     Case("FMT-03", "plain cite among natbib", ["As shown by \\cite{a} earlier work.", "Many works agree~\\citep{b} on this point.", "Many works agree~\\citep{c} again on this."], True, "cite:cite"),
     Case("FMT-03", "declared natbib", ["Earlier work on this topic~\\cite{a} agrees with ours."], True, "cite:cite", fmt={"cite": "natbib"}),
     Case("FMT-03", "declared plain cite", ["Earlier work on this topic~\\citep{a} agrees with ours."], True, "cite:natbib", fmt={"cite": "cite"}),
+    Case("FMT-03", "narrative \\citet mixes with plain \\cite (natbib numeric style)", ["As shown by \\cite{a} earlier work on the problem.",
+         "As \\citet{b} argue, the gains hold on this point.", "As \\citet{c} argue, the gains hold again on this."], False),
     Case("FMT-03", "natbib throughout", ["Earlier work on this topic~\\citep{a} agrees with ours.", "See \\citet{b} for more details on it."], False),
     Case("FMT-03", "plain throughout", ["Earlier work on this topic~\\cite{a} agrees with ours.", "See also~\\cite{b} for more details on it."], False),
     Case("FMT-03", "biblatex commands are neither", ["Earlier work on this topic~\\parencite{a} agrees with ours.", "See \\textcite{b} for more details on it."], False),
@@ -347,3 +362,74 @@ def test_once_promoted_a_format_rule_does_reach_the_agent(project_dir):
     out = _post_edit(project_dir, "loud")
     note = out["hookSpecificOutput"]["additionalContext"]
     assert "FMT-08" in note and "FMT-01" not in note, "the promoted rule is reported; the others stay advisory"
+
+
+# ---- reading order and headings ----
+
+def _write(root: Path, rel: str, text: str):
+    (root / "src" / rel).parent.mkdir(parents=True, exist_ok=True)
+    (root / "src" / rel).write_text(text)
+
+
+def _fresh(root: Path) -> list:
+    for f in (root / "src" / "sections").glob("*/index.tex"):
+        f.write_text("")
+    return []
+
+
+def test_acronym_order_follows_the_input_order_not_the_file_names(project_dir):
+    _fresh(project_dir)
+    _write(project_dir, "sections/01_introduction/index.tex", "Our NLP system is fast and it is used in every experiment here.\n")
+    _write(project_dir, "sections/04_experiments/index.tex", "Natural language processing (NLP) is the field of this whole paper.\n")
+    assert main(["units", "--project", str(project_dir), "sync"]) == 0
+    in_name_order = [f.key for f in check_format(build_context(Project(str(project_dir)))) if f.check == "ACR-01"]
+    assert in_name_order == ["before:NLP"], "01 is input before 04, so the use comes first"
+    _write(project_dir, "views/main.tex", "\\documentclass{article}\n\\begin{document}\n\\input{sections/04_experiments/index}\n"
+           "\\input{sections/01_introduction/index}\n\\end{document}\n")
+    reordered = [f.key for f in check_format(build_context(Project(str(project_dir)))) if f.check == "ACR-01"]
+    assert reordered == [], "the view reads 04 first, so NLP is defined before it is used, whatever the file names say"
+
+
+def test_an_acronym_first_seen_in_a_heading_is_first_seen_there(project_dir):
+    _fresh(project_dir)
+    _write(project_dir, "sections/04_experiments/index.tex",
+           "\\section{NLP pipeline results}\n\nNatural language processing (NLP) is the field of this paper and NLP is used.\n")
+    assert main(["units", "--project", str(project_dir), "sync"]) == 0
+    (f,) = [f for f in check_format(build_context(Project(str(project_dir)))) if f.check == "ACR-01"]
+    assert f.key == "before:NLP" and "heading 'NLP pipeline results'" in f.message
+    assert f.ref and f.line == 1, "attached to the paragraph after the heading, at the heading's line"
+
+
+def test_a_heading_finding_is_attached_to_the_paragraph_after_it(project_dir):
+    _fresh(project_dir)
+    _write(project_dir, "sections/04_experiments/index.tex",
+           "\\section{Results on the Benchmark Datasets}\n\nThe first paragraph of this section is long enough to be a unit.\n\n"
+           "\\section{Analysis of the error sources}\n\nThe second paragraph of this section is long enough to be a unit.\n\n"
+           "\\section{Discussion of the Main Findings}\n\nThe third paragraph of this section is long enough to be a unit.\n")
+    assert main(["units", "--project", str(project_dir), "sync"]) == 0
+    ctx = build_context(Project(str(project_dir)))
+    (f,) = [f for f in check_format(ctx) if f.check == "FMT-06"]
+    from ah.context import unit_ref
+    second = next(u for u in ctx.units if "second paragraph" in u.norm)
+    heading_line = 1 + (project_dir / "src/sections/04_experiments/index.tex").read_text().split("\n").index("\\section{Analysis of the error sources}")
+    assert f.ref == unit_ref(second) and f.line == heading_line
+
+
+def test_an_acronym_defined_in_the_main_file_is_defined(project_dir):
+    _fresh(project_dir)
+    _write(project_dir, "views/main.tex", "\\documentclass{article}\n\\begin{document}\n\n"
+           "Antimicrobial resistance (AMR) is a global health emergency that this whole proposal addresses.\n\n"
+           "\\input{sections/04_experiments/index}\n\\end{document}\n")
+    _write(project_dir, "sections/04_experiments/index.tex", "We measure AMR in every isolate collected during the whole study.\n")
+    assert main(["units", "--project", str(project_dir), "sync"]) == 0
+    assert not [f for f in check_format(build_context(Project(str(project_dir)))) if f.check in ("ACR-01", "ACR-03")]
+
+
+def test_a_name_in_a_bibliography_title_is_a_name(project_dir):
+    _fresh(project_dir)
+    _write(project_dir, "sections/04_experiments/index.tex", "We fine-tune BERT on the notes of every patient in the whole cohort.\n")
+    _write(project_dir, "refs/references.bib", "@article{devlin2019,\n  title = {BERT: Pre-training of Deep Bidirectional Transformers},\n  year = {2019}\n}\n")
+    assert main(["units", "--project", str(project_dir), "sync"]) == 0
+    assert not [f for f in check_format(build_context(Project(str(project_dir)))) if f.check == "ACR-03"]
+    _write(project_dir, "refs/references.bib", "")
+    assert [f.key for f in check_format(build_context(Project(str(project_dir)))) if f.check == "ACR-03"] == ["undefined:BERT"]
