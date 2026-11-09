@@ -108,6 +108,25 @@ def unit_hashes(project: Project) -> dict[str, str]:
     return {unit_ref(u): u.hash for u in load_units(project)[0]}
 
 
+def prose_numbers(project: Project) -> dict[str, dict[str, int]]:
+    """The numbers written in each prose file (literal, cited or bound; not years, labels, dates or 0-2), counted by token.
+    Lets the post-edit check see an edit that made a number disappear."""
+    from collections import Counter
+    from .context import unit_ref
+    from .tex.inventory import inventory
+    from .tex.units import load_units
+    out: dict[str, Counter] = {}
+    for i in inventory(load_units(project)[0]):
+        for n in i.nums:
+            if n.cls in ("literal", "cited", "bound"):
+                out.setdefault(i.unit.file, Counter())[f"{n.text}{'%' if n.pct else ''}"] += 1
+    return {f: dict(c) for f, c in out.items()}
+
+
+def removed_numbers(before: dict[str, int], after: dict[str, int]) -> list[str]:
+    return sorted(k for k, c in before.items() if after.get(k, 0) < c)
+
+
 def resolve_touched(project: Project, touched: list[str]) -> list[str]:
     """TeX-root-relative paths for prose the adapter marked as touched (project-relative or TeX-relative)."""
     out: list[str] = []
@@ -171,6 +190,10 @@ def handle(event: str, data: dict) -> dict | None:
             st["baseline"] = [f["fp"] for f in current_findings(project)]
             st["hashes"], st["reported"] = prose_hashes(project), []
             st["unit_hashes"] = unit_hashes(project) if project.cfg["gate"].get("verify_touched") else {}
+            try:
+                st["nums"] = prose_numbers(project)
+            except Exception:
+                st["nums"] = {}
             log("baseline", findings=len(st["baseline"]))
         out = None
         if os.environ.get("AH_NO_STATE") != "1":
@@ -264,13 +287,31 @@ def handle(event: str, data: dict) -> dict | None:
         # The format rules (ACR-*, FMT-*) are advisory until the author promotes one: they are in the audit, not in an agent's
         # turn, where a low-precision hint ("define this acronym") would only make it rewrite text that was fine.
         fresh = [f for f in fresh if not (f["level"] == "info" and f["check"].startswith(("ACR-", "FMT-", "RUB-")))]
-        log("post_edit_check", path=rel, via=tool, total=len(fs), new=[f"{f['check']}:{f['level']}" for f in fresh])
+        gone = []
+        try:
+            after = prose_numbers(project)
+            for f in (changed if tool == "Bash" else [rel]):
+                try:
+                    key = project.rel(project.root / f)              # the name the inventory uses for the same file
+                except Exception:
+                    key = f
+                gone += [f"{k} ({f})" for k in removed_numbers(st.get("nums", {}).get(key, {}), after.get(key, {}))]
+                st.setdefault("nums", {})[key] = after.get(key, {})      # each removal is reported once
+        except Exception:
+            pass
+        log("post_edit_check", path=rel, via=tool, total=len(fs), new=[f"{f['check']}:{f['level']}" for f in fresh], numbers_removed=gone)
         save_state(project, sid, st)
-        if not fresh:
+        parts = []
+        if fresh:
+            parts.append(f"[AH] This edit introduced {len(fresh)} finding(s) (checked by code, not opinion):\n{G.format_findings(fresh)}\n"
+                         "Fix them in the text. Numbers from data are written \\fact{id}; `ah facts list` shows ids. You cannot waive findings.")
+        if gone:
+            parts.append("[AH] This edit made number(s) disappear from the text: " + ", ".join(gone[:8]) + ". A number is a claim. "
+                         "A finding about a number is cleared by binding it to a \\fact{id} or citing its source, not by rewording it away. "
+                         "If the figure was right, put it back; if it was wrong or unsupported, say so to the author instead of editing it out silently.")
+        if not parts:
             return None
-        note = (f"[AH] This edit introduced {len(fresh)} finding(s) (checked by code, not opinion):\n{G.format_findings(fresh)}\n"
-                "Fix them in the text. Numbers from data are written \\fact{id}; `ah facts list` shows ids. You cannot waive findings.")
-        return {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": note}}
+        return {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": "\n\n".join(parts)}}
 
     if event == "stop":
         st = load_state(project, sid)

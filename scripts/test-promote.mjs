@@ -94,3 +94,17 @@ console.log('promote: ok')
 assert.match(EXPLORATORY_NOTE, /ah_triage source=deep_review/)
 assert.match(readFileSync(resolve(HERE, '..', 'deep-review.js'), 'utf8'), /ah_triage source=deep_review deep_review_key=\$\{key\}/, 'a finished review names the exact triage call')
 console.log('deep_review points at the triage call that keeps quotes OK')
+
+// Live: the model cleared info lints by rewording numbers away, and read two sections itself when asked for a deep review.
+{
+  const { ACADEMIC_HARNESS_PROMPT } = await import('../prompt.js')
+  assert.match(ACADEMIC_HARNESS_PROMPT, /Never reword a number away/)
+  assert.match(ACADEMIC_HARNESS_PROMPT, /call the `deep_review` tool/)
+  assert.match(ACADEMIC_HARNESS_PROMPT, /do not import the report with `ah_review`/)
+  const skill = readFileSync(resolve(HERE, '..', 'skills', 'deep-review', 'SKILL.md'), 'utf8')
+  assert.match(skill, /one file or section when you pass `path`/)
+  assert.doesNotMatch(skill, /\nIt It /)
+  const fix = readFileSync(resolve(HERE, '..', 'skills', 'ah-fix-findings', 'SKILL.md'), 'utf8')
+  assert.match(fix, /Never clear it by rewording the number away/)
+  console.log('prompt and skills carry the live-run guidance OK')
+}
