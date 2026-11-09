@@ -161,6 +161,17 @@ What makes the answer repeatable:
 
 **Levels and admission.** Every criterion reports at **info** and cannot gate until the author has measured it. `ah_rubric action=sheet` lists the paragraphs in scope with their hashes; you label each `yes` (defect present) or `no`; `ah_author action=rubric-admit id=RUB-NAME file=labels.yaml` (CLI: `ah rubric admit RUB-NAME --labels labels.yaml --yes`) runs the model over them and records the agreement in `rubric/admissions.yaml`. Defaults: at least 20 usable labels with at least 5 of each kind, Cohen's kappa at least 0.6 and precision at least 0.8, because a gate that flags text the author considers fine is worse than none. Labels whose paragraph was edited since are skipped, not trusted. An admission is evidence about **this question and this model**: reword the question or change the model and it is void, and the criterion drops back to info (a carried finding too). Without `--yes` the command only reports whether the thresholds are met. `rubric/**` is a protected path, so an agent cannot edit criteria, labels or admissions to admit its own check.
 
+**Why a finding stopped being reported.** A rubric finding disappears for different reasons, and only one is a model saying "no". The ledger
+records `fixed_reason` when it closes a finding: `verdict-no` (the model answered no, on the paragraph as it is now), `unit-gone` (the paragraph
+was deleted, or rewritten with no anchor), `criterion-off` (the criterion was switched off or removed), `out-of-scope` (its scope no longer covers
+the paragraph), and for other tiers `text-changed`, `evidence-changed`, `rules-changed` or `check-passes`. `ah finding show` prints it, an audit
+shows `closed because: {...}`, and when findings were closed because a criterion went away `ah done` says so in the rubric line ("no model verdict"),
+because switching a criterion off makes the document pass and a reader should know that is what happened. A run that was told which criteria or
+files to ask makes no claim about the ones it skipped. A finding that is *carried* over an unusable answer (unclear, unverifiable, error, over
+budget) ends with a note saying it is the earlier assessment, because after an edit it may quote words that are no longer in the paragraph. A waived
+finding stays waived and a finding handed to the author stays handed over when the model later answers `unclear`; a waived one then leaves the
+document INCOMPLETE, a handed-over one leaves it FAIL.
+
 New findings are `RUB-01` (cause `evidence-changed` when the model's first verdict on unchanged text arrives, `text-changed` after an edit, `rubric-changed` after a criterion edit) and `RUB-02` for a malformed criteria file.
 
 Limits: the model is only asked about one paragraph at a time, so a defect that spans paragraphs is invisible to it. The `http` backend sends temperature 0; the `pi` backend cannot set it, and with `--no-cache` any backend's non-determinism shows as `evidence-changed`. A cache entry requires the same verifier fingerprint, so changing a model or route re-judges the affected evidence and voids incompatible admissions. Judging sends paragraph text to whichever backend `verifier:` names; `data_policy` applies as it does to the claim verifier. A command backend can itself make network calls: a local subprocess is not proof that its model runs locally. The shipped criteria are starting points, not validated instruments: nothing is admitted until you measure it on your own text.
@@ -230,7 +241,15 @@ supporting TeX, unreachable files, unresolved literal inputs and cycles.
 dropped when a project also has `sections/`. `UNIT-04` (major) reports included
 prose outside `tex.prose`; `UNIT-03` still reports substantial prose in an
 unparsed build root. Dynamic TeX inputs remain a static-analysis limit. Profile
-selection is heuristic: inspect it and use `--profile` explicitly when needed.
+selection is heuristic: `profile_inference` in the migration JSON lists every profile with the keywords that matched and whether it qualifies,
+and says why one was chosen. When two specific profiles both fit (a systematic review that is also a proposal) the result is `generic`, not the first
+one in a list; a grant needs a structural signal (a heading that names the proposal, aims, work packages or budget), not the word "budget" in a
+paragraph. An explicit `--profile` always wins.
+
+`migrate` is a dry run unless `--apply`, and a dry run writes nothing. `--apply` writes the overlay (`ah.yaml`, empty facts, sources, glossary,
+outline) and, unless `--no-sync`, adds a `%% @unit` anchor comment above each paragraph and builds the fact macro file; the text of the author's
+files is never changed by that (`--no-sync` leaves them byte-identical). A second `--apply` refuses because the overlay exists and changes nothing;
+`--force` rewrites the overlay without stacking anchors.
 The state card now reads cached rubric and external results like `ah done`,
 without model calls, including carried findings.
 

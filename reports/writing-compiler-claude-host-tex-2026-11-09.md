@@ -105,6 +105,34 @@ last paragraph of an included file after that file's closing parenthesis, so the
 starting line and the first words of the box, and an ambiguous box stays a document-level finding. Checked against a real `latexmk` build
 (page count equals `pdfinfo`; the overfull paragraph is found by id).
 
+### 6. The fix loop on real manuscript copies, and the free-review path
+
+`scripts/claude-host-test/fix_loop.py` runs a real Claude Code agent (Sonnet 5.5, hooks live, bubblewrap) on a copy of a manuscript for up to five
+rounds, auditing with the ledger after each and recording what the edits did to the author's claims (numbers, citations, bibliography entries). Three
+runs, each converged in **one** round (the five-round bound was never needed, so multi-round dynamics are untested):
+
+- Each handed the author-only items over (`ah finding decide`: unsupported claim, missing source, unknown fact, a missing section) instead of changing
+  or deleting the claim. No bibliography entry, citation or number was added, dropped or changed in any run.
+- The planted-defect copy (a missing `\input` for a macro file, a mistyped `\cref` key, a deleted `\label`) had all three repaired and verified by a
+  compile; the four items that need the author were handed over with a specific question each.
+- Closed findings carry a reason (`check-passes`, `unit-gone`, `re-anchored`, `verdict-no`, ...). That exposed one wrong label: a finding on an
+  unanchored paragraph moved to a new fingerprint when its anchor was written, and was reported as "unit gone". It is now `re-anchored`.
+
+`review_path.py` drives the free-review path with `claude -p` as reviewer (not DSH's `deep_review`): two independent reviews overlap only partly,
+`ah triage` tags the comments a check already covers, one comment became a proposed rule, `rule accept` without `--yes` was refused, the author's
+accept activated it, and a repair removed its findings.
+
+## Plan status (gpt-6-astra remediation plan, phases A-G and its 12-item release checklist)
+
+Implemented and tested here: the Claude verifier adapter; guard and fail-closed hook behaviour; the shared TeX scanner checked against real LaTeX;
+build-log attribution, glyphs, page limit and TEX-06..09; the model-based ledger test; closure reasons, the carried-finding note, waived and
+decision-needed surviving uncertainty; profile inference with its reasons; the pinned migrate contract; the fix loop and the free-review path
+against a real host. Engine suite: 506 tests.
+
+Not done or not possible, as listed under "Not verified": human-label accuracy and its admissions, format rules that need a human judgement,
+`deep_review` and live DSH or Pi sessions, an OpenCode host adapter, and loops longer than one round. Opening the pull request, merging and releasing
+0.50.0 were not done (see the branch state; the pull-request call needs the owner's permission).
+
 ## Not verified
 
 - **Rubric accuracy against independent human labels.** No `admissions.yaml` or labelled sheet exists on this machine. The two blind sheets
@@ -122,7 +150,7 @@ starting line and the first words of the box, and an ambiguous box stays a docum
 ## Re-running
 
 ```sh
-npm run test:ah-engine                                  # 486 tests; the 20 TeX cases need latexmk and pdftotext, else they are skipped
+npm run test:ah-engine                                  # 506 tests; the 20 TeX cases need latexmk and pdftotext, else they are skipped
 python3 scripts/claude-host-test/mkproj.py ~/.cache/ah-claude-host/proj-pristine && python3 scripts/claude-host-test/scenarios.py
 python3 scripts/claude-host-test/tui_matrix.py          # the real UI in tmux
 python3 scripts/writing-compiler-live.py --adapter claude --corpus <results.json> --model claude-sonnet-5-5 --switch-model claude-haiku-5-5 --output <dir>

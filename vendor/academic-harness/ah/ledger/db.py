@@ -94,11 +94,13 @@ class Ledger:
                 self.db.execute("UPDATE findings SET last_seen=?, message=?, level=? WHERE fp=?", (run_id, f.message, f.level, fp))
                 stats["unchanged"] += 1
 
+        still = {(f.check, f.file, f.key) for f in cur.values()}            # the same finding under a new fingerprint is not a fixed one
         for fp, r in rows.items():
             if fp in cur or r["state"] not in ("open", "decision-needed"):
                 continue
             if r["tier"] in tiers_run:
-                why = self._fix_reason(r, unit_hashes, prev, snapshot, rubric)
+                why = "re-anchored" if r["ref"] and "#" in r["ref"] and (r["check_id"], r["file"], r["key"]) in still \
+                    else self._fix_reason(r, unit_hashes, prev, snapshot, rubric)
                 self.db.execute("UPDATE findings SET state='fixed', fixed_in=?, fixed_reason=? WHERE fp=?", (run_id, why, fp))
                 stats["fixed"] += 1
                 fixed_by[why] = fixed_by.get(why, 0) + 1

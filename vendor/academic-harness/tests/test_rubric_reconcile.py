@@ -176,3 +176,24 @@ def test_a_ledger_from_before_closures_were_explained_is_upgraded(project_dir):
     led.close()
     rep = run(project_dir, all_no())
     assert rep["fixed_by"] == {"verdict-no": 1}
+
+
+def test_a_finding_that_only_moved_to_a_new_anchor_is_not_called_fixed_for_a_real_reason(project_dir):
+    """An unanchored paragraph is keyed by its text, so the first edit anchors it and the same finding appears under a new fingerprint."""
+    from test_done import open_gate
+    sec = project_dir / "src" / "sections" / "01_introduction" / "index.tex"
+    text = sec.read_text()
+    sec.write_text(text.replace("%% @unit", "%% was-unit"))                     # take the anchors off: findings are keyed by content
+    audit(Project(str(project_dir)), use_ledger=True)
+    led = Ledger(Project(str(project_dir)))
+    before = {r["fp"] for r in led.list(("open",)) if r["ref"] and "#" in r["ref"]}
+    led.close()
+    assert before, "the fixture has findings on unanchored units"
+    main(["units", "--project", str(project_dir), "sync"])
+    rep = audit(Project(str(project_dir)), use_ledger=True)
+    led = Ledger(Project(str(project_dir)))
+    try:
+        why = {dict(r)["fixed_reason"] for r in led.list(("fixed",)) if r["fp"] in before}
+    finally:
+        led.close()
+    assert "re-anchored" in why and rep["fixed_by"].get("re-anchored"), (why, rep["fixed_by"])
