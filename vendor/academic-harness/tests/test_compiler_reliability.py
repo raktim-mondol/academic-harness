@@ -221,3 +221,20 @@ def test_readonly_rubric_does_not_create_a_cache(project_dir):
     assert not cache.exists()
     run_rubric(build_context(Project(project_dir)))
     assert not cache.exists()
+
+
+@pytest.mark.parametrize("scope", ["scope:", "scope:\n      files:", "scope:\n      kinds:\n      min_words:", "scope: {}"])
+def test_an_empty_scope_key_is_the_default_scope_not_a_malformed_criterion(project_dir, scope):
+    (project_dir / "rubric").mkdir(exist_ok=True)
+    (project_dir / "rubric" / "mine.yaml").write_text(
+        f"criteria:\n  - id: RUB-EMPTY\n    version: 1\n    level: minor\n    question: Does the paragraph say something odd?\n    {scope}\n")
+    crits, problems = load_criteria(Project(str(project_dir)))
+    assert "RUB-EMPTY" in [c.id for c in crits] and not problems, [p.message for p in problems]
+
+
+def test_a_bare_criteria_key_in_ah_yaml_means_nothing_configured(project_dir):
+    cfg = yaml.safe_load((project_dir / "ah.yaml").read_text())
+    cfg["criteria"] = None
+    (project_dir / "ah.yaml").write_text(yaml.safe_dump(cfg))
+    crits, problems = load_criteria(Project(str(project_dir)))
+    assert crits and not problems

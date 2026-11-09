@@ -35,12 +35,13 @@ ADMISSION_PROTOCOL = 2
 
 
 def criteria_config(project) -> tuple[dict, list[Problem]]:
-    raw = project.cfg.get("criteria", {})
+    raw = project.cfg.get("criteria")
+    raw = {} if raw is None else raw                       # a bare `criteria:` key is "nothing configured", not an error
     defaults = {"files": ["rubric/*.yaml"], "off": [], "workers": 4, "min_words": 12}
     problems = []
     if not isinstance(raw, dict):
         return defaults, [Problem("ah.yaml", "criteria:layout", "ah.yaml: criteria must be a mapping")]
-    out = dict(defaults, **raw)
+    out = dict(defaults, **{str(k): v for k, v in raw.items() if v is not None})      # a null value means "not given"
     for k in ("files", "off"):
         if not isinstance(out[k], list) or not all(isinstance(x, str) and x for x in out[k]):
             problems.append(Problem("ah.yaml", f"criteria:{k}", f"ah.yaml: criteria.{k} must be a list of strings"))
@@ -99,17 +100,21 @@ def _parse(raw: dict, origin: str, defaults: dict) -> Criterion | str:
     version = raw.get("version", 1)
     if type(version) is not int or version < 1:
         return f"{cid}: version must be a positive integer"
-    scope = raw.get("scope", {})
+    scope = raw.get("scope")
+    scope = {} if scope is None else scope                 # `scope:` with nothing under it is the default scope
     if not isinstance(scope, dict):
         return f"{cid}: scope must be a mapping"
-    files = scope.get("files", ["*"])
-    kinds = scope.get("kinds", ["para"])
+    files = scope.get("files")
+    files = ["*"] if files is None else files
+    kinds = scope.get("kinds")
+    kinds = ["para"] if kinds is None else kinds
     if isinstance(files, str):
         files = [files]
     if (not isinstance(files, list) or not files or not all(isinstance(g, str) and g for g in files)
             or not isinstance(kinds, list) or not kinds or any(k not in KINDS for k in kinds)):
         return f"{cid}: scope.files must be globs and scope.kinds from {', '.join(KINDS)}"
-    words = scope.get("min_words", defaults["min_words"])
+    words = scope.get("min_words")
+    words = defaults["min_words"] if words is None else words
     if type(words) is not int or words < 0:
         return f"{cid}: scope.min_words must be a nonnegative integer"
     qp = str(raw.get("quote_pattern") or "")
