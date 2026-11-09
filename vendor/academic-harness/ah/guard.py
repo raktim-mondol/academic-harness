@@ -117,7 +117,7 @@ def bash_is_human_only(cmd: str) -> str | None:
 
 
 def new_findings(baseline: set[str], current: list[dict], levels: list[str] | None = None) -> list[dict]:
-    return [f for f in current if f["fp"] not in baseline and (not levels or f["level"] in levels) and f.get("state") != "waived"]
+    return [f for f in current if f["fp"] not in baseline and (not levels or f["level"] in levels) and f.get("state") not in ("waived", "decision-needed")]   # a finding handed to the author is theirs to decide; steering the agent again only loops
 
 
 def format_findings(fs: list[dict], mx: int = 8) -> str:

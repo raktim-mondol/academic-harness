@@ -42,3 +42,12 @@ def test_a_new_prompt_after_the_turn_settled_starts_fresh(project_dir):
         _event(project_dir, "stop")
     _event(project_dir, "userprompt")                       # the author's next message
     assert _event(project_dir, "stop") is None              # the old blocker belongs to the baseline now
+
+
+def test_a_finding_handed_to_the_author_stops_the_steering(project_dir):
+    """Live: after the agent recorded a decision request, the gate still steered it three more times on the same finding."""
+    from ah.guard import new_findings
+    open_ = {"fp": "a1", "level": "blocker", "state": "open"}
+    handed = {"fp": "b2", "level": "blocker", "state": "decision-needed"}
+    waived = {"fp": "c3", "level": "blocker", "state": "waived"}
+    assert new_findings(set(), [open_, handed, waived]) == [open_]

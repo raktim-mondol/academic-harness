@@ -3659,7 +3659,7 @@ function text(value) {
 }
 
 /** A free review notices different things each run, so it is never the definition of done. */
-export const EXPLORATORY_NOTE = 'Exploratory, never gating: a re-run of this review will raise different points. In an ah.yaml project only ah_check findings decide what is left; ah_triage shows which of these comments a rule already covers, and ah_rule_propose turns a recurring one into a rule.'
+export const EXPLORATORY_NOTE = 'Exploratory, never gating: a re-run of this review will raise different points. In an ah.yaml project only ah_check findings decide what is left; ah_triage source=deep_review shows which of these comments a rule already covers (it keeps each comment\'s quote, so it can find the passage; importing the report with ah_review loses the quotes), and ah_rule_propose turns a recurring one into a rule.'
 
 function renderReviewSummary(value) {
   const lines = []
@@ -3680,6 +3680,8 @@ function renderReviewSummary(value) {
   if (value.job_id) lines.push(`Live progress: background job ${value.job_id} — expand it in the session header jobs panel.`)
   lines.push(`Stored under ${value.dir}. Full report: action "show" section "markdown"; findings are advisory.`)
   lines.push(EXPLORATORY_NOTE)
+  const key = String(value.dir || '').split(/[\\/]/).filter(Boolean).pop()
+  if (key && /^[0-9a-f]{16}$/.test(key)) lines.push(`Next, to see which comments the checks already cover: ah_triage source=deep_review deep_review_key=${key}`)
   return text(lines.join('\n'))
 }
 
