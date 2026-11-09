@@ -10,7 +10,7 @@ scaffold:
     # Each contribution claimed in the introduction must have a unit in the experiments.
     items: []   # - {id: c1, units: [intro.p003, experiments.p002]}
 rules:
-  - {id: sections, kind: sections, required: [Introduction, "Related Work|Background", "Method|Approach|Methods", "Experiments|Evaluation|Results", "Conclusion|Conclusions"]}
+  - {id: sections, kind: sections, required: [Introduction, "Related Work|Background", "Method|Approach|Methods|Methodology", "Experiments|Evaluation|Results", "Conclusion|Conclusions"]}
   - {id: length, kind: limit, label: body, max_words: "${max_words}", exclude: ["*appendi*", "*supplement*"]}
   - id: anonymity
     kind: patterns

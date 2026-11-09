@@ -121,6 +121,7 @@ FLOW_RE = re.compile(r"\b(randomi[sz]ed|allocated|analy[sz]ed|screened|included|
 FRACTION_PERCENT_RE = re.compile(r"(?P<num>\d[\d,]*)\s*/\s*(?P<den>\d[\d,]*)\s*\(\s*(?P<pct>\d+(?:\.\d+)?)\s*%\s*\)")
 PERCENT_RE = re.compile(r"(?P<prefix>[<>≤≥]?)\s*(?P<value>-?\d+(?:\.\d+)?)\s*%")
 STANDALONE_P_RE = re.compile(r"\bp\s*(?P<op><|>|=|≤|≥|<=|>=)\s*(?P<value>-?\d+(?:\.\d+)?)", re.I)
+P_VALUE_CUE = re.compile(r"p[\s-]*values?|signific|\\textit\{p\}|probabilit", re.I)
 TABLE_ROW_MD = re.compile(r"^\s*\|.*\|\s*$")
 TABLE_ROW_TEX = re.compile(r"^\s*[^%]*&[^%]*\\\\\s*$")
 
@@ -256,6 +257,11 @@ def numbers_audit(request):
             continue
         counts["p_values"] += 1
         value = float(match.group("value"))
+        if value > 1 and "." not in match.group("value") and not P_VALUE_CUE.search(
+                content[max(0, match.start() - 60): match.end() + 20]):
+            # `$P = 12$` (patches), `p = 8` (predictors): a whole number is a count unless the text calls it a p-value.
+            counts["p_values"] -= 1
+            continue
         if value < 0 or value > 1:
             add_row(rows, seen, "p_value", line, f"p-value outside [0, 1]: {match.group(0).strip()}",
                     section=section, context=context_at(content, match.start()))

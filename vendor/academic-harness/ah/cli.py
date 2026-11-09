@@ -5,6 +5,7 @@ import argparse
 import json
 import re
 import sys
+import textwrap
 from pathlib import Path
 
 import yaml
@@ -471,12 +472,18 @@ def cmd_rubric(a):
 
     if a.action == "sheet":
         units = [u for u in ctx.units if in_scope(crit, u)]
-        if a.limit:
-            units = units[: a.limit]
-        print(f"# Label each paragraph for {crit.id}: {crit.question}\n# label: yes = the defect is present, no = it is not. Leave nothing null.\nlabels:")
-        for u in units:
-            snippet = " ".join(u.norm.split())[:150].replace("\n", " ")
-            print(f"  # {snippet}\n  - {{unit: {unit_ref(u)}, hash: {u.hash}, label: null}}")
+        if a.limit and len(units) > a.limit:
+            # evenly spaced through the document, so the sample is not just the introduction
+            units = [units[int(i * len(units) / a.limit)] for i in range(a.limit)]
+        print(f"# Label each paragraph for {crit.id}: {crit.question}\n# label: yes = the defect is present, no = it is not. Leave nothing null.\n"
+              "# The model's verdicts are not shown here, on purpose: label from the text alone.\nlabels:")
+        for n, u in enumerate(units, 1):
+            text = " ".join(u.norm.split())
+            lines = textwrap.wrap(text, 110) or [""]
+            print(f"  # [{n}/{len(units)}] {unit_ref(u)}")
+            for line in lines:
+                print(f"  #   {line}")
+            print(f"  - {{unit: {unit_ref(u)}, hash: {u.hash}, label: null}}\n")
         return EXIT_OK
 
     if a.action == "admit":

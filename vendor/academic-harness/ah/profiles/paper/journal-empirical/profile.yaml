@@ -23,7 +23,7 @@ scaffold:
   profile/guideline_map.yaml: |
     items: {}
 rules:
-  - {id: sections, kind: sections, required: [Introduction, "Methods|Materials and methods", Results, Discussion, "Limitations|Limitation"]}
+  - {id: sections, kind: sections, required: [Introduction, "Methods|Materials and methods|Methodology|Methods and materials", Results, Discussion, "Limitations|Limitation"]}
   - {id: outcomes, kind: coverage, file: profile/outcomes.yaml, label: outcome, groups: [["${methods_glob}"], ["${results_glob}"]]}
   - {id: guideline, kind: checklist, optional: true, items: "${guideline_items}", map: profile/guideline_map.yaml}
   - {id: abstract_length, kind: limit, label: abstract, files: ["*abstract*"], max_words: "${abstract_words}"}
