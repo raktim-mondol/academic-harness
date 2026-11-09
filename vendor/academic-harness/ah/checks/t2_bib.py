@@ -5,7 +5,8 @@ import re
 
 from ..context import Context, unit_ref
 from ..sources.registry import entry_for
-from ..tex.text import RE_CITE
+from ..tex.scan import cites as scan_cites
+from ..tex.scan import nocites as scan_nocites
 from .base import Finding, make
 
 
@@ -22,13 +23,17 @@ def check_t2(ctx: Context) -> list[Finding]:
             out.append(f)
 
     cited: dict[str, list[tuple[str, int, str | None]]] = {}   # key -> [(file, line, unit ref)]
+    nocited_all = False                                         # \\nocite{*}: every entry is in the bibliography on purpose
     for rel, text in sorted(ctx.tex_texts.items()):
-        for m in RE_CITE.finditer(text):
-            ln = text.count("\n", 0, m.start()) + 1
+        for k, at in scan_cites(text, ctx.wrappers):
+            ln = text.count("\n", 0, at) + 1
             ref = next((unit_ref(u) for u in ctx.units if u.file == rel and u.start <= ln <= u.end), None)
-            for k in (x.strip() for x in m.group(1).split(",")):
-                if k:
-                    cited.setdefault(k, []).append((rel, ln, ref))
+            cited.setdefault(k, []).append((rel, ln, ref))
+        for k, at in scan_nocites(text):       # in the bibliography without a sentence: counts as cited, but no claim hangs on it
+            if k == "*":
+                nocited_all = True
+            else:
+                cited.setdefault(k, []).append((rel, text.count("\n", 0, at) + 1, None))
 
     for k in ctx.bib_dups:
         add("BIB-06", None, ctx.bib[k].file if k in ctx.bib else None, None, f"dup:{k}", f"bibliography key '{k}' is defined more than once")
@@ -57,7 +62,7 @@ def check_t2(ctx: Context) -> list[Finding]:
                     bad.append("title")
                 if bad:
                     add("BIB-03", ref, rel, ln, f"fields:{k}:{','.join(bad)}", f"bibliography and registry differ for '{k}' in: {', '.join(bad)}")
-    unused = sorted(set(ctx.bib) - set(cited))
+    unused = [] if nocited_all else sorted(set(ctx.bib) - set(cited))
     if unused:
         add("BIB-05", None, None, None, "unused", f"{len(unused)} of {len(ctx.bib)} bibliography entries are never cited (first: {', '.join(unused[:8])})")
     return out

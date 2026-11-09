@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 
 from .context import Context, unit_ref
 from .tex.inventory import extract_numbers
+from .tex.scan import cite_keys
 from .tex.text import RE_CITE, RE_FACT, RE_LABEL, RE_REF
 from .util import collapse_ws, sha1
 
@@ -59,7 +60,7 @@ def split_by_cites(sentence: str) -> list[tuple[str, list[str]]]:
     ms = list(RE_CITE.finditer(sentence))
     for i, m in enumerate(ms):
         clause = carry + sentence[pos:m.start()]
-        keys = carry_keys + [k.strip() for k in m.group(1).split(",") if k.strip()]
+        keys = carry_keys + cite_keys(m.group(0))
         pos = m.end()
         words = len(re.findall(r"[A-Za-z]{3,}", re.sub(r"\\[a-zA-Z]+", " ", clause)))
         if words < 5 and i + 1 < len(ms):
@@ -84,7 +85,7 @@ def extract_claims(ctx: Context, kinds: set[str] | None = None, granularity: str
             else:
                 keys = []
                 for m in RE_CITE.finditer(sent):
-                    keys += [k.strip() for k in m.group(1).split(",") if k.strip()]
+                    keys += cite_keys(m.group(0))
                 pieces = [(sent, keys)] if keys else []
             for pi, (clause, keys) in enumerate(pieces):
                 if not keys:

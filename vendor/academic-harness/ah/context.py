@@ -10,7 +10,7 @@ import yaml
 from .facts.model import FactSet, build_facts
 from .project import Project
 from .tex.inventory import UnitInv, inventory
-from .tex.text import RE_CITE, RE_INPUT, RE_LABEL, RE_REF, strip_comments
+from .tex.scan import markup_view, wrappers
 from .tex.units import ParsedFile, Unit, load_units
 
 
@@ -73,8 +73,9 @@ class Context:
     registry: dict[str, dict]
     glossary: list[dict]
     bindings: list[dict]
-    tex_texts: dict[str, str] = field(default_factory=dict)   # every .tex file, comments stripped
+    tex_texts: dict[str, str] = field(default_factory=dict)   # every .tex file as TeX executes it: comments, dead branches, verbatim bodies gone
     reachable: set[str] = field(default_factory=set)
+    wrappers: dict = field(default_factory=dict)   # user macros that only wrap a cite, ref, label or input
     recheck: set[str] | None = None   # unit refs to re-derive; None = all (incremental audits)
 
     @property
@@ -103,7 +104,10 @@ def _reachable(project: Project, texts: dict[str, str]) -> set[str]:
 
 def build_context(project: Project) -> Context:
     units, parsed = load_units(project)
-    inv = inventory(units)
+    files = project.all_tex_files()
+    views = {project.rel(p): markup_view(p.read_text(errors="replace")) for p in files}
+    table = wrappers(views.values())
+    inv = inventory(units, table)
     fs, errs = build_facts(project)
     bib: dict[str, BibEntry] = {}
     dups: list[str] = []
@@ -115,11 +119,12 @@ def build_context(project: Project) -> Context:
             bib[k] = v
         dups += d
     registry = {s["id"]: s for s in _load_yaml(project.path("sources"), "sources")}
-    texts = {project.rel(p): strip_comments(p.read_text(errors="replace")) for p in project.all_tex_files()
-             if p.resolve() != project.macros_file().resolve()}
+    macros = project.macros_file().resolve()
+    texts = {project.rel(p): views[project.rel(p)] for p in files if p.resolve() != macros}
     ctx = Context(project, units, parsed, inv, fs, errs, bib, sorted(set(dups)), registry,
                   _load_yaml(project.path("glossary"), "terms"), _load_yaml(project.path("bindings"), "bindings"),
                   texts)
+    ctx.wrappers = table
     ctx.reachable = _reachable(project, texts)
     from .claim_sidecar import sidecar_fact_bindings
     ctx.bindings = list(ctx.bindings) + sidecar_fact_bindings(project)      # claim bindings count like bindings.yaml

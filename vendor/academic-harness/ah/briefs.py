@@ -15,7 +15,8 @@ import yaml
 from .claims import extract_claims, plain_claim
 from .context import Context, unit_ref
 from .project import Project
-from .tex.text import RE_CITE, RE_FACT, word_count
+from .tex.scan import cites as scan_cites
+from .tex.text import RE_FACT, word_count
 
 LEXICONS = {
     "causal": r"\b(because|due to|leads? to|led to|causes?|caused|results? in|resulted in|driven by|attributable|explains?|originat\w+|stems? from|mutually reinforcing)\b",
@@ -116,7 +117,7 @@ def check_brief(ctx: Context, b: Brief) -> list[dict]:
         return out
     raw = "\n".join(u.raw for u in units)
     text = target_text(ctx, units)
-    cites = {k.strip() for m in RE_CITE.finditer(raw) for k in m.group(1).split(",") if k.strip()}
+    cites = {k for k, _ in scan_cites(raw)}
     facts_used = {k.strip() for k in RE_FACT.findall(raw)}
     planned_cites: set[str] = set(d.get("extra_cites") or [])
     for c in d.get("claims") or []:

@@ -14,7 +14,9 @@ from typing import Any
 import yaml
 
 from .tex.inventory import RE_NUM, classify
-from .tex.text import RE_CITE, RE_FACT, RE_INPUT, sentences, strip_comments
+from .tex.scan import inputs as scan_inputs
+from .tex.scan import markup_view
+from .tex.text import RE_CITE, RE_FACT, sentences, strip_comments
 from .util import sha1
 
 IGNORE_DIRS = {".ah", "build", ".git", "node_modules", "__pycache__", "vendor", "archive",
@@ -150,7 +152,7 @@ def scan(root: Path) -> dict[str, Any]:
     inputs = []
     for p, t in zip(tex_files, texts):
         if _rel(root, p) in views:
-            inputs += [m.group(1) for m in RE_INPUT.finditer(t)]
+            inputs += [i.path for i in scan_inputs(markup_view(t))]
     lits: list[dict] = []
     for p, t in zip(tex_files, texts):
         if _rel(root, p) in views:

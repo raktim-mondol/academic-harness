@@ -27,7 +27,9 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 
 from ..context import Context, unit_ref
-from ..tex.text import RE_CITE, RE_INPUT, RE_LABEL, RE_REF, sentences
+from ..tex.inputs import resolve_input
+from ..tex.scan import inputs as scan_inputs
+from ..tex.text import RE_CITE, RE_LABEL, RE_REF, sentences
 from ..util import sha1
 from .base import Finding, make
 
@@ -145,25 +147,18 @@ def reading_order(ctx: Context):
     seen: set[str] = set()
     counter = [0]
 
-    def resolve(cur: str, inc: str) -> str | None:
-        cand = inc if inc.endswith(".tex") else inc + ".tex"
-        for c in (os.path.normpath(os.path.join(os.path.dirname(cur), cand)), os.path.normpath(cand)):
-            if c in texts:
-                return c
-        return None
-
-    def expand(f: str, depth: int = 0):
+    def expand(f: str, depth: int = 0, base: str | None = None):
         if f in seen or f not in texts or depth > 50:
             return
         seen.add(f)
         text, cur = texts[f], 1
-        for m in RE_INPUT.finditer(text):
-            line = text.count("\n", 0, m.start()) + 1
+        for inp in scan_inputs(text, ctx.wrappers):
+            line = text.count("\n", 0, inp.pos) + 1
             spans[f].append((cur, line, counter[0]))
             counter[0] += 1
-            child = resolve(f, m.group(1))
+            child = resolve_input(f, inp.path, texts, inp.base or base)
             if child:
-                expand(child, depth + 1)
+                expand(child, depth + 1, inp.base or base)
             cur = line + 1
         spans[f].append((cur, 10 ** 9, counter[0]))
         counter[0] += 1
