@@ -51,3 +51,18 @@ def test_a_finding_handed_to_the_author_stops_the_steering(project_dir):
     handed = {"fp": "b2", "level": "blocker", "state": "decision-needed"}
     waived = {"fp": "c3", "level": "blocker", "state": "waived"}
     assert new_findings(set(), [open_, handed, waived]) == [open_]
+
+
+def test_a_decision_recorded_in_the_ledger_stops_the_steering(project_dir):
+    """Live (round 4): the filter in guard.new_findings never matched in the hook, because the hook audits without the ledger and
+    every finding came back `open`; the gate steered three more times after the agent had handed the blocker to the author."""
+    from ah.audit import audit
+    from ah.cli import main
+    from ah.project import Project
+    _event(project_dir, "userprompt")
+    _event(project_dir, "post", tool_name="Edit", tool_input={"file_path": _edit_intro(project_dir)})
+    first = _event(project_dir, "stop")
+    assert first and first.get("decision") == "block"        # before the agent says anything, it is blocked
+    fp = next(f["fingerprint"] for f in audit(Project(str(project_dir)), use_ledger=True)["findings"] if f["check"] == "TEX-02" and "does_not_exist" in f["message"])
+    assert main(["finding", "decide", fp[:8], "--reason", "leave the reference until the figure exists, or waive", "--project", str(project_dir)]) == 0
+    assert _event(project_dir, "stop") is None               # handed over: nothing left to steer the agent on

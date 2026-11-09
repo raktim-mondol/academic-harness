@@ -215,7 +215,9 @@ def audit(project: Project, tiers: tuple[str, ...] = DEFAULT_TIERS, use_ledger: 
         led.save_run(run_id, manifest, report_hash(findings))
         led.close()
     else:
-        report["findings"] = [dict(f.to_dict(), state="open") for f in findings]
+        from .ledger.db import read_states
+        decided = read_states(project, unit_hashes)       # without the ledger every finding would read `open`, waived ones included
+        report["findings"] = [dict(f.to_dict(), state=decided.get(f.fingerprint(), "open")) for f in findings]
     live = [d for d in report["findings"] if d["state"] in ("open", "decision-needed")]
     report["counts"] = dict(Counter(d["level"] for d in live))
     report["checks_fired"] = dict(Counter(d["check"] for d in live))

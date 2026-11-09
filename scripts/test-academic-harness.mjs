@@ -174,6 +174,9 @@ ok('ah_plan propose argv', Array.isArray(toolArgv('ah_plan', { action: 'propose'
 ok('ah_migrate apply without confirm blocked', toolArgv('ah_migrate', { apply: true }).error)
 ok('ah_migrate dry-run', JSON.stringify(toolArgv('ah_migrate', { dir: '/tmp/p' })) === JSON.stringify(['migrate', '/tmp/p']))
 ok('ah_author waive', JSON.stringify(toolArgv('ah_author', { action: 'waive', id: 'abc', reason: 'ok' })).includes('finding'))
+// found live: without --by the engine refuses to waive, so a waive through the host could never succeed; and the name must not come from the agent
+ok('ah_author waive passes --by author', JSON.stringify(toolArgv('ah_author', { action: 'waive', id: 'abc', reason: 'ok' })) === JSON.stringify(['finding', 'waive', 'abc', '--by', 'author', '--reason', 'ok', '--yes']))
+ok('ah_author waive ignores a name the agent supplies', JSON.stringify(toolArgv('ah_author', { action: 'waive', id: 'abc', reason: 'ok', by: 'Someone Else' })).includes('Someone Else') === false)
 ok('ah_author bad action', toolArgv('ah_author', { action: 'delete', id: 'x' }).error)
 ok('ah_review_set declined blocked', toolArgv('ah_review_set', { item: 'R1.1', status: 'declined' }).error)
 ok('ah_init uses dir', toolArgv('ah_init', { dir: '/tmp/paper', profile: 'thesis' }, '/cwd')[0] === 'init')

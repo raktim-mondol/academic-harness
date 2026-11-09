@@ -107,3 +107,30 @@ Main at the merge of round 2, packed and installed into the isolated host, drive
 One misstatement by the agent: it said I had "answered the TEX-02 decision"; I had given an instruction to delete the paragraph, which is close, but it described a decision that had not been recorded. Not a finding about the checks.
 
 Not covered by this round: approval prompts (no `ah_author` action was requested), `deep_review` in the UI, the rubric (still no admitted criterion), and a model other than `deepseek-flash`.
+
+## Round 4: full web-UI run, with approvals (same day)
+
+Same setup as round 3 (isolated host, browser, `deepseek-flash`; the session is created over RPC with the first prompt, the rest typed or clicked in the UI). The run ended early: the provider account reached a balance of 0.00 USD (HTTP 402), so the model-backed scenarios after the rubric could not run.
+
+| Scenario | Observed |
+|---|---|
+| Build state, read-only | Honest FAIL with the one blocking item; no edit |
+| Add a sentence that refers to a missing figure (stop gate) | `TEX-02` flagged as new right after the edit; the gate steered the agent and then handed off after 3 attempts; the agent kept the author's sentence and recorded a decision request. **Bug:** the gate kept counting the finding as blocking after the hand-over (see below) |
+| Waive both blockers (approval gate) | The card appears and the agent waits. **Allow once** on a first call that failed (bug below); **Reject** on a retry left the ledger untouched and the agent reported it accurately. The agent also tried `ah finding waive` through the shell: blocked by the host (`human-only`) |
+| Same waive on the fixed build | **Allow once** twice: `TEX-02` and `EVD-04` waived, recorded `by author`, and `ah done` returned **PASS**, the first live PASS |
+| `ask_user_question` | The card shows radio options and a Submit button; clicking "Cut the last sentence" was accepted and acted on: the last sentence was removed, `LAT-03` cleared, no number lost |
+| Rubric with the model (abstract + introduction) | 45 model calls, then 0 on the second run, identical verdicts; one flag (`RUB-SUPERLATIVE` on "most widely adopted..."), which the agent itself called arguable, and one unverifiable quote |
+| `deep_review` and rule promotion | **Not run**: model balance exhausted |
+
+Found and fixed (all with tests that fail without the fix):
+
+- **The stop gate ignored the hand-over (F12, second try).** The hook audits without the ledger, so every finding came back `open`; the filter for `decision-needed` could never match. After the fix the same scenario ran the gate once, saw 0 blocking, and settled (before: four attempts and a handoff).
+- **`ah_author waive` could never succeed.** The tool sent no `--by`, which the engine requires. The agent worked this out from the plugin source, then guessed a name from the git config. The tool now passes `--by author` itself, since only a person's approval lets it run.
+- **The status card disagreed with `ah done`.** After two waivers `ah done` said PASS while the card said Gate FAIL. The audit without the ledger now reads waived and decision-needed states (read-only; a waiver tied to a paragraph lapses if that paragraph changes). Not re-checked in the UI after the fix: the model ran out of credit.
+- **A PASS hid what was waived.** `ah done` now says "PASS ... 2 waived by the author: EVD-04 1, TEX-02 1".
+
+Seen, not changed:
+
+- The approval card says only "Author-only Academic Harness act ... Confirm to run it." It does not say which finding, which action or which reason, so the person approving must trust the chat.
+- The agent told the user how to waive from the shell (`ah finding waive ... --by <name>`) after the host had told it only the author may do that; accurate, but it is advice on how to go around the card.
+- `RUB-SUPERLATIVE` flagged a claim that the paragraph backs with citations, once more.

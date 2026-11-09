@@ -74,7 +74,14 @@ def done_status(project: Project, rep: dict, now: datetime | None = None) -> dic
             by[f["check"]] = by.get(f["check"], 0) + 1
         comps.append(_c("findings", "fail", f"{len(blocking)} open at {'/'.join(sorted(levels))}: " + ", ".join(f"{k} {v}" for k, v in sorted(by.items()))))
     else:
-        comps.append(_c("findings", "ok", f"no open finding at {'/'.join(sorted(levels))} in {', '.join(sorted(tiers - {'TX'})) or 'no tier'}"))
+        detail = f"no open finding at {'/'.join(sorted(levels))} in {', '.join(sorted(tiers - {'TX'})) or 'no tier'}"
+        waived = [f for f in rep["findings"] if f["state"] == "waived" and f["level"] in levels]
+        if waived:      # a pass that hides what the author waived reads more optimistic than it is
+            by = {}
+            for f in waived:
+                by[f["check"]] = by.get(f["check"], 0) + 1
+            detail += f"; {len(waived)} waived by the author: " + ", ".join(f"{k} {v}" for k, v in sorted(by.items()))
+        comps.append(_c("findings", "ok", detail))
 
     # rubric
     run = rep.get("rubric_run") or {}

@@ -357,7 +357,9 @@ export function toolArgv(name, args = {}, cwd) {
         return ['rubric', 'admit', id, '--labels', String(args.file), '--yes']
       }
       if (!id) return { error: 'ah_author needs an id' }
-      if (action === 'waive') return ['finding', 'waive', id, '--reason', String(args.reason || ''), '--yes']
+      // The engine records who waived. The host only runs this after a person approved it, so the waiver is the author's, and a name the
+      // agent picks (it guessed one from the git config when --by was missing) is not a record of who decided.
+      if (action === 'waive') return ['finding', 'waive', id, '--by', 'author', '--reason', String(args.reason || ''), '--yes']
       const isRule = /^(PRM|RUB)-/.test(id)       // a promoted rule or criterion; fact ids cannot contain a dash
       if (action === 'accept') return isRule ? ['rule', 'accept', id, '--yes'] : ['proposals', 'accept', id, '--yes']
       if (action === 'reject') return isRule ? ['rule', 'reject', id, '--yes'] : ['proposals', 'reject', id, '--yes']
