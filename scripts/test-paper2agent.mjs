@@ -59,6 +59,7 @@ const {
 } = await import('../paper-mcp.js')
 const { queryResearchTemplates, fillPrompt } = await import('../workflows.js')
 const { seed } = await import('../seed.js')
+const { loadSkill } = await import('../skill-index.js')
 
 // ── research_template ─────────────────────────────────────────────────────
 
@@ -272,7 +273,7 @@ const { seed } = await import('../seed.js')
   ok('seed copies paper2agent', existsSync(join(fakeHome, 'skills', 'paper2agent', 'SKILL.md')))
   ok('seed copies paper2mcp', existsSync(join(fakeHome, 'skills', 'paper2mcp', 'SKILL.md')))
   ok('seed copies paper2skill', existsSync(join(fakeHome, 'skills', 'paper2skill', 'SKILL.md')))
-  ok('seed copies paper-agent-builder', existsSync(join(fakeHome, 'skills', 'paper-agent-builder', 'SKILL.md')))
+  ok('paper-agent-builder is bundled and loads on demand, not seeded', !existsSync(join(fakeHome, 'skills', 'paper-agent-builder', 'SKILL.md')) && !!loadSkill('paper-agent-builder').content)
   writeFileSync(join(fakeHome, 'skills', 'paper2agent', 'SKILL.md'), 'stale\n')
   seed()
   ok('seed does not overwrite existing skill', readFileSync(join(fakeHome, 'skills', 'paper2agent', 'SKILL.md'), 'utf8') === 'stale\n')

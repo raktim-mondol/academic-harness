@@ -202,9 +202,10 @@ function renderStatus(value) {
     }
     case 'design_protocol':
       return [{ type: 'text', text: `Protocol for \`${value.hypothesis.id}\` recorded (${value.steps} steps). It belongs to that hypothesis only.` }]
-    case 'synthesize':
+    case 'synthesize': {
       const saved = [value.critique ? 'Meta-review critique stored; it steers later generation.' : '', value.overview ? 'Research overview stored.' : ''].filter(Boolean)
       return [{ type: 'text', text: saved.join('\n') }]
+    }
     case 'embed':
       return [{ type: 'text', text: [
         value.note || `Embedded ${value.embedded}/${value.total} hypotheses with ${value.model} (${value.dimensions}-dimensional).`,
@@ -582,7 +583,7 @@ export function apply(ctx) {
       title: { type: 'string', description: 'Hypothesis title (add).' },
       summary: { type: 'string', description: 'One-paragraph claim (add); the review one-liner (review).' },
       content: { type: 'string', description: 'The hypothesis stated in full, with its predictions (add).' },
-      rationale: { type: 'string', description: 'Mechanism and why it is plausible (add).' },
+      rationale: { type: 'string', description: 'add: mechanism and why the hypothesis is plausible. select: why this candidate is the champion (required there; stored with the evidence digest).' },
       experimental_plan: { type: 'string', description: 'A discriminating experiment that could refute it (add).' },
       novelty_assessment: { type: 'string', description: 'What makes it distinct from published work, with the searches that checked it (add).' },
       key_assumptions: { type: 'array', items: { type: 'string' }, description: 'Load-bearing assumptions (add). Verified one by one in deep_verification.' },
@@ -618,7 +619,6 @@ export function apply(ctx) {
       limitation_reason: { type: 'string', description: 'Why this sufficiency reading (limitation verify). Required.' },
       max_rounds: { type: 'number', description: `Verification rounds one limitation may spend. Default ${DEFAULT_LIMITATION_ROUNDS} (or CO_SCIENTIST_LIMITATION_ROUNDS).` },
       compared_ids: { type: 'array', items: { type: 'string' }, description: 'Surviving candidates the champion was compared against (select). Defaults to every other active idea.' },
-      rationale: { type: 'string', description: 'Why this candidate is the champion (select). Required; stored with the evidence digest.' },
       experiment: { type: 'string', description: 'Restrict traces or selection evidence to one experiment_log slug (trace/select).' },
       steps: { type: 'array', items: { type: 'string' }, description: 'Ordered protocol steps (design_protocol).' },
       meta_critique: { type: 'string', description: 'Cross-cutting critique of the set, injected into later generation (synthesize).' },

@@ -225,7 +225,7 @@ function updateTurnFromTool(turn, summary, args = {}) {
   for (const [lessonId, action] of turn.injectedActions || []) {
     if (!action) continue
     if (summary.name === action) turn.reachedLessonIds.add(lessonId)
-    else if (summary.name === 'skill' && argsText.includes(action)) turn.reachedLessonIds.add(lessonId)
+    else if ((summary.name === 'skill' || summary.name === 'skill_load') && argsText.includes(action)) turn.reachedLessonIds.add(lessonId)
   }
   const signature = `${summary.name}|${summary.args_hash}`
   if (turn.toolSignatures.has(signature)) turn.signals.add(`retry:${summary.name}`)
