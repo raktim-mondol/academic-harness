@@ -73,6 +73,7 @@ should continue.
 | Review stages run in order; a `fail` at `initial`/`full` rejects | A rejected hypothesis never re-enters; add a new one |
 | Only `active` hypotheses compete; withheld ones cannot be matched | Quarantine is a human release, with a name and a reason |
 | Ratings move only through `record` and `feedback` | Prose praise changes nothing |
+| `feedback` takes the experiment's `outcome` (`supports`, `refutes` or `inconclusive`) as the direction of the reward | Say what the result showed; do not leave it to a keyword reading of your prose, which can score "did not improve ... no significant effect" as neutral. Ask the scientist when it is unclear; use `inconclusive` rather than guessing |
 | `next` samples the task; `status`/`next` say when to stop | You do not choose when the tournament ends |
 | `next` never samples a task the ledger cannot execute | At the cap there is no generation/evolution; reflection needs a pending review |
 | A pair that has never met plays before a repeat | Complete the first ranking instead of replaying one matchup |

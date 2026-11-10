@@ -737,17 +737,42 @@ export function feedbackSentiment(text) {
 }
 
 /**
- * Reward in [-1, 1] from feedback text and optional 0–10 scores (upstream
+ * Combine a direction signal in [-1, 1] with optional 0–10 scores (upstream
  * `reward-signal.ts:65-82`). Scores are averaged and normalized to [-1, 1]
- * (sum/30 − 1), then weighted 0.6 against a 0.4 sentiment. Absent scores shift
- * the whole weight onto sentiment rather than treating them as zero.
+ * (sum/30 − 1), then weighted 0.6 against a 0.4 direction. Absent scores shift
+ * the whole weight onto the direction rather than treating them as zero.
+ */
+function combineReward(direction, novelty, correctness, testability) {
+  const scores = [novelty, correctness, testability].map((v) => (v === null || v === undefined || v === '' ? undefined : Number(v)))
+  if (scores.some((v) => !Number.isFinite(v))) return direction
+  const scoreAvg = scores.reduce((sum, v) => sum + v, 0) / 30 - 1
+  return Math.max(-1, Math.min(1, 0.4 * direction + 0.6 * scoreAvg))
+}
+
+/**
+ * Reward from feedback TEXT, using the keyword sentiment as the direction. This is the
+ * fallback when the caller states no outcome: a keyword count misreads negation ("did not
+ * improve ... no significant effect" scores neutral, "does not fail" scores -1), so
+ * `extractRewardFromOutcome` is preferred and callers should say which one they used.
  */
 export function extractRewardFromFeedback(feedbackText, novelty, correctness, testability) {
-  const sentiment = feedbackSentiment(feedbackText)
-  const scores = [novelty, correctness, testability].map((v) => (v === null || v === undefined || v === '' ? undefined : Number(v)))
-  if (scores.some((v) => !Number.isFinite(v))) return sentiment
-  const scoreAvg = scores.reduce((sum, v) => sum + v, 0) / 30 - 1
-  return Math.max(-1, Math.min(1, 0.4 * sentiment + 0.6 * scoreAvg))
+  return combineReward(feedbackSentiment(feedbackText), novelty, correctness, testability)
+}
+
+/** The outcome a person states about an experiment, and the direction each one carries. */
+export const FEEDBACK_OUTCOMES = ['supports', 'refutes', 'inconclusive']
+const OUTCOME_DIRECTION = { supports: 1, refutes: -1, inconclusive: 0 }
+
+/**
+ * Reward from a STATED outcome (supports / refutes / inconclusive): the outcome sets the
+ * direction, so no wording can flip it, and the optional scores moderate it exactly as they
+ * do for text. A refutation stays a loss even with perfect scores (-0.4 against the ±0.33
+ * threshold), and a draw only comes from `inconclusive` or a supportive result with poor scores.
+ */
+export function extractRewardFromOutcome(outcome, novelty, correctness, testability) {
+  const key = typeof outcome === 'string' ? outcome.trim().toLowerCase() : ''
+  if (!Object.hasOwn(OUTCOME_DIRECTION, key)) throw new Error(`outcome must be one of ${FEEDBACK_OUTCOMES.join(', ')}`)
+  return combineReward(OUTCOME_DIRECTION[key], novelty, correctness, testability)
 }
 
 /**

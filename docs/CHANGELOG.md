@@ -2,6 +2,12 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+Scoring, from the 2026-11-10 review (decision D24; finding B6).
+
+- **`coscientist_rank feedback` takes the experiment's outcome.** The reward was a keyword count over the feedback text, so two wordings of one negative finding scored very differently: "The treatment did not improve survival; no significant effect was observed." was a draw (rating unchanged) while "Replication failed. No significant effect was observed." lost 175 points, and "It does not fail under load." scored as a failure. You can now pass `outcome: supports | refutes | inconclusive`. It sets the direction of the reward (+1, -1, 0), the optional 0-10 scores still moderate it as before, and no wording can flip it; a refutation stays a loss even with perfect scores. Without `outcome` the keyword reading is kept as a fallback, and the result says so with a warning. When a stated outcome and the text disagree, the outcome is used and the result carries a note. Feedback events record `outcome` and `reward_basis`; older events replay as keyword-based. See [Research](RESEARCH.md).
+
 ## 0.50.0
 
 The writing compiler, checked against a second model, a real host and real LaTeX. Rule set 1.10.0, `BUNDLE_REV` `dsh14`. Evidence and limits: [the follow-up report](../reports/writing-compiler-claude-host-tex-2026-11-09.md).

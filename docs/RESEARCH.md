@@ -233,7 +233,7 @@ State lives under `<cwd>/.dsh/coscientist/<slug>/` as append-only `events.jsonl`
 | `record` | A judged pair, both presentation orders, judged sequentially with the same brief. |
 | `compare` | Compare two hypotheses. |
 | `similarity` | Report the measure behind a similarity score. |
-| `feedback` | An experimental result as a reward. |
+| `feedback` | An experimental result as a reward. Pass `outcome` (`supports`, `refutes` or `inconclusive`) to state what it showed: that sets the direction (+1, −1, 0) and the optional 0–10 scores moderate it. Without `outcome` the direction is a keyword reading of `feedback_text`, which can misread negation ("did not improve ... no significant effect" scores as a draw), and the result carries a warning. The event records `outcome` and `reward_basis`. |
 | `history` | Match history. |
 
 ### Ratings and decisions

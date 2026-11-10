@@ -25,7 +25,7 @@ import {
   GLICKO2_DEFAULTS,
   SAFETY_SEVERITIES, applyFeedbackAsGlicko2Match, citationPenalty, combineSwappedVerdicts,
   computeGlicko2Update, computeWeights, decideSafety, evolvedSeedRating,
-  extractRewardFromFeedback, feedbackSentiment, isNearDuplicate, mapPresentedVerdict, matchupKey,
+  FEEDBACK_OUTCOMES, extractRewardFromFeedback, extractRewardFromOutcome, feedbackSentiment, isNearDuplicate, mapPresentedVerdict, matchupKey,
   sampleNextTaskType, selectMatchup, similarityPairs, tokenOverlap,
   terminationCheck, verdictToMatchResult, seededRatingWithPenalty,
 } from './coscientist-models.js'
@@ -392,6 +392,8 @@ export function deriveState(cwd, slug) {
       hyp.feedback.push({
         feedback_text: event.feedback_text,
         sentiment: event.sentiment,
+        outcome: event.outcome ?? null,
+        reward_basis: event.reward_basis ?? 'keywords',
         reward: event.reward,
         novelty: event.novelty,
         correctness: event.correctness,
@@ -1762,11 +1764,28 @@ export function matchHistory(cwd, slug, id = null) {
 
 // ─── Experimental feedback ────────────────────────────────────────────────────
 
-/** An empirical result moves a rating through a match against the baseline. */
-export async function recordFeedback({ cwd, slug, id, feedbackText, novelty, correctness, testability, recordedBy }) {
+const KEYWORD_WARNING = 'No outcome was given, so the reward came from keyword matching on the text, which can misread negation '
+  + '("did not improve ... no significant effect" scores neutral; "does not fail" scores as a failure). '
+  + 'Pass outcome: supports, refutes or inconclusive to state what the experiment showed.'
+
+/** The stated outcome, normalised, or null when none was given. Anything else is an error. */
+function normaliseOutcome(value) {
+  if (value === undefined || value === null || String(value).trim() === '') return null
+  const key = String(value).trim().toLowerCase()
+  if (!FEEDBACK_OUTCOMES.includes(key)) throw new Error(`outcome must be one of ${FEEDBACK_OUTCOMES.join(', ')}`)
+  return key
+}
+
+/**
+ * An empirical result moves a rating through a match against the baseline.
+ * `outcome` (supports | refutes | inconclusive) sets the direction of the reward; without it the
+ * direction is a keyword reading of `feedbackText`, and the result says so.
+ */
+export async function recordFeedback({ cwd, slug, id, feedbackText, outcome, novelty, correctness, testability, recordedBy }) {
   const dir = ensureSession(cwd, slug)
   const body = prose(feedbackText)
   if (!body) throw new Error('feedback_text is required')
+  const stated = normaliseOutcome(outcome)
 
   return withLedgerLock(dir, async () => {
     const state = deriveState(cwd, slug)
@@ -1775,7 +1794,11 @@ export async function recordFeedback({ cwd, slug, id, feedbackText, novelty, cor
     if (hyp.status === 'rejected') throw new Error(`${id} is rejected; feedback does not revive it`)
 
     const scores = [number(novelty), number(correctness), number(testability)]
-    const reward = extractRewardFromFeedback(body, scores[0], scores[1], scores[2])
+    const sentiment = feedbackSentiment(body)
+    const reward = stated
+      ? extractRewardFromOutcome(stated, scores[0], scores[1], scores[2])
+      : extractRewardFromFeedback(body, scores[0], scores[1], scores[2])
+    const basis = stated ? 'outcome' : 'keywords'
     const updated = applyFeedbackAsGlicko2Match(
       { rating: hyp.rating, rd: hyp.rd, volatility: hyp.volatility, matchesPlayed: 0, wins: 0, losses: 0, draws: 0 },
       reward,
@@ -1787,7 +1810,9 @@ export async function recordFeedback({ cwd, slug, id, feedbackText, novelty, cor
       type: 'feedback',
       hypothesisId: id,
       feedback_text: body,
-      sentiment: Number(feedbackSentiment(body).toFixed(3)),
+      sentiment: Number(sentiment.toFixed(3)),
+      outcome: stated,
+      reward_basis: basis,
       reward: Number(reward.toFixed(3)),
       novelty: scores[0],
       correctness: scores[1],
@@ -1803,8 +1828,15 @@ export async function recordFeedback({ cwd, slug, id, feedbackText, novelty, cor
 
     const next = deriveState(cwd, slug)
     refreshSnapshot(cwd, slug, next)
+    // The text may read the other way to what the person stated; the outcome wins, but say so.
+    const direction = { supports: 1, refutes: -1, inconclusive: 0 }[stated]
+    const disagrees = stated && direction !== 0 && Math.abs(sentiment) >= 0.5 && Math.sign(sentiment) !== direction
     return {
       reward: Number(reward.toFixed(3)),
+      outcome: stated,
+      reward_basis: basis,
+      ...(stated ? {} : { warning: KEYWORD_WARNING }),
+      ...(disagrees ? { note: `The text reads as ${sentiment > 0 ? 'positive' : 'negative'} but outcome=${stated} was stated; the stated outcome was used. Check that the wording says what you meant.` } : {}),
       rating_before: hyp.rating,
       rating_after: updated.rating,
       rd_after: updated.rd,
@@ -2083,7 +2115,7 @@ export function priorFeedback({ cwd, slug, query, limit = 5, minScore = 0.15 }) 
       const title = titles.get(event.hypothesisId) || ''
       let prior = null
       if (event.type === 'feedback') {
-        prior = { kind: 'feedback', text: event.feedback_text, reward: event.reward, hypothesis_id: event.hypothesisId }
+        prior = { kind: 'feedback', text: event.feedback_text, reward: event.reward, ...(event.outcome ? { outcome: event.outcome } : {}), hypothesis_id: event.hypothesisId }
       } else if (event.type === 'status' && (event.status === 'rejected' || event.status === 'quarantined')) {
         // A human withholding is as much a prior as a screen withholding: both
         // say this neighbourhood already cost a tournament something.
