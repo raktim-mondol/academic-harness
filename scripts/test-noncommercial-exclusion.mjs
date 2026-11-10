@@ -34,7 +34,7 @@ try {
   check('seeding with AH_EXCLUDE_NONCOMMERCIAL=1 skips exactly the six and installs the rest', () => {
     const home = join(scratch, 'excluded-home')
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', "const { seed } = await import(process.argv[1]); seed()", join(ROOT, 'seed.js')], {
-      env: { ...process.env, DSH_HOME: home, AH_EXCLUDE_NONCOMMERCIAL: '1' },
+      env: { ...process.env, DSH_HOME: home, AH_EXCLUDE_NONCOMMERCIAL: '1', AH_SKILLS_SEED: 'all' },
       encoding: 'utf8',
     })
     assert.equal(run.status, 0, run.stderr)
@@ -47,7 +47,7 @@ try {
   check('seeding without the switch installs all six', () => {
     const home = join(scratch, 'full-home')
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', "const { seed } = await import(process.argv[1]); seed()", join(ROOT, 'seed.js')], {
-      env: { ...process.env, DSH_HOME: home, AH_EXCLUDE_NONCOMMERCIAL: '' },
+      env: { ...process.env, DSH_HOME: home, AH_EXCLUDE_NONCOMMERCIAL: '', AH_SKILLS_SEED: 'all' },
       encoding: 'utf8',
     })
     assert.equal(run.status, 0, run.stderr)

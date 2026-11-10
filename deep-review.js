@@ -7,6 +7,7 @@
  * report never lands in the model context by accident. `show` reads the rest
  * back from disk. The engine is stateless upstream; state lives here.
  */
+import { runAsJob } from './job-runner.js'
 import { createHash, randomUUID } from 'node:crypto'
 import {
   appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync,
@@ -557,89 +558,6 @@ function makeProgressSink(job) {
         buffer = ''
       }
     },
-  }
-}
-
-/**
- * Run long work as an owned background job so the Web UI's jobs panel can
- * stream progress while the tool call waits. The tool still returns the work's
- * value at settlement; the job id is added for the user to expand afterwards.
- */
-async function runAsJob(ctx, exec, { kind, label, timeoutMs }, work) {
-  const jobs = ctx?.jobs
-  if (!jobs) return work(null, exec?.signal)
-  const owner = exec?.agent?.id
-  const controller = new AbortController()
-  const onAbort = () => controller.abort('tool call aborted')
-  if (exec?.signal?.aborted) controller.abort('tool call aborted')
-  else exec?.signal?.addEventListener?.('abort', onAbort, { once: true })
-
-  let resolveResult
-  let rejectResult
-  const resultPromise = new Promise((resolve, reject) => {
-    resolveResult = resolve
-    rejectResult = reject
-  })
-  resultPromise.catch(() => {})
-  let settleOutcome
-  const done = new Promise((resolve) => {
-    settleOutcome = resolve
-  })
-
-  let jobId
-  try {
-    jobId = jobs.start({
-      kind,
-      label,
-      ...(owner ? { owner } : {}),
-      toolCall: { callId: exec.callId, rootCallId: exec.rootCallId },
-      run: (job) => {
-        void (async () => {
-          let outcome
-          try {
-            const value = await work(job, controller.signal)
-            resolveResult(value)
-            outcome = { status: 'completed', detail: 'completed', result: JSON.stringify(value) }
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
-            rejectResult(error)
-            outcome = { status: controller.signal.aborted ? 'killed' : 'failed', detail: message }
-          } finally {
-            exec?.signal?.removeEventListener?.('abort', onAbort)
-            settleOutcome(outcome)
-          }
-        })()
-        return {
-          done,
-          cancel: (reason) => controller.abort(reason || 'cancelled'),
-        }
-      },
-    })
-  } catch (error) {
-    exec?.signal?.removeEventListener?.('abort', onAbort)
-    throw error
-  }
-
-  try {
-    let view
-    try {
-      view = await jobs.wait(jobId, timeoutMs, owner, exec?.signal)
-    } catch (error) {
-      try { jobs.kill(jobId, owner, 'tool call aborted') } catch { /* already settled */ }
-      throw error
-    }
-    if (view.status === 'running' || view.status === 'stopping') {
-      try { jobs.kill(jobId, owner, 'deep review timed out') } catch { /* already settled */ }
-      try { await jobs.wait(jobId, 10_000, owner) } catch { /* already gone */ }
-      throw new Error(`deep review timed out after ${Math.round(timeoutMs / 60_000)} minutes`)
-    }
-    if (view.status === 'killed') {
-      throw new Error(`deep review cancelled${view.detail ? `: ${view.detail}` : ''}`)
-    }
-    const value = await resultPromise
-    return { ...value, job_id: jobId }
-  } finally {
-    exec?.signal?.removeEventListener?.('abort', onAbort)
   }
 }
 
@@ -2041,6 +1959,8 @@ async function actionReview(args, exec, cwd, input, ctx) {
     kind: 'deep-review',
     label,
     timeoutMs: timeoutMinutes * 60_000 + 60_000,
+    noun: 'deep review',
+    detailFromStatus: false,
   }, async (job, signal) => {
     const progress = makeProgressSink(job)
     const bridge = await startLlmBridge(ctx, exec, progress.onEvent)
@@ -2849,6 +2769,8 @@ async function actionValidity(args, exec, cwd, input, ctx) {
     kind: 'deep-review',
     label,
     timeoutMs: timeoutMinutes * 60_000 + 60_000,
+    noun: 'deep review',
+    detailFromStatus: false,
   }, async (job, signal) => {
     const read = await readValidityText(input, paths, stored, round)
     const evaluation = evaluateValidity({
@@ -3282,6 +3204,8 @@ async function actionScore(args, exec, cwd, input, ctx) {
     kind: 'deep-review',
     label,
     timeoutMs: timeoutMinutes * 60_000 + 60_000,
+    noun: 'deep review',
+    detailFromStatus: false,
   }, async (job, signal) => {
     const score = await callScoreModel({ ctx, exec, signal, views, report, rubric })
     const run = runRecord('score', startedAt, {

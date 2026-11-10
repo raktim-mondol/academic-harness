@@ -9,6 +9,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { fakeApproval } from './helpers/fake-host.mjs'
+
+// Approvals are stored under $DSH_HOME; never touch the real one.
+process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'p2a-dsh-home-'))
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -34,10 +38,15 @@ function execFor(cwd) {
 
 function mockCtx() {
   const plugins = []
+  const approval = fakeApproval(['allowed-once'])
   return {
     plugins,
+    approval,
     plugin(mod, cfg) {
       plugins.push({ mod, cfg })
+    },
+    get(name) {
+      return name === 'approval' ? approval : undefined
     },
   }
 }
@@ -50,6 +59,7 @@ const {
 } = await import('../paper-mcp.js')
 const { queryResearchTemplates, fillPrompt } = await import('../workflows.js')
 const { seed } = await import('../seed.js')
+const { loadSkill } = await import('../skill-index.js')
 
 // ── research_template ─────────────────────────────────────────────────────
 
@@ -263,7 +273,7 @@ const { seed } = await import('../seed.js')
   ok('seed copies paper2agent', existsSync(join(fakeHome, 'skills', 'paper2agent', 'SKILL.md')))
   ok('seed copies paper2mcp', existsSync(join(fakeHome, 'skills', 'paper2mcp', 'SKILL.md')))
   ok('seed copies paper2skill', existsSync(join(fakeHome, 'skills', 'paper2skill', 'SKILL.md')))
-  ok('seed copies paper-agent-builder', existsSync(join(fakeHome, 'skills', 'paper-agent-builder', 'SKILL.md')))
+  ok('paper-agent-builder is bundled and loads on demand, not seeded', !existsSync(join(fakeHome, 'skills', 'paper-agent-builder', 'SKILL.md')) && !!loadSkill('paper-agent-builder').content)
   writeFileSync(join(fakeHome, 'skills', 'paper2agent', 'SKILL.md'), 'stale\n')
   seed()
   ok('seed does not overwrite existing skill', readFileSync(join(fakeHome, 'skills', 'paper2agent', 'SKILL.md'), 'utf8') === 'stale\n')

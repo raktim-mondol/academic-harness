@@ -33,11 +33,20 @@ jobs:
         with:
           node-version: '24'
 
+      # npm ci installs exactly what package-lock.json records and fails if package.json has drifted from it.
       - name: Install plugin dependencies
-        run: npm install
+        run: npm ci
 
       - name: Check generated cordis patch is current
         run: node scripts/build-cordis-patch.mjs --check
+
+      # Correctness-only lint (errors fail; unused-variable warnings do not) and
+      # a type check of the modules listed in tsconfig.json.
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check the allowlisted modules
+        run: npm run typecheck
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -80,7 +89,15 @@ jobs:
       - name: Run the test suite
         env:
           AH_OFFICE_PYTHON: python
-        run: npm test
+        run: npm test -- --jobs 2 --junit "$RUNNER_TEMP/junit.xml"
+
+      - name: Keep the test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit
+          path: ${{ runner.temp }}/junit.xml
+          if-no-files-found: ignore
 
       - name: Rebuild the client bundle and check it's committed
         run: |
@@ -95,6 +112,12 @@ jobs:
       # resolution loop that OOM'd the runner (~1h, exit 134).
       - name: Install the dsh CLI
         run: npm install -g @deepseek-ai/dsh@0.2.1-rc.5
+
+      # The approval and trust code asks through the host approval service and
+      # a `tools/pre-execute` ask. The plugin's fake-host tests cannot see the
+      # host change underneath them, so read the installed host's own seams.
+      - name: Check the host approval contract
+        run: node scripts/check-host-contract.mjs "$(npm root -g)/@deepseek-ai/dsh"
 
       - name: Compose a throwaway profile that installs this plugin
         run: |

@@ -204,9 +204,10 @@ When the revision was guided by a prior round's rubric or report, pass
 
 `compare` never accepts or rejects the paper, and the round ladder is not a
 score to climb. Where the user wants the tool itself checked,
-`node scripts/deep-review-calibration.mjs --report` summarizes stored rounds and
-their agreement with real OpenReview decisions, reporting `not_checked` when the
-sample is too small.
+a maintainer working in a checkout of the plugin repository can run
+`node scripts/deep-review-calibration.mjs --report` (the script is not part of
+the installed package) to summarize stored rounds and their agreement with real
+OpenReview decisions; it reports `not_checked` when the sample is too small.
 
 ### 7. Check the validity of what the paper claims
 

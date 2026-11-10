@@ -10,18 +10,32 @@
  * so the run tool registers a per-call ephemeral key and removes it again in
  * its teardown block.
  */
+import { abortError, DEFAULT_REQUEST_TIMEOUT_MS, requestSignal } from './api-request.js'
 import { sleep } from './ssh-client.js'
 import { isTransientError } from './search-http.js'
 
 const API_BASE = process.env.VAST_API_BASE_URL ?? 'https://console.vast.ai/api/v0'
 
-async function request(apiKey, method, relPath, body) {
-  const res = await fetch(`${API_BASE}${relPath}`, {
-    method,
-    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  const text = await res.text()
+/**
+ * One REST call. `opts.signal` is the tool's cancel signal (leave it out for teardown calls);
+ * `opts.timeoutMs` bounds the whole exchange including the body.
+ */
+async function request(apiKey, method, relPath, body, opts = {}) {
+  const timeoutMs = opts.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+  const label = `Vast.ai API ${method} ${relPath}`
+  let res
+  let text
+  try {
+    res = await fetch(`${API_BASE}${relPath}`, {
+      method,
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: requestSignal({ signal: opts.signal, timeoutMs }),
+    })
+    text = await res.text()
+  } catch (error) {
+    throw abortError(error, { label, timeoutMs, signal: opts.signal })
+  }
   let data = null
   if (text) {
     try {
@@ -44,8 +58,8 @@ async function request(apiKey, method, relPath, body) {
 }
 
 /** POST /bundles/ — returns offer objects, cheapest first. */
-export async function searchOffers(apiKey, body) {
-  const data = await request(apiKey, 'POST', '/bundles/', body)
+export async function searchOffers(apiKey, body, opts) {
+  const data = await request(apiKey, 'POST', '/bundles/', body, opts)
   const raw = data?.offers
   const offers = Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : []
   return offers
@@ -55,39 +69,39 @@ export async function searchOffers(apiKey, body) {
 }
 
 /** PUT /asks/{offerId}/ — returns `{ success, new_contract }`. */
-export async function createInstance(apiKey, offerId, body) {
-  return request(apiKey, 'PUT', `/asks/${encodeURIComponent(offerId)}/`, body)
+export async function createInstance(apiKey, offerId, body, opts) {
+  return request(apiKey, 'PUT', `/asks/${encodeURIComponent(offerId)}/`, body, opts)
 }
 
 /** GET /instances/{id}/ — returns the instance object (wrapped in `instances`). */
-export async function showInstance(apiKey, instanceId) {
-  const data = await request(apiKey, 'GET', `/instances/${encodeURIComponent(instanceId)}/`)
+export async function showInstance(apiKey, instanceId, opts) {
+  const data = await request(apiKey, 'GET', `/instances/${encodeURIComponent(instanceId)}/`, undefined, opts)
   return data?.instances ?? data?.instance ?? data ?? null
 }
 
 /** GET /instances/ — used to find an orphan after a failed create. */
-export async function listInstances(apiKey) {
-  const data = await request(apiKey, 'GET', '/instances/')
+export async function listInstances(apiKey, opts) {
+  const data = await request(apiKey, 'GET', '/instances/', undefined, opts)
   const raw = data?.instances
   return Array.isArray(raw) ? raw : raw && typeof raw === 'object' ? [raw] : []
 }
 
 /** DELETE /instances/{id}/ — permanently destroys the instance. */
-export async function destroyInstance(apiKey, instanceId) {
-  return request(apiKey, 'DELETE', `/instances/${encodeURIComponent(instanceId)}/`)
+export async function destroyInstance(apiKey, instanceId, opts) {
+  return request(apiKey, 'DELETE', `/instances/${encodeURIComponent(instanceId)}/`, undefined, opts)
 }
 
 /** POST /ssh — register a public key on the account (required before create). */
-export async function registerSshKey(apiKey, publicKey) {
-  const data = await request(apiKey, 'POST', '/ssh', { ssh_key: publicKey })
+export async function registerSshKey(apiKey, publicKey, opts) {
+  const data = await request(apiKey, 'POST', '/ssh', { ssh_key: publicKey }, opts)
   const id = data?.key?.id ?? data?.id
   if (id === undefined || id === null) throw new Error('Vast.ai SSH key registration returned no key id')
   return id
 }
 
 /** DELETE /ssh/{id} — remove a key from the account. */
-export async function deleteSshKey(apiKey, keyId) {
-  return request(apiKey, 'DELETE', `/ssh/${encodeURIComponent(keyId)}`)
+export async function deleteSshKey(apiKey, keyId, opts) {
+  return request(apiKey, 'DELETE', `/ssh/${encodeURIComponent(keyId)}`, undefined, opts)
 }
 
 /** SSH endpoint from an instance object: `ssh_host`/`ssh_port`, else the 22/tcp mapping. */
@@ -118,7 +132,7 @@ export async function waitForInstanceSsh(apiKey, instanceId, opts) {
     if (opts.signal?.aborted) throw new Error('Aborted while waiting for Vast.ai instance')
     let info
     try {
-      info = await showInstance(apiKey, instanceId)
+      info = await showInstance(apiKey, instanceId, { signal: opts.signal, timeoutMs: opts.requestTimeoutMs })
     } catch (error) {
       if (!isTransientError(error)) throw error
       await sleep(opts.pollMs ?? 10_000, opts.signal)

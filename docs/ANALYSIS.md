@@ -37,6 +37,21 @@ hidden; network is off by convention (`no_proxy=*` — a guardrail, not a
 firewall) and `network: true` is recorded in the manifest. The tool uses the
 host's existing permission model; it is not a privilege boundary.
 
+### How a run executes
+
+A run is asynchronous and holds no lock while the command runs. It happens in three steps:
+
+1. **Prepare** (a short lock): choose the run id, make the run directory, hash the inputs, snapshot the declared outputs, and write a `running.json` marker.
+2. **Execute** (no lock): the command runs in its own process group with the allowlisted environment. Nothing else in the plugin or the host waits for it, and another run of the same slug can start meanwhile.
+3. **Record** (a short lock): write the manifest, the ledger line and the notebook entry, and remove the marker.
+
+With the host job service the run is a **job**: it shows in the jobs panel with its output as it arrives, and killing the job (or cancelling the call) stops the command. The tool call still waits for the run and returns the same manifest, with a `job_id`. Without a job service the run happens inline and still honours the call's cancel signal.
+
+- **Cancelled** runs are recorded (`cancelled: true`, `exit_code: null`). On a cancel or a timeout the whole process group is stopped (a polite stop, then a kill after three seconds), so a command's own child processes do not outlive it.
+- **In progress.** `status` lists runs that are executing now.
+- **Abandoned.** If the process that started a run ends before it records a result (a crash, a killed host), the marker remains. The next `status`, `list`, `show`, `diff`, `verify_scores`, `compliance` or `export` records that run as `abandoned: true` with no exit code, instead of leaving a directory nothing mentions. A run still executing in this process, or owned by another live process inside its time limit plus ten minutes, is never touched. An abandoned manifest says it does not know whether the command finished.
+- **Logs** still keep the first 4 MiB of each stream with a `[truncated at ...]` note, but a chatty command is no longer killed for exceeding a buffer.
+
 ### Re-execution and compliance
 
 The ledger distinguishes **what was reported** from **what a re-run produced**.
