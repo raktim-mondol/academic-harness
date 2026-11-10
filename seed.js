@@ -73,6 +73,7 @@ const STALE_SKILLS = [
   { dir: 'modal-usage', stale: (text) => /^name: modal$/m.test(text) },
   { dir: 'papermemory', stale: (text) => !text.includes('its project scopes exports') },
   { dir: 'systematic-review-ledger', stale: (text) => !text.includes('risk-of-bias-appraisal') },
+  { dir: 'co-scientist-tournament', stale: (text) => !text.includes('as the direction of the reward') },
   ...SUPERVISOR_SKILLS.map((dir) => ({ dir, stale: (text) => !text.includes('Routing in Academic Harness') })),
   ...RELATED_SKILLS.map((dir) => ({ dir, stale: (text) => !text.includes('Supervisor-Skills') })),
 ]
