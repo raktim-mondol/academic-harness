@@ -13,6 +13,7 @@ import { fakeAgent, fakeHost } from './helpers/fake-host.mjs'
 import { makeWorkspace } from './helpers/test-workspace.mjs'
 
 process.env.ACADEMIC_HARNESS_SKIP_INSTALL = '1'
+process.env.DSH_HOME = makeWorkspace('ah-compute-approval-home-').cwd // the prompt reads the spend ledger under $DSH_HOME
 const hooks = await import('../academic-harness-hooks.js')
 const { computeApprovalReason, describeComputeCall, PAID_COMPUTE_TOOLS } = await import('../compute-approval.js')
 

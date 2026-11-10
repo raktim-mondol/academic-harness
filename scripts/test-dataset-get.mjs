@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { apply, runDatasetGet } from '../dataset-get.js'
+import { apply, defaultFetchBinary, runDatasetGet } from '../dataset-get.js'
 import { makeWorkspace, fakeExec } from './helpers/test-workspace.mjs'
 
 const workspace = makeWorkspace('ah-dataset-')
@@ -154,7 +154,9 @@ try {
   const okStatus = await tool.execute({ action: 'status', slug: 'ghost' }, exec)
   assert.equal(okStatus.status.downloads, 0)
 
-  // Loopback HTTP: exercise the real fetchBinary/stream/hash path end to end.
+  // Loopback HTTP: exercise the real fetchBinary/stream/hash path end to end. The download guard
+  // (rightly) refuses a loopback address, so the file is addressed by a public-looking URL and a
+  // fetch that serves it from the local server; the guard, streaming and hashing are all the real ones.
   const http = await import('node:http')
   const body = Buffer.from('loopback,payload\n1,2\n')
   const loopSha = 'sha256:' + createHash('sha256').update(body).digest('hex')
@@ -167,7 +169,11 @@ try {
   const loopDeps = {
     search: async ({ action }) => action === 'get'
       ? { dataset: { doi: ZENODO_DOI, title: 'Loopback', creators: [], publisher: 'Zenodo', year: 2024, resource_type: 'Dataset', version: null, license: 'MIT', url: 'https://doi.org/x', description: null } }
-      : { repository: 'Zenodo', files: [{ name: 'loop.csv', size: body.length, checksum: loopSha, download_url: `http://127.0.0.1:${port}/loop.csv` }] },
+      : { repository: 'Zenodo', files: [{ name: 'loop.csv', size: body.length, checksum: loopSha, download_url: 'http://93.184.216.34/loop.csv' }] },
+    fetchBinary: (url, opts) => defaultFetchBinary(url, {
+      ...opts,
+      fetch: (target, init) => fetch(`http://127.0.0.1:${port}${new URL(target).pathname}`, init),
+    }),
   }
   result = await runDatasetGet({ action: 'download', doi: ZENODO_DOI, slug: 'loopback' }, exec, loopDeps)
   const loopFile = result.event.files[0]

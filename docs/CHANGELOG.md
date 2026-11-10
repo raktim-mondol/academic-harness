@@ -4,6 +4,16 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+Hardening, from the 2026-11-10 review (decisions D26, D28, D29, D31-D34; finding B9).
+
+- **One network guard for every URL the plugin did not choose (`net-guard.js`).** Public hosts only (the union of the three older checks, now one), each redirect re-checked, credential headers dropped when a redirect leaves the origin, one deadline that stays armed through the body, and size limits counted on the bytes actually read. `dataset_get`, the Wiley TDM PDF fetch, generated-image URLs, `paper_download`, `style_url` and the link checker use it. A dataset link can no longer redirect to a local or private address, a missing `Content-Length` no longer defeats the total cap, and a failed or stalled download leaves no partial file and no longer aborts the rest of the batch.
+- **`modal_run` image packages are validated and quoted.** `image_apt` and `image_pip` entries are checked against strict package-name patterns and single-quoted, so an entry cannot add a Dockerfile instruction.
+- **Paid-compute requests have their own timeouts and honour cancel.** Runpod and Vast.ai requests time out on their own (the body included); provisioning calls take the tool's cancel signal; teardown calls take none, so a cancel cannot stop the call that ends billing.
+- **SSH trusts a host key on first use, per run.** `StrictHostKeyChecking=accept-new` with a private per-run known_hosts file replaces "no checking"; a changed key mid-run is a clear failure.
+- **A per-session spend cap and one ledger across Modal, Runpod and Vast.ai.** `COMPUTE_SESSION_CAP_USD` (default USD 10, `off` to remove). Each paid run reserves an estimated ceiling first and settles at its actual cost in `$DSH_HOME/compute-ledger/spend.jsonl`; the approval prompt shows spend so far, and a run that cannot fit is denied before you are asked. See [Compute](COMPUTE.md#spend-cap-and-ledger).
+- **API keys leave URLs where the provider allows it.** OpenAlex, openFDA and the hosted Firecrawl MCP server now get the key in an `Authorization` header (read from each provider's documentation). NCBI PubMed and Springer Nature document no header and keep the key in the query string. The MCP session cache no longer holds the raw key. See [Configuration](CONFIGURATION.md#where-a-key-travels).
+- **An engine that exits early no longer crashes the host.** A write to a child's closed stdin (`EPIPE`) is ignored instead of raised as an unhandled error.
+
 Trust and approval, from the 2026-11-10 review (decisions D11-D18).
 
 - **Paid compute asks first.** `modal_run`, `runpod_run` and `vastai_run` request approval on every call. The prompt shows provider, instance, maximum run time, a cost ceiling and a preview of the command; a pinned Vast.ai offer says its price is unchecked.

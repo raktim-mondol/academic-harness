@@ -8,9 +8,10 @@
  * licenses are recorded as stated, never inferred.
  */
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { closeSync, existsSync, openSync, readFileSync, renameSync, rmSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
+import { NetGuardError, guardedFetch, iterateBody } from './net-guard.js'
 import { canonicalDoi } from './search-normalize.js'
 import { runDatasetSearch } from './dataset-search.js'
 import { appendJsonl, ensureDir, hashFile, nowIso, readJsonl, slug as slugify } from './ledger-kit.js'
@@ -21,6 +22,11 @@ const ACTIONS = ['get', 'download', 'verify', 'status']
 const DEFAULT_MAX_FILE_BYTES = 512 * 1024 * 1024
 const DEFAULT_MAX_TOTAL_BYTES = 2 * 1024 * 1024 * 1024
 const HARD_MAX_FILE_BYTES = 4 * 1024 * 1024 * 1024
+// Timeouts for the default fetcher: how long to wait for headers, how long a body may go silent,
+// and an overall ceiling for one file (the largest allowed file at a slow 1 MB/s is about 70 minutes).
+const HEADERS_TIMEOUT_MS = 120_000
+const IDLE_TIMEOUT_MS = 120_000
+const FILE_DEADLINE_MS = 2 * 60 * 60 * 1000
 
 function text(value) {
   return String(value ?? '').trim()
@@ -79,40 +85,67 @@ function checksumAlgorithms(sourceChecksum) {
   return []
 }
 
-export async function defaultFetchBinary(url, { signal, timeoutMs = 120_000 }) {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(new Error('download timed out')), timeoutMs)
-  if (signal) signal.addEventListener('abort', () => controller.abort(signal.reason), { once: true })
+/**
+ * Default fetcher: public hosts only, redirects re-checked at every hop, a header
+ * timeout, an idle timeout and an overall deadline that all stay armed while the
+ * body is read. A refusal is returned as `{ ok: false, error }` so one bad link
+ * fails that file, not the whole batch. `fetch` and `lookup` are injectable.
+ */
+export async function defaultFetchBinary(url, {
+  signal, timeoutMs = HEADERS_TIMEOUT_MS, idleMs = IDLE_TIMEOUT_MS, deadlineMs = FILE_DEADLINE_MS, fetch: fetchImpl, lookup,
+} = {}) {
   try {
-    const response = await fetch(url, { signal: controller.signal, redirect: 'follow' })
-    if (!response.ok) return { ok: false, status: response.status, error: `HTTP ${response.status}` }
+    const { response } = await guardedFetch(url, {
+      signal, headersMs: timeoutMs, deadlineMs, fetch: fetchImpl, lookup, headers: { Accept: '*/*' },
+    })
+    if (!response.ok) {
+      try { await response.body?.cancel() } catch { /* closed */ }
+      return { ok: false, status: response.status, error: `HTTP ${response.status}` }
+    }
     const declared = Number(response.headers.get('content-length'))
-    if (Number.isFinite(declared) && declared > 0) return { ok: true, stream: response.body, contentLength: declared }
-    return { ok: true, stream: response.body }
-  } finally {
-    clearTimeout(timer)
+    const result = { ok: true, stream: iterateBody(response, { idleMs }) }
+    if (Number.isFinite(declared) && declared > 0) result.contentLength = declared
+    return result
+  } catch (error) {
+    if (error instanceof NetGuardError) return { ok: false, status: error.status ?? 0, error: error.message }
+    throw error
   }
 }
 
-async function streamToFile(stream, dest, maxBytes) {
+/**
+ * Write a stream to `dest` as it arrives (never holding the whole file), counting
+ * the bytes actually received against the per-file cap and what is left of the
+ * total. The file appears at `dest` only when complete; any other outcome removes
+ * the partial file.
+ */
+async function streamToFile(stream, dest, maxBytes, remainingTotal = Infinity) {
   ensureDir(dirname(dest))
+  const part = `${dest}.part`
   const sha256 = createHash('sha256')
   const md5 = createHash('md5')
+  let fd = openSync(part, 'w')
   let bytes = 0
-  const chunks = []
-  for await (const chunk of stream) {
-    bytes += chunk.byteLength
-    if (bytes > maxBytes) {
-      if (typeof stream.cancel === 'function') await stream.cancel()
-      return { tooLarge: true, bytes }
+  let complete = false
+  try {
+    for await (const chunk of stream) {
+      bytes += chunk.byteLength
+      if (bytes > maxBytes) return { tooLarge: true, bytes }
+      if (bytes > remainingTotal) return { totalExceeded: true, bytes }
+      const buf = Buffer.from(chunk.buffer ?? chunk, chunk.byteOffset, chunk.byteLength)
+      sha256.update(buf)
+      md5.update(buf)
+      writeSync(fd, buf)
     }
-    const buf = Buffer.from(chunk.buffer ?? chunk, chunk.byteOffset, chunk.byteLength)
-    sha256.update(buf)
-    md5.update(buf)
-    chunks.push(buf)
+    closeSync(fd)
+    fd = null
+    renameSync(part, dest)
+    complete = true
+    return { tooLarge: false, bytes, sha256: sha256.digest('hex'), md5: md5.digest('hex') }
+  } finally {
+    if (fd != null) closeSync(fd)
+    if (!complete) rmSync(part, { force: true })
+    if (!complete && typeof stream.cancel === 'function') await Promise.resolve(stream.cancel()).catch(() => {})
   }
-  writeFileSync(dest, Buffer.concat(chunks))
-  return { tooLarge: false, bytes, sha256: sha256.digest('hex'), md5: md5.digest('hex') }
 }
 
 function selectFiles(files, wanted) {
@@ -153,18 +186,29 @@ export async function downloadDataset({
         written.push({ name: file.name, status: 'rejected_path', error: error instanceof Error ? error.message : String(error) })
         continue
       }
-      const response = await fetchBinary(file.download_url, { signal })
-      if (!response.ok) {
-        written.push({ name: file.name, status: 'download_failed', error: response.error || `HTTP ${response.status}` })
+      let streamed
+      try {
+        const response = await fetchBinary(file.download_url, { signal })
+        if (!response.ok) {
+          written.push({ name: file.name, status: 'download_failed', error: response.error || `HTTP ${response.status}` })
+          continue
+        }
+        if (bytesSoFar + (response.contentLength || 0) > total) {
+          written.push({ name: file.name, status: 'total_limit_exceeded', limit_bytes: total })
+          continue
+        }
+        streamed = await streamToFile(response.stream, dest, perFile, total - bytesSoFar)
+      } catch (error) {
+        if (signal?.aborted) throw error
+        written.push({ name: file.name, status: 'download_failed', error: error instanceof Error ? error.message : String(error) })
         continue
       }
-      if (bytesSoFar + (response.contentLength || 0) > total) {
-        written.push({ name: file.name, status: 'total_limit_exceeded', limit_bytes: total })
-        continue
-      }
-      const streamed = await streamToFile(response.stream, dest, perFile)
       if (streamed.tooLarge) {
         written.push({ name: file.name, status: 'size_limit_exceeded', limit_bytes: perFile })
+        continue
+      }
+      if (streamed.totalExceeded) {
+        written.push({ name: file.name, status: 'total_limit_exceeded', limit_bytes: total })
         continue
       }
       bytesSoFar += streamed.bytes

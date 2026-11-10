@@ -1,3 +1,4 @@
+import { guardSpend } from './compute-ledger.js'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { dirname, posix } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
@@ -17,6 +18,7 @@ import {
   waitForPodSsh,
 } from './runpod-client.js'
 import {
+  forgetHostKeys,
   makeEphemeralSshKey,
   scpDownload,
   scpUpload,
@@ -38,8 +40,8 @@ const DEFAULT_VOLUME_SIZE_GB = 20
 const TEARDOWN_ATTEMPTS = 3
 
 /** Find an existing network volume by name, or create one. Volumes are pinned to a data center. */
-async function resolveNetworkVolume(key, { volumeName, volumeSizeGb, dataCenterId }) {
-  const existing = await listNetworkVolumes(key)
+async function resolveNetworkVolume(key, { volumeName, volumeSizeGb, dataCenterId, signal }) {
+  const existing = await listNetworkVolumes(key, { signal })
   const found = existing.find((v) => v.name === volumeName)
   if (found) return { id: found.id, dataCenter: found.dataCenter, created: false }
   if (!dataCenterId) {
@@ -49,7 +51,7 @@ async function resolveNetworkVolume(key, { volumeName, volumeSizeGb, dataCenterI
     name: volumeName,
     size: Math.max(Math.floor(Number(volumeSizeGb ?? DEFAULT_VOLUME_SIZE_GB)) || DEFAULT_VOLUME_SIZE_GB, 10),
     dataCenter: dataCenterId,
-  })
+  }, { signal })
   return { id: created.id, dataCenter: created.dataCenter ?? dataCenterId, created: true }
 }
 
@@ -94,7 +96,8 @@ async function reconcileOrphanPod(key, name) {
 
 /** Register the Runpod ephemeral-pod remote-compute offload tool. */
 export function applyRunpodRun(ctx) {
-  ctx.tools.register(defineTool({
+  // Every call goes through the session spend cap and ledger (compute-ledger.js).
+  ctx.tools.register(guardSpend(defineTool({
     name: 'runpod_run',
     description: [
       'Run a command or script on an ephemeral Runpod Pod (on-demand CPU or GPU) and get the result back.',
@@ -102,7 +105,7 @@ export function applyRunpodRun(ctx) {
       `Pick an instance by GPU need (one of: ${RUNPOD_INSTANCE_IDS.join(', ')}; default "${DEFAULT_RUNPOD_INSTANCE_ID}").`,
       'Upload inputs with files_in (workspace-relative; files or directories) and name expected outputs in files_out — they are copied back into the local workspace.',
       'Every call is a fresh, disposable pod by default — /workspace is wiped when it terminates. Pass volume_name to mount a persistent Runpod network volume at /workspace instead, so a dataset or checkpoints uploaded in one call are still there on the next call with the same volume_name (no need to re-upload via files_in every time). The pod is always deleted after the call either way; a named volume is not — it keeps costing storage until deleted from the Runpod console.',
-      'Uses Runpod REST API v2. Requires RUNPOD_API_KEY (https://console.runpod.io/user/settings). Always terminates the pod when done.',
+      'Uses Runpod REST API v2. Requires RUNPOD_API_KEY (https://console.runpod.io/user/settings). Always terminates the pod when done. SSH trusts the host key of the pod on first use and holds it for that run only.',
     ].join(' '),
     parameters: {
       command: { type: 'string', required: true, description: 'Shell command to run remotely (via bash -lc) in /workspace.' },
@@ -164,6 +167,7 @@ export function applyRunpodRun(ctx) {
             volumeName: args.volume_name,
             volumeSizeGb: args.volume_size_gb,
             dataCenterId: args.data_center_id,
+            signal,
           })
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error)
@@ -173,6 +177,7 @@ export function applyRunpodRun(ctx) {
       }
 
       let keys = null
+      let sshEndpoint = null // its per-run known_hosts file is removed with the pod
       let podId = null
       const startedAt = Date.now()
 
@@ -202,6 +207,8 @@ export function applyRunpodRun(ctx) {
           }
           keys?.cleanup()
           keys = null
+          if (sshEndpoint) forgetHostKeys(sshEndpoint)
+          sshEndpoint = null
           return failure
         })
         return teardownChain
@@ -225,7 +232,8 @@ export function applyRunpodRun(ctx) {
 
         let created
         try {
-          created = await createPod(key, createBody)
+          // The tool's cancel signal reaches the create call; the orphan sweep and the teardown below do not take it.
+          created = await createPod(key, createBody, { signal })
         } catch (error) {
           const orphan = await reconcileOrphanPod(key, createBody.name).catch(() => null)
           if (orphan) {
@@ -239,6 +247,7 @@ export function applyRunpodRun(ctx) {
 
         const provisionDeadline = Date.now() + PROVISION_TIMEOUT_S * 1000
         const { ssh } = await waitForPodSsh(key, podId, { timeoutMs: PROVISION_TIMEOUT_S * 1000, signal, requireDirect: true })
+        sshEndpoint = ssh
 
         await sshExec(keys.privateKeyPath, ssh, `mkdir -p ${WORKDIR}`, {
           timeoutMs: 60_000,
@@ -371,5 +380,5 @@ export function applyRunpodRun(ctx) {
     presentCall() {
       return { card: 'generic', title: 'Runpod compute', kind: 'other' }
     },
-  }))
+  }), 'Runpod'))
 }

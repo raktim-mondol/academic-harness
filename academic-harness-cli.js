@@ -160,6 +160,9 @@ export function run(command, args, { cwd, timeoutMs, env, signal, silent, stdin,
       if (!silent) process.stderr.write(text)
     })
     if (stdin != null && child.stdin) {
+      // A child that exits before it reads its input closes the pipe; the write then fails with EPIPE.
+      // That is the child's problem to report through its exit code, not an unhandled error here.
+      child.stdin.on('error', () => {})
       child.stdin.write(typeof stdin === 'string' ? stdin : String(stdin))
       child.stdin.end()
     }
