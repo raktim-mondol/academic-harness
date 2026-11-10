@@ -2,6 +2,16 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+Licensing, from the 2026-11-10 review (decisions D05-D09).
+
+- **The `docx`, `pdf`, `pptx` and `xlsx` skills are rewritten from scratch.** The versions in 0.50.0 and earlier were third-party files under an all-rights-reserved licence. The new skills are MIT, written from the public documentation of python-docx, openpyxl, python-pptx, pypdf, reportlab, pdfplumber, pandoc, LibreOffice and poppler, with no bundled schema files (about 3.4 MB smaller). They add tracked-change and comment editing, a package checker, form filling with and without fields, a slide lint, and a LibreOffice recalculation check. Method, tests and an automated overlap check against the old text are in `docs/legal/skill-rewrite-provenance.md`; `scripts/check-skill-rewrite.mjs` repeats it.
+- **Skill scripts moved.** `skills/pptx/scripts/thumbnail.py` is now `pptx_thumbs.py` (`--slides-dir` replaces `--individual`); the html2pptx, rearrange, inventory and replace helpers are gone, replaced by python-pptx recipes and `pptx_outline.py`. `scientific-slides` points at the new names.
+- **Seeding moves the old copies aside.** On start, an installed copy of the four old skills (recognised by its `LICENSE.txt`) is moved to `$DSH_HOME/skills-retired/` and the rewrite installed. A copy you changed is left alone.
+- **`what-if-oracle` (CC BY-NC-SA 4.0) is now in `NOTICE`**, with the five GPL-labelled skills explained. `AH_EXCLUDE_NONCOMMERCIAL=1` makes the seeder skip all six non-commercial skills, and `npm run pack:commercial` builds a tarball without them.
+- **Skill licences are SPDX identifiers** where the meaning was unambiguous (109 labels). 103 skills with no or unclear labels are listed in `docs/legal/skill-licence-inventory.md`, not guessed. `docs/legal/skill-licence-brief.md` is the brief for an independent review; the next release should wait for it.
+
 ## 0.50.0
 
 The writing compiler, checked against a second model, a real host and real LaTeX. Rule set 1.10.0, `BUNDLE_REV` `dsh14`. Evidence and limits: [the follow-up report](../reports/writing-compiler-claude-host-tex-2026-11-09.md).

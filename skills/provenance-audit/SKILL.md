@@ -2,7 +2,7 @@
 name: provenance-audit
 description: Trace where a claim came from across the whole workspace with the read-only `provenance_audit` tool — join review evidence, extraction, appraisal and GRADE events, reporting_check verdicts, deep_review claims, citation verdicts and validity flags, notebook hypotheses, analysis expectations/re-executions/compliance, experiment protocol digests and verdicts, ablation attribution, dataset downloads, meta-analysis studies, and Academic Harness claim sidecars by the ids and hashes they already store. Use the report-only `rollup` action for the ordered loop record across a coscientist cycle. Use before reporting a result, submitting a manuscript, editing a source that claims depend on, or answering "what supports this?"
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

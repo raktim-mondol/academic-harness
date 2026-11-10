@@ -2,7 +2,7 @@
 name: power-and-sample-size
 description: Plan a study's sample size, power, or smallest detectable effect with the native `power_analysis` tool; convert effect sizes; correct for multiple comparisons; simulate power for designs without a closed form. Use when the user asks how many participants or samples they need, whether a study is adequately powered, what effect they could detect, how to adjust for many tests, or to justify a sample size in a protocol, grant, or pre-registration.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

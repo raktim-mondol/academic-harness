@@ -401,6 +401,7 @@
     "prompt-section.js",
     "prompt.js",
     "seed.js",
+    "skill-licenses.js",
     "cordis.patch.yml",
     "presets",
     "skills",
@@ -438,6 +439,8 @@
   "scripts": {
     "build": "node build-client.mjs",
     "build:patch": "node scripts/build-cordis-patch.mjs",
+    "pack:commercial": "node scripts/pack-commercial.mjs",
+    "licenses:check": "node scripts/normalize-skill-licenses.mjs --check",
     "test": "node scripts/run-tests.mjs",
     "docs:diagrams": "node scripts/build-docs-diagrams.mjs",
     "test:fold": "node scripts/test-fold.mjs",

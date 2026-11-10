@@ -2,7 +2,7 @@
 name: causal-dag
 description: Make causal assumptions explicit with a user-specified DAG, derive identification diagnostics (d-separation, minimal backdoor/front-door sets, colliders, instruments, testable implications), and compute E-values. Use before an observational causal analysis, when defending an adjustment set, or when asking what a DAG implies.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

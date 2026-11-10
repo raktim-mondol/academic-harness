@@ -2,7 +2,7 @@
 name: authorship-credit
 description: Record authorship, CRediT roles, and ICMJE criteria with the `authorship` ledger and generate an author-contributions statement. Use when preparing a submission, when the user asks who did what, or when contribution and corresponding-author metadata must be collected. The tool never decides order or qualification; humans do.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

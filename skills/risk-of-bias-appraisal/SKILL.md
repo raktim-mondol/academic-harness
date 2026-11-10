@@ -2,7 +2,7 @@
 name: risk-of-bias-appraisal
 description: Appraise included studies for risk of bias with the native `review` ledger — RoB 2, ROBINS-I, QUADAS-2, Newcastle-Ottawa, AMSTAR 2, PROBAST, QUIPS, SYRCLE, and CASP cohort/case-control/qualitative checklists, with named reviewers, verbatim quotes, consensus reconciliation, agreement statistics, and rob-table/rob-summary/rob-figure exports. Use when a systematic review needs a risk-of-bias assessment, dual-reviewer appraisal, or an auditable appraisal table.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

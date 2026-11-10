@@ -2,7 +2,7 @@
 name: numbers-audit
 description: Audit a manuscript's reported numbers with `numbers_audit` — recompute p-values from test statistics, check confidence intervals and estimates, total N and subgroup counts, flow counts, percentages, table/text values, and impossible values. Use before submission or whenever a manuscript's numbers need a consistency pass. Candidates only, never a validity or misconduct verdict.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

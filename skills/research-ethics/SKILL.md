@@ -2,7 +2,7 @@
 name: research-ethics
 description: Draft an ethics/IRB protocol and consent, check it against Helsinki/Common Rule/GDPR/HIPAA concepts, and scan/redact PHI/PII locally with the ethics_protocol and deidentify tools. Use before human-subjects or identifiable-data work, before sharing a dataset, or when preparing an ethics submission.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness
