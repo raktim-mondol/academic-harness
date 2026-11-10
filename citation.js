@@ -7,10 +7,9 @@
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { createHash } from 'node:crypto'
-import { lookup } from 'node:dns/promises'
-import { isIP } from 'node:net'
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { NetGuardError, guardedFetch, isBlockedHostname, streamBody } from './net-guard.js'
 import { resolveWorkspacePath } from './paper-download.js'
 import { libraryRecords } from './papermemory-library.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
@@ -45,112 +44,36 @@ function text(value) {
   return String(value ?? '').trim()
 }
 
-function privateIpv4(address) {
-  const match = String(address || '').match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-  if (!match) return true
-  const octets = match.slice(1).map(Number)
-  if (octets.some((value) => value < 0 || value > 255)) return true
-  const [a, b] = octets
-  return a === 0 || a === 10 || a === 127 || a >= 224
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 198 && (b === 18 || b === 19))
-    || (a === 192 && b === 0 && octets[2] === 0)
-}
+export { isPrivateAddress as privateAddress, isBlockedHostname as privateHostname } from './net-guard.js'
 
-function expandIpv6(address) {
-  let value = String(address || '').toLowerCase().split('%')[0]
-  if (value.includes('.')) {
-    const lastColon = value.lastIndexOf(':')
-    const ipv4 = value.slice(lastColon + 1).split('.').map(Number)
-    if (ipv4.length !== 4 || ipv4.some((part) => Number.isNaN(part) || part > 255)) return null
-    value = `${value.slice(0, lastColon + 1)}${((ipv4[0] << 8) | ipv4[1]).toString(16)}:${((ipv4[2] << 8) | ipv4[3]).toString(16)}`
-  }
-  const [head, tail] = value.split('::')
-  const headParts = head ? head.split(':').filter(Boolean) : []
-  const tailParts = tail ? tail.split(':').filter(Boolean) : []
-  const missing = 8 - headParts.length - tailParts.length
-  if (missing < 0) return null
-  return [...headParts, ...Array(missing).fill('0'), ...tailParts].map((part) => Number.parseInt(part, 16))
-}
-
-function privateIpv6(address) {
-  const parts = expandIpv6(address)
-  if (!parts || parts.length !== 8 || parts.some((part) => Number.isNaN(part))) return true
-  if (parts.every((part) => part === 0)) return true
-  if (parts.slice(0, 7).every((part) => part === 0) && parts[7] === 1) return true
-  if ((parts[0] & 0xfe00) === 0xfc00) return true
-  if ((parts[0] & 0xffc0) === 0xfe80) return true
-  if ((parts[0] & 0xff00) === 0xff00) return true
-  const embedded = `${parts[6] >> 8}.${parts[6] & 0xff}.${parts[7] >> 8}.${parts[7] & 0xff}`
-  if (parts.slice(0, 5).every((part) => part === 0) && parts[5] === 0xffff) return privateIpv4(embedded)
-  if (parts[0] === 0x0064 && parts[1] === 0xff9b && parts.slice(2, 6).every((part) => part === 0)) return privateIpv4(embedded)
-  if (parts.slice(0, 6).every((part) => part === 0)) return privateIpv4(embedded)
-  return false
-}
-
-export function privateAddress(address) {
-  const kind = isIP(String(address || ''))
-  if (kind === 4) return privateIpv4(address)
-  if (kind === 6) return privateIpv6(address)
-  return true
-}
-
-export function privateHostname(hostname) {
-  const host = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '')
-  if (!host) return true
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return true
-  if (isIP(host)) return privateAddress(host)
-  return false
-}
-
-async function assertPublicStyleUrl(url) {
-  if (!['http:', 'https:'].includes(url.protocol)) throw new Error('style_url must use http or https')
-  if (url.username || url.password) throw new Error('style_url must not contain credentials')
-  if (privateHostname(url.hostname)) throw new Error('style_url must not point at a local or private network host')
-  const host = url.hostname.replace(/^\[|\]$/g, '')
-  let addresses
-  if (isIP(host)) addresses = [{ address: host }]
-  else {
-    try {
-      addresses = await lookup(host, { all: true, verbatim: true })
-    } catch (error) {
-      throw new Error(`style_url host could not be resolved: ${error instanceof Error ? error.message : String(error)}`)
-    }
-  }
-  if (!addresses.length || addresses.some((entry) => privateAddress(entry.address))) {
-    throw new Error('style_url resolves to a local or private network address')
+/** The style_url errors callers and tests have always seen, mapped from the shared guard's. */
+function styleUrlError(error) {
+  if (!(error instanceof NetGuardError)) return error
+  switch (error.code) {
+    case 'scheme': return new Error('style_url must use http or https')
+    case 'credentials': return new Error('style_url must not contain credentials')
+    case 'private': return new Error('style_url must not point at a local or private network host')
+    case 'dns': return new Error(`style_url host could not be resolved: ${error.message}`)
+    case 'redirects': return new Error('style_url redirected too many times')
+    case 'size': return new Error(`style_url is larger than ${MAX_CSTYLE_BYTES / 1024}KB`)
+    case 'deadline': return new Error('style_url took too long to download')
+    default: return error
   }
 }
 
 async function fetchStyleUrl(raw) {
-  let url
+  let requested
   try {
-    url = new URL(String(raw).trim())
+    requested = new URL(String(raw).trim())
   } catch {
     throw new Error(`style_url is not a valid URL: ${raw}`)
   }
-  for (let hop = 0; hop <= 4; hop += 1) {
-    await assertPublicStyleUrl(url)
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(15_000),
-      headers: { 'User-Agent': searchUserAgent() },
-    })
-    if ([301, 302, 303, 307, 308].includes(response.status)) {
-      if (hop === 4) throw new Error('style_url redirected too many times')
-      const location = response.headers.get('location')
-      if (!location) throw new Error(`style_url redirected (HTTP ${response.status}) without a Location header`)
-      const next = new URL(location, url)
-      if (!['http:', 'https:'].includes(next.protocol)) throw new Error('style_url redirected to a non-http(s) URL')
-      url = next
-      continue
-    }
+  try {
+    const { response, url } = await guardedFetch(requested.href, { deadlineMs: 15_000, maxHops: 4, headers: { 'User-Agent': searchUserAgent() } })
     return { response, finalUrl: url }
+  } catch (error) {
+    throw styleUrlError(error)
   }
-  throw new Error('style_url redirected too many times')
 }
 
 async function loadCustomStyle(cwd, args) {
@@ -175,7 +98,7 @@ async function loadCustomStyle(cwd, args) {
     }
     if (!['http:', 'https:'].includes(requested.protocol)) throw new Error('style_url must use http or https')
     if (requested.username || requested.password) throw new Error('style_url must not contain credentials')
-    if (privateHostname(requested.hostname)) throw new Error('style_url must not point at a local or private network host')
+    if (isBlockedHostname(requested.hostname)) throw new Error('style_url must not point at a local or private network host')
     const cacheRel = join('.dsh', 'styles', `${createHash('sha256').update(requested.href).digest('hex').slice(0, 16)}.csl`)
     cacheAbs = resolveWorkspacePath(cwd, cacheRel)
     if (existsSync(cacheAbs)) {
@@ -187,8 +110,13 @@ async function loadCustomStyle(cwd, args) {
       if (!response.ok) throw new Error(`style_url returned HTTP ${response.status}`)
       const declared = Number(response.headers.get('content-length'))
       if (Number.isFinite(declared) && declared > MAX_CSTYLE_BYTES) throw new Error(`style_url is larger than ${MAX_CSTYLE_BYTES / 1024}KB`)
-      xml = await response.text()
-      if (Buffer.byteLength(xml) > MAX_CSTYLE_BYTES) throw new Error(`style_url is larger than ${MAX_CSTYLE_BYTES / 1024}KB`)
+      const parts = []
+      try {
+        await streamBody(response, { maxBytes: MAX_CSTYLE_BYTES, onChunk: (chunk) => parts.push(Buffer.from(chunk)) })
+      } catch (error) {
+        throw styleUrlError(error)
+      }
+      xml = Buffer.concat(parts).toString('utf8')
       source = finalUrl.href
       writeCache = true
     }

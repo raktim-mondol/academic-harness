@@ -85,13 +85,55 @@ export async function sleep(ms, signal) {
   })
 }
 
+/**
+ * Host keys (review A8, decision D33): trust on first use, per run.
+ *
+ * A rented machine has no key we know in advance, so the first connection of a
+ * run records its host key and every later connection of that run must present
+ * the same one (`StrictHostKeyChecking=accept-new`); a different key is a hard
+ * failure, not a silent accept. The record is a private known_hosts file that
+ * lives for one run only: a provider reuses addresses, and a stale entry would
+ * wrongly reject the next machine. The run tools can pass their own file as
+ * `ssh.knownHostsFile`; otherwise one is made per endpoint object (one per run)
+ * and removed with `forgetHostKeys(ssh)`.
+ */
+const generatedKnownHosts = new WeakMap()
+
+export function knownHostsFile(ssh) {
+  if (ssh?.knownHostsFile) return ssh.knownHostsFile
+  let entry = generatedKnownHosts.get(ssh)
+  if (!entry) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'academic-harness-hosts-'))
+    fs.chmodSync(dir, 0o700)
+    const file = path.join(dir, 'known_hosts')
+    fs.writeFileSync(file, '', { mode: 0o600 })
+    entry = { dir, file }
+    generatedKnownHosts.set(ssh, entry)
+  }
+  return entry.file
+}
+
+/** Remove the generated known_hosts file for a run. Safe to call twice. */
+export function forgetHostKeys(ssh) {
+  const entry = generatedKnownHosts.get(ssh)
+  if (!entry) return
+  generatedKnownHosts.delete(ssh)
+  fs.rmSync(entry.dir, { recursive: true, force: true })
+}
+
+function hostKeyArgs(ssh) {
+  return [
+    '-o', 'StrictHostKeyChecking=accept-new',
+    '-o', `UserKnownHostsFile=${knownHostsFile(ssh)}`,
+    '-o', 'GlobalKnownHostsFile=/dev/null',
+  ]
+}
+
 function sshBaseArgs(keyPath, ssh) {
   return [
     '-i', keyPath,
     '-p', String(ssh.port),
-    '-o', 'StrictHostKeyChecking=no',
-    '-o', 'UserKnownHostsFile=/dev/null',
-    '-o', 'GlobalKnownHostsFile=/dev/null',
+    ...hostKeyArgs(ssh),
     '-o', 'IdentitiesOnly=yes',
     '-o', 'BatchMode=yes',
     '-o', 'ConnectTimeout=15',
@@ -130,6 +172,10 @@ function sshExecOnce(keyPath, ssh, command, opts) {
     child.on('close', (code) => {
       clearTimeout(timer)
       opts.signal?.removeEventListener('abort', onAbort)
+      if (code === 255 && /REMOTE HOST IDENTIFICATION HAS CHANGED|Host key verification failed/i.test(stderr)) {
+        reject(new Error(`SSH host key for ${ssh.host} changed during this run or could not be verified; refusing to continue (${stderr.trim().split('\n').pop()})`))
+        return
+      }
       if (code === 255 && /Permission denied|Connection refused|timed out/i.test(stderr + stdout)) {
         reject(new Error((stderr || stdout || 'SSH failed').trim()))
         return
@@ -182,9 +228,7 @@ function scpOnce(keyPath, ssh, src, dest, opts) {
       ...(opts.recursive ? ['-r'] : []),
       '-i', keyPath,
       '-P', String(ssh.port),
-      '-o', 'StrictHostKeyChecking=no',
-      '-o', 'UserKnownHostsFile=/dev/null',
-      '-o', 'GlobalKnownHostsFile=/dev/null',
+      ...hostKeyArgs(ssh),
       '-o', 'IdentitiesOnly=yes',
       '-o', 'BatchMode=yes',
       '-o', 'ConnectTimeout=15',
@@ -257,8 +301,7 @@ export async function tarUploadDir(keyPath, ssh, localDir, remoteDir, signal, ti
     const remote = spawn('ssh', [
       '-i', keyPath,
       '-p', String(ssh.port),
-      '-o', 'StrictHostKeyChecking=no',
-      '-o', 'UserKnownHostsFile=/dev/null',
+      ...hostKeyArgs(ssh),
       '-o', 'IdentitiesOnly=yes',
       '-o', 'BatchMode=yes',
       '-o', 'ConnectTimeout=15',
@@ -315,8 +358,7 @@ export async function tarDownloadDir(keyPath, ssh, remoteDir, localDir, signal, 
       const remote = spawn('ssh', [
         '-i', keyPath,
         '-p', String(ssh.port),
-        '-o', 'StrictHostKeyChecking=no',
-        '-o', 'UserKnownHostsFile=/dev/null',
+        ...hostKeyArgs(ssh),
         '-o', 'IdentitiesOnly=yes',
         '-o', 'BatchMode=yes',
         '-o', 'ConnectTimeout=15',

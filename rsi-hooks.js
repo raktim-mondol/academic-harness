@@ -49,9 +49,16 @@ function sessionModel(agent) {
   return header?.model || header?.route?.model || agent?.options?.model || null
 }
 
+/**
+ * A delegated sub-agent's "user" messages are the parent's task prompt, which the
+ * host stamps `source.kind: 'user'` like a person's. Recognise sub-agents by any
+ * of depth, parent, or the session origin, so such a prompt is never read as the
+ * user speaking (review B3).
+ */
 function agentKind(agent) {
   const depth = Number(agent?.depth ?? agent?.descriptor?.depth ?? 0)
-  return depth > 0 || agent?.parent ? 'subagent' : 'main'
+  const origin = agent?.session?.header?.origin ?? agent?.origin
+  return depth > 0 || agent?.parent || origin === 'subagent' ? 'subagent' : 'main'
 }
 
 function stateFor(agent) {
@@ -102,6 +109,7 @@ function newTurn(state, text, turnNumber = null) {
     eligibleLessonIds: new Set(),
     toolSignatures: new Set(),
     gate: null,
+    gateHistory: [],
     qualitySignals: {},
     integrityIssue: false,
     citationIssue: false,
@@ -217,7 +225,7 @@ function updateTurnFromTool(turn, summary, args = {}) {
   for (const [lessonId, action] of turn.injectedActions || []) {
     if (!action) continue
     if (summary.name === action) turn.reachedLessonIds.add(lessonId)
-    else if (summary.name === 'skill' && argsText.includes(action)) turn.reachedLessonIds.add(lessonId)
+    else if ((summary.name === 'skill' || summary.name === 'skill_load') && argsText.includes(action)) turn.reachedLessonIds.add(lessonId)
   }
   const signature = `${summary.name}|${summary.args_hash}`
   if (turn.toolSignatures.has(signature)) turn.signals.add(`retry:${summary.name}`)
@@ -245,7 +253,13 @@ export function apply(ctx) {
     const state = sessions.get(event.sessionId)
     if (!state?.currentTurn || state.currentTurn.finalized) return
     if (Number(event.at) && Number(event.at) < Number(state.currentTurn.startedAtMs || 0)) return
-    state.currentTurn.gate = event.kind === 'none' ? null : { kind: event.kind, at: event.at || Date.now() }
+    const turn = state.currentTurn
+    turn.gateHistory.push({ kind: event.kind, at: event.at || Date.now() })
+    if (event.kind !== 'none') turn.gate = { kind: event.kind, at: event.at || Date.now() }
+    // "none" means the gate had nothing more to say. After continue that is a
+    // resolved turn; after a handoff the findings are still open and the author
+    // was told so, so silence must not erase it (review B2).
+    else if (turn.gate?.kind !== 'handoff') turn.gate = null
     if (event.kind === 'handoff') state.currentTurn.signals.add(`handoff:${state.currentTurn.taskClass}`)
     try {
       appendTurnEvent(STORE, {
@@ -291,9 +305,12 @@ export function apply(ctx) {
     if (state.currentTurn) state.currentTurn.turns += 1
 
     if (promptChanged && state.currentTurn) {
-      const preference = extractPreference(text)
-      const forget = !preference && detectForget(text)
-      const correction = preference ? { corrected: false, marker: null } : detectCorrection(text)
+      // Preferences, "forget that" and corrections are things a person says. A
+      // sub-agent's prompt is a task written by the parent agent.
+      const fromUser = state.agentKind !== 'subagent'
+      const preference = fromUser ? extractPreference(text) : null
+      const forget = fromUser && !preference && detectForget(text)
+      const correction = preference || !fromUser ? { corrected: false, marker: null } : detectCorrection(text)
       if (preference) {
         try {
           await recordExplicitPreference({

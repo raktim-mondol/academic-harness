@@ -34,6 +34,7 @@
  * Settings-changed CONSENSUS_API_KEY takes effect on the next call rather
  * than needing a restart. See presets/academic-harness/agent.cordis.yml.
  */
+import { firecrawlMcp } from './provider-auth.js'
 import * as McpClient from 'ah-dsh-mcp-client'
 import { resolveEnv } from './credential-env.js'
 
@@ -50,7 +51,8 @@ export async function apply(ctx) {
     ctx.plugin(McpClient, {
       serverName: 'firecrawl',
       transport: 'streamable-http',
-      url: `https://mcp.firecrawl.dev/${encodeURIComponent(firecrawlKey)}/v2/mcp`,
+      url: firecrawlMcp(firecrawlKey).endpoint,
+      headers: firecrawlMcp(firecrawlKey).headers,
     })
   }
 

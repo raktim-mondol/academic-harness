@@ -16,7 +16,7 @@ import { resetLimitersForTests } from '../search-http.js'
 import { readFileSync } from 'node:fs'
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 assert.ok(pkg.files.includes('jev-router.js'), 'jev-router.js is imported by literature-search.js, so it must ship')
-assert.ok(pkg.files.includes('scripts'), 'the routing fixture ships with scripts/')
+assert.ok(!pkg.files.includes('scripts'), 'the routing fixture is test-only: nothing at runtime reads it, and scripts/ is not shipped (D44)')
 assert.ok(pkg.files.includes('cohere-rerank.js'), 'cohere-rerank.js is imported by literature-search.js, so it must ship')
 assert.ok(pkg.files.includes('bm25-rank.js'), 'bm25-rank.js is imported by literature-search.js, so it must ship')
 

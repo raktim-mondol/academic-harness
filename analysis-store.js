@@ -14,11 +14,12 @@
 import os from 'node:os'
 import { relative, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import {
   appendJsonl, ensureDir, exportText, hashFile, mdCell, nowIso, readJson, readJsonl,
   sha256, shortHash, slug as slugify, stableStringify,
 } from './ledger-kit.js'
+import { baseEnv, runCommand } from './safe-process.js'
 import { withLock } from './store-lock.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 import { appendNotebookEntryAt } from './notebook.js'
@@ -217,20 +218,6 @@ export async function freezeAnalysisPlan({ cwd, slug: slugValue, plan, newVersio
   }, { label: 'analysis plan ledger' })
 }
 
-function baseEnv(network) {
-  const env = {}
-  for (const key of ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TMP', 'TEMP']) {
-    if (process.env[key]) env[key] = process.env[key]
-  }
-  env.PYTHONUNBUFFERED = '1'
-  env.PYTHONIOENCODING = 'utf-8'
-  if (!network) {
-    env.no_proxy = '*'
-    env.NO_PROXY = '*'
-  }
-  return env
-}
-
 function explicitEnv(input) {
   if (input == null) return {}
   if (typeof input !== 'object' || Array.isArray(input)) throw new Error('env must be an object of NAME=value strings')
@@ -414,6 +401,7 @@ export function analysisStatus(cwd, slugValue) {
       ? { version: planEvents.at(-1).version, hash: planEvents.at(-1).hash, question: planEvents.at(-1).plan.question, versions: planEvents.length }
       : null,
     runs: runs.length,
+    in_flight: inFlightRuns(cwd, slugValue),
     failed: runs.filter((run) => run.exit_code !== 0 || run.timed_out).length,
     last_run: last
       ? { run_id: last.run_id, ts: last.ts, exit_code: last.exit_code, timed_out: Boolean(last.timed_out), duration_ms: last.duration_ms }
@@ -479,11 +467,74 @@ export function diffAnalysisRuns(cwd, slugValue, { a, b = null } = {}) {
   return { a: left.run_id, b: 'current plan and inputs', against_plan: true, changed: manifestDiff(left, current) }
 }
 
+/** Run ids this process is executing right now: their `running.json` marker is alive, not abandoned. */
+const activeRuns = new Set()
+/** A marker owned by a live process is left alone until it is this long past its own time limit. */
+const ABANDON_GRACE_MS = 10 * 60_000
+const MARKER = 'running.json'
+
+/** Keep the first `limit` bytes of a stream (what the log has always held), counting the rest. */
+function headCapture(limit) {
+  const parts = []
+  let bytes = 0
+  let truncated = false
+  return {
+    push(chunk) {
+      if (truncated) return
+      const size = Buffer.byteLength(chunk)
+      if (bytes + size <= limit) {
+        parts.push(chunk)
+        bytes += size
+        return
+      }
+      const room = limit - bytes
+      if (room > 0) parts.push(Buffer.from(chunk).subarray(0, room).toString('utf8'))
+      bytes = limit
+      truncated = true
+    },
+    value() {
+      const body = parts.join('')
+      return truncated ? `${body}\n[truncated at ${limit} bytes]` : body
+    },
+  }
+}
+
+function pidAlive(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return false
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error?.code === 'EPERM' // alive, but not ours to signal
+  }
+}
+
+function readMarker(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Run a frozen-plan analysis.
+ *
+ * Three steps, so the command never runs under the ledger lock and never blocks the process:
+ *  1. prepare (short lock): choose the run id, make the run directory, hash the inputs and
+ *     snapshot the declared outputs, and leave a `running.json` marker so a run whose process
+ *     dies is found and recorded later (reapAbandonedRuns) instead of vanishing;
+ *  2. execute (no lock): the command runs asynchronously in its own process group with the
+ *     allowlisted environment; `signal` cancels it (the whole group is killed) and `onOutput`
+ *     sees its output as it arrives;
+ *  3. record (short lock): write the manifest, the ledger line and the notebook entry, and
+ *     remove the marker.
+ */
 export async function runAnalysis({
   cwd, slug: slugValue, command, kind = 'other', notebook = null, engine = 'auto',
   env = null, inputs = null, outputs = null, seed = null,
   timeoutMs = DEFAULT_TIMEOUT_MS, network = false, capturePackages: wantPackages = false,
-  notebookEntry = null,
+  notebookEntry = null, signal = null, onOutput = null,
 }) {
   const f = files(cwd, slugValue)
   const plan = currentPlan(cwd, slugValue)
@@ -503,7 +554,9 @@ export async function runAnalysis({
   const baseRunId = `run-${nowIso().replace(/[-:]/g, '').replace(/\..+$/, '').replace(/Z$/, '')}-${shortHash(stableStringify({ command, plan: plan.hash, ts: nowIso() }), 6)}`
 
   ensureDir(f.dir)
-  return withLock(f.dir, () => {
+
+  // 1. prepare
+  const prepared = await withLock(f.dir, () => {
     let runId = baseRunId
     let runDir = join(f.runsDir, runId)
     for (let suffix = 2; existsSync(runDir); suffix += 1) {
@@ -523,23 +576,36 @@ export async function runAnalysis({
     // file left over from an earlier run is hashed as if this run wrote it, and
     // a machine check would pass on bytes the re-execution never produced.
     const priorOutputs = new Map(hashPaths(cwd, outputPaths).map((entry) => [entry.path, outputStamp(cwd, entry)]))
+    activeRuns.add(runId)
+    writeFileSync(join(runDir, MARKER), `${JSON.stringify({
+      run_id: runId, slug: slugify(slugValue), kind, command: argv, timeout_ms: timeout, started_at: nowIso(),
+      pid: process.pid, plan_hash: plan.hash, plan_version: plan.version, inputs: inputHashes,
+    })}\n`, 'utf8')
+    return { runId, runDir, argv, executedNotebook, inputHashes, priorOutputs }
+  }, { label: 'analysis run ledger' })
+  const { runId, runDir, argv, executedNotebook, inputHashes, priorOutputs } = prepared
+
+  try {
+    // 2. execute (no lock held)
     const started = Date.now()
-    const spawnResult = spawnSync(argv[0], argv.slice(1), {
+    const out = headCapture(MAX_LOG_BYTES)
+    const err = headCapture(MAX_LOG_BYTES)
+    const result = await runCommand(argv[0], argv.slice(1), {
       cwd,
       env: { ...baseEnv(wantNetwork), ...extraEnv },
-      encoding: 'utf8',
-      timeout,
-      maxBuffer: MAX_LOG_BYTES + 1024 * 1024,
-      shell: false,
-      killSignal: 'SIGKILL',
+      timeoutMs: timeout,
+      graceMs: 3_000,
+      signal: signal ?? undefined,
+      tailChars: 1024,
+      onStdout: (chunk) => { out.push(chunk); onOutput?.('stdout', chunk) },
+      onStderr: (chunk) => { err.push(chunk); onOutput?.('stderr', chunk) },
     })
     const durationMs = Date.now() - started
-    const timedOut = spawnResult.error?.code === 'ETIMEDOUT'
-    const spawnError = spawnResult.error && !timedOut
-      ? text(spawnResult.error.message || spawnResult.error.code)
-      : null
-    const stdout = redactLog(capLog(spawnResult.stdout ?? ''), Object.entries(extraEnv))
-    const stderr = redactLog(capLog(spawnResult.stderr ?? ''), Object.entries(extraEnv))
+    const timedOut = result.timedOut
+    const cancelled = result.aborted && !timedOut
+    const spawnError = result.error && !timedOut ? text(result.error) : null
+    const stdout = redactLog(out.value(), Object.entries(extraEnv))
+    const stderr = redactLog(err.value(), Object.entries(extraEnv))
     writeFileSync(join(runDir, 'stdout.log'), stdout, 'utf8')
     writeFileSync(join(runDir, 'stderr.log'), stderr, 'utf8')
 
@@ -565,9 +631,10 @@ export async function runAnalysis({
       seed: seed == null ? (plan.plan.seed ?? null) : Number(seed),
       timeout_ms: timeout,
       timed_out: timedOut,
+      ...(cancelled ? { cancelled: true } : {}),
       spawn_error: spawnError,
-      exit_code: timedOut || spawnError ? null : (spawnResult.status ?? null),
-      signal: spawnResult.signal ?? null,
+      exit_code: timedOut || cancelled || spawnError ? null : (result.status ?? null),
+      signal: result.signal ?? null,
       duration_ms: durationMs,
       inputs: inputHashes,
       outputs: outputHashes,
@@ -580,20 +647,106 @@ export async function runAnalysis({
       ],
     }
     writeFileSync(join(runDir, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
-    appendJsonl(f.runs, [manifest])
-    if (notebookEntry) {
-      const status = timedOut ? 'timed out' : spawnError ? 'failed to start' : `exit ${manifest.exit_code}`
-      appendNotebookEntryAt(notebookEntry.file, {
-        id: notebookEntry.id || runId,
-        timestamp: Date.now(),
-        type: 'observation',
-        title: `analysis run ${runId} ${status} (${kind})`,
-        body: `Plan v${plan.version} ${plan.hash.slice(0, 18)}… · ${durationMs} ms · inputs ${inputHashes.length} · outputs ${outputHashes.filter((entry) => entry.written_by_run).length}/${outputHashes.length} written by this run. Reproducibility evidence is recorded in the manifest; the tool does not interpret the result.`,
-        artifacts: [...manifest.artifacts, manifest.stdout, manifest.stderr],
-        tags: ['analysis_run', `slug:${manifest.slug}`],
-      })
-    }
+
+    // 3. record
+    await withLock(f.dir, () => {
+      appendJsonl(f.runs, [manifest])
+      if (notebookEntry) {
+        const status = cancelled ? 'cancelled' : timedOut ? 'timed out' : spawnError ? 'failed to start' : `exit ${manifest.exit_code}`
+        appendNotebookEntryAt(notebookEntry.file, {
+          id: notebookEntry.id || runId,
+          timestamp: Date.now(),
+          type: 'observation',
+          title: `analysis run ${runId} ${status} (${kind})`,
+          body: `Plan v${plan.version} ${plan.hash.slice(0, 18)}… · ${durationMs} ms · inputs ${inputHashes.length} · outputs ${outputHashes.filter((entry) => entry.written_by_run).length}/${outputHashes.length} written by this run. Reproducibility evidence is recorded in the manifest; the tool does not interpret the result.`,
+          artifacts: [...manifest.artifacts, manifest.stdout, manifest.stderr],
+          tags: ['analysis_run', `slug:${manifest.slug}`],
+        })
+      }
+      rmSync(join(runDir, MARKER), { force: true })
+    }, { label: 'analysis run ledger' })
     return manifest
+  } finally {
+    activeRuns.delete(runId)
+  }
+}
+
+/** Runs of this slug that are executing now: [{ run_id, started_at, command, pid }]. */
+export function inFlightRuns(cwd, slugValue) {
+  const f = files(cwd, slugValue)
+  if (!existsSync(f.runsDir)) return []
+  const out = []
+  for (const name of readdirSync(f.runsDir)) {
+    const marker = readMarker(join(f.runsDir, name, MARKER))
+    if (!marker) continue
+    const alive = activeRuns.has(name) || (marker.pid !== process.pid && pidAlive(marker.pid))
+    if (alive) out.push({ run_id: name, started_at: marker.started_at, command: marker.command, pid: marker.pid })
+  }
+  return out
+}
+
+/**
+ * Find runs whose process ended before it recorded a result and put them on the ledger, so a crash
+ * leaves a visible `abandoned` run instead of a directory nothing mentions. A run is left alone
+ * while this process is executing it, or while another live process owns its marker and the run
+ * is still inside its own time limit plus a grace period. A marker whose manifest was already
+ * written is completed from that manifest (the crash came between the two steps).
+ */
+export async function reapAbandonedRuns(cwd, slugValue, { now = Date.now() } = {}) {
+  const f = files(cwd, slugValue)
+  if (!existsSync(f.runsDir)) return []
+  const candidates = readdirSync(f.runsDir).filter((name) => existsSync(join(f.runsDir, name, MARKER)))
+  if (!candidates.length) return []
+  return withLock(f.dir, () => {
+    const onLedger = new Set(readJsonl(f.runs).map((run) => run.run_id))
+    const reaped = []
+    for (const runId of candidates) {
+      if (activeRuns.has(runId)) continue
+      const dir = join(f.runsDir, runId)
+      const marker = readMarker(join(dir, MARKER))
+      const manifestPath = join(dir, 'manifest.json')
+      if (existsSync(manifestPath)) {
+        const finished = readJson(manifestPath)
+        if (finished && !onLedger.has(runId)) appendJsonl(f.runs, [finished])
+        rmSync(join(dir, MARKER), { force: true })
+        reaped.push({ run_id: runId, completed: true })
+        continue
+      }
+      const started = Date.parse(marker?.started_at ?? '')
+      const age = Number.isFinite(started) ? now - started : Infinity
+      const limit = (Number(marker?.timeout_ms) || DEFAULT_TIMEOUT_MS) + ABANDON_GRACE_MS
+      const ownedElsewhere = marker?.pid && marker.pid !== process.pid && pidAlive(marker.pid)
+      if (ownedElsewhere && age < limit) continue
+      const manifest = {
+        run_id: runId,
+        slug: marker?.slug ?? slugify(slugValue),
+        ts: marker?.started_at ?? nowIso(),
+        plan_hash: marker?.plan_hash ?? null,
+        plan_version: marker?.plan_version ?? null,
+        command: marker?.command ?? [],
+        kind: marker?.kind ?? 'other',
+        seed: null,
+        timeout_ms: marker?.timeout_ms ?? null,
+        timed_out: false,
+        spawn_error: null,
+        exit_code: null,
+        signal: null,
+        duration_ms: null,
+        abandoned: true,
+        note: 'The process that started this run ended before it recorded a result. Nothing in this manifest says whether the command finished.',
+        inputs: marker?.inputs ?? [],
+        outputs: [],
+        environment: {},
+        stdout: join(relative(cwd, dir), 'stdout.log'),
+        stderr: join(relative(cwd, dir), 'stderr.log'),
+        artifacts: [],
+      }
+      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+      appendJsonl(f.runs, [manifest])
+      rmSync(join(dir, MARKER), { force: true })
+      reaped.push({ run_id: runId, abandoned: true })
+    }
+    return reaped
   }, { label: 'analysis run ledger' })
 }
 

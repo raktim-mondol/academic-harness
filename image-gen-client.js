@@ -4,7 +4,28 @@
  * no SDK dependency.
  */
 
+import { NetGuardError, guardedDownload } from './net-guard.js'
+
 const DEFAULT_TIMEOUT_MS = 120_000
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024
+
+/**
+ * Download an image an image API returned by URL. The URL comes from a remote
+ * response, so it is fetched through the network guard: public hosts only, each
+ * redirect re-checked, a deadline that covers the body and a size cap counted on
+ * real bytes. `fetch`, `lookup` and `maxBytes` are injectable for tests.
+ */
+export async function downloadGeneratedImage(url, { signal, fetch: fetchImpl, lookup, maxBytes = MAX_IMAGE_BYTES, deadlineMs = DEFAULT_TIMEOUT_MS } = {}) {
+  try {
+    const { buffer, headers } = await guardedDownload(url, { signal, fetch: fetchImpl, lookup, maxBytes, deadlineMs })
+    const contentType = headers.get('content-type') || 'image/png'
+    return { buffer, mimeType: contentType.split(';')[0].trim() || 'image/png' }
+  } catch (error) {
+    if (!(error instanceof NetGuardError)) throw error
+    if (error.code === 'http') throw new Error(`failed to download generated image URL (HTTP ${error.status})`)
+    throw new Error(`generated image URL refused or failed: ${error.message}`)
+  }
+}
 
 function withTimeout(signal, timeoutMs) {
   const ctrl = new AbortController()
@@ -109,13 +130,10 @@ async function generateOpenAI(req) {
         continue
       }
       if (typeof item.url === 'string' && item.url) {
-        const imgRes = await fetch(item.url, { signal })
-        if (!imgRes.ok) throw new Error(`failed to download generated image URL (HTTP ${imgRes.status})`)
-        const ab = await imgRes.arrayBuffer()
-        const ct = imgRes.headers.get('content-type') || 'image/png'
+        const downloaded = await downloadGeneratedImage(item.url, { signal })
         images.push({
-          buffer: Buffer.from(ab),
-          mimeType: ct.split(';')[0].trim() || 'image/png',
+          buffer: downloaded.buffer,
+          mimeType: downloaded.mimeType,
           revisedPrompt: typeof item.revised_prompt === 'string' ? item.revised_prompt : undefined,
         })
       }

@@ -1,8 +1,10 @@
+import { guardSpend } from './compute-ledger.js'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join, posix } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
+import { buildImageCommands, checkImagePackages } from './image-packages.js'
 import { DEFAULT_MODAL_INSTANCE_ID, MODAL_INSTANCE_IDS, resolveModalInstance } from './modal-instances.js'
 import { resolveEnv } from './credential-env.js'
 import { resolveWorkspacePath } from './workspace-path.js'
@@ -86,7 +88,8 @@ function extractLocalTar(tarPath, localDir) {
 
 /** Register the Modal remote-compute offload tool. */
 export function applyModalRun(ctx) {
-  ctx.tools.register(defineTool({
+  // Every call goes through the session spend cap and ledger (compute-ledger.js).
+  ctx.tools.register(guardSpend(defineTool({
     name: 'modal_run',
     description: [
       'Run a command or script on a remote Modal Sandbox (on-demand CPU or GPU) and get the result back.',
@@ -100,8 +103,8 @@ export function applyModalRun(ctx) {
       command: { type: 'string', required: true, description: 'Shell command to run remotely (via sh -lc) in /workspace.' },
       instance: { type: 'string', enum: MODAL_INSTANCE_IDS, description: `Compute instance id (default "${DEFAULT_MODAL_INSTANCE_ID}").` },
       image_base: { type: 'string', description: 'Base registry image. Defaults to a slim Python image for CPU and a CUDA/PyTorch image for GPU instances.' },
-      image_pip: { type: 'array', items: { type: 'string' }, description: 'pip packages to install into the image.' },
-      image_apt: { type: 'array', items: { type: 'string' }, description: 'apt packages to install into the image.' },
+      image_pip: { type: 'array', items: { type: 'string' }, description: 'pip requirements for the image: a name with optional [extras] and version clauses, for example "numpy>=1.26,<2". No flags, URLs, markers or spaces; anything else goes in the command.' },
+      image_apt: { type: 'array', items: { type: 'string' }, description: 'apt packages for the image: a Debian package name with optional =version, for example "libgl1". No flags or spaces; anything else goes in the command.' },
       files_in: { type: 'array', items: { type: 'string' }, description: 'Workspace-relative paths (files or directories) to upload into the remote /workspace before running.' },
       files_out: { type: 'array', items: { type: 'string' }, description: 'Workspace-relative paths (files or directories) to download back after the job finishes.' },
       timeout_sec: { type: 'integer', description: `Max seconds before the sandbox is killed (default ${DEFAULT_TIMEOUT_S}, max ${MAX_TIMEOUT_S}).` },
@@ -133,6 +136,10 @@ export function applyModalRun(ctx) {
       if (!spec) {
         return { error: 'unknown_instance', text: `Unknown compute instance "${instanceId}". Valid instances: ${MODAL_INSTANCE_IDS.join(', ')}.` }
       }
+
+      // Package names become Dockerfile lines: check them before anything is loaded or built.
+      const packageProblem = checkImagePackages(args)
+      if (packageProblem) return { error: 'invalid_package', text: packageProblem }
 
       let ModalClient
       try {
@@ -207,13 +214,7 @@ export function applyModalRun(ctx) {
         const app = await modal.apps.fromName(APP_NAME, { createIfMissing: true })
 
         let image = modal.images.fromRegistry(args.image_base?.trim() || spec.defaultImage)
-        const dockerCmds = []
-        if (args.image_apt?.length) {
-          dockerCmds.push(`RUN apt-get update && apt-get install -y ${args.image_apt.join(' ')} && rm -rf /var/lib/apt/lists/*`)
-        }
-        if (args.image_pip?.length) {
-          dockerCmds.push(`RUN pip install --no-cache-dir ${args.image_pip.join(' ')}`)
-        }
+        const dockerCmds = buildImageCommands({ apt: args.image_apt, pip: args.image_pip })
         if (dockerCmds.length) image = image.dockerfileCommands(dockerCmds)
 
         const volumes = {}
@@ -373,5 +374,5 @@ export function applyModalRun(ctx) {
     presentCall() {
       return { card: 'generic', title: 'Modal compute', kind: 'other' }
     },
-  }))
+  }), 'Modal'))
 }

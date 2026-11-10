@@ -8,6 +8,7 @@
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { fetchText, getLimiter, searchUserAgent } from './search-http.js'
+import { fenceUntrusted } from './untrusted-fence.js'
 
 const READ = 'https://r.jina.ai/'
 const SEARCH = 'https://s.jina.ai/'
@@ -55,7 +56,7 @@ function render(value) {
   const content = value.content.length > RENDER_CAP
     ? `${value.content.slice(0, RENDER_CAP).trimEnd()}\n… [truncated]`
     : value.content
-  return [{ type: 'text', text: `${header}\n\n${content}` }]
+  return [{ type: 'text', text: `${header}\n\n${fenceUntrusted(content, { source: value.target, kind: `jina-${value.mode}`, truncated: value.content.length > RENDER_CAP || undefined })}` }]
 }
 
 export const name = 'academic-harness-jina-reader'

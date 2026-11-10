@@ -265,6 +265,12 @@ This is a speed bump for a cooperative agent, not a sandbox: a shell can still d
 
 Verified in real sessions, not only unit tests (`scripts/claude-host-test`, Claude Code 2.1.319): headless scenarios with Haiku 5.5 and Sonnet 5.5, and the terminal UI driven through tmux (14 checks) with Haiku 5.5. Held: a protected edit and a shell append are denied and the file is byte-identical; the author's acts are denied with the reason; an edit that adds an unbound number gets the post-edit note, the Stop hook blocks and re-enters the model, the model hands the finding to the author and the gate stops steering; Claude Code's own approval dialog still appears for an allowed edit ("No" leaves the file untouched); a protected edit gets no dialog at all; and the author waives the finding from inside the session with `!`. Not run: DSH and Pi sessions in this pass (the shared engine code is covered by the tests, and the DSH adapter by `scripts/test-academic-harness.mjs`).
 
+### What counts as one turn for the gate
+
+The gate's state (the retry count, whether it has already handed off to the author, whether the evidence note was shown) lasts for one **host turn**. A new turn starts when the host's turn number changes, that is, when you send a new message; the paper-state card and the findings baseline are then taken again. The gate's own steer messages come back through the agent's inbox on the next step of the same turn, and they no longer reset anything. Before this fix a handoff could be forgotten mid-turn, the baseline re-taken, and the final stop reported as clean while the defect was still in the text. If the host supplies no turn number, only a message that is user-sourced (or has no source) starts a new turn.
+
+The learning loop records every gate event of a turn (`gate_history` on the episode) and keeps a handoff even if a later `none` follows; a turn where the gate asked to continue and then settled still counts as resolved. Prompts a parent agent writes for a sub-agent are not treated as your preferences, corrections or "forget that" requests.
+
 ### Installation and activation
 
 You do **not** install Pi, and you do not install Academic Harness into DSH. The engine is part of this plugin (`vendor/academic-harness`). Where that tree should live long-term is an [open decision](ACADEMIC-HARNESS-ENGINE.md).
@@ -311,6 +317,8 @@ In a project directory:
 3. Write through `ah-write-unit`. The gate keeps the agent on this turn's findings.
 
 T3 (does this cited clause match the source) is advisory and never a gate. Optional model backends in `ah.yaml` are `http` (OpenAI-compatible, including local Ollama) or `command`. The engine's unused `pi` backend is not required.
+
+**When T3 runs, and who is asked.** It is off unless `gate: {verify_touched: true}` is set with a `verifier:` backend. It then runs **at most once per session**, when the gate is clean and the turn is about to end, and it costs one verifier-model call per paragraph changed. On DSH the plugin asks first: the stop hook reports what would be read (`AH_T3_MODE=defer`), you get one approval prompt naming the paragraph count, files and backend, and the answer decides whether the check runs (`run`) or is skipped for the session (`skip`). A no, a cancel or a host with no approval channel skips it; the only loss is the advice. For unattended runs set `AH_T3_MODE=run` to run it without asking, or `AH_T3_MODE=skip` to turn it off. Claude Code and Pi do not ask; with `verify_touched` on they run it once per session as before.
 
 ## Deep review scores are advisory
 
