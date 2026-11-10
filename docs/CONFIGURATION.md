@@ -111,6 +111,14 @@ Optional preference for `rebuttal`. It is read per call and applies to the next 
 |---|---|---|
 | `REBUTTAL_MAX_TASKS` | `20` | Cap on supplementary task stubs one rebuttal slug may plan (integer 1–200). A non-integer or out-of-range value falls back to 20 and the call says so in a warning. No tool argument overrides it — an override would defeat the cap that replaces the paper's `N_t`, which this ledger never instantiates. |
 
+### Remote compute spend cap
+
+Optional preference for `modal_run`, `runpod_run` and `vastai_run`. It is read per call and applies to the next call with no restart.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `COMPUTE_SESSION_CAP_USD` | `10` | Most one session (a sub-agent shares its parent's budget) may spend on rented compute, in US dollars. Each run reserves an estimated ceiling first (price x time limit, plus 10 minutes for provisioning and transfers) and is refused, with nothing rented, if it would pass the cap; it is then settled at its actual cost. `0` blocks all paid compute, `off` removes the cap. A non-number falls back to 10 with a warning. Runs whose price is unknown up front (Vast.ai with no `max_price_dph`, or a pinned `offer_id`) are recorded as unpriced and counted once they finish. The ledger is `$DSH_HOME/compute-ledger/spend.jsonl`. |
+
 ### Workspace index
 
 | Field | Default | Meaning |

@@ -18,6 +18,7 @@
  */
 import { ahEnv, cliArgs, DSH_STATE_FOOTER, ensureAcademicHarnessInstalled, findAhRoot, LOG, run } from './academic-harness-cli.js'
 import { computeApprovalReason, PAID_COMPUTE_TOOLS } from './compute-approval.js'
+import { describeSessionBudget, refusalText } from './compute-ledger.js'
 import { emitGate } from './rsi-bus.js'
 
 export const name = 'academic-harness-ah-hooks'
@@ -218,8 +219,16 @@ export function apply(ctx) {
       }
     }
     if (PAID_COMPUTE_TOOLS.has(exec?.name)) {
-      // Rented hardware bills by the hour, so every call asks, in any workspace.
-      return { kind: 'ask', reason: computeApprovalReason(exec.name, exec.arguments) }
+      // Rented hardware bills by the hour, so every call asks, in any workspace. A run that cannot fit
+      // under the session cap is refused here, before the person is asked, with the numbers.
+      let budget = null
+      try {
+        budget = await describeSessionBudget(exec, exec.name, exec.arguments)
+      } catch (error) {
+        console.warn(`${LOG}: spend ledger unavailable for the approval prompt: ${error?.message || error}`)
+      }
+      if (budget?.wouldExceed) return { kind: 'deny', reason: refusalText(budget) }
+      return { kind: 'ask', reason: computeApprovalReason(exec.name, exec.arguments, budget) }
     }
     if (exec?.name === 'ah_migrate' && exec.arguments?.apply && !exec.arguments?.confirm) {
       return { kind: 'deny', reason: 'AH guard: applying migrate rewrites the tree. Pass confirm=true after the author agrees, or run a dry plan first.' }

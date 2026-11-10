@@ -83,8 +83,22 @@ function finish(provider, instance, timeoutS, pricePerHour, hours, priceNote) {
   }
 }
 
+/** One sentence about the session budget for the approval prompt. `budget` comes from describeSessionBudget(). */
+function budgetSentence(budget) {
+  if (!budget) return null
+  const parts = []
+  if (budget.cap == null) {
+    parts.push(`No session spend cap is set (spent or reserved so far: ${money(budget.spent)}).`)
+  } else {
+    const projected = budget.estUsd == null ? null : budget.spent + budget.estUsd
+    parts.push(`Session spend so far: ${money(budget.spent)} of a ${money(budget.cap)} session cap (estimates for unfinished runs included)${projected == null ? '' : `; this run could bring it to ${money(projected)}`}.`)
+  }
+  if (budget.unpriced > 0) parts.push(`${budget.unpriced} earlier run(s) had no known price and are not counted.`)
+  return parts.join(' ')
+}
+
 /** Human-readable reason for the approval prompt. Null for non-compute tools. */
-export function computeApprovalReason(name, args = {}) {
+export function computeApprovalReason(name, args = {}, budget = null) {
   const info = describeComputeCall(name, args)
   if (!info) return null
   const parts = [`${info.provider} will rent paid hardware: instance "${info.instance}", up to ${info.timeoutS}s of command time plus provisioning.`]
@@ -98,6 +112,8 @@ export function computeApprovalReason(name, args = {}) {
     const preview = command.length > COMMAND_PREVIEW_CHARS ? `${command.slice(0, COMMAND_PREVIEW_CHARS)}…` : command
     parts.push(`Command: ${preview}`)
   }
+  const budgetLine = budgetSentence(budget)
+  if (budgetLine) parts.push(budgetLine)
   parts.push('Confirm to start the run.')
   return parts.join(' ')
 }

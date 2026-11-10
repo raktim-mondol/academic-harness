@@ -1,3 +1,4 @@
+import { guardSpend } from './compute-ledger.js'
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
@@ -87,7 +88,8 @@ function extractLocalTar(tarPath, localDir) {
 
 /** Register the Modal remote-compute offload tool. */
 export function applyModalRun(ctx) {
-  ctx.tools.register(defineTool({
+  // Every call goes through the session spend cap and ledger (compute-ledger.js).
+  ctx.tools.register(guardSpend(defineTool({
     name: 'modal_run',
     description: [
       'Run a command or script on a remote Modal Sandbox (on-demand CPU or GPU) and get the result back.',
@@ -372,5 +374,5 @@ export function applyModalRun(ctx) {
     presentCall() {
       return { card: 'generic', title: 'Modal compute', kind: 'other' }
     },
-  }))
+  }), 'Modal'))
 }

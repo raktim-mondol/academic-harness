@@ -1,3 +1,4 @@
+import { guardSpend } from './compute-ledger.js'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, posix } from 'node:path'
@@ -95,7 +96,8 @@ async function reconcileOrphanInstance(key, label) {
 
 /** Register the Vast.ai marketplace remote-compute offload tool. */
 export function applyVastaiRun(ctx) {
-  ctx.tools.register(defineTool({
+  // Every call goes through the session spend cap and ledger (compute-ledger.js).
+  ctx.tools.register(guardSpend(defineTool({
     name: 'vastai_run',
     description: [
       'Run a command or script on an ephemeral Vast.ai GPU instance and get the result back.',
@@ -450,5 +452,5 @@ export function applyVastaiRun(ctx) {
     presentCall() {
       return { card: 'generic', title: 'Vast.ai compute', kind: 'other' }
     },
-  }))
+  }), 'Vast.ai'))
 }

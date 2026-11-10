@@ -1,3 +1,4 @@
+import { guardSpend } from './compute-ledger.js'
 import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { dirname, posix } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
@@ -95,7 +96,8 @@ async function reconcileOrphanPod(key, name) {
 
 /** Register the Runpod ephemeral-pod remote-compute offload tool. */
 export function applyRunpodRun(ctx) {
-  ctx.tools.register(defineTool({
+  // Every call goes through the session spend cap and ledger (compute-ledger.js).
+  ctx.tools.register(guardSpend(defineTool({
     name: 'runpod_run',
     description: [
       'Run a command or script on an ephemeral Runpod Pod (on-demand CPU or GPU) and get the result back.',
@@ -378,5 +380,5 @@ export function applyRunpodRun(ctx) {
     presentCall() {
       return { card: 'generic', title: 'Runpod compute', kind: 'other' }
     },
-  }))
+  }), 'Runpod'))
 }

@@ -215,6 +215,7 @@
     "vastai-client.js",
     "vastai-instances.js",
     "compute-approval.js",
+    "compute-ledger.js",
     "safe-process.js",
     "image-packages.js",
     "net-guard.js",
