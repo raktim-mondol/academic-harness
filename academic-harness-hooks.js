@@ -17,6 +17,7 @@
  * waits on the vendored venv's uv/pip timeout.
  */
 import { ahEnv, cliArgs, DSH_STATE_FOOTER, ensureAcademicHarnessInstalled, findAhRoot, LOG, run } from './academic-harness-cli.js'
+import { computeApprovalReason, PAID_COMPUTE_TOOLS } from './compute-approval.js'
 import { emitGate } from './rsi-bus.js'
 
 export const name = 'academic-harness-ah-hooks'
@@ -215,6 +216,10 @@ export function apply(ctx) {
         kind: 'ask',
         reason: 'Author-only Academic Harness act (waive, accept/reject a fact, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure, admit a rubric criterion). Confirm to run it.',
       }
+    }
+    if (PAID_COMPUTE_TOOLS.has(exec?.name)) {
+      // Rented hardware bills by the hour, so every call asks, in any workspace.
+      return { kind: 'ask', reason: computeApprovalReason(exec.name, exec.arguments) }
     }
     if (exec?.name === 'ah_migrate' && exec.arguments?.apply && !exec.arguments?.confirm) {
       return { kind: 'deny', reason: 'AH guard: applying migrate rewrites the tree. Pass confirm=true after the author agrees, or run a dry plan first.' }

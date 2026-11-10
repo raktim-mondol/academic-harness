@@ -2,6 +2,15 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+Trust and approval, from the 2026-11-10 review (decisions D11-D18).
+
+- **Paid compute asks first.** `modal_run`, `runpod_run` and `vastai_run` request approval on every call. The prompt shows provider, instance, maximum run time, a cost ceiling and a preview of the command; a pinned Vast.ai offer says its price is unchecked.
+- **`repo_audit run_tests` no longer exposes your API keys.** The repository's tests run with an allowlisted environment (`safe-process.js`, shared with `analysis_run`), asynchronously, with a timeout that kills the whole process group and honours cancel.
+- **A registry that arrives with a folder no longer starts a program.** `paper_mcp` entries mount only after you approve that exact entry for that workspace. `register` and the new `approve` action ask; approvals are stored under `$DSH_HOME/paper-mcp/`, and any change to the command, arguments, directory or env names asks again. Only the approved env names reach the server.
+- **Host seams are checked in CI.** `scripts/check-host-contract.mjs` reads the installed host's declarations and fails if the approval seams move. See `docs/COMPATIBILITY.md`.
+
 ## 0.50.0
 
 The writing compiler, checked against a second model, a real host and real LaTeX. Rule set 1.10.0, `BUNDLE_REV` `dsh14`. Evidence and limits: [the follow-up report](../reports/writing-compiler-claude-host-tex-2026-11-09.md).

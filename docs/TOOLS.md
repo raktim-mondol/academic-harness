@@ -33,7 +33,7 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `integrity_check` | Academic Harness preset | Retraction / expression-of-concern / correction status from Crossref and OpenAlex, with notice DOIs | [Search](SEARCH.md#publication-integrity) |
 | `deep_review` | Academic Harness preset | Optional estimate, multi-pass full-manuscript critique with live background-job progress, page/quote-anchored comments, scholar-peer questions, checklist, claims, and reference verification; every pass is kept as a numbered round and `compare` diffs two rounds; `validity` adds four advisory evaluation-validity checks (`attribution`, `evaluator_drift`, `benchmark_coverage`, `unmeasured_trade_off`) over a stored round and a deterministic manuscript inventory, each answered `clear`, `flagged`, or `not_checked`, with at most one critic model call and none with `critic: false`; `score` adds advisory `soundness`/`originality`/`clarity`/`significance` readings on a declared scale, each citing stored comment ids, with one bounded model call; rounds record `evaluator_kind` (`held_out` or `in_distribution`); artifacts under `.dsh/deep-review/<key>/` | [Papers](PAPERS.md#deep-review) |
 | `paper_resolve` | Academic Harness preset | Convert between DOI, PMID, arXiv ID, OpenAlex ID, Semantic Scholar ID, and source-specific INSPIRE/ACL/bibcode/Scopus/WoS/Wikidata identifiers | [Search](SEARCH.md#academic-databases) |
-| `paper_mcp` | Academic Harness preset | Register / status / unregister a Paper2MCP stdio server from `<cwd>/.dsh/paper-mcps.json` | [Papers](PAPERS.md#paper-agents-paper2agent) |
+| `paper_mcp` | Academic Harness preset | Register / approve / status / unregister a Paper2MCP stdio server from `<cwd>/.dsh/paper-mcps.json`; each entry needs user approval before it starts | [Papers](PAPERS.md#paper-agents-paper2agent) |
 | `mcp__papermemory__*` | Academic Harness preset | 14-tool local academic memory: search, ingest, get, cite, cite-check, recap, remember, claim, quote-check, trace, outline, list, register-to-ah, lesson | [Papers](PAPERS.md#paper-memory) |
 | `reference_library` | Academic Harness preset | The reference manager over PaperMemory's library: import/export BibTeX, BibLaTeX, RIS, CSL-JSON; tags, collections, notes, keys, duplicates, merge, doctor. Native, so paths are relative to the session workspace | [Papers](PAPERS.md#reference-library) |
 
@@ -149,9 +149,9 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 
 | Tool | Scope | What it does | Details |
 |---|---|---|---|
-| `modal_run` | Every preset | Offload a command to a Modal CPU/GPU instance; optional Volume; terminate when done | [Compute](COMPUTE.md) |
-| `runpod_run` | Every preset | Offload a command to a Runpod pod; optional network volume | [Compute](COMPUTE.md) |
-| `vastai_run` | Every preset | Rent the cheapest matching Vast.ai offer, run a command, destroy it; spot bids and volumes | [Compute](COMPUTE.md) |
+| `modal_run` | Every preset | Offload a command to a Modal CPU/GPU instance; optional Volume; terminate when done. Asks for approval on every call | [Compute](COMPUTE.md) |
+| `runpod_run` | Every preset | Offload a command to a Runpod pod; optional network volume. Asks for approval on every call | [Compute](COMPUTE.md) |
+| `vastai_run` | Every preset | Rent the cheapest matching Vast.ai offer, run a command, destroy it; spot bids and volumes. Asks for approval on every call | [Compute](COMPUTE.md) |
 | `subagent` | DSH built-in | Ordinary delegated work; inherits the parent session's model. The preset adds `subagent_pro` for difficulty-bound tasks and `subagent_vision` for image reading alongside it. | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_fork` | DSH built-in | Fork delegation that inherits the parent preset and history | [Agents](AGENTS.md#subagent-model-routing) |
 | `subagent_pro` | Academic Harness preset | Difficulty-bound delegation with an optional custom endpoint/model/key route; inherits the session model when unset | [Agents](AGENTS.md#subagent-model-routing) |

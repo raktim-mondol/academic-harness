@@ -85,6 +85,12 @@ jobs:
       - name: Install the dsh CLI
         run: npm install -g @deepseek-ai/dsh@0.2.1-rc.5
 
+      # The approval and trust code asks through the host approval service and
+      # a `tools/pre-execute` ask. The plugin's fake-host tests cannot see the
+      # host change underneath them, so read the installed host's own seams.
+      - name: Check the host approval contract
+        run: node scripts/check-host-contract.mjs "$(npm root -g)/@deepseek-ai/dsh"
+
       - name: Compose a throwaway profile that installs this plugin
         run: |
           mkdir -p /tmp/dsh-home/profiles/ci

@@ -84,7 +84,7 @@ PaperMemory and zvec-grep are separate on purpose: zg is **fail-soft** and Paper
 | `<cwd>/.dsh/deep-review/<key>/` | `deep_review` | `review.json`, `review.md`, parsed `paper.md`, `pdf-meta.json`, `citations.json`, `estimate.json`, `extra_checks.json` (the `validity` checks), `score.json` (the advisory dimension score), `meta.json`, `rounds/<run_id>.json` and `rounds/<run_id>.md` for every kept round, append-only `runs.jsonl` |
 | `<cwd>/.dsh/coscientist/<slug>/` | `coscientist` | Write-once protocol, append-only `events.jsonl` / `matches.jsonl`; limitation, selection, and grounded-novelty records also live in `events.jsonl` (no second ledger), and `.dsh/experiments` is read-only input to `trace` |
 | `<cwd>/.dsh/rebuttal/<slug>/` | `rebuttal` | Write-once `rebuttal.json` round definition; append-only imported points, capped task stubs, digest-pinned run links, author answers, recorded declines, and per-import provenance envelopes; `exports/` reports |
-| `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets) |
+| `<cwd>/.dsh/paper-mcps.json` | `paper_mcp` | Registered Paper2MCP stdio servers (interpreter, script, env **names**, never secrets). An entry mounts only after the user approves it; approvals live in `$DSH_HOME/paper-mcp/approvals.json`, not in the workspace |
 | `<cwd>/.zvec-grep/` | zvec-grep | Workspace index |
 | `~/.local/share/papermemory/papermemory.db` | PaperMemory | Shared SQLite store (Academic Harness, standalone `papermemory`, Grok) |
 | `~/.zvec-grep/` | zvec-grep | Daemon state and token (`daemon/`), model cache (`models/`) |

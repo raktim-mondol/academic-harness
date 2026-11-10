@@ -11,15 +11,22 @@
  * the first workspace to claim a serverName keeps it until restart. Status
  * reports that caveat instead of silently sharing another workspace's tools.
  *
- * Native `paper_mcp` (status / register / unregister) edits the JSON and
- * tries to mount immediately; if the catalog does not pick up the tools,
+ * Native `paper_mcp` (status / register / approve / unregister) edits the JSON
+ * and tries to mount immediately; if the catalog does not pick up the tools,
  * restart `dsh`. Skip subagent-origin sessions.
+ *
+ * Trust: the registry sits inside the workspace, so a cloned folder can ship
+ * one. An entry mounts only after a person approved that exact entry for that
+ * workspace (see paper-mcp-trust.js); approvals are stored under $DSH_HOME.
+ * `register` and `approve` ask through the host approval service from inside
+ * the tool, because `session/created` has no turn to raise a prompt on.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import * as McpClient from 'ah-dsh-mcp-client'
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { approvalReason, forgetApprovals, isApproved, recordApproval } from './paper-mcp-trust.js'
 import { isPluginPreset } from './preset-ids.js'
 
 export const name = 'academic-harness-paper-mcp'
@@ -109,6 +116,37 @@ export function normalizeServer(cwd, raw) {
   return { serverName, command, args, cwd: serverCwd, envNames, toolCallTimeoutMs }
 }
 
+/** Same checks `register` has always made, now shared with the startup path. */
+function precheckSpec(spec) {
+  if (!existsSync(spec.command)) return `command not found: ${spec.command}`
+  if (!existsSync(spec.cwd)) return `cwd not found: ${spec.cwd}`
+  const missingArg = spec.args.find((a) => a.startsWith('/') && !existsSync(a))
+  if (missingArg) return `server entry not found: ${missingArg}`
+  const badEnv = spec.envNames.find((n) => /[=\s]/.test(n) || n.length > 128)
+  if (badEnv) return `envNames must be variable names, not values: ${badEnv}`
+  return null
+}
+
+/**
+ * Ask the person to approve running this entry. Fails closed: no approval
+ * service, no agent to route the question through, a rejection or a
+ * cancellation all mean "not approved".
+ */
+async function requestApproval(ctx, exec, spec, workspaceCwd) {
+  const approval = ctx?.get?.('approval')
+  if (!approval) return { ok: false, error: 'approval is required to run a registered MCP server, and no approval channel is available' }
+  if (!exec?.agent) return { ok: false, error: 'approval is required to run a registered MCP server, but this call has no agent to ask through' }
+  const outcome = await approval.request({
+    agent: exec.agent,
+    toolName: 'paper_mcp',
+    callId: exec.callId,
+    reason: approvalReason(spec, workspaceCwd),
+    signal: exec.signal,
+  })
+  if (outcome === 'allowed-once') return { ok: true }
+  return { ok: false, error: `the MCP server "${spec.serverName}" was not approved (${outcome})` }
+}
+
 async function envFor(spec) {
   const env = { PYTHONUNBUFFERED: '1' }
   for (const name of spec.envNames) {
@@ -118,7 +156,10 @@ async function envFor(spec) {
   return env
 }
 
-async function mountServer(ctx, spec) {
+async function mountServer(ctx, spec, workspaceCwd) {
+  if (!isApproved(workspaceCwd, spec)) {
+    return { mounted: false, serverName: spec.serverName, pending_approval: true, hint: `"${spec.serverName}" is not approved for this workspace. Run paper_mcp action=approve to review and approve it.` }
+  }
   const existing = mounted.get(spec.serverName)
   if (existing) {
     if (existing.cwd === spec.cwd && existing.command === spec.command) {
@@ -173,6 +214,7 @@ function render(value) {
     if (!value.servers.length) lines.push('no paper MCP servers registered in this workspace')
     for (const s of value.servers) {
       const bits = [`${s.serverName}`, s.mounted ? 'mounted' : 'not-mounted']
+      if (s.approved === false) bits.push('pending-approval')
       if (s.restart) bits.push('restart-dsh')
       if (s.command) bits.push(s.command)
       lines.push(`- ${bits.join(' · ')}`)
@@ -211,7 +253,12 @@ export async function apply(ctx) {
         console.warn(`${LOG}: skip invalid server: ${error.message}`)
         continue
       }
-      mountServer(ctx, spec).then((result) => {
+      const problem = precheckSpec(spec)
+      if (problem) {
+        console.warn(`${LOG}: skip "${spec.serverName}": ${problem}`)
+        continue
+      }
+      mountServer(ctx, spec, cwd).then((result) => {
         if (result.error) console.warn(`${LOG}: ${result.error}`)
         else if (result.hint && !result.mounted) console.warn(`${LOG}: ${result.hint}`)
       }).catch((error) => {
@@ -226,19 +273,20 @@ export async function apply(ctx) {
       'Register, list, or drop Paper2MCP stdio servers for this workspace.',
       'Registry is <cwd>/.dsh/paper-mcps.json (python, server script, env *names* — never secrets).',
       'action=status lists registered servers and whether they are mounted as mcp__<serverName>__* tools.',
-      'action=register adds a server (from Paper2MCP USAGE.md after a verified ZIP) and tries to mount it.',
+      'action=register adds a server (from Paper2MCP USAGE.md after a verified ZIP), asks the user to approve it, then mounts it.',
+      'action=approve asks the user to approve an entry already in the registry (for example one that came with a cloned folder). Entries mount only after approval.',
       'action=unregister removes it from the JSON; dropping live tools may need a dsh restart.',
       'Connect only when the user asked. Do not put API keys in the JSON.',
     ].join(' '),
     parameters: {
       action: {
         type: 'string',
-        enum: ['status', 'register', 'unregister'],
-        description: 'status (default) lists; register adds a stdio server; unregister removes one.',
+        enum: ['status', 'register', 'approve', 'unregister'],
+        description: 'status (default) lists; register adds a stdio server after user approval; approve reviews an existing entry; unregister removes one.',
       },
       serverName: {
         type: 'string',
-        description: 'MCP namespace (mcp__<serverName>__*). Required for register/unregister. [A-Za-z0-9_-], 1–32 chars.',
+        description: 'MCP namespace (mcp__<serverName>__*). Required for register/approve/unregister. [A-Za-z0-9_-], 1–32 chars.',
       },
       command: {
         type: 'string',
@@ -288,17 +336,23 @@ export async function executePaperMcp(args, exec, ctx) {
           const live = mounted.get(spec.serverName)
           const mountedHere = live && live.cwd === spec.cwd && live.command === spec.command
           const conflict = live && !mountedHere
+          const approved = isApproved(cwd, spec)
           return {
             serverName: spec.serverName,
             command: spec.command,
             args: spec.args,
             cwd: spec.cwd,
             envNames: spec.envNames,
+            approved,
             mounted: Boolean(mountedHere),
             restart: Boolean(conflict),
             hint: conflict
               ? `mounted from ${live.cwd}; restart dsh to use this workspace's server`
-              : (mountedHere ? undefined : 'not mounted in this dsh process — register, or restart dsh'),
+              : (mountedHere
+                ? undefined
+                : (approved
+                  ? 'not mounted in this dsh process — register, or restart dsh'
+                  : 'pending approval — run paper_mcp action=approve to review it; it will not start until approved')),
           }
         } catch (error) {
           return { serverName: raw.serverName ?? '(invalid)', error: error.message, mounted: false }
@@ -323,6 +377,7 @@ export async function executePaperMcp(args, exec, ctx) {
         return lossless({ action: 'unregister', serverName, error: `not in ${REGISTRY_REL}` })
       }
       const path = saveRegistry(cwd, registry)
+      await forgetApprovals(cwd, serverName)
       const live = mounted.has(serverName)
       return lossless({
         action: 'unregister',
@@ -336,6 +391,25 @@ export async function executePaperMcp(args, exec, ctx) {
       })
     }
 
+    if (action === 'approve') {
+      const serverName = typeof args.serverName === 'string' ? args.serverName.trim() : ''
+      if (!NAME_RE.test(serverName)) {
+        return lossless({ action: 'approve', error: 'approve requires a valid serverName' })
+      }
+      const raw = loadRegistry(cwd).servers.find((s) => s.serverName === serverName)
+      if (!raw) return lossless({ action: 'approve', serverName, error: `not in ${REGISTRY_REL}` })
+      const spec = normalizeServer(cwd, raw)
+      const problem = precheckSpec(spec)
+      if (problem) return lossless({ action: 'approve', serverName, error: problem })
+      if (!isApproved(cwd, spec)) {
+        const decision = await requestApproval(ctx, exec, spec, cwd)
+        if (!decision.ok) return lossless({ action: 'approve', serverName, error: decision.error })
+        await recordApproval(cwd, spec)
+      }
+      const mount = await mountServer(ctx, spec, cwd)
+      return lossless({ action: 'approve', ...mount, approved: true })
+    }
+
     if (action === 'register') {
       const spec = normalizeServer(cwd, {
         serverName: args.serverName,
@@ -345,19 +419,12 @@ export async function executePaperMcp(args, exec, ctx) {
         envNames: args.envNames,
         toolCallTimeoutMs: args.toolCallTimeoutMs,
       })
-      if (!existsSync(spec.command)) {
-        return lossless({ action: 'register', serverName: spec.serverName, error: `command not found: ${spec.command}` })
-      }
-      if (!existsSync(spec.cwd)) {
-        return lossless({ action: 'register', serverName: spec.serverName, error: `cwd not found: ${spec.cwd}` })
-      }
-      const missingArg = spec.args.find((a) => a.startsWith('/') && !existsSync(a))
-      if (missingArg) {
-        return lossless({ action: 'register', serverName: spec.serverName, error: `server entry not found: ${missingArg}` })
-      }
-      const badEnv = spec.envNames.find((n) => /[=\s]/.test(n) || n.length > 128)
-      if (badEnv) {
-        return lossless({ action: 'register', serverName: spec.serverName, error: `envNames must be variable names, not values: ${badEnv}` })
+      const problem = precheckSpec(spec)
+      if (problem) return lossless({ action: 'register', serverName: spec.serverName, error: problem })
+      if (!isApproved(cwd, spec)) {
+        const decision = await requestApproval(ctx, exec, spec, cwd)
+        if (!decision.ok) return lossless({ action: 'register', serverName: spec.serverName, error: decision.error })
+        await recordApproval(cwd, spec)
       }
       const registry = loadRegistry(cwd)
       const idx = registry.servers.findIndex((s) => s.serverName === spec.serverName)
@@ -372,7 +439,7 @@ export async function executePaperMcp(args, exec, ctx) {
       if (idx >= 0) registry.servers[idx] = record
       else registry.servers.push(record)
       const path = saveRegistry(cwd, registry)
-      const mount = await mountServer(ctx, spec)
+      const mount = await mountServer(ctx, spec, cwd)
       return lossless({
         action: 'register',
         path,

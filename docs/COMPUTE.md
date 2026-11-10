@@ -63,6 +63,10 @@ Output is truncated from the front (last 16,000 characters per stream, with only
 
 On Vast.ai never copy to `/` or `/root` — it breaks SSH key permissions. The tool always works under `/workspace`.
 
+## Approval
+
+`modal_run`, `runpod_run` and `vastai_run` ask for approval on **every** call, because rented hardware bills by the hour. The prompt names the provider, the instance, the maximum command time, a cost ceiling taken from the instance catalog (`$/h` times the clamped timeout, not counting provisioning) and a preview of the command. Vast.ai is a marketplace, so its ceiling is known only when `max_price_dph` or `bid_price` is set; a pinned `offer_id` skips the price check, and the prompt says so. If the host has no approval channel, the call is denied.
+
 ## Teardown and failures
 
 Every call tears down its compute in a `finally` block, including aborts and command failures. Deletes are retried with a shared linear backoff; if the final delete still fails, the tool returns `runpod_teardown_failed`, `modal_teardown_failed`, or `vastai_teardown_failed` with the resource id and the console command to remove it (the original run result is preserved alongside the error). If Vast.ai's temporary SSH key cannot be removed after its instance is gone, the call reports `vastai_ssh_key_cleanup_failed`. Modal sandboxes also self-destruct at their timeout.
