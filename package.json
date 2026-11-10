@@ -216,6 +216,8 @@
     "vastai-instances.js",
     "compute-approval.js",
     "safe-process.js",
+    "image-packages.js",
+    "net-guard.js",
     "paper-mcp-trust.js",
     "ssh-client.js",
     "workspace-path.js",

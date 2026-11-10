@@ -9,10 +9,9 @@
  */
 import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, relative, resolve } from 'node:path'
-import { isIP } from 'node:net'
-import { lookup } from 'node:dns/promises'
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { NetGuardError, assertPublicUrl as netAssertPublicUrl, guardedDownload, isPrivateAddress } from './net-guard.js'
 import { ingestDownloadedPaper } from './papermemory-cli.js'
 import { canonicalArxivId, canonicalDoi } from './search-normalize.js'
 import { fetchJson, getLimiter, searchUserAgent } from './search-http.js'
@@ -53,71 +52,12 @@ export function resolveWorkspacePath(cwd, path) {
   return target
 }
 
-export function isPrivateIp(address) {
-  const family = isIP(address)
-  if (family === 4) {
-    const parts = address.split('.').map(Number)
-    if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) return true
-    if (parts[0] === 0 || parts[0] === 10 || parts[0] === 127) return true
-    if (parts[0] === 169 && parts[1] === 254) return true
-    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true
-    if (parts[0] === 192 && parts[1] === 168) return true
-    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true
-    if (parts[0] === 192 && parts[1] === 0 && parts[2] === 0) return true
-    if (parts[0] === 198 && (parts[1] === 18 || parts[1] === 19)) return true
-    if (parts[0] === 198 && parts[1] === 51 && parts[2] === 100) return true
-    if (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) return true
-    if (parts[0] >= 224) return true
-    return false
-  }
-  if (family === 6) {
-    const lower = address.toLowerCase()
-    if (lower === '::' || lower === '::1') return true
-    if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true
-    if (/^fe[89ab][0-9a-f]:/.test(lower)) return true
-    if (/^ff[0-9a-f]{2}:/.test(lower)) return true
-    if (lower.startsWith('::ffff:')) {
-      const tail = lower.slice(7)
-      if (isIP(tail) === 4) return isPrivateIp(tail)
-      const mapped = tail.match(/^([0-9a-f]{1,4}):([0-9a-f]{1,4})$/)
-      if (mapped) {
-        const high = Number.parseInt(mapped[1], 16)
-        const low = Number.parseInt(mapped[2], 16)
-        return isPrivateIp(`${high >> 8}.${high & 255}.${low >> 8}.${low & 255}`)
-      }
-      return true
-    }
-    return false
-  }
-  return true
-}
+/** Kept for callers and tests that import it from here; the single implementation is in net-guard.js. */
+export const isPrivateIp = isPrivateAddress
 
+/** Throws unless `value` is an http(s) URL to a public host (checked again at every redirect by fetchPdf). Returns the URL. */
 export async function assertPublicUrl(value) {
-  let url
-  try {
-    url = new URL(value)
-  } catch {
-    throw new Error(`invalid URL: ${value}`)
-  }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new Error('only HTTP(S) URLs are allowed')
-  }
-  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase()
-  if (host === 'localhost' || host.endsWith('.localhost')) {
-    throw new Error('localhost URLs are not allowed')
-  }
-  if (isIP(host)) {
-    if (isPrivateIp(host)) throw new Error(`private/internal address is not allowed: ${host}`)
-    return url
-  }
-  // Revalidate immediately before each hop to narrow the DNS-rebinding window.
-  const addresses = await lookup(host, { all: true, verbatim: true })
-  if (!addresses.length) throw new Error(`could not resolve host: ${host}`)
-  const privateAddress = addresses.find((entry) => isPrivateIp(entry.address))
-  if (privateAddress) {
-    throw new Error(`host ${host} resolves to a private/internal address (${privateAddress.address})`)
-  }
-  return url
+  return netAssertPublicUrl(value)
 }
 
 export function arxivIdFromDoi(doi) {
@@ -377,65 +317,27 @@ export async function resolvePdfCandidates(args = {}) {
 
 /** Fetch a URL, capping size, validating every hop, and verifying the bytes are a PDF. */
 export async function fetchPdf(url, email, signal) {
-  let current = url
-  let res = null
-  for (let redirects = 0; redirects <= 5; redirects += 1) {
-    await assertPublicUrl(current)
-    const timeout = AbortSignal.timeout(120_000)
-    const combined = signal ? AbortSignal.any([signal, timeout]) : timeout
-    res = await fetch(current, {
-      redirect: 'manual',
-      signal: combined,
+  let download
+  try {
+    download = await guardedDownload(url, {
+      signal,
+      maxBytes: MAX_BYTES,
+      deadlineMs: 120_000,
       headers: {
         'User-Agent': searchUserAgent(email),
         Accept: 'application/pdf,*/*;q=0.8',
       },
     })
-    if ([301, 302, 303, 307, 308].includes(res.status)) {
-      const location = res.headers.get('location')
-      try {
-        await res.body?.cancel()
-      } catch {
-        // body may already be closed
-      }
-      if (!location) throw new Error(`redirect without Location from ${current}`)
-      current = new URL(location, current).href
-      continue
+  } catch (error) {
+    if (error instanceof NetGuardError && error.code === 'size') {
+      throw new Error(`download exceeds the ${MAX_BYTES / (1024 * 1024)}MB limit: ${url}`)
     }
-    break
+    throw error
   }
-  if (!res || [301, 302, 303, 307, 308].includes(res.status)) {
-    throw new Error(`too many redirects starting at ${url}`)
-  }
-  if (!res.ok) throw new Error(`fetch failed: HTTP ${res.status} for ${current}`)
-
-  const declared = Number(res.headers.get('content-length'))
-  if (Number.isFinite(declared) && declared > MAX_BYTES) {
-    try {
-      await res.body?.cancel()
-    } catch {
-      // body may already be closed
-    }
-    throw new Error(`download exceeds the ${MAX_BYTES / (1024 * 1024)}MB limit: ${current}`)
-  }
-
-  const reader = res.body.getReader()
-  const chunks = []
-  let total = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    total += value.byteLength
-    if (total > MAX_BYTES) {
-      await reader.cancel()
-      throw new Error(`download exceeded the ${MAX_BYTES / (1024 * 1024)}MB limit: ${current}`)
-    }
-    chunks.push(value)
-  }
-  const buffer = Buffer.concat(chunks.map((c) => Buffer.from(c)))
+  const { buffer, url: finalUrl, headers } = download
   if (!buffer.subarray(0, 5).equals(PDF_MAGIC)) {
     throw new Error(
-      `response from ${current} is not a PDF (got ${res.headers.get('content-type') ?? 'unknown content-type'}). `
+      `response from ${finalUrl.href} is not a PDF (got ${headers.get('content-type') ?? 'unknown content-type'}). `
       + 'This usually means a paywall, login page, or CAPTCHA was returned instead.',
     )
   }
