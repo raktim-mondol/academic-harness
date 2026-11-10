@@ -4,6 +4,7 @@
  * metadata is not misconduct, and a passing test run is not full repro.
  */
 import { spawnSync } from 'node:child_process'
+import { baseEnv, repoTestEnv, runCommand } from './safe-process.js'
 import { existsSync, lstatSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { basename, join, resolve, sep } from 'node:path'
@@ -613,13 +614,15 @@ export async function runRepoAudit(args, exec, deps = {}) {
       return { error: error instanceof Error ? error.message : String(error) }
     }
     temp = mkdtempSync(join(tmpdir(), 'ah-repo-audit-'))
-    const clone = spawnSync('git', ['clone', '--depth', '1', '--quiet', repoUrl, temp], {
-      encoding: 'utf8',
-      timeout: 120_000,
+    const clone = await runCommand('git', ['clone', '--depth', '1', '--quiet', repoUrl, temp], {
+      env: { ...baseEnv(true), GIT_TERMINAL_PROMPT: '0' },
+      timeoutMs: 120_000,
+      signal: exec?.signal,
     })
     if (clone.status !== 0) {
       rmSync(temp, { recursive: true, force: true })
-      return { error: `git clone failed: ${String(clone.stderr || clone.stdout || 'unknown error').trim().slice(0, 500)}` }
+      const why = clone.timedOut ? 'timed out' : clone.aborted ? 'cancelled' : (clone.stderr || clone.stdout || clone.error || 'unknown error').trim()
+      return { error: `git clone failed: ${String(why).slice(0, 500)}` }
     }
     dir = temp
   }
@@ -648,17 +651,22 @@ export async function runRepoAudit(args, exec, deps = {}) {
       const command = detectTestCommand(dir, tests.length > 0)
       if (!command) testRun = { ran: false, reason: 'no test command detected' }
       else {
-        const result = spawnSync(command[0], command.slice(1), {
+        // The repository is not trusted code: run its tests with an allowlisted
+        // environment (no API keys), asynchronously, and kill the whole process
+        // group on timeout or cancel.
+        const result = await runCommand(command[0], command.slice(1), {
           cwd: dir,
-          encoding: 'utf8',
-          timeout: 300_000,
-          maxBuffer: 8 * 1024 * 1024,
+          env: repoTestEnv(true),
+          timeoutMs: 300_000,
+          signal: exec?.signal,
         })
         testRun = {
           ran: true,
           command: command.join(' '),
           exit_code: result.status,
-          timed_out: result.status === null,
+          timed_out: result.timedOut,
+          ...(result.aborted ? { cancelled: true } : {}),
+          ...(result.error ? { error: result.error } : {}),
           stdout_tail: String(result.stdout || '').slice(-3000),
           stderr_tail: String(result.stderr || '').slice(-2000),
         }

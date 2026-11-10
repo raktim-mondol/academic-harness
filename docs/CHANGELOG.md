@@ -4,6 +4,13 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+Trust and approval, from the 2026-11-10 review (decisions D11-D18).
+
+- **Paid compute asks first.** `modal_run`, `runpod_run` and `vastai_run` request approval on every call. The prompt shows provider, instance, maximum run time, a cost ceiling and a preview of the command; a pinned Vast.ai offer says its price is unchecked.
+- **`repo_audit run_tests` no longer exposes your API keys.** The repository's tests run with an allowlisted environment (`safe-process.js`, shared with `analysis_run`), asynchronously, with a timeout that kills the whole process group and honours cancel.
+- **A registry that arrives with a folder no longer starts a program.** `paper_mcp` entries mount only after you approve that exact entry for that workspace. `register` and the new `approve` action ask; approvals are stored under `$DSH_HOME/paper-mcp/`, and any change to the command, arguments, directory or env names asks again. Only the approved env names reach the server.
+- **Host seams are checked in CI.** `scripts/check-host-contract.mjs` reads the installed host's declarations and fails if the approval seams move. See `docs/COMPATIBILITY.md`.
+
 - **Reproducible installs and CI.** `package-lock.json` is committed and CI installs with `npm ci`. The profile install in CI still uses `npm install` because it depends on a `file:` copy of the plugin.
 - **Faster, safer test runner.** `npm test` runs files in parallel with a per-file timeout that kills the process group, a scratch `DSH_HOME` per file and optional JUnit output (`--junit`). About 70 s instead of about four minutes.
 - **Lint and type check.** ESLint (correctness rules only) and `tsc --noEmit` over an explicit allowlist run in CI. The first lint pass found a duplicated `rationale` key in the `coscientist` tool schema, which made the `add` description read as the `select` one; the two are merged.

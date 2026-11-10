@@ -316,9 +316,11 @@ The bundled `paper2agent` skill ([jmiao24/Paper2Agent](https://github.com/jmiao2
 
 Load it with the `skill` tool when the user asks to agentify a paper. It is not a replacement for `pdf_to_markdown` (fast unreviewed extract) or for catalogue skills such as `scanpy` (how-to).
 
-A full repository conversion is long (many `subagent` specialists plus independent verifiers). The agent should confirm scope first. After a verified ZIP, connect the server **only when asked**, with native `paper_mcp` (`register` / `status` / `unregister`) on the Academic Harness preset.
+A full repository conversion is long (many `subagent` specialists plus independent verifiers). The agent should confirm scope first. After a verified ZIP, connect the server **only when asked**, with native `paper_mcp` (`register` / `approve` / `status` / `unregister`) on the Academic Harness preset.
 
 `paper_mcp` writes `<cwd>/.dsh/paper-mcps.json` (interpreter, server script, env **names** — never secrets) and tries to mount the server over stdio so tools appear as `mcp__<serverName>__*`. Those mounts are standing for the life of `dsh`, same as Parallel/Scite: if tools do not appear, restart `dsh`. A different workspace that reuses the same `serverName` also needs a restart.
+
+**Trust.** A registry file can arrive inside a cloned folder, and mounting it runs a program, so an entry only starts after you approve that exact entry for that workspace. `register` and `approve` raise an approval prompt that lists the program, its arguments, its working directory and the environment variable names it will receive. Approvals are stored under `$DSH_HOME/paper-mcp/approvals.json`, outside the folder, and any change to the command, arguments, directory or env names asks again. Entries that are not approved show as `pending-approval` in `status` and are skipped at session start.
 
 Do not run `claude mcp add`. GPU papers use `runpod_run` / `modal_run` / `vastai_run` rather than a silent CPU fallback.
 

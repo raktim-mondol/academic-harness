@@ -19,6 +19,7 @@ import {
   appendJsonl, ensureDir, exportText, hashFile, mdCell, nowIso, readJson, readJsonl,
   sha256, shortHash, slug as slugify, stableStringify,
 } from './ledger-kit.js'
+import { baseEnv } from './safe-process.js'
 import { withLock } from './store-lock.js'
 import { resolveWorkspacePath } from './workspace-path.js'
 import { appendNotebookEntryAt } from './notebook.js'
@@ -215,20 +216,6 @@ export async function freezeAnalysisPlan({ cwd, slug: slugValue, plan, newVersio
     appendJsonl(f.plan, [event])
     return { slug: slugify(slugValue), ...event, created: true }
   }, { label: 'analysis plan ledger' })
-}
-
-function baseEnv(network) {
-  const env = {}
-  for (const key of ['PATH', 'HOME', 'LANG', 'LC_ALL', 'TZ', 'TMPDIR', 'TMP', 'TEMP']) {
-    if (process.env[key]) env[key] = process.env[key]
-  }
-  env.PYTHONUNBUFFERED = '1'
-  env.PYTHONIOENCODING = 'utf-8'
-  if (!network) {
-    env.no_proxy = '*'
-    env.NO_PROXY = '*'
-  }
-  return env
 }
 
 function explicitEnv(input) {

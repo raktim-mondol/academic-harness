@@ -9,6 +9,10 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import { fakeApproval } from './helpers/fake-host.mjs'
+
+// Approvals are stored under $DSH_HOME; never touch the real one.
+process.env.DSH_HOME = mkdtempSync(join(tmpdir(), 'p2a-dsh-home-'))
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(HERE, '..')
@@ -34,10 +38,15 @@ function execFor(cwd) {
 
 function mockCtx() {
   const plugins = []
+  const approval = fakeApproval(['allowed-once'])
   return {
     plugins,
+    approval,
     plugin(mod, cfg) {
       plugins.push({ mod, cfg })
+    },
+    get(name) {
+      return name === 'approval' ? approval : undefined
     },
   }
 }
