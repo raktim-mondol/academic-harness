@@ -2,7 +2,7 @@
 name: reproducible-analysis
 description: Run analyses so their numbers can be audited later — freeze an analysis plan, execute through the `analysis_run` ledger (argv commands, hashed inputs/outputs, environment allowlist, redacted logs, hard timeouts), declare reported numbers and verify them against a re-execution (`repro_check.json`), check frozen task rules and exclude violating runs, diff runs against the plan, download datasets with provenance via `dataset_get`, profile local files with `data_profile`, and ship a reader-facing `repro_package` (manifest, environment, Dockerfile, CITATION.cff, RO-Crate). Use whenever a result may be reported, published, or revisited after this session.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

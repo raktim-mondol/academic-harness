@@ -2,7 +2,7 @@
 name: presentation-build
 description: Build conference posters and slide decks from a manuscript or outline with `presentation_build`, then run its visual-QA checklist with `read_image` on an image-capable model. Use for talks, posters, defense decks, and lab-meeting slides. Routes design detail to `latex-posters` and `scientific-slides`; the tool never invents results and a compile is not a visual pass.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

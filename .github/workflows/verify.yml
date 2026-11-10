@@ -75,9 +75,20 @@ jobs:
       - name: Check the MCP tool surface and plugin guidance
         run: PM_CLI="$(command -v papermemory)" node scripts/test-phase7.mjs
 
+      # The rewritten docx/pdf/pptx/xlsx skills drive these libraries; their unit
+      # tests (run by `npm test` through scripts/test-office-skills.mjs) skip any
+      # test whose library is missing, so install them to run all of it.
+      - name: Install the office-skill test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          pip install python-docx openpyxl pypdf reportlab lxml python-pptx pdfplumber pandas pillow
+
       # Runs every scripts/test-*.mjs (see scripts/run-tests.mjs), so a new test
       # file is picked up without editing this workflow.
       - name: Run the test suite
+        env:
+          AH_OFFICE_PYTHON: python
         run: npm test -- --jobs 2 --junit "$RUNNER_TEMP/junit.xml"
 
       - name: Keep the test report

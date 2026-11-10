@@ -2,7 +2,7 @@
 name: reporting-guidelines
 description: Check a manuscript against a reporting guideline (CONSORT, STROBE, PRISMA, ARRIVE, TRIPOD+AI, CARE, STARD) with the native `reporting_check` tool — item-by-item verdicts, verified verbatim evidence, stale detection, and evidence-only exports. Use when a user asks whether a paper reports what a guideline requires, prepares a submission checklist, or audits a manuscript against CONSORT/STROBE/PRISMA/etc.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

@@ -22,6 +22,7 @@
   "deep-review",
   "designing-the-analysis",
   "diagram-design",
+  "docx",
   "drawio-reconstruction",
   "establishing-feasibility-first",
   "experiment-tracking",
@@ -55,8 +56,10 @@
   "paper2mcp",
   "paper2skill",
   "papermemory",
+  "pdf",
   "peer-reviewer",
   "power-and-sample-size",
+  "pptx",
   "pre-submission-reviewer",
   "preregistering-analysis",
   "presentation-build",
@@ -85,5 +88,6 @@
   "using-science-superpowers",
   "vastai",
   "verifying-results-before-claiming",
-  "vibe-research-workflow"
+  "vibe-research-workflow",
+  "xlsx"
 ]

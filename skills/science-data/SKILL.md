@@ -2,7 +2,7 @@
 name: science-data
 description: Look up proteins, structures, and compounds in UniProt, RCSB PDB, AlphaFold DB, and PubChem with `science_source`, and compute on them locally with `chem_toolkit` (RDKit), `seq_toolkit` (sequences, ORFs, primer Tm, alignment), and `structure_toolkit` (chains, ligands, contacts, superposition). Use when a claim rests on a database record or a calculated molecular, sequence, or structural property and the source, retrieval date, license, and inputs must be recoverable.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

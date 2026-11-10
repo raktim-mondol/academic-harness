@@ -2,7 +2,7 @@
 name: experiment-tracking
 description: Use when tracking sweeps, simulations, pilots, or model comparisons with the experiment ledger and scoped rankings.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.2"
   skill-author: Academic Harness

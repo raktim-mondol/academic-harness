@@ -2,7 +2,7 @@
 name: systematic-review-ledger
 description: Run a systematic or scoping review as an auditable screening funnel with the native `review` tool — protocol, record intake from literature searches, two-stage screening (single or dual reviewer), verbatim evidence, risk-of-bias appraisal, PRISMA-style counts, agreement statistics, and exports. Use when the user asks for a systematic review, scoping review, PRISMA audit, reproducible screening, dual-reviewer screening, or an evidence table built from a search.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

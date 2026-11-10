@@ -119,10 +119,10 @@ For PowerPoint presentations, use the pptx skill's thumbnail tool:
 
 ```bash
 # Create thumbnail grid
-python scripts/thumbnail.py presentation.pptx output --cols 4
+python skills/pptx/scripts/pptx_thumbs.py presentation.pptx -o output.png --cols 4
 
-# Individual slides
-python scripts/thumbnail.py presentation.pptx slides/slide --individual
+# Also keep individual slide images
+python skills/pptx/scripts/pptx_thumbs.py presentation.pptx -o output.png --slides-dir slides/
 ```
 
 **Advantages**:

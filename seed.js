@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto'
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { patchAcademicHarnessProfiles } from './pnpm-workspace.js'
+import { excludeNonCommercial, isNonCommercial, readLicense } from './skill-licenses.js'
 import { coreSkillNames } from './skill-index.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -12,7 +13,16 @@ function dshHome() {
   return process.env.DSH_HOME || join(homedir(), '.dsh')
 }
 
-function copyMissing(src, dest, only = null) {
+/** True when the skill directory's licence label is a non-commercial one. */
+function skillIsNonCommercial(dir) {
+  try {
+    return isNonCommercial(readLicense(readFileSync(join(dir, 'SKILL.md'), 'utf8')))
+  } catch {
+    return false
+  }
+}
+
+function copyMissing(src, dest, only = null, skip = null) {
   if (!existsSync(src)) return 0
   mkdirSync(dest, { recursive: true })
   let n = 0
@@ -23,6 +33,7 @@ function copyMissing(src, dest, only = null) {
     const to = join(dest, ent.name)
     if (existsSync(to)) continue
     if (!existsSync(join(from, 'SKILL.md'))) continue
+    if (skip && skip(from)) continue
     cpSync(from, to, { recursive: true })
     n++
   }
@@ -67,7 +78,13 @@ const SKILL_DIR_NAME = /^[a-z0-9][a-z0-9-]{0,80}$/
 export function seedSkills({ home = dshHome(), bundled = join(here, 'skills'), env = process.env, core = coreSkillNames() } = {}) {
   const dest = join(home, 'skills')
   const mode = env.AH_SKILLS_SEED === 'all' ? 'all' : 'core'
-  const copied = copyMissing(bundled, dest, mode === 'core' ? core : null)
+  // Anthropic's old docx/pdf/pptx/xlsx copies must go before the clean-up below, which only
+  // removes copies that equal the bundled skill (the rewrites differ from them).
+  for (const { name, to } of retireRestrictedSkills(dest)) {
+    console.warn(`[academic-harness] skill "${name}": moved the previously installed copy to ${to}; the bundled rewrite replaces it`)
+  }
+  // AH_EXCLUDE_NONCOMMERCIAL=1 leaves the CC BY-NC skills out (see NOTICE).
+  const copied = copyMissing(bundled, dest, mode === 'core' ? core : null, excludeNonCommercial(env) ? skillIsNonCommercial : null)
   let pruned = []
   if (mode === 'core' && core.size > 0) {
     const statePath = join(dest, SEED_STATE)
@@ -167,6 +184,41 @@ function refreshStaleSkills(dest) {
     }
     if (shipped !== installed && stale(installed)) writeFileSync(to, shipped)
   }
+}
+
+/**
+ * The docx, pdf, pptx and xlsx skills were rewritten from scratch after 0.50.0. Earlier
+ * releases shipped Anthropic's versions, whose all-rights-reserved LICENSE.txt
+ * does not allow redistribution, and `copyMissing` never replaces an installed
+ * directory, so an upgraded install would keep them. A seeded copy is recognised
+ * by that LICENSE.txt (SHA-256 below, the same file in all four) and moved to
+ * `$DSH_HOME/skills-retired/`, out of the catalogue, instead of deleted. A
+ * directory without that file, or with a different one, is the user's own and is
+ * left alone. The bundled rewrite is then copied in by `copyMissing`.
+ */
+const RESTRICTED_SKILLS = ['docx', 'pdf', 'pptx', 'xlsx']
+const RESTRICTED_LICENSE_SHA256 = '79f6d8f5b427252fa3b1c11ecdbdb6bf610b944f7530b4de78f770f38741cfaa'
+
+export function retireRestrictedSkills(dest, retiredRoot = join(dirname(dest), 'skills-retired')) {
+  const moved = []
+  for (const name of RESTRICTED_SKILLS) {
+    const dir = join(dest, name)
+    const license = join(dir, 'LICENSE.txt')
+    if (!existsSync(license)) continue
+    let digest
+    try {
+      digest = createHash('sha256').update(readFileSync(license)).digest('hex')
+    } catch {
+      continue
+    }
+    if (digest !== RESTRICTED_LICENSE_SHA256) continue
+    mkdirSync(retiredRoot, { recursive: true })
+    let target = join(retiredRoot, name)
+    for (let i = 2; existsSync(target); i += 1) target = join(retiredRoot, `${name}-${i}`)
+    renameSync(dir, target)
+    moved.push({ name, to: target })
+  }
+  return moved
 }
 
 /**

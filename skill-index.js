@@ -16,6 +16,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import YAML from 'yaml'
 import { rankWithBm25 } from './bm25-rank.js'
+import { excludeNonCommercial, isNonCommercial } from './skill-licenses.js'
 
 const here = dirname(fileURLToPath(import.meta.url))
 export const BUNDLED_SKILLS_DIR = join(here, 'skills')
@@ -31,10 +32,8 @@ export function coreSkillNames() {
   }
 }
 
-/** `AH_EXCLUDE_NONCOMMERCIAL=1` hides CC-BY-NC skills, as the packaging option does. */
-export function isNonCommercialLicense(license) {
-  return /^(cc[- ]by[- ]nc|non-?commercial)/i.test(String(license ?? '').trim())
-}
+/** `AH_EXCLUDE_NONCOMMERCIAL=1` hides CC-BY-NC skills, as the seeder and the packaging option do (skill-licenses.js). */
+export const isNonCommercialLicense = isNonCommercial
 
 function frontmatterOf(path) {
   let head
@@ -86,7 +85,7 @@ export function resetSkillIndexForTests() {
 }
 
 function visible(skills, env) {
-  return env.AH_EXCLUDE_NONCOMMERCIAL === '1' ? skills.filter((s) => !isNonCommercialLicense(s.license)) : skills
+  return excludeNonCommercial(env) ? skills.filter((s) => !isNonCommercialLicense(s.license)) : skills
 }
 
 function clip(text, max = DESCRIPTION_CHARS) {

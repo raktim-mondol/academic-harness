@@ -17,7 +17,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const EXTRA = []
+// The four office skills are rewritten clean-room (docx, pdf, pptx, xlsx) and widely used by hand (/docx, /pdf ...), so they stay in the catalogue.
+const EXTRA = ['docx', 'pdf', 'pptx', 'xlsx']
 
 export function deriveCore(root = ROOT) {
   const skills = new Set(readdirSync(join(root, 'skills'), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name))

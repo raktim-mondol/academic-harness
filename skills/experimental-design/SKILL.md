@@ -2,7 +2,7 @@
 name: experimental-design
 description: Choose and generate a reproducible randomization or design-of-experiments schedule with the `design` tool — simple/block/stratified/cluster/crossover/minimization allocation, allocation and blinding codes, realized-balance diagnostics, full/fractional factorial, Plackett–Burman, central composite, and Box–Behnken designs.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

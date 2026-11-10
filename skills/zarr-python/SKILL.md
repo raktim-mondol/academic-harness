@@ -2,7 +2,7 @@
 name: zarr-python
 description: Chunked N-D arrays for cloud storage (Zarr-Python 3). Compressed arrays, parallel I/O, S3/GCS via fsspec, NumPy/Dask/Xarray compatible, for large-scale scientific computing pipelines.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 compatibility: Requires Python 3.12+ and zarr 3.x. Cloud I/O needs zarr[remote] plus s3fs or gcsfs. Legacy Zarr v2 workflows use zarr==2.* on older Python.
 metadata:
   version: "1.0"

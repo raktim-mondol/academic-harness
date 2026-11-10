@@ -2,7 +2,7 @@
 name: research-monitoring
 description: Keep a literature search alive between sessions with `literature_watch` (saved queries, de-duplicated runs, Markdown digests) and find related work from a seed paper with `paper_recommend`. Use when the user wants to track a topic over time, set up alerts, catch up on what is new since last time, or expand from a few key papers without re-running the same search by hand.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness
