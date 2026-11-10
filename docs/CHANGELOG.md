@@ -4,6 +4,10 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+Scoring, from the 2026-11-10 review (decision D24; finding B6).
+
+- **`coscientist_rank feedback` takes the experiment's outcome.** The reward was a keyword count over the feedback text, so two wordings of one negative finding scored very differently: "The treatment did not improve survival; no significant effect was observed." was a draw (rating unchanged) while "Replication failed. No significant effect was observed." lost 175 points, and "It does not fail under load." scored as a failure. You can now pass `outcome: supports | refutes | inconclusive`. It sets the direction of the reward (+1, -1, 0), the optional 0-10 scores still moderate it as before, and no wording can flip it; a refutation stays a loss even with perfect scores. Without `outcome` the keyword reading is kept as a fallback, and the result says so with a warning. When a stated outcome and the text disagree, the outcome is used and the result carries a note. Feedback events record `outcome` and `reward_basis`; older events replay as keyword-based. See [Research](RESEARCH.md).
+
 Reliability, from the 2026-11-10 review (decision D30; finding A6).
 
 - **`analysis_run` no longer freezes the host.** The command used to run with `spawnSync` inside the ledger lock for up to an hour, which blocked everything else in the process, held the lock past its 60 s staleness limit, and could not be cancelled. It now runs asynchronously with no lock held, as a host job when there is a job service (output streamed to the panel, killable from it), and cancelling or timing out stops the whole process group. Cancelled runs are recorded, runs in progress show in `status`, and a run whose process died is recorded as `abandoned` rather than lost. See [Analysis](ANALYSIS.md#how-a-run-executes).
