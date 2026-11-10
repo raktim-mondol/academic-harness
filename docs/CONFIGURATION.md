@@ -144,7 +144,7 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 | Variable | Effect |
 |---|---|
 | `ACADEMIC_HARNESS_SKILLS_DIR` | Use a different skills catalogue. `~/scientific-agent-skills/skills` is the default checkout path. |
-| `AH_SKILLS_SEED` | `core` (default) seeds only the core skills into `$DSH_HOME/skills`; `all` seeds every bundled skill, as before 0.51. See [Skills on demand](#skills-on-demand). |
+| `AH_SKILLS_SEED` | `core` (default) seeds only the core skills into `$DSH_HOME/skills`; `all` seeds every bundled skill, as before this change. See [Skills on demand](#skills-on-demand). |
 | `AH_EXCLUDE_NONCOMMERCIAL` | `1` hides CC-BY-NC bundled skills from `skill_search` and `skill_load`. |
 | `AH_SECRET_SETTINGS` | `0` turns off the secret role on credential fields in Settings (see [Credential fields](#credential-fields-in-settings)). |
 | `ACADEMIC_HARNESS_HELPERS_DIR` | Use a different `python-helpers` checkout. |
