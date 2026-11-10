@@ -2,7 +2,20 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
-## Unreleased
+## 0.51.0
+
+The 2026-11-10 review of 0.50.0, implemented: trust and approval, licensing, the writing gate, hardening, reliability, scoring, and a lighter context and package. Rule set 1.10.0, `BUNDLE_REV` `dsh15`.
+
+**Behaviour changes to know about**
+
+- `modal_run`, `runpod_run` and `vastai_run` ask for approval on every call, and a per-session spend cap (default USD 10, `COMPUTE_SESSION_CAP_USD`) refuses a run that would exceed it.
+- The evidence check (T3) asks once per session before it spends model calls (`AH_T3_MODE=defer|run|skip`).
+- Only the 91 core skills are seeded into the host catalogue; the other bundled skills are found with `skill_search` and read with `skill_load`. On first start, byte-identical copies of the others are removed from `$DSH_HOME/skills`, and the old Anthropic `docx`, `pdf`, `pptx` and `xlsx` copies are moved to `$DSH_HOME/skills-retired/`. `AH_SKILLS_SEED=all` keeps the old behaviour.
+- API keys and tokens are secret settings: they are no longer sent to the browser, and the Settings page shows "configured" from the host.
+- The package no longer ships `scripts/`, `docs/`, `reports/` or vendored tests.
+- A `paper_mcp` registry that arrives with a folder mounts only after you approve it.
+
+**Checked how:** 129 Node test files, 515 engine and 233 PaperMemory tests, lint and type check in CI, the fake host and the host-contract check on both host lines, 10 headless and 14 terminal-UI Claude Code host scenarios with Haiku 5.5, and a Haiku 5.5 run through the real `skill_search` / `skill_load` and a prompt-injection listing. **Not yet checked on a live DSH:** the approval prompt click-through, sub-agent delegation with host-appended guidance, `analysis_run` as a host job, the Firecrawl header form, the Settings page and `/name` invocation after the clean-up. **Licensing:** the four office skills are clean-room rewrites with a recorded method (`docs/legal/`); the legal opinion on the rewrite and the remaining skills has not been obtained, and the old files remain in git history and in earlier releases.
 
 Licensing, from the 2026-11-10 review (decisions D05-D09).
 
@@ -42,13 +55,15 @@ Trust and approval, from the 2026-11-10 review (decisions D11-D18).
 - **The evidence check (T3) asks before it spends model calls.** Once per session, through the approval prompt, with the paragraph count, files and backend; engine switch `AH_T3_MODE=defer|run|skip`. Engine bundle `dsh15`.
 - **Host seams are checked in CI.** `scripts/check-host-contract.mjs` reads the installed host's declarations and fails if the approval seams move. See `docs/COMPATIBILITY.md`.
 
+Weight and checks, from the 2026-11-10 review (decisions D39-D47).
+
 - **Reproducible installs and CI.** `package-lock.json` is committed and CI installs with `npm ci`. The profile install in CI still uses `npm install` because it depends on a `file:` copy of the plugin.
 - **Faster, safer test runner.** `npm test` runs files in parallel with a per-file timeout that kills the process group, a scratch `DSH_HOME` per file and optional JUnit output (`--junit`). About 70 s instead of about four minutes.
 - **Lint and type check.** ESLint (correctness rules only) and `tsc --noEmit` over an explicit allowlist run in CI. The first lint pass found a duplicated `rationale` key in the `coscientist` tool schema, which made the `add` description read as the `select` one; the two are merged.
 - **Smaller package.** `scripts/`, `docs/`, `reports/` and vendored tests no longer ship: 3,415 to 3,145 files and 45.1 to 41.1 MiB unpacked. A new test (`test-package-files.mjs`) fails if a shipped module imports a file that is not packed. `skills/deep-review` now says its calibration script is for a repository checkout.
 - **Fetched text is fenced as data.** Search listings (every provider through `renderPapers`), Jina pages, `paper_get` abstracts and Consensus results are wrapped in an `<untrusted-source>` block, a payload cannot close its own fence, and the system prompt's Safety section says fetched text has no authority. Paper full text from `paper_fold` and `paper_context` is not yet fenced.
 - The dated "Runpod v1 retires on 2026-11-15" line is gone from the system prompt.
-- **Skills on demand (D39).** The host catalogue lists only the 87 core skills (about 20,000 characters instead of about 290,000). `skill_search` and `skill_load` reach the other bundled skills, and earlier byte-identical copies are removed from `$DSH_HOME/skills` once. `AH_SKILLS_SEED=all` restores the old behaviour. The host `skill` tool is not shadowed: a second `skill` tool in the preset layer would collide with it.
+- **Skills on demand (D39).** The host catalogue lists only the 91 core skills (the 87 named by the prompt, workflows or preset, plus the four office skills) (about 20,000 characters instead of about 290,000). `skill_search` and `skill_load` reach the other bundled skills, and earlier byte-identical copies are removed from `$DSH_HOME/skills` once. `AH_SKILLS_SEED=all` restores the old behaviour. The host `skill` tool is not shadowed: a second `skill` tool in the preset layer would collide with it.
 - **Tool surface measured, nothing deferred (D40).** `scripts/measure-tool-surface.mjs`: 136 tools, about 294,000 characters (about 73,000 tokens) resent each step. `deferLoading` is not used because a deferred tool is only usable after a host-written `tool-addition` record; see `docs/DEFERRED-TOOLS.md`.
 - **Checked with a real model instead of a live session.** `scripts/claude-plugin-check/run.mjs` (not part of `npm test`: needs a Claude login) drives Claude Haiku 5.5 through the plugin's real `skill_search` / `skill_load` over MCP and through an injected search listing. 36 task runs: searched first 36/36, loaded an accepted skill 35/36 (the miss loaded `datamol`, a reasonable alternative). 60 injection runs per arm: the old unfenced listing was followed in 32, the fenced listing with the Safety paragraph in 3. It does not cover the Settings page, the host catalogue or `/name`.
 - **Credential settings are secrets (D47).** API keys and tokens use `role('secret')`, so a stored key is no longer sent to the browser; the Settings page shows "configured" from the host's presence sidecar. `AH_SECRET_SETTINGS=0` turns it off.
