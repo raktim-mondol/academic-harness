@@ -406,10 +406,8 @@
     "skills",
     "python-helpers",
     "vendor",
+    "!vendor/*/tests",
     "lib",
-    "scripts",
-    "docs",
-    "reports",
     "README.md",
     "LICENSE",
     "NOTICE"
