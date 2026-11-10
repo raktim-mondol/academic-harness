@@ -683,6 +683,7 @@ export function computeTurnOutcome(turn, context) {
     blocking_findings: turn.blockingFindings || 0,
     findings: Object.fromEntries(turn.findings || []),
     gate: turn.gate || null,
+    gate_history: (turn.gateHistory || []).map((entry) => entry.kind),
     signals,
     quality: Number(quality.toFixed(3)),
     success,

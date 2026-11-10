@@ -171,6 +171,24 @@ def verify_touched(project: Project, touched: list[str], backend=None, before: d
     return {"checked": rep.get("evidence", {}).get("verified", 0), "verdicts": rep.get("evidence", {}).get("verdicts", {}), "flags": flags}
 
 
+def t3_pending(project: Project, st: dict) -> dict | None:
+    """What the advisory T3 check would read, or None when it would read nothing (no verifier configured or no changed units).
+    Lets a host ask the person before the check spends a verifier-model call per unit (AH_T3_MODE=defer)."""
+    from .verifier.backends import get_backend
+    only = resolve_touched(project, st.get("touched") or [])
+    if not only:
+        return None
+    try:
+        if get_backend(project.cfg) is None:
+            return None
+    except Exception:                                    # a misconfigured verifier is reported by the run itself
+        return None
+    before = st.get("unit_hashes") or None
+    now = unit_hashes(project)
+    units = [u for u, h in now.items() if before is None or before.get(u) != h]
+    return {"units": len(units), "files": only[:5], "backend": (project.cfg.get("verifier") or {}).get("backend")}
+
+
 def card(project: Project) -> str:
     """The paper-state card, worded for an agent that runs `ah` commands through its shell instead of Pi tools."""
     from .state import build_state
@@ -339,6 +357,17 @@ def handle(event: str, data: dict) -> dict | None:
             st["settled"] = True
             save_state(project, sid, st)
             if project.cfg["gate"].get("verify_touched") and not st.get("t3_done"):
+                # AH_T3_MODE: run (default) | defer (report what would run and run nothing) | skip (declined)
+                t3_mode = os.environ.get("AH_T3_MODE", "run")
+                if t3_mode == "skip":
+                    st["t3_done"] = True
+                    save_state(project, sid, st)
+                    log("t3_touched", skipped="declined by the author")
+                    return None
+                if t3_mode == "defer":
+                    pending = t3_pending(project, st)
+                    if pending:
+                        return {"t3Pending": pending}
                 st["t3_done"] = True
                 save_state(project, sid, st)
                 try:
