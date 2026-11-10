@@ -218,6 +218,7 @@
     "safe-process.js",
     "image-packages.js",
     "net-guard.js",
+    "api-request.js",
     "paper-mcp-trust.js",
     "ssh-client.js",
     "workspace-path.js",

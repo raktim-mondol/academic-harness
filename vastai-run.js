@@ -20,6 +20,7 @@ import {
   waitForInstanceSsh,
 } from './vastai-client.js'
 import {
+  forgetHostKeys,
   makeEphemeralSshKey,
   scpDownload,
   scpUpload,
@@ -101,7 +102,7 @@ export function applyVastaiRun(ctx) {
       'Vast.ai is a GPU marketplace: the tool searches live offers for the requested GPU, rents the cheapest verified one, runs the command, and destroys it.',
       `Pick an instance by GPU need (one of: ${VASTAI_INSTANCE_IDS.join(', ')}; default "${DEFAULT_VASTAI_INSTANCE_ID}").`,
       'Upload inputs with files_in (workspace-relative; files or directories) and name expected outputs in files_out — they are copied back into the local workspace.',
-      'Pass bid_price to rent an interruptible (spot) instance. Persistent storage needs a pre-created volume_id, mounted at /workspace. Requires VAST_API_KEY (https://cloud.vast.ai/manage-keys/). Always destroys the instance when done.',
+      'Pass bid_price to rent an interruptible (spot) instance. Persistent storage needs a pre-created volume_id, mounted at /workspace. Requires VAST_API_KEY (https://cloud.vast.ai/manage-keys/). Always destroys the instance when done. SSH trusts the host key of the instance on first use and holds it for that run only.',
     ].join(' '),
     parameters: {
       command: { type: 'string', required: true, description: 'Shell command to run remotely (via bash -lc) in /workspace.' },
@@ -192,7 +193,7 @@ export function applyVastaiRun(ctx) {
             numGpus,
             maxPricePerHour: maxPrice,
             spot,
-          }))
+          }), { signal })
           offer = offers[0]
         } catch (error) {
           return { error: 'vastai_failure', text: `Vast.ai offer search failed: ${error instanceof Error ? error.message : String(error)}` }
@@ -208,6 +209,7 @@ export function applyVastaiRun(ctx) {
 
       let ephemeralKey = null
       let registeredKeyId = null
+      let sshEndpoint = null // its per-run known_hosts file is removed with the instance
       let lastInstanceId = null
       const label = `dshrc-${Date.now().toString(36)}`
       const startedAt = Date.now()
@@ -252,6 +254,8 @@ export function applyVastaiRun(ctx) {
           }
           ephemeralKey?.cleanup()
           ephemeralKey = null
+          if (sshEndpoint) forgetHostKeys(sshEndpoint)
+          sshEndpoint = null
           return { instanceFailure, keyFailure }
         })
         return teardownChain
@@ -266,7 +270,7 @@ export function applyVastaiRun(ctx) {
         // before the instance exists.
         if (!userKey) {
           ephemeralKey = makeEphemeralSshKey()
-          registeredKeyId = await registerSshKey(key, ephemeralKey.publicKeyOpenSsh)
+          registeredKeyId = await registerSshKey(key, ephemeralKey.publicKeyOpenSsh, { signal })
           if (signal?.aborted) throw new Error('Aborted after SSH key registration')
         }
         const sshKeyPath = userKey?.privateKeyPath ?? ephemeralKey.privateKeyPath
@@ -282,7 +286,8 @@ export function applyVastaiRun(ctx) {
 
         let created
         try {
-          created = await createInstance(key, offer.id, createBody)
+          // The tool's cancel signal reaches the create call; the orphan sweep and the teardown below do not take it.
+          created = await createInstance(key, offer.id, createBody, { signal })
         } catch (error) {
           const orphan = await reconcileOrphanInstance(key, label).catch(() => null)
           if (orphan !== null) {
@@ -301,6 +306,7 @@ export function applyVastaiRun(ctx) {
         })
         const endpoint = resolveSshEndpoint(info)
         if (!endpoint) throw new Error('Vast.ai instance is running but has no SSH endpoint yet')
+        sshEndpoint = endpoint
 
         await sshExec(sshKeyPath, endpoint, `mkdir -p ${WORKDIR}`, {
           timeoutMs: 60_000,
