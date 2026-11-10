@@ -7,7 +7,7 @@ Academic Harness is **Linux-only**. `package.json` declares `"os": ["linux"]`, C
 ## Build the Settings page
 
 ```sh
-npm install   # once, for esbuild
+npm ci   # once: installs exactly what package-lock.json records (esbuild builds the client)
 npm run build # after any client/ change — rebuilds lib/client.js
 ```
 
@@ -22,6 +22,15 @@ npm test                      # every scripts/test-*.mjs
 npm test -- deep-research     # only files whose name contains the fragment
 node scripts/test-grade.mjs   # a single file
 ```
+
+The runner (`scripts/run-tests.mjs`) runs files in parallel, `min(4, CPUs)` at a time, each with its own scratch `DSH_HOME` that is printed and kept when the file fails. Useful flags: `--serial`, `--jobs N`, `--timeout S` (per file, default 900; the whole process group is killed), `--junit FILE`, `--verbose`, `--list`. A full run takes about 70 s at four jobs, against about four minutes serially. A new test must not use a fixed port or a path outside its scratch directory.
+
+```sh
+npm run lint        # ESLint, correctness rules only; errors fail, unused-variable warnings do not
+npm run typecheck   # tsc over the allowlist in tsconfig.json (grow the list as modules are annotated)
+```
+
+`scripts/test-package-files.mjs` reads `npm pack --dry-run --json` and fails if a shipped module imports a file that is not in `package.json` `files`, or if `scripts/`, `docs/`, `reports/` or vendored tests leak into the package. The package ships runtime code only; tests and documentation stay in the repository.
 
 Some suites have a per-area alias in `package.json` (for example `npm run test:provenance`). The provenance audit suite hashes every file outside its own cache before and after a run to prove it never writes to a source ledger. The TeX compile path is exercised by hand and is skipped by the fixture suite where TeX is not installed.
 

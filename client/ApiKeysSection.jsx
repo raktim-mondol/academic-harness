@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { IndexProgressPanel } from './ZvecIndexProgress.jsx'
+import { secretPresence } from './secret-presence.js'
 
 const IMAGE_MODEL_OPTIONS = [
   { value: 'gemini-2.5-flash-image', label: 'gemini-2.5-flash-image — nano banana' },
@@ -157,11 +158,14 @@ function SelectField({ k, scope, snapshot, writable }) {
 }
 
 /** A secret field: write-only draft input, never populated from the stored value. */
-function SecretField({ k, scope, snapshot, writable }) {
+function SecretField({ k, scope, snapshot, writable, presence }) {
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState()
-  const configured = Boolean(snapshot.value?.[k.field])
+  // The sidecar is authoritative when it names this field; otherwise (a host that does not
+  // redact this field) the value itself says whether it is set.
+  const fromSidecar = presence?.get(k.field)
+  const configured = fromSidecar !== undefined ? fromSidecar : Boolean(snapshot.value?.[k.field])
 
   const save = async () => {
     const value = draft.trim()
@@ -285,12 +289,19 @@ function TextField({ k, scope, snapshot, writable }) {
   )
 }
 
-/** Props supplied by our own client/index.js registration: { scope }. */
+/** Props supplied by our own client/index.js registration: { scope, describe }. */
 export function ApiKeysSection(props) {
-  const { scope } = props
+  const { scope, describe } = props
   const [snapshot, setSnapshot] = useState(() => scope.getSnapshot())
+  const [described, setDescribed] = useState(() => describe?.getSnapshot?.())
 
   useEffect(() => scope.subscribe(() => setSnapshot(scope.getSnapshot())), [scope])
+  useEffect(() => {
+    if (!describe?.subscribe) return undefined
+    setDescribed(describe.getSnapshot())
+    return describe.subscribe(() => setDescribed(describe.getSnapshot()))
+  }, [describe])
+  const presence = secretPresence(described?.view)
 
   if (snapshot.status === 'loading') {
     return (
@@ -329,7 +340,7 @@ export function ApiKeysSection(props) {
               ? <SelectField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
               : k.type === 'text'
                 ? <TextField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
-                : <SecretField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} />
+                : <SecretField key={k.field} k={k} scope={scope} snapshot={snapshot} writable={writable} presence={presence} />
           ))}
           {group === 'Workspace search (zvec-grep)' && (
             <IndexProgressPanel scope={scope} />
