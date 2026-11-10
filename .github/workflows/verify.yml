@@ -33,8 +33,9 @@ jobs:
         with:
           node-version: '24'
 
+      # npm ci installs exactly what package-lock.json records and fails if package.json has drifted from it.
       - name: Install plugin dependencies
-        run: npm install
+        run: npm ci
 
       - name: Check generated cordis patch is current
         run: node scripts/build-cordis-patch.mjs --check

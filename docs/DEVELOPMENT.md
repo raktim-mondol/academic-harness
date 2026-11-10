@@ -7,7 +7,7 @@ Academic Harness is **Linux-only**. `package.json` declares `"os": ["linux"]`, C
 ## Build the Settings page
 
 ```sh
-npm install   # once, for esbuild
+npm ci   # once: installs exactly what package-lock.json records (esbuild builds the client)
 npm run build # after any client/ change — rebuilds lib/client.js
 ```
 
