@@ -8,6 +8,7 @@
  */
 import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
+import { fenceUntrusted } from './untrusted-fence.js'
 import {
   canonicalArxivId,
   canonicalDoi,
@@ -211,7 +212,7 @@ function renderPaperGet(value) {
     `matched by: ${value.matched_by}`,
     `sources: ${(paper.sources || []).join(', ')}`,
   ]
-  if (paper.abstract) bits.push(`${paper.abstract.slice(0, 1200).trimEnd()}${paper.abstract.length > 1200 ? '…' : ''}`)
+  if (paper.abstract) bits.push(fenceUntrusted(`${paper.abstract.slice(0, 1200).trimEnd()}${paper.abstract.length > 1200 ? '…' : ''}`, { source: paper.doi || paper.url || value.identifier, kind: 'abstract' }))
   if (value.bibtex) bits.push(`BibTeX (${value.bibtex_source}):\n${value.bibtex.length > 900 ? `${value.bibtex.slice(0, 900)}…` : value.bibtex}`)
   if (value.warnings?.length) bits.push(`warnings: ${value.warnings.join('; ')}`)
   return [{ type: 'text', text: bits.filter(Boolean).join('\n\n') }]

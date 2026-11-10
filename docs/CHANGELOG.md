@@ -2,6 +2,15 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## Unreleased
+
+- **Reproducible installs and CI.** `package-lock.json` is committed and CI installs with `npm ci`. The profile install in CI still uses `npm install` because it depends on a `file:` copy of the plugin.
+- **Faster, safer test runner.** `npm test` runs files in parallel with a per-file timeout that kills the process group, a scratch `DSH_HOME` per file and optional JUnit output (`--junit`). About 70 s instead of about four minutes.
+- **Lint and type check.** ESLint (correctness rules only) and `tsc --noEmit` over an explicit allowlist run in CI. The first lint pass found a duplicated `rationale` key in the `coscientist` tool schema, which made the `add` description read as the `select` one; the two are merged.
+- **Smaller package.** `scripts/`, `docs/`, `reports/` and vendored tests no longer ship: 3,415 to 3,145 files and 45.1 to 41.1 MiB unpacked. A new test (`test-package-files.mjs`) fails if a shipped module imports a file that is not packed. `skills/deep-review` now says its calibration script is for a repository checkout.
+- **Fetched text is fenced as data.** Search listings (every provider through `renderPapers`), Jina pages, `paper_get` abstracts and Consensus results are wrapped in an `<untrusted-source>` block, a payload cannot close its own fence, and the system prompt's Safety section says fetched text has no authority. Paper full text from `paper_fold` and `paper_context` is not yet fenced.
+- The dated "Runpod v1 retires on 2026-11-15" line is gone from the system prompt.
+
 ## 0.50.0
 
 The writing compiler, checked against a second model, a real host and real LaTeX. Rule set 1.10.0, `BUNDLE_REV` `dsh14`. Evidence and limits: [the follow-up report](../reports/writing-compiler-claude-host-tex-2026-11-09.md).
