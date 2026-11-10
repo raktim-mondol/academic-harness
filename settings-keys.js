@@ -22,12 +22,17 @@
  * profile patch on Loader entry id `academic-harness`. The browser page uses
  * `ctx.configForms.get(KEYS_ENTRY_ID)`.
  *
- * Fields are deliberately NOT `role('secret')`: that role strips the field
- * from every client-facing snapshot unconditionally (the write still lands,
- * but no reader, including this plugin's own settings page, can ever read
- * it back to show "configured"). The web UI's own write-only design (blank
- * input, Save/Clear, never populating the field from the stored value) is
- * this plugin's actual protection against displaying a stored key.
+ * Credential fields (SECRET_FIELDS) carry `role('secret')` (decision D47): the
+ * host removes them from every client-facing snapshot, so a stored key never
+ * reaches the browser. The host reports, beside the redacted value, a
+ * `secrets: [{ path, set }]` sidecar, and the settings page reads "configured"
+ * from that (client/ApiKeysSection.jsx) instead of from the value. Both host
+ * lines this plugin supports (0.2.1-rc.5 and 0.2.2-rc.1) return the sidecar.
+ * This plugin reads the live Config reference in-process (readSection), which
+ * redaction does not touch, so tools still see the stored key.
+ * Emails, model ids, endpoint URLs and the other preferences stay plain: they
+ * are not secrets and the form shows their stored values.
+ * `AH_SECRET_SETTINGS=0` restores plain fields (the page then reads the value).
  */
 import z from '@deepseek-ai/schemastery'
 
@@ -91,6 +96,7 @@ export const KEY_FIELDS = [
   'DEEP_REVIEW_MAX_ROUNDS',
   'DEEP_REVIEW_COST_CEILING_USD',
   'REBUTTAL_MAX_TASKS',
+  'COMPUTE_SESSION_CAP_USD',
   'ZVEC_GREP_EMBEDDING',
   'ZVEC_GREP_API_KEY',
   'ZVEC_GREP_AUTO_INDEX',
@@ -98,13 +104,23 @@ export const KEY_FIELDS = [
   'ZVEC_GREP_INDEX_CANCEL',
 ]
 
-function fieldSchema() {
-  const field = z.string().default('')
-  return typeof field.volatile === 'function' ? field.volatile() : field
+/** Credentials: API keys and tokens. Everything else in KEY_FIELDS is a preference. */
+export const SECRET_FIELDS = new Set(KEY_FIELDS.filter((field) => /(_API_KEY|_TOKEN|INSTTOKEN|_TOKEN_ID|_TOKEN_SECRET)$/.test(field)))
+
+/** `AH_SECRET_SETTINGS=0` turns the secret role off (the page falls back to reading the value). */
+export function secretSettingsEnabled(env = process.env) {
+  return env.AH_SECRET_SETTINGS !== '0'
+}
+
+export function fieldSchema(field, env = process.env) {
+  let schema = z.string().default('')
+  // Older schemastery builds have no role(); keep the plain field then.
+  if (secretSettingsEnabled(env) && SECRET_FIELDS.has(field) && typeof schema.role === 'function') schema = schema.role('secret')
+  return typeof schema.volatile === 'function' ? schema.volatile() : schema
 }
 
 const shape = {}
-for (const field of KEY_FIELDS) shape[field] = fieldSchema()
+for (const field of KEY_FIELDS) shape[field] = fieldSchema(field)
 export const KeysSettingsSchema = z.object(shape)
 
 let keysCtx

@@ -59,6 +59,8 @@ The diagrams in [Architecture](ARCHITECTURE.md) show how the bundle and preset r
 | `exa_search` | Academic Harness preset | Neural/entity search; `lite` uses cached snapshots | [Search](SEARCH.md#web-indexes) |
 | `perplexity_search` | Academic Harness preset | Raw ranked results with country/domain/language/date filters | [Search](SEARCH.md#web-indexes) |
 | `jina_read` | Academic Harness preset | URL/PDF → Markdown, or Jina web search | [Search](SEARCH.md#web-indexes) |
+| `skill_search` | Academic Harness preset | Find a bundled skill by task (BM25 over name and description); the session catalogue lists only core skills | [Configuration](CONFIGURATION.md#skills-on-demand) |
+| `skill_load` | Academic Harness preset | Read the instructions of a bundled skill by exact name | [Configuration](CONFIGURATION.md#skills-on-demand) |
 | `core_search` | Academic Harness preset | CORE's open-access records; optional full text | [Search](SEARCH.md#additional-sources) |
 | `elicit_search` | Academic Harness preset | Elicit paper/trial search with study and journal filters | [Search](SEARCH.md#additional-sources) |
 | `futurehouse_agent` | Academic Harness preset | FutureHouse Crow/Falcon/Owl agents; async start/status/cancel | [Search](SEARCH.md#additional-sources) |

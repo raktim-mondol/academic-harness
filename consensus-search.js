@@ -10,6 +10,7 @@ import { defineTool } from 'ah-dsh-tools'
 import { resolveEnv } from './credential-env.js'
 import { getLimiter } from './search-http.js'
 import { fromConsensusResult } from './search-normalize.js'
+import { fenceUntrusted } from './untrusted-fence.js'
 
 const STUDY_TYPES = [
   'bench experiment', 'case report', 'case study', 'case-control study', 'cohort study',
@@ -69,7 +70,7 @@ function render(value) {
   if (!Array.isArray(value.results) || value.results.length === 0) {
     return [{ type: 'text', text: 'No results.' }]
   }
-  const lines = value.results.map((r, i) => `${i + 1}. ${renderResult(r)}`)
+  const lines = [fenceUntrusted(value.results.map((r, i) => `${i + 1}. ${renderResult(r)}`).join('\n\n'), { source: 'consensus', kind: 'paper-list' })]
   if (!value.is_end) lines.push(`_(more results available — page ${value.page + 1})_`)
   return [{ type: 'text', text: lines.join('\n\n') }]
 }

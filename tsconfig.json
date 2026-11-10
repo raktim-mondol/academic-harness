@@ -1,0 +1,23 @@
+{
+  "//": "Type-checks plain JavaScript with JSDoc (decision D45). The allowlist is explicit and grows over time: checking all ~200 modules at once would bury the signal.",
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": ["node"]
+  },
+  "files": [
+    "store-lock.js",
+    "ledger-kit.js",
+    "workspace-path.js",
+    "untrusted-fence.js",
+    "credential-env.js",
+    "preset-ids.js"
+  ]
+}

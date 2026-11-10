@@ -29,7 +29,7 @@ const PYTHON_BINS = process.platform === 'win32' ? ['python.exe', 'python'] : ['
 export const LOG = '[academic-harness] ah'
 export const MIN_AH_VERSION = '0.1.0'
 /** Bump when the vendored tree changes without a pyproject version bump. */
-const BUNDLE_REV = 'dsh14'
+const BUNDLE_REV = 'dsh15'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -160,6 +160,9 @@ export function run(command, args, { cwd, timeoutMs, env, signal, silent, stdin,
       if (!silent) process.stderr.write(text)
     })
     if (stdin != null && child.stdin) {
+      // A child that exits before it reads its input closes the pipe; the write then fails with EPIPE.
+      // That is the child's problem to report through its exit code, not an unhandled error here.
+      child.stdin.on('error', () => {})
       child.stdin.write(typeof stdin === 'string' ? stdin : String(stdin))
       child.stdin.end()
     }

@@ -10,6 +10,7 @@
  * Needs FIRECRAWL_API_KEY. Unlike the agent-facing connector this is read per call, so
  * a key saved in Settings works without a restart.
  */
+import { firecrawlMcp } from './provider-auth.js'
 import { resolveEnv } from './credential-env.js'
 import { callMcpTool } from './mcp-http.js'
 import { getLimiter } from './search-http.js'
@@ -24,7 +25,7 @@ export async function runFirecrawlPapers({ query, limit = 10 } = {}, { signal } 
   if (!text) return { error: 'query is required' }
   const limiter = getLimiter('firecrawl-papers', { minIntervalMs: 150, maxConcurrent: 2 })
   const reply = await limiter.run(() => callMcpTool({
-    endpoint: `https://mcp.firecrawl.dev/${encodeURIComponent(key)}/v2/mcp`,
+    ...firecrawlMcp(key),
     tool: 'firecrawl_research_search_papers',
     args: { query: text, k: Math.max(1, Math.min(Number(limit) || 10, 100)) },
     signal,
