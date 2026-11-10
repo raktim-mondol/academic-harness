@@ -40,6 +40,14 @@ jobs:
       - name: Check generated cordis patch is current
         run: node scripts/build-cordis-patch.mjs --check
 
+      # Correctness-only lint (errors fail; unused-variable warnings do not) and
+      # a type check of the modules listed in tsconfig.json.
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check the allowlisted modules
+        run: npm run typecheck
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -70,7 +78,15 @@ jobs:
       # Runs every scripts/test-*.mjs (see scripts/run-tests.mjs), so a new test
       # file is picked up without editing this workflow.
       - name: Run the test suite
-        run: npm test
+        run: npm test -- --jobs 2 --junit "$RUNNER_TEMP/junit.xml"
+
+      - name: Keep the test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit
+          path: ${{ runner.temp }}/junit.xml
+          if-no-files-found: ignore
 
       - name: Rebuild the client bundle and check it's committed
         run: |
