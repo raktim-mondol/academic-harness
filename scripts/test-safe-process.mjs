@@ -118,5 +118,17 @@ await check('a command that ignores SIGTERM is still stopped by SIGKILL', async 
   assert.equal(result.timedOut, true)
 })
 
+await check('output callbacks see every chunk as it arrives, alongside the kept tail', async () => {
+  const seen = { out: '', err: '' }
+  const result = await runCommand(process.execPath, ['-e', "process.stdout.write('one'); setTimeout(() => { process.stdout.write('two'); process.stderr.write('oops') }, 80)"], {
+    env: baseEnv(false),
+    onStdout: (chunk) => { seen.out += chunk },
+    onStderr: (chunk) => { seen.err += chunk },
+  })
+  assert.equal(seen.out, 'onetwo')
+  assert.equal(seen.err, 'oops')
+  assert.equal(result.stdout, 'onetwo')
+})
+
 if (process.exitCode) console.error('safe-process: FAILED')
 else console.log(`safe-process: ${passed} checks passed`)

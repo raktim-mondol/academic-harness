@@ -216,6 +216,7 @@
     "vastai-instances.js",
     "compute-approval.js",
     "safe-process.js",
+    "job-runner.js",
     "paper-mcp-trust.js",
     "ssh-client.js",
     "workspace-path.js",

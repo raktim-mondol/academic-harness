@@ -10,9 +10,46 @@ import {
   ANALYSIS_EXPORT_FORMATS, ANALYSIS_KINDS, ANALYSIS_METRIC_FORMATS, ANALYSIS_REFERENCES,
   ANALYSIS_RULE_OPS, analysisStatus, complianceAnalysisRun, currentPlan,
   diffAnalysisRuns, expectAnalysisScores, exportAnalysisRun, freezeAnalysisPlan,
-  listAnalysisRuns, runAnalysis, showAnalysisRun, verifyAnalysisScores,
+  listAnalysisRuns, reapAbandonedRuns, runAnalysis, showAnalysisRun, verifyAnalysisScores,
 } from './analysis-store.js'
+import { runAsJob } from './job-runner.js'
 import { notebookFile } from './notebook.js'
+
+const DEFAULT_RUN_TIMEOUT_MS = 600_000
+const PANEL_FLUSH_MS = 250
+const PANEL_CHUNK_CHARS = 8_000
+
+/**
+ * Stream a command's output into the host jobs panel, a quarter of a second at a time rather than
+ * chunk by chunk (a chatty command would otherwise flood it). With no job there is no panel: a no-op.
+ */
+function makePanelSink(job) {
+  if (!job) return { push() {}, flush() {} }
+  const buffers = { stdout: '', stderr: '' }
+  const channels = { stdout: 'log', stderr: 'stderr' }
+  let timer = null
+  const flush = () => {
+    if (timer) clearTimeout(timer)
+    timer = null
+    for (const stream of ['stdout', 'stderr']) {
+      if (!buffers[stream]) continue
+      const chunk = buffers[stream]
+      buffers[stream] = ''
+      try {
+        job.append(chunk.length > PANEL_CHUNK_CHARS ? `${chunk.slice(0, PANEL_CHUNK_CHARS)}\n[output truncated in the panel]\n` : chunk, { channel: channels[stream] })
+      } catch {
+        // the panel is a convenience; the run does not depend on it
+      }
+    }
+  }
+  return {
+    push(stream, chunk) {
+      buffers[stream] += chunk
+      if (!timer) timer = setTimeout(flush, PANEL_FLUSH_MS)
+    },
+    flush,
+  }
+}
 
 const ACTIONS = ['plan', 'run', 'expect', 'verify_scores', 'compliance', 'status', 'list', 'show', 'diff', 'export']
 
@@ -42,7 +79,11 @@ function renderPlan(value) {
 }
 
 function renderRun(run) {
-  const status = run.timed_out
+  const status = run.abandoned
+    ? 'ABANDONED (the process that started it ended before it recorded a result)'
+    : run.cancelled
+      ? 'CANCELLED'
+      : run.timed_out
     ? `TIMED OUT after ${run.timeout_ms} ms`
     : run.spawn_error
       ? `FAILED TO START (${run.spawn_error})`
@@ -104,7 +145,10 @@ function renderStatus(status) {
   lines.push(status.plan
     ? `Plan v${status.plan.version} (${status.plan.hash.slice(0, 18)}…): ${status.plan.question}${status.plan.versions > 1 ? ` [${status.plan.versions} versions]` : ''}`
     : 'Plan: none frozen yet.')
-  lines.push(`Runs: ${status.runs}${status.failed ? `, ${status.failed} failed or timed out` : ''}.`)
+  lines.push(`Runs: ${status.runs}${status.failed ? `, ${status.failed} failed, timed out, cancelled or abandoned` : ''}.`)
+  for (const live of status.in_flight || []) {
+    lines.push(`In progress: ${live.run_id} · started ${live.started_at} · ${(live.command || []).join(' ').slice(0, 100)}`)
+  }
   if (status.last_run) {
     lines.push(`Last: ${status.last_run.run_id} · exit ${status.last_run.exit_code ?? 'n/a'}${status.last_run.timed_out ? ' (timed out)' : ''} · ${status.last_run.duration_ms} ms`)
   }
@@ -181,6 +225,15 @@ export async function runAnalysisAction(args, exec, deps = {}) {
   const slug = requireString(args.slug, 'slug')
   const runner = deps.run || runAnalysis
 
+  // A run whose process died before it recorded a result is put on the ledger before anything reads it.
+  if (action !== 'plan' && action !== 'run') {
+    try {
+      await reapAbandonedRuns(cwd, slug)
+    } catch {
+      // recovery is best effort; the action itself must still answer
+    }
+  }
+
   if (action === 'plan') {
     if (!args.plan || typeof args.plan !== 'object' || Array.isArray(args.plan)) {
       throw new Error('plan must be an object with at least a question')
@@ -195,23 +248,40 @@ export async function runAnalysisAction(args, exec, deps = {}) {
   }
 
   if (action === 'run') {
-    const run = await runner({
-      cwd,
-      slug,
-      command: args.command,
-      kind: args.kind || 'other',
-      notebook: args.notebook,
-      engine: args.engine,
-      env: args.env,
-      inputs: args.inputs,
-      outputs: args.outputs,
-      seed: args.seed,
-      timeoutMs: args.timeout_ms,
-      network: Boolean(args.network),
-      capturePackages: Boolean(args.capture_packages),
-      notebookEntry: args.notebook_entry === false ? null : { file: notebookFile(exec), id: exec.callId },
+    // The command runs as a host job when there is a jobs service (visible and killable in the panel,
+    // output streamed to it) and inline on the call's own signal when there is not. Either way it is
+    // asynchronous: nothing else is blocked while it runs, and no ledger lock is held.
+    const label = `analysis ${slug}: ${(Array.isArray(args.command) ? args.command : []).slice(0, 4).join(' ')}`
+    const limitMs = Number(args.timeout_ms) || DEFAULT_RUN_TIMEOUT_MS
+    const outcome = await runAsJob(deps.ctx, exec, {
+      kind: 'analysis_run', label, timeoutMs: limitMs + 120_000, noun: 'analysis run', resultClip: 2000,
+    }, async (job, signal) => {
+      const panel = makePanelSink(job)
+      try {
+        const run = await runner({
+          cwd,
+          slug,
+          command: args.command,
+          kind: args.kind || 'other',
+          notebook: args.notebook,
+          engine: args.engine,
+          env: args.env,
+          inputs: args.inputs,
+          outputs: args.outputs,
+          seed: args.seed,
+          timeoutMs: args.timeout_ms,
+          network: Boolean(args.network),
+          capturePackages: Boolean(args.capture_packages),
+          notebookEntry: args.notebook_entry === false ? null : { file: notebookFile(exec), id: exec.callId },
+          signal,
+          onOutput: panel.push,
+        })
+        return { run }
+      } finally {
+        panel.flush()
+      }
     })
-    return { action, run }
+    return { action, run: outcome.run, ...(outcome.job_id ? { job_id: outcome.job_id } : {}) }
   }
 
   if (action === 'expect') {
@@ -289,7 +359,7 @@ export async function runAnalysisAction(args, exec, deps = {}) {
 }
 
 export const name = 'academic-harness-analysis-run'
-export const inject = ['tools']
+export const inject = ['tools', 'jobs']
 
 export function apply(ctx) {
   ctx.tools.register(defineTool({
@@ -336,7 +406,7 @@ export function apply(ctx) {
     },
     async execute(args, exec) {
       try {
-        return await runAnalysisAction(args, exec)
+        return await runAnalysisAction(args, exec, { ctx })
       } catch (error) {
         return { error: error instanceof Error ? error.message : String(error) }
       }

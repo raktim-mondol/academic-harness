@@ -4,6 +4,11 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+Reliability, from the 2026-11-10 review (decision D30; finding A6).
+
+- **`analysis_run` no longer freezes the host.** The command used to run with `spawnSync` inside the ledger lock for up to an hour, which blocked everything else in the process, held the lock past its 60 s staleness limit, and could not be cancelled. It now runs asynchronously with no lock held, as a host job when there is a job service (output streamed to the panel, killable from it), and cancelling or timing out stops the whole process group. Cancelled runs are recorded, runs in progress show in `status`, and a run whose process died is recorded as `abandoned` rather than lost. See [Analysis](ANALYSIS.md#how-a-run-executes).
+- **One job helper.** `runAsJob` is now `job-runner.js`, shared by `analysis_run`, `deep_research` and `deep_review` instead of two near-identical copies.
+
 Trust and approval, from the 2026-11-10 review (decisions D11-D18).
 
 - **Paid compute asks first.** `modal_run`, `runpod_run` and `vastai_run` request approval on every call. The prompt shows provider, instance, maximum run time, a cost ceiling and a preview of the command; a pinned Vast.ai offer says its price is unchecked.
