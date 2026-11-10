@@ -1,8 +1,8 @@
 /**
  * Minimal Runpod REST client for ephemeral pod jobs.
  *
- * Targets REST API v2 (https://api.runpod.io/v2) — v1
- * (https://rest.runpod.io/v1) retires on 2026-11-15. v2 wraps list
+ * Targets REST API v2 (https://api.runpod.io/v2), the replacement for the old
+ * v1 API (https://rest.runpod.io/v1). v2 wraps list
  * responses, nests the GPU/CPU request, reports pod lifecycle on
  * `status`, and returns RFC 9457 problem+json errors.
  *

@@ -152,6 +152,9 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 | Variable | Effect |
 |---|---|
 | `ACADEMIC_HARNESS_SKILLS_DIR` | Use a different skills catalogue. `~/scientific-agent-skills/skills` is the default checkout path. |
+| `AH_SKILLS_SEED` | `core` (default) seeds only the core skills into `$DSH_HOME/skills`; `all` seeds every bundled skill, as before this change. See [Skills on demand](#skills-on-demand). |
+| `AH_EXCLUDE_NONCOMMERCIAL` | `1` hides CC-BY-NC bundled skills from `skill_search` and `skill_load`. |
+| `AH_SECRET_SETTINGS` | `0` turns off the secret role on credential fields in Settings (see [Credential fields](#credential-fields-in-settings)). |
 | `ACADEMIC_HARNESS_HELPERS_DIR` | Use a different `python-helpers` checkout. |
 | `ACADEMIC_HARNESS_PYTHON` | Python interpreter for the helpers. |
 | `ACADEMIC_HARNESS_CLI` / `AH_CMD` | Override the writing-engine CLI. |
@@ -206,3 +209,18 @@ A key in a URL is kept by proxies, server access logs and error messages, so key
 The relocation for OpenAlex and openFDA happens in the shared fetcher just before a request leaves, so it covers every tool that calls them. Researchers who must not put a key in any URL can leave the PubMed and Springer keys unset; both work without one at a lower rate.
 
 See [Search](SEARCH.md), [Papers](PAPERS.md), [Compute](COMPUTE.md), and [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) for what each key unlocks.
+
+## Skills on demand
+
+The host publishes every skill under `$DSH_HOME/skills` to the model as a catalogue message on every step. With all 790 bundled skills seeded that was about 290,000 characters. Only the **core** skills are seeded now (`skills-core.json`: the skills the system prompt, workflows or preset name, and the skills those load; 87 at this commit), and their catalogue entries are capped at 240 characters: about 20,000 characters.
+
+The rest stay inside the package. The model finds them with `skill_search` (describe the task; results are ranked name and description summaries) and reads one with `skill_load` (exact name). `/name` invocation and the host `skill` tool are unchanged for the core and for anything you install yourself.
+
+- Earlier versions copied every bundled skill into `$DSH_HOME/skills`. On first start the non-core copies are removed **only when byte-identical to the bundled skill**; a skill you edited, and any skill of your own, stays. A marker file `$DSH_HOME/skills/.ah-skill-seed.json` records that the clean-up ran.
+- To keep every bundled skill in the catalogue, set `AH_SKILLS_SEED=all` (and accept the context cost).
+- `node scripts/build-skills-core.mjs` regenerates `skills-core.json`; `--check` fails when it is stale.
+
+## Credential fields in Settings
+
+API keys and tokens (39 fields, `SECRET_FIELDS` in `settings-keys.js`) are declared `role('secret')`. The host removes them from every client-facing settings snapshot, so a stored key is never sent to the browser; it reports a `secrets: [{ path, set }]` sidecar instead, and the Settings page shows "configured" from that. Tools still read the stored key in-process. Emails, model ids, endpoint URLs and preferences stay plain and show their stored values. `AH_SECRET_SETTINGS=0` restores plain fields. Checked against the host's redaction code on 0.2.1-rc.5 and 0.2.2-rc.1; the page itself has not yet been clicked through on a live host.
+

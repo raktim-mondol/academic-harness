@@ -25,6 +25,7 @@
     "./exa-search": "./exa-search.js",
     "./perplexity-search": "./perplexity-search.js",
     "./jina-reader": "./jina-reader.js",
+    "./skill-on-demand": "./skill-on-demand.js",
     "./core-search": "./core-search.js",
     "./elicit-search": "./elicit-search.js",
     "./futurehouse-agent": "./futurehouse-agent.js",
@@ -245,6 +246,9 @@
     "exa-search.js",
     "perplexity-search.js",
     "jina-reader.js",
+    "skills-core.json",
+    "skill-on-demand.js",
+    "skill-index.js",
     "core-search.js",
     "elicit-search.js",
     "futurehouse-agent.js",
@@ -414,10 +418,8 @@
     "skills",
     "python-helpers",
     "vendor",
+    "!vendor/*/tests",
     "lib",
-    "scripts",
-    "docs",
-    "reports",
     "README.md",
     "LICENSE",
     "NOTICE"
@@ -447,6 +449,8 @@
     "build": "node build-client.mjs",
     "build:patch": "node scripts/build-cordis-patch.mjs",
     "test": "node scripts/run-tests.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc -p tsconfig.json",
     "docs:diagrams": "node scripts/build-docs-diagrams.mjs",
     "test:fold": "node scripts/test-fold.mjs",
     "test:library": "node scripts/test-library.mjs",
@@ -509,12 +513,12 @@
     "@citation-js/plugin-bibtex": "^0.9.0",
     "@citation-js/plugin-csl": "^0.9.0",
     "@citation-js/plugin-ris": "^0.9.0",
-    "ah-dsh-mcp-client": "npm:@deepseek-ai/dsh-mcp-client@0.2.1-rc.5",
-    "ah-dsh-tool-subagent": "npm:@deepseek-ai/dsh-tool-subagent@0.2.1-rc.5",
-    "ah-dsh-tools": "npm:@deepseek-ai/dsh-tools@0.2.1-rc.5",
     "@deepseek-ai/schemastery": "~3.18.5",
     "@firecrawl/pdf-inspector": "^1.25.2",
     "adm-zip": "^0.6.0",
+    "ah-dsh-mcp-client": "npm:@deepseek-ai/dsh-mcp-client@0.2.1-rc.5",
+    "ah-dsh-tool-subagent": "npm:@deepseek-ai/dsh-tool-subagent@0.2.1-rc.5",
+    "ah-dsh-tools": "npm:@deepseek-ai/dsh-tools@0.2.1-rc.5",
     "pdfjs-dist": "^4.10.38",
     "pele": "^1.9.0",
     "yaml": "^2.9.1"
@@ -530,9 +534,14 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.6.6",
     "esbuild": "^0.25.0",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "typescript": "^7.0.2"
   },
   "os": [
     "linux"

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { queryResearchTemplates } from '../workflows.js'
 import { seed } from '../seed.js'
+import { loadSkill } from '../skill-index.js'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const skillNames = [
@@ -63,12 +64,17 @@ try {
   process.env.DSH_HOME = home
   seed()
   assert.equal(readFileSync(join(kept, 'SKILL.md'), 'utf8'), 'user-owned skill\n')
+  // Only the core skills are seeded into the host catalogue; the rest are bundled
+  // and load on demand (skill_load), so each Phase 10 skill is reachable one way or the other.
+  const coreNames = new Set(JSON.parse(readFileSync(join(root, 'skills-core.json'), 'utf8')))
   for (const name of skillNames.filter((name) => name !== 'subset-first-eval')) {
-    assert.ok(existsSync(join(home, 'skills', name, 'SKILL.md')), `${name} is seeded`)
+    const seeded = existsSync(join(home, 'skills', name, 'SKILL.md'))
+    assert.equal(seeded, coreNames.has(name), `${name} is seeded exactly when it is core`)
+    assert.ok(loadSkill(name).content, `${name} loads on demand`)
   }
-  assert.ok(existsSync(join(home, 'skills', 'pele', 'SKILL.md')), 'pele is seeded')
-  assert.ok(existsSync(join(home, 'skills', 'pele', 'scripts', 'render.mjs')), 'pele renderer is seeded')
-  assert.ok(existsSync(join(home, 'skills', 'pele', 'LICENSE')), 'pele license is seeded')
+  assert.ok(existsSync(join(root, 'skills', 'pele', 'scripts', 'render.mjs')), 'pele renderer is bundled')
+  assert.ok(existsSync(join(root, 'skills', 'pele', 'LICENSE')), 'pele license is bundled')
+  assert.ok(loadSkill('pele').content, 'pele loads on demand')
 } finally {
   if (oldHome === undefined) delete process.env.DSH_HOME
   else process.env.DSH_HOME = oldHome

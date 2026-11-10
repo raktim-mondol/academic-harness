@@ -8,6 +8,8 @@
  * conservative: a missing year does not merge two same-titled papers.
  */
 
+import { fenceUntrusted } from './untrusted-fence.js'
+
 const NOW = () => new Date().toISOString()
 
 export function canonicalDoi(value) {
@@ -1124,9 +1126,16 @@ export function capText(text, maxChars = 24_000) {
     : text
 }
 
-export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSources = false } = {}) {
+/**
+ * Render search results for a tool reply.
+ *
+ * Titles, abstracts, takeaways and snippets come from third-party indexes, so
+ * the listing is wrapped once in an untrusted-source fence (decision D41).
+ * `fence: false` returns the bare listing for callers that fence a larger block.
+ */
+export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSources = false, fence = true } = {}) {
   if (!Array.isArray(papers) || papers.length === 0) return 'No results.'
-  return papers.map((paper, i) => {
+  const listing = papers.map((paper, i) => {
     const bits = [`${i + 1}. **${paper.title || '(untitled)'}**`]
     const meta = [authorLine(paper.authors, maxAuthors), paper.year, paper.venue].filter(Boolean).join(' · ')
     if (meta) bits.push(meta)
@@ -1164,6 +1173,7 @@ export function renderPapers(papers, { maxAuthors = 3, abstractChars = 0, showSo
     }
     return bits.join('\n')
   }).join('\n\n')
+  return fence ? fenceUntrusted(listing, { source: 'search results', kind: 'paper-list' }) : listing
 }
 
 /** Classify a free-form identifier into the provider that can resolve it. */

@@ -19,7 +19,7 @@ export function fakeAgent({ cwd, id = 'fake-session', model = 'test-model', dept
     depth,
     parent,
     origin,
-    session: { header: { id, cwd, model, ...(parent ? { parentSession: parent.session?.header?.id } : {}) } },
+    session: { header: { id, cwd, model, ...(origin ? { origin } : {}), ...(parent ? { parentSession: parent.session?.header?.id } : {}) } },
     steer(message) {
       steered.push(message)
     },
