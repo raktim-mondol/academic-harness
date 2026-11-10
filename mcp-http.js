@@ -6,15 +6,23 @@
  * notifications/initialized, tools/call. The session id is cached per endpoint and
  * credential and re-created once if the server forgets it.
  *
- * Endpoints can carry a secret (Firecrawl puts the key in the URL path), so no error
- * or log line from here ever includes the URL, the headers, or a response body.
+ * Credentials travel in the Authorization header (Firecrawl accepts a Bearer token on
+ * its keyless endpoint URL), and the session cache is keyed by a digest of the credential,
+ * so no secret is held as a map key. No error or log line from here ever includes the
+ * URL, the headers, or a response body.
  */
 
+import { credentialFingerprint } from './provider-auth.js'
 const sessions = new Map()
 const PROTOCOL_VERSION = '2025-03-26'
 
 export function resetMcpHttpForTests() {
   sessions.clear()
+}
+
+/** Test-only: the keys of the session cache, to check that no secret is among them. */
+export function sessionKeysForTests() {
+  return [...sessions.keys()]
 }
 
 function parseBody(contentType, text, id) {
@@ -74,7 +82,8 @@ async function openSession(endpoint, headers, opts) {
  * `{ ok: false, error, status? }`; never throws.
  */
 export async function callMcpTool({ endpoint, headers = {}, tool, args = {}, signal, timeoutMs = 30_000 }) {
-  const cacheKey = `${endpoint}|${headers.authorization || headers.Authorization || ''}`
+  // The session cache is keyed by endpoint and a digest of the credential, never the credential itself.
+  const cacheKey = `${endpoint}|${credentialFingerprint(headers.authorization || headers.Authorization || '')}`
   const opts = { signal, timeoutMs }
   let id = 100
   for (let attempt = 0; attempt < 2; attempt += 1) {

@@ -191,4 +191,18 @@ The tools that call `resolveEnv()` per invocation are: `image_generate`, `modal_
 - Settings values live in the profile's `cordis.patch.yml` (the `academic-harness` Loader row); there is no separate keychain integration.
 - Keys entered in Settings reach per-call tools without a restart; MCP connectors and model-id mounts do not. Check the matrix above before concluding a key "doesn't work".
 
+### Where a key travels
+
+A key in a URL is kept by proxies, server access logs and error messages, so keys go in a header wherever the provider's documentation allows it:
+
+| Provider | How the key is sent |
+|---|---|
+| OpenAlex | `Authorization: Bearer <key>` |
+| openFDA | `Authorization: Basic` with the key as the username |
+| Firecrawl (hosted MCP, `mcp.firecrawl.dev/v2/mcp`) | `Authorization: Bearer <key>` |
+| Scite, Exa, Consensus, CORE, ADS and others | already a header |
+| NCBI PubMed, Springer Nature | **query string** (no header is documented); redacted from this plugin's logs, but visible to anything between you and the provider that records URLs |
+
+The relocation for OpenAlex and openFDA happens in the shared fetcher just before a request leaves, so it covers every tool that calls them. Researchers who must not put a key in any URL can leave the PubMed and Springer keys unset; both work without one at a lower rate.
+
 See [Search](SEARCH.md), [Papers](PAPERS.md), [Compute](COMPUTE.md), and [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) for what each key unlocks.

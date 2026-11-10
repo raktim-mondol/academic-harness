@@ -18,6 +18,7 @@
  * Dry run is the default and makes only metadata calls. Every outcome goes to a
  * ledger so a paywalled paper is not retried for 30 days.
  */
+import { firecrawlMcp } from './provider-auth.js'
 import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
@@ -192,7 +193,7 @@ export async function fetchPageMarkdown(url, { signal, exaKey, firecrawlKey, acc
   if (firecrawlKey) {
     const limiter = getLimiter('firecrawl-scrape', { minIntervalMs: 200, maxConcurrent: 2 })
     const reply = await limiter.run(() => mcpImpl({
-      endpoint: `https://mcp.firecrawl.dev/${encodeURIComponent(firecrawlKey)}/v2/mcp`,
+      ...firecrawlMcp(firecrawlKey),
       tool: 'firecrawl_scrape',
       args: { url, formats: ['markdown'], onlyMainContent: true },
       signal, timeoutMs: 60_000,

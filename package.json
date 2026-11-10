@@ -220,6 +220,7 @@
     "image-packages.js",
     "net-guard.js",
     "api-request.js",
+    "provider-auth.js",
     "paper-mcp-trust.js",
     "ssh-client.js",
     "workspace-path.js",

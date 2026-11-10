@@ -227,13 +227,14 @@ const fcBody = { results: [{ primaryId: 'pmid:37952131', ids: { doi: ['10.1056/N
   assert.equal(calls.filter((c) => c.method === 'initialize').length, 1, 'the MCP session is opened once and reused')
   assert.ok(calls.filter((c) => c.method === 'tools/call').every((c) => c.session === 'scite-sess-1'), 'every tool call carries the session id')
 
-  // Firecrawl over SSE with structuredContent; the key lives in the URL and must not leak
+  // Firecrawl over SSE with structuredContent; the key travels in the Authorization header, never in the URL
   resetMcpHttpForTests(); resetLimitersForTests(); calls.length = 0
   globalThis.fetch = mcpServer({ name: 'fc', sse: true, onCall: () => ({ content: [{ type: 'text', text: '## [pmid:37952131] md rendering' }], structuredContent: fcBody }) })
   const f = await runSource('firecrawl', { query: 'semaglutide', perSource: 10 })
   assert.equal(f.results[0].doi, '10.1056/nejmoa2307563')
   assert.equal(f.results[0].pmid, '37952131')
-  assert.match(calls[0].url, /mcp\.firecrawl\.dev\/fc-secret-key\/v2\/mcp/)
+  assert.equal(calls[0].url, 'https://mcp.firecrawl.dev/v2/mcp')
+  assert.ok(!calls.some((c) => String(c.url).includes('fc-secret-key')), 'the key is not in any request URL')
   assert.equal(calls.find((c) => c.method === 'tools/call').tool, 'firecrawl_research_search_papers')
 
   // a server that forgets the session: one transparent re-initialise
