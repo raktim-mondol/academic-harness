@@ -10,6 +10,9 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 - **Smaller package.** `scripts/`, `docs/`, `reports/` and vendored tests no longer ship: 3,415 to 3,145 files and 45.1 to 41.1 MiB unpacked. A new test (`test-package-files.mjs`) fails if a shipped module imports a file that is not packed. `skills/deep-review` now says its calibration script is for a repository checkout.
 - **Fetched text is fenced as data.** Search listings (every provider through `renderPapers`), Jina pages, `paper_get` abstracts and Consensus results are wrapped in an `<untrusted-source>` block, a payload cannot close its own fence, and the system prompt's Safety section says fetched text has no authority. Paper full text from `paper_fold` and `paper_context` is not yet fenced.
 - The dated "Runpod v1 retires on 2026-11-15" line is gone from the system prompt.
+- **Skills on demand (D39).** The host catalogue lists only the 87 core skills (about 20,000 characters instead of about 290,000). `skill_search` and `skill_load` reach the other bundled skills, and earlier byte-identical copies are removed from `$DSH_HOME/skills` once. `AH_SKILLS_SEED=all` restores the old behaviour. The host `skill` tool is not shadowed: a second `skill` tool in the preset layer would collide with it.
+- **Tool surface measured, nothing deferred (D40).** `scripts/measure-tool-surface.mjs`: 136 tools, about 294,000 characters (about 73,000 tokens) resent each step. `deferLoading` is not used because a deferred tool is only usable after a host-written `tool-addition` record; see `docs/DEFERRED-TOOLS.md`.
+- **Credential settings are secrets (D47).** API keys and tokens use `role('secret')`, so a stored key is no longer sent to the browser; the Settings page shows "configured" from the host's presence sidecar. `AH_SECRET_SETTINGS=0` turns it off.
 
 ## 0.50.0
 
