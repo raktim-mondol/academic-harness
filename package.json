@@ -218,6 +218,7 @@
     "compute-approval.js",
     "compute-ledger.js",
     "safe-process.js",
+    "job-runner.js",
     "image-packages.js",
     "net-guard.js",
     "api-request.js",

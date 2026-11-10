@@ -4,6 +4,11 @@ Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub 
 
 ## Unreleased
 
+Reliability, from the 2026-11-10 review (decision D30; finding A6).
+
+- **`analysis_run` no longer freezes the host.** The command used to run with `spawnSync` inside the ledger lock for up to an hour, which blocked everything else in the process, held the lock past its 60 s staleness limit, and could not be cancelled. It now runs asynchronously with no lock held, as a host job when there is a job service (output streamed to the panel, killable from it), and cancelling or timing out stops the whole process group. Cancelled runs are recorded, runs in progress show in `status`, and a run whose process died is recorded as `abandoned` rather than lost. See [Analysis](ANALYSIS.md#how-a-run-executes).
+- **One job helper.** `runAsJob` is now `job-runner.js`, shared by `analysis_run`, `deep_research` and `deep_review` instead of two near-identical copies.
+
 Hardening, from the 2026-11-10 review (decisions D26, D28, D29, D31-D34; finding B9).
 
 - **One network guard for every URL the plugin did not choose (`net-guard.js`).** Public hosts only (the union of the three older checks, now one), each redirect re-checked, credential headers dropped when a redirect leaves the origin, one deadline that stays armed through the body, and size limits counted on the bytes actually read. `dataset_get`, the Wiley TDM PDF fetch, generated-image URLs, `paper_download`, `style_url` and the link checker use it. A dataset link can no longer redirect to a local or private address, a missing `Content-Length` no longer defeats the total cap, and a failed or stalled download leaves no partial file and no longer aborts the rest of the batch.

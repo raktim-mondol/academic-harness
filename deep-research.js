@@ -16,6 +16,7 @@
  * Pipeline shape adapted from jordan-gibbs/hyperresearch (MIT); see NOTICE. No
  * upstream code is vendored.
  */
+import { runAsJob } from './job-runner.js'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
@@ -599,6 +600,9 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
         kind: 'deep-research',
         label: `deep research ${runId} (${action})`,
         timeoutMs: jobTimeoutMs(manifest),
+        noun: 'deep research',
+        resumeHint: '; the run is resumable with action=resume',
+        resultClip: 2000,
       }, (job, signal) => {
         const lines = []
         const sink = makeProgressSink(job, (line) => lines.push(line))
@@ -734,86 +738,6 @@ function gateDeps(cwd, runId, exec, args) {
       if (/\b(?:scaffold|canonical query|Register:)\b/u.test(body)) leaks.push('scaffold label echoed into the report')
       return { leaks }
     },
-  }
-}
-
-/**
- * Long runs execute inside a host job so the chat stays responsive, progress is
- * visible while it works, and an abort actually stops the model calls in flight.
- * With no jobs service the same work runs inline on the call's own signal.
- */
-async function runAsJob(ctx, exec, { kind, label, timeoutMs }, work) {
-  const jobs = ctx?.jobs
-  if (!jobs) return work(null, exec?.signal ?? null)
-  const owner = exec?.agent?.id
-  const controller = new AbortController()
-  const onAbort = () => controller.abort('tool call aborted')
-  if (exec?.signal?.aborted) controller.abort('tool call aborted')
-  else exec?.signal?.addEventListener?.('abort', onAbort, { once: true })
-
-  let resolveResult
-  let rejectResult
-  const resultPromise = new Promise((resolve, reject) => {
-    resolveResult = resolve
-    rejectResult = reject
-  })
-  resultPromise.catch(() => {})
-  let settleOutcome
-  const done = new Promise((resolve) => {
-    settleOutcome = resolve
-  })
-
-  let jobId
-  try {
-    jobId = jobs.start({
-      kind,
-      label,
-      ...(owner ? { owner } : {}),
-      toolCall: { callId: exec?.callId, rootCallId: exec?.rootCallId },
-      run: (job) => {
-        void (async () => {
-          let outcome
-          try {
-            const value = await work(job, controller.signal)
-            resolveResult(value)
-            outcome = { status: 'completed', detail: value?.status ?? 'completed', result: JSON.stringify(value)?.slice(0, 2000) }
-          } catch (error) {
-            const message = error instanceof Error ? error.message : String(error)
-            rejectResult(error)
-            outcome = { status: controller.signal.aborted ? 'killed' : 'failed', detail: message }
-          } finally {
-            exec?.signal?.removeEventListener?.('abort', onAbort)
-            settleOutcome(outcome)
-          }
-        })()
-        return { done, cancel: (reason) => controller.abort(reason || 'cancelled') }
-      },
-    })
-  } catch (error) {
-    exec?.signal?.removeEventListener?.('abort', onAbort)
-    throw error
-  }
-
-  try {
-    let view
-    try {
-      view = await jobs.wait(jobId, timeoutMs, owner, exec?.signal)
-    } catch (error) {
-      try { jobs.kill(jobId, owner, 'tool call aborted') } catch { /* already settled */ }
-      throw error
-    }
-    if (view.status === 'running' || view.status === 'stopping') {
-      try { jobs.kill(jobId, owner, 'deep research timed out') } catch { /* already settled */ }
-      try { await jobs.wait(jobId, 10_000, owner) } catch { /* already gone */ }
-      throw new Error(`deep research timed out after ${Math.round(timeoutMs / 60_000)} minutes; the run is resumable with action=resume`)
-    }
-    if (view.status === 'killed') {
-      throw new Error(`deep research cancelled${view.detail ? `: ${view.detail}` : ''}; the run is resumable with action=resume`)
-    }
-    const value = await resultPromise
-    return { ...value, job_id: jobId }
-  } finally {
-    exec?.signal?.removeEventListener?.('abort', onAbort)
   }
 }
 

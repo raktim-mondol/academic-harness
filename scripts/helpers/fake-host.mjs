@@ -83,3 +83,47 @@ export function fakeHost({ services = {}, extra = {} } = {}) {
     },
   }
 }
+
+/**
+ * Fake host job service (`ctx.jobs`): start / wait / kill with the same shapes the
+ * plugin uses. `started` records every job (kind, label, owner, panel lines).
+ */
+export function fakeJobs() {
+  const started = []
+  const find = (id) => started.find((job) => job.id === id)
+  return {
+    started,
+    start({ kind, label, owner, toolCall, run }) {
+      const record = { id: `job-${started.length + 1}`, kind, label, owner, toolCall, lines: [], progress: [], status: 'running', outcome: null, killed: null }
+      started.push(record)
+      const job = {
+        append: (text, options) => record.lines.push({ text: String(text), channel: options?.channel ?? null }),
+        updateProgress: (label) => record.progress.push(label),
+      }
+      record.handle = run(job)
+      record.handle.done.then((outcome) => {
+        record.outcome = outcome
+        record.status = outcome?.status ?? 'completed'
+      })
+      return record.id
+    },
+    async wait(id, timeoutMs, owner, signal) {
+      const record = find(id)
+      if (!record) throw new Error(`no job ${id}`)
+      await new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, timeoutMs)
+        const onAbort = () => { clearTimeout(timer); reject(signal.reason ?? new Error('aborted')) }
+        if (signal?.aborted) return onAbort()
+        signal?.addEventListener('abort', onAbort, { once: true })
+        record.handle.done.then(() => { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); resolve() })
+      })
+      return { status: record.status, detail: record.outcome?.detail }
+    },
+    kill(id, owner, reason) {
+      const record = find(id)
+      if (!record) return
+      record.killed = reason
+      record.handle.cancel(reason)
+    },
+  }
+}

@@ -95,6 +95,8 @@ function killGroup(child, signal) {
  * Run a command to completion. Never throws: spawn failures, timeouts and
  * aborts come back as fields.
  *
+ * `onStdout` / `onStderr` receive each decoded chunk as it arrives.
+ *
  * @returns {Promise<{status: number|null, signal: string|null, stdout: string,
  *   stderr: string, timedOut: boolean, aborted: boolean, error: string|null}>}
  */
@@ -106,6 +108,8 @@ export function runCommand(command, args, {
   signal,
   tailChars = 64 * 1024,
   stdin,
+  onStdout,
+  onStderr,
 } = {}) {
   return new Promise((resolve) => {
     let child
@@ -144,8 +148,9 @@ export function runCommand(command, args, {
 
     child.stdout?.setEncoding('utf8')
     child.stderr?.setEncoding('utf8')
-    child.stdout?.on('data', (chunk) => out.push(chunk))
-    child.stderr?.on('data', (chunk) => err.push(chunk))
+    // Callbacks see every chunk as it arrives (a caller may keep the head instead of the tail, or stream to a panel).
+    child.stdout?.on('data', (chunk) => { out.push(chunk); onStdout?.(chunk) })
+    child.stderr?.on('data', (chunk) => { err.push(chunk); onStderr?.(chunk) })
     if (stdin != null && child.stdin) {
       child.stdin.on('error', () => {})
       child.stdin.end(String(stdin))
