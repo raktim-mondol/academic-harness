@@ -6,7 +6,7 @@ description: >
   NIRS, motion capture, EMG, MR spectroscopy, behavioral), querying BIDS layouts,
   validating compliance, converting DICOM to BIDS, writing metadata sidecars, or
   creating BIDS derivatives.
-license: https://creativecommons.org/licenses/by/4.0/
+license: CC-BY-4.0
 metadata:
   version: "1.0"
   skill-author: Yaroslav Halchenko

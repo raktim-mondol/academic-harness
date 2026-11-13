@@ -2,7 +2,7 @@
 name: reference-audit
 description: Audit a bibliography with `citation` action=audit (DOI validity, Crossref metadata match, retraction and correction status, duplicates, missing fields, uncited entries) and check a paper's data and code links with `paper_artifacts` (repository links, accessions, availability statements, link checks). Use before submission, when reviewing a manuscript's references, or when judging whether a paper's data and code are really available.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

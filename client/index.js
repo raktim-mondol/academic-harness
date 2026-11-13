@@ -40,7 +40,9 @@ export function apply(ctx) {
     id: 'academic-harness-api-keys',
     order: 60,
     label: () => 'Academic Harness API keys',
-    inject: () => ({ scope }),
+    // `describe` is the shared mirror of the host's settings document; it carries the
+    // `secrets` presence sidecar the page needs now that credential fields are redacted.
+    inject: () => ({ scope, describe: ctx.configForms.describe?.() }),
   }, ApiKeysSection))))
 
   ctx.slots.inject('conversation.session.header.actions', () => ctx.slots.register({

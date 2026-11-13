@@ -2,7 +2,7 @@
 name: deep-review
 description: Run the native `deep_review` tool for a Deep-Review-style multi-pass critique of a whole manuscript — segmented review with page/quote-anchored comments, scholar-peer questions, claim-evidence map, reproducibility checklist, and reference verification, kept as numbered rounds that `compare` can diff, plus four advisory evaluation-validity readings over the manuscript's own text and grids and an advisory dimension score with held-out/in-distribution provenance. Use when the user asks for a deep, multi-pass, or pre-submission review of a full paper, a second opinion beyond the session model, whether a revision closed the findings from an earlier review, whether a reported gain survives removing its mechanism, changing the evaluator, and reading the results grid against a baseline, or for an automated soundness/originality/clarity/significance reading on a declared scale.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.3"
   skill-author: Academic Harness
@@ -204,9 +204,10 @@ When the revision was guided by a prior round's rubric or report, pass
 
 `compare` never accepts or rejects the paper, and the round ladder is not a
 score to climb. Where the user wants the tool itself checked,
-`node scripts/deep-review-calibration.mjs --report` summarizes stored rounds and
-their agreement with real OpenReview decisions, reporting `not_checked` when the
-sample is too small.
+a maintainer working in a checkout of the plugin repository can run
+`node scripts/deep-review-calibration.mjs --report` (the script is not part of
+the installed package) to summarize stored rounds and their agreement with real
+OpenReview decisions; it reports `not_checked` when the sample is too small.
 
 ### 7. Check the validity of what the paper claims
 

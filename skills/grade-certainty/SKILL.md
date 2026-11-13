@@ -2,7 +2,7 @@
 name: grade-certainty
 description: Record GRADE certainty judgements and produce an evidence profile plus summary-of-findings table with the native `review` tool — outcome definitions, risk-of-bias/inconsistency/indirectness/imprecision/publication-bias ratings, observational upgrade domains, reviewer-keyed conflicts, and a human-owned overall certainty. Use when the user asks for GRADE, certainty of evidence, an evidence profile, or a summary-of-findings table.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

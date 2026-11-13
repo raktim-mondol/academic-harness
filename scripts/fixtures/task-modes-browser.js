@@ -1,3 +1,4 @@
+/* global document, window */
 /** Browser-only fixture: production task plugin and views with a deterministic DSH input/command adapter. */
 import { createElement as h, useState, useSyncExternalStore } from 'react'
 import { createRoot } from 'react-dom/client'

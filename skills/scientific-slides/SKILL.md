@@ -2,7 +2,7 @@
 name: scientific-slides
 description: Build slide decks and presentations for research talks. Use this for making PowerPoint slides, conference presentations, seminar talks, research presentations, thesis defense slides, or any scientific talk. Provides slide structure, design templates, timing guidance, and visual validation. Works with PowerPoint and LaTeX Beamer.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: K-Dense Inc.
@@ -172,7 +172,7 @@ When creating PowerPoint presentations, use Nano Banana Pro to generate images a
 **How it works:**
 1. **Plan the deck**: Create content plan for each slide
 2. **Generate visuals**: Use Nano Banana Pro with `--visual-only` flag to create images for slides
-3. **Build PPTX**: Use the PPTX skill (html2pptx or template-based) to create slides with generated visuals and separate text
+3. **Build PPTX**: Use the PPTX skill (python-pptx from code, or a template) to create slides with generated visuals and separate text
 
 **Step 1: Generate Visuals for Each Slide**
 
@@ -189,7 +189,7 @@ python scripts/generate_slide_image.py "Before and after comparison showing impr
 
 **Step 2: Build PowerPoint with PPTX Skill**
 
-Use the PPTX skill's html2pptx workflow to create slides that include:
+Use the PPTX skill's python-pptx recipes (`skills/pptx/references/python-pptx-recipes.md`) to create slides that include:
 - Generated images from step 1
 - Title and body text added separately
 - Professional layout and formatting
@@ -510,13 +510,13 @@ Use Nano Banana Pro with `--visual-only` to generate images, then build PPTX wit
 
 **Key Resources**:
 - `assets/powerpoint_design_guide.md`: Complete PowerPoint design guide
-- PPTX skill's `html2pptx.md`: Programmatic creation workflow
-- PPTX skill's scripts: `rearrange.py`, `inventory.py`, `replace.py`, `thumbnail.py`
+- PPTX skill's `references/python-pptx-recipes.md`: Programmatic creation, tables, charts, reordering
+- PPTX skill's scripts: `pptx_outline.py`, `pptx_check.py`, `pptx_thumbs.py`
 
 **Workflow**:
 1. Generate visuals with `generate_slide_image.py --visual-only`
-2. Design HTML slides (for programmatic) or use templates
-3. Create presentation using html2pptx or template editing
+2. Plan slide layouts (for programmatic creation) or pick a template
+3. Create the presentation with python-pptx, from code or from a template
 4. Add generated images and text content
 5. Generate thumbnails for visual validation
 6. Iterate based on visual inspection
@@ -567,8 +567,8 @@ Implement iterative improvement through visual inspection. For complete workflow
 # Using the pdf_to_images script
 python scripts/pdf_to_images.py presentation.pdf review/slide --dpi 150
 
-# Or use pptx skill's thumbnail tool
-python skills/pptx/scripts/thumbnail.py presentation.pptx review/thumb
+# Or use the pptx skill's thumbnail tool (needs LibreOffice and poppler)
+python skills/pptx/scripts/pptx_thumbs.py presentation.pptx -o review/thumb.png --slides-dir review/slides
 ```
 
 **Step 3: Systematic Inspection**
@@ -795,8 +795,8 @@ and discussion (slides 13-14) BEFORE creating slides.
 # Convert PDF to images
 python scripts/pdf_to_images.py presentation.pdf review/slides
 
-# Or create thumbnail grid
-python skills/pptx/scripts/thumbnail.py presentation.pptx review/grid
+# Or create a thumbnail grid
+python skills/pptx/scripts/pptx_thumbs.py presentation.pptx -o review/grid.png --cols 4
 ```
 
 **Systematic Review**:
@@ -886,7 +886,7 @@ python skills/pptx/scripts/thumbnail.py presentation.pptx review/grid
 - Use for PowerPoint creation and editing
 - Leverage scripts for template workflows
 - Use thumbnail generation for validation
-- Reference html2pptx for programmatic creation
+- Reference the python-pptx recipes for programmatic creation
 
 **Data Visualization**:
 - Create presentation-appropriate figures
@@ -1036,10 +1036,10 @@ python scripts/pdf_to_images.py presentation.pdf output/slide --dpi 150
 ### PPTX Skill Scripts
 
 From `skills/pptx/scripts/`:
-- `thumbnail.py`: Create thumbnail grids
-- `rearrange.py`: Duplicate and reorder slides
-- `inventory.py`: Extract text content
-- `replace.py`: Update text programmatically
+- `pptx_thumbs.py`: Create thumbnail grids (and per-slide PNGs)
+- `pptx_outline.py`: Extract text, tables, alt text and notes
+- `pptx_check.py`: Lint for off-slide shapes, small fonts, missing alt text, overflow
+- Reordering and text replacement: recipes in `references/python-pptx-recipes.md`
 
 ### External Tools
 

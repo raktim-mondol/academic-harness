@@ -107,6 +107,14 @@
 
 - id: tool-skill
   name: '@deepseek-ai/dsh-tool-skill'
+  config:
+    # The catalogue lists only the core skills (skills-core.json); keep each
+    # entry short. The rest of the bundle is reached through skill_search and
+    # skill_load (skill-on-demand.js), so it costs context only when used.
+    catalogDescriptionMaxLength: 240
+
+- id: skill-on-demand
+  name: academic-harness/skill-on-demand
 
 # ── goals ───────────────────────────────────────────────────────────────────
 

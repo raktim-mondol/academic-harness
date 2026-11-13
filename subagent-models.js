@@ -421,7 +421,15 @@ function scheduleCustomRoutes(ctx, routes) {
 }
 
 export async function apply(ctx) {
-  const ToolSubagent = await loadHostToolSubagent()
+  let ToolSubagent
+  try {
+    ToolSubagent = await loadHostToolSubagent()
+  } catch (error) {
+    // The host always ships this package; a miss means the profile is broken or
+    // this module is being measured outside a host. Keep the rest of the preset.
+    ctx.logger?.warn(`academic-harness: delegation tools are unavailable; could not resolve the host's ${TOOL_SUBAGENT}: ${error instanceof Error ? error.message : String(error)}`)
+    return
+  }
   const routes = { pro: readCustomRoute('pro'), vision: readCustomRoute('vision') }
   const proOptions = routes.pro && !routes.pro.incomplete && !routes.pro.invalid
     ? { provider: SPECS.pro.provider, model: routes.pro.model }

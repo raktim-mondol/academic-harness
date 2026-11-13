@@ -18,22 +18,22 @@ This guide provides comprehensive instructions for creating professional scienti
 ### Reference
 
 For complete technical documentation on PowerPoint creation, refer to:
-- **Main documentation**: `document-skills/pptx/SKILL.md`
-- **HTML to PowerPoint workflow**: Detailed in `pptx/html2pptx.md`
-- **OOXML editing**: For advanced editing in `pptx/ooxml.md`
+- **Main documentation**: `skills/pptx/SKILL.md`
+- **Code recipes (python-pptx, pptxgenjs)**: `skills/pptx/references/python-pptx-recipes.md`
+- **Package-level editing**: `skills/pptx/scripts/ooxml_tools.py`
 
 ### Two Approaches to PowerPoint Creation
 
-#### 1. Programmatic Creation (html2pptx)
+#### 1. Programmatic Creation (python-pptx or PptxGenJS)
 
 **Best for**: Creating presentations from scratch with custom designs and data visualizations.
 
 **Workflow**:
-1. Read `document-skills/pptx/SKILL.md` completely
-2. Design slides in HTML with proper dimensions (720pt × 405pt for 16:9)
-3. Create JavaScript file using `html2pptx()` function
-4. Add charts and tables using PptxGenJS API
-5. Generate thumbnails and validate visually
+1. Read `skills/pptx/SKILL.md` and the python-pptx recipes
+2. Plan each slide's layout at the target size (13.33 in × 7.5 in for 16:9)
+3. Write a script that builds the slides from layouts, or use PptxGenJS as below
+4. Add charts and tables with the library's chart and table APIs
+5. Run `pptx_check.py`, then generate thumbnails and validate visually
 6. Iterate based on visual inspection
 
 **Example Structure**:
@@ -61,17 +61,15 @@ pptx.writeFile({ fileName: "presentation.pptx" });
 
 **Workflow**:
 1. Start with template.pptx
-2. Use `scripts/rearrange.py` to duplicate/reorder slides
-3. Use `scripts/inventory.py` to extract text
-4. Generate replacement text JSON
-5. Use `scripts/replace.py` to update content
-6. Validate with thumbnail grids
+2. Use `pptx_outline.py` to list each slide's layout, title and text
+3. Edit the text runs with python-pptx (keeps formatting) and reorder with the recipe in the reference
+4. Run `pptx_check.py` on the result
+5. Validate with thumbnail grids
 
-**Key Scripts**:
-- `rearrange.py`: Duplicate and reorder slides
-- `inventory.py`: Extract all text shapes
-- `replace.py`: Apply text replacements
-- `thumbnail.py`: Visual validation
+**Key Scripts** (in `skills/pptx/scripts/`):
+- `pptx_outline.py`: Extract all text, tables, alt text and notes
+- `pptx_check.py`: Lint slides
+- `pptx_thumbs.py`: Visual validation
 
 ## Design Principles for Scientific Presentations
 
@@ -452,10 +450,10 @@ After creating presentation:
 
 ```bash
 # Create thumbnail grid for quick review
-python scripts/thumbnail.py presentation.pptx review/thumbnails --cols 4
+python skills/pptx/scripts/pptx_thumbs.py presentation.pptx -o review/thumbnails.png --cols 4
 
-# Or for individual slides
-python scripts/thumbnail.py presentation.pptx review/slide
+# Or keep individual slide images as well
+python skills/pptx/scripts/pptx_thumbs.py presentation.pptx -o review/thumbnails.png --slides-dir review/slides
 ```
 
 ### Inspection Checklist
@@ -493,25 +491,19 @@ If you have an existing template:
 
 1. **Extract template structure**:
 ```bash
-python scripts/inventory.py template.pptx inventory.json
+python skills/pptx/scripts/pptx_outline.py template.pptx --json > outline.json
 ```
 
 2. **Create thumbnail grid**:
 ```bash
-python scripts/thumbnail.py template.pptx template_review
+python skills/pptx/scripts/pptx_thumbs.py template.pptx -o template_review.png
 ```
 
 3. **Analyze layouts** and document which slides to use
 
-4. **Rearrange slides**:
-```bash
-python scripts/rearrange.py template.pptx working.pptx 0,5,5,12,18,22
-```
+4. **Rearrange slides**: reorder or drop slides through the slide id list (recipe in `skills/pptx/references/python-pptx-recipes.md`), then run `skills/pptx/scripts/ooxml_tools.py check` on the result
 
-5. **Replace content**:
-```bash
-python scripts/replace.py working.pptx replacements.json output.pptx
-```
+5. **Replace content**: edit the text runs with python-pptx (this keeps each run's formatting), then run `skills/pptx/scripts/pptx_check.py` and look at the thumbnails
 
 ## Best Practices Summary
 
@@ -595,10 +587,9 @@ python scripts/replace.py working.pptx replacements.json output.pptx
 - Image editing (PowerPoint built-in, external tools)
 
 **PPTX Skill Documentation**:
-- `document-skills/pptx/SKILL.md`: Main documentation
-- `document-skills/pptx/html2pptx.md`: HTML to PPTX workflow
-- `document-skills/pptx/ooxml.md`: Advanced editing
-- `document-skills/pptx/scripts/`: Utility scripts
+- `skills/pptx/SKILL.md`: Main documentation
+- `skills/pptx/references/python-pptx-recipes.md`: Code recipes
+- `skills/pptx/scripts/`: Outline, check and thumbnail scripts
 
 ## Quick Reference
 

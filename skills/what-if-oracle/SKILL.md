@@ -1,7 +1,7 @@
 ---
 name: what-if-oracle
 description: Run structured What-If scenario analysis with 4–6 branch possibility exploration (best, likely, worst, wild card, contrarian, second-order). Use when the user asks speculative what-if questions about uncertain futures, strategic forks, contingency planning, or stress-testing a decision before committing.
-license: CC BY-NC-SA 4.0
+license: CC-BY-NC-SA-4.0
 metadata:
   version: "1.1"
   skill-author: AHK Strategies (ashrafkahoush-ux)

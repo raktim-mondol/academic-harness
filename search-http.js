@@ -9,6 +9,7 @@
  * request; a single limiter instance is shared for the process lifetime.
  */
 
+import { relocateCredential } from './provider-auth.js'
 import { createHash } from 'node:crypto'
 
 const limiters = new Map()
@@ -282,9 +283,13 @@ async function attemptRequest(url, options, parse) {
     retries = 2,
     minRetryDelayMs = 0,
     maxBytes = 20 * 1024 * 1024,
-    headers,
+    headers: callerHeaders,
     ...init
   } = options
+  // OpenAlex and openFDA document a header for the key: move it out of the URL before anything is sent or logged (provider-auth.js).
+  const relocated = relocateCredential(url, callerHeaders)
+  url = relocated.url
+  const headers = relocated.headers
   const urlLabel = safeUrl(url)
   let attempt = 0
 

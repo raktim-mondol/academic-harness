@@ -63,6 +63,20 @@ Output is truncated from the front (last 16,000 characters per stream, with only
 
 On Vast.ai never copy to `/` or `/root` — it breaks SSH key permissions. The tool always works under `/workspace`.
 
+## Approval
+
+`modal_run`, `runpod_run` and `vastai_run` ask for approval on **every** call, because rented hardware bills by the hour. The prompt names the provider, the instance, the maximum command time, a cost ceiling taken from the instance catalog (`$/h` times the clamped timeout, not counting provisioning) and a preview of the command. Vast.ai is a marketplace, so its ceiling is known only when `max_price_dph` or `bid_price` is set; a pinned `offer_id` skips the price check, and the prompt says so. If the host has no approval channel, the call is denied.
+
+## Spend cap and ledger
+
+Every paid call is checked against a per-session cap, `COMPUTE_SESSION_CAP_USD` (default USD 10; see [Configuration](CONFIGURATION.md)), and written to one ledger shared by Modal, Runpod and Vast.ai, `$DSH_HOME/compute-ledger/spend.jsonl`. The ledger is append-only. A run writes an **intent** with its estimated ceiling before anything is rented, under a lock, so two sub-agents cannot both pass a cap that only one fits under; when the run ends, whatever happened, it writes a **settlement** with the actual cost. A session's spend is the settled costs plus the ceiling of any run that never settled, so a crash keeps counting.
+
+- The estimate is the instance's hourly price times (`timeout_sec` + 10 minutes for provisioning, transfers and teardown), rounded up to the cent. The approval prompt shows it with what the session has spent so far; a run that cannot fit under the cap is denied there, before you are asked.
+- Every result carries a `spend` block: `estimated_max_usd`, `session_spent_usd` before the run, `session_cap_usd`, `actual_usd`, and the ledger path.
+- A run that fails after it started is charged for the time it ran, capped at its estimate. A run that never rented anything (no credentials, a bad argument) costs nothing.
+- A Vast.ai run with no `max_price_dph`, or a pinned `offer_id`, has no price up front. It is recorded as unpriced, cannot be refused in advance, and is counted at its actual cost when it ends. Set `max_price_dph` to have the cap check it first.
+- Per-provider price caps for Modal and Runpod, and a price check on a pinned Vast.ai offer, are not part of this; the session cap is the only limit.
+
 ## Teardown and failures
 
 Every call tears down its compute in a `finally` block, including aborts and command failures. Deletes are retried with a shared linear backoff; if the final delete still fails, the tool returns `runpod_teardown_failed`, `modal_teardown_failed`, or `vastai_teardown_failed` with the resource id and the console command to remove it (the original run result is preserved alongside the error). If Vast.ai's temporary SSH key cannot be removed after its instance is gone, the call reports `vastai_ssh_key_cleanup_failed`. Modal sandboxes also self-destruct at their timeout.

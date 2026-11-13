@@ -2,7 +2,7 @@
 name: grant-budget
 description: Build a multi-year grant budget and justification with the `grant_budget` tool — personnel effort/fringe/escalation, equipment, supplies, travel, publication, subawards, cost share, indirect rates and caps — with arithmetic checks and CSV/Markdown/JSON/XLSX export. Use when preparing a proposal budget or checking one.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

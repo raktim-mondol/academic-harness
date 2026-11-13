@@ -2,7 +2,7 @@
 name: submission-package
 description: Assemble a journal submission bundle with `submission_pack` — plan limits and required statements, build the PDF/figures/supplement/cover letter/highlights/checklist, verify every file hash, export without submitting. Use when a manuscript is going to a journal or when the user asks what is missing before upload. Advisory only; unknown requirements stay manual checks and drafts need author approval.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

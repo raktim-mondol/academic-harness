@@ -2,7 +2,7 @@
 name: manuscript-revision
 description: Produce a real revision diff and response-letter skeleton with `manuscript_diff` — latexdiff or Markdown diffs, changed blocks, DOCX tracked changes/comments, and a letter that only cites recorded changes. Use for revise-and-resubmit work, reviewer responses, or comparing two manuscript versions without editing either.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

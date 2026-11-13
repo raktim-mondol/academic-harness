@@ -17,6 +17,8 @@
  * waits on the vendored venv's uv/pip timeout.
  */
 import { ahEnv, cliArgs, DSH_STATE_FOOTER, ensureAcademicHarnessInstalled, findAhRoot, LOG, run } from './academic-harness-cli.js'
+import { computeApprovalReason, PAID_COMPUTE_TOOLS } from './compute-approval.js'
+import { describeSessionBudget, refusalText } from './compute-ledger.js'
 import { emitGate } from './rsi-bus.js'
 
 export const name = 'academic-harness-ah-hooks'
@@ -92,6 +94,29 @@ export function isHandoffMessage(text) {
   return /AH gate: stop(?:ping|ped) after /i.test(s) || /The author decides what to do next/.test(s)
 }
 
+/** Source kind of a queued message; the host may wrap the message in `data`. */
+function messageSourceKind(message) {
+  const raw = message?.data && (message.data.role || message.data.content) ? message.data : message
+  return raw?.source?.kind
+}
+
+/**
+ * Does this step start a new user turn? The inbox is not a reliable signal: the
+ * gate's own steer messages (and post-edit context) come back through it on the
+ * next step of the SAME turn, and treating them as a new prompt wiped the
+ * handoff state mid-turn (review B1). The host's turn number is the signal. When
+ * the host gives none, only a message that is user-sourced (or has no source)
+ * counts; anything stamped by a plugin does not.
+ */
+export function startsNewTurn(hostTurn, previousTurn, messages) {
+  const turn = Number(hostTurn)
+  if (hostTurn != null && Number.isFinite(turn)) return previousTurn === undefined || previousTurn !== turn
+  return (messages ?? []).some((message) => {
+    const kind = messageSourceKind(message)
+    return kind === undefined || kind === 'user'
+  })
+}
+
 async function pluginMessage(text) {
   try {
     const { createUserMessage } = await import('@deepseek-ai/dsh-llm')
@@ -144,14 +169,14 @@ export function gateDecision(out, { alreadyHandedOff, alreadyT3 } = {}) {
   }
 }
 
-async function runHook(event, payload, signal) {
+async function runHook(event, payload, signal, extraEnv = {}) {
   const launch = await ensureAcademicHarnessInstalled()
   if (!launch) return null
   const root = findAhRoot(payload.cwd) || payload.cwd
   const r = await run(launch.command, cliArgs(launch, ['hook', event]), {
     cwd: payload.cwd,
     timeoutMs: HOOK_TIMEOUT_MS,
-    env: ahEnv({}, { root, model: payload.model }),
+    env: ahEnv(extraEnv, { root, model: payload.model }),
     signal,
     silent: true,
     stdin: `${JSON.stringify(payload)}\n`,
@@ -161,6 +186,38 @@ async function runHook(event, payload, signal) {
     return null
   }
   return parseHookStdout(r.out)
+}
+
+/**
+ * The advisory evidence check (T3) calls a verifier model once per changed unit,
+ * so it asks first (decision D23). `AH_T3_MODE=run` runs it without asking and
+ * `AH_T3_MODE=skip` turns it off, for unattended setups. Anything that is not an
+ * allow (a no, a cancel, no approval channel) skips the check; it only advises,
+ * so declining costs the person nothing but the advice.
+ */
+function t3Preference() {
+  const mode = String(process.env.AH_T3_MODE || '').toLowerCase()
+  return mode === 'run' || mode === 'skip' ? mode : 'defer'
+}
+
+async function askEvidenceCheck(ctx, agent, pending, signal) {
+  const approval = ctx.get?.('approval')
+  if (!approval || !agent) return false
+  const units = Number(pending?.units) || 0
+  const where = Array.isArray(pending?.files) && pending.files.length ? ` in ${pending.files.join(', ')}` : ''
+  const backend = pending?.backend ? ` (verifier: ${pending.backend})` : ''
+  try {
+    const outcome = await approval.request({
+      agent,
+      toolName: 'ah_evidence_check',
+      reason: `Run the advisory evidence check? A verifier model${backend} will read the sources cited by ${units} paragraph(s) changed in this session${where}. `
+        + 'It costs one model call per changed paragraph, runs at most once per session, and only advises: it never blocks your work.',
+      signal,
+    })
+    return outcome === 'allowed-once'
+  } catch {
+    return false
+  }
 }
 
 function prependContext(ours, theirs) {
@@ -183,11 +240,15 @@ export function apply(ctx) {
 
   const handedOff = new Set()
   const t3Steered = new Set()
+  const lastTurn = new Map() // session id -> host turn number of the last prompt we baselined
+  const t3Asked = new Set() // sessions already asked about the evidence check
 
-  ctx.on('agent/pre-step', async ({ agent, messages, signal }, next) => {
+  ctx.on('agent/pre-step', async ({ agent, messages, turn: hostTurn, signal }, next) => {
     const cwd = sessionCwd(agent)
     if (!cwd || !findAhRoot(cwd) || messages.length === 0) return next()
     const sid = sessionId(agent)
+    if (!startsNewTurn(hostTurn, lastTurn.get(sid), messages)) return next()
+    if (hostTurn != null && Number.isFinite(Number(hostTurn))) lastTurn.set(sid, Number(hostTurn))
     handedOff.delete(sid)
     t3Steered.delete(sid)
     let out = null
@@ -215,6 +276,18 @@ export function apply(ctx) {
         kind: 'ask',
         reason: 'Author-only Academic Harness act (waive, accept/reject a fact, approve a brief or plan, verify a claim, decline a review item, fill provenance, approve a disclosure, admit a rubric criterion). Confirm to run it.',
       }
+    }
+    if (PAID_COMPUTE_TOOLS.has(exec?.name)) {
+      // Rented hardware bills by the hour, so every call asks, in any workspace. A run that cannot fit
+      // under the session cap is refused here, before the person is asked, with the numbers.
+      let budget = null
+      try {
+        budget = await describeSessionBudget(exec, exec.name, exec.arguments)
+      } catch (error) {
+        console.warn(`${LOG}: spend ledger unavailable for the approval prompt: ${error?.message || error}`)
+      }
+      if (budget?.wouldExceed) return { kind: 'deny', reason: refusalText(budget) }
+      return { kind: 'ask', reason: computeApprovalReason(exec.name, exec.arguments, budget) }
     }
     if (exec?.name === 'ah_migrate' && exec.arguments?.apply && !exec.arguments?.confirm) {
       return { kind: 'deny', reason: 'AH guard: applying migrate rewrites the tree. Pass confirm=true after the author agrees, or run a dry plan first.' }
@@ -272,12 +345,15 @@ export function apply(ctx) {
     const sid = sessionId(agent)
     let out = null
     try {
-      out = await runHook('stop', {
-        cwd,
-        session_id: sid,
-        model: sessionModel(agent),
-        hook_event_name: 'Stop',
-      }, signal)
+      const payload = { cwd, session_id: sid, model: sessionModel(agent), hook_event_name: 'Stop' }
+      const preference = t3Preference()
+      out = await runHook('stop', payload, signal, { AH_T3_MODE: preference })
+      if (preference === 'defer' && out?.raw?.t3Pending) {
+        // The gate is clean and the evidence check is next: ask once, then tell the engine the answer.
+        const approved = !t3Asked.has(sid) && await askEvidenceCheck(ctx, agent, out.raw.t3Pending, signal)
+        t3Asked.add(sid)
+        out = await runHook('stop', payload, signal, { AH_T3_MODE: approved ? 'run' : 'skip' })
+      }
     } catch (error) {
       console.warn(`${LOG}: stop hook failed: ${error?.message || error}`)
       return
@@ -295,5 +371,13 @@ export function apply(ctx) {
     if (decision.kind === 'handoff') handedOff.add(sid)
     if (decision.kind === 't3') t3Steered.add(sid)
     agent.steer(message)
+  })
+
+  ctx.on('agent/disposed', async (payload) => {
+    const sid = sessionId(payload?.agent ?? payload)
+    handedOff.delete(sid)
+    t3Steered.delete(sid)
+    lastTurn.delete(sid)
+    t3Asked.delete(sid)
   })
 }

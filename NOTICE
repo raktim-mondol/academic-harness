@@ -283,6 +283,38 @@ routing notes were added to the plugin's `academic-harness`, `ah-write-unit`,
 `seed.js` refreshes those known-stale copies on existing installs.
 See `vendor/supervisor-skills/SOURCE.txt` for the exact file list and changes.
 
+The `what-if-oracle` skill (`skills/what-if-oracle`) is vendored from
+https://github.com/ashrafkahoush-ux/claude-consciousness-skills (AHK Strategies,
+ashrafkahoush-ux; research DOIs 10.5281/zenodo.18736841 and
+10.5281/zenodo.18807387). It is licensed **CC BY-NC-SA 4.0**: non-commercial and
+share-alike. It remains under that licence inside this package, and this
+package's MIT licence does not relicense it. Together with the five CC BY-NC-SA
+Supervisor-Skills above it makes **six non-commercial skills**. To build or run
+without them, set `AH_EXCLUDE_NONCOMMERCIAL=1` (the skill seeder and the skill
+index then skip them) or build a tarball with `npm run pack:commercial`, which
+leaves all six out; `scripts/test-noncommercial-exclusion.mjs` checks that none
+of the six is present in that tarball.
+
+Skills whose frontmatter `license` names a GPL licence (`bioservices`,
+`cobrapy`, `etetoolkit`, `pathml`, `scikit-survival`) are guides to using
+third-party Python libraries that are themselves GPL-licensed. The label records
+the licence of the *library the skill teaches*, not of the skill text. The skill
+text is a how-to written for this catalogue and ships under this package's MIT
+licence; the libraries are never bundled, only named, and are installed by the
+user from their own distribution. `scripts/normalize-skill-licenses.mjs` leaves
+these five labels as they are and lists them so the owner can confirm this
+reading or relabel them.
+
+The `docx`, `pdf`, `pptx` and `xlsx` skills are first-party. Releases up to and
+including 0.50.0 shipped third-party versions of these four skills under a
+licence that did not permit redistribution; those versions are no longer
+distributed. The current skills were written from scratch from the public
+documentation of the libraries and tools they drive (python-docx, openpyxl,
+python-pptx, pypdf, reportlab, pdfplumber, pandoc, LibreOffice, poppler), with
+new names, structure and scripts, and no bundled ECMA/ISO/Microsoft schema
+files. Those libraries are used, not bundled. Method, tests and the automated
+overlap check are in `docs/legal/skill-rewrite-provenance.md`.
+
 Deep research pipeline design
 
 The `deep_research` tool's pipeline shape — step-per-phase skills, the frozen

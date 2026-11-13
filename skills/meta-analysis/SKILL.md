@@ -2,7 +2,7 @@
 name: meta-analysis
 description: Run a pairwise meta-analysis as an auditable ledger with the native `meta_analysis` tool — effect-size conversion, fixed/random pooling, DL/PM/REML tau², Hartung–Knapp CIs, heterogeneity, subgroup and meta-regression analyses, leave-one-out, Egger/Begg/funnel diagnostics, diagnostic-accuracy pooling, forest/funnel/SROC plots, and import from a review extraction table. Use when the user asks for pooled effect sizes, heterogeneity, a forest plot, a meta-regression, publication bias, or diagnostic accuracy synthesis.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

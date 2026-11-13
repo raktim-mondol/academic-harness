@@ -4,6 +4,7 @@
  * not automated-tested; they require institutional/publisher credentials.
  */
 import { resolveEnv } from './credential-env.js'
+import { NetGuardError, guardedDownload } from './net-guard.js'
 import { fetchJson, fetchText, getLimiter, searchUserAgent } from './search-http.js'
 import { canonicalDoi } from './search-normalize.js'
 import { parseJatsXml, rankPassages } from './html-sections.js'
@@ -15,29 +16,44 @@ function skipped(field) {
   return { skipped: true, reason: 'key_missing', field }
 }
 
-export async function fetchWileyPdf(doi, { signal } = {}) {
+/**
+ * Wiley TDM PDF. The API answers with a PDF or redirects to one, so the fetch goes
+ * through the network guard: public hosts only at every hop, the token header
+ * dropped if a redirect leaves api.wiley.com, a deadline that covers the body, and
+ * the 25 MB cap counted on the bytes actually read. `fetch`, `lookup` and
+ * `maxBytes` are injectable for tests.
+ */
+export async function fetchWileyPdf(doi, { signal, fetch: fetchImpl, lookup, maxBytes = MAX_PDF_BYTES } = {}) {
   const token = await resolveEnv('WILEY_TDM_TOKEN')
   if (!token) return skipped('WILEY_TDM_TOKEN')
   const clean = canonicalDoi(doi)
   if (!clean) return { error: 'invalid DOI' }
   const limiter = getLimiter('wiley-tdm', { minIntervalMs: 334 })
-  const result = await limiter.run(async () => {
-    const response = await fetch(`https://api.wiley.com/onlinelibrary/tdm/v1/articles/${encodeURIComponent(clean)}`, {
-      signal,
-      redirect: 'follow',
-      headers: {
-        'Wiley-TDM-Client-Token': token,
-        'User-Agent': searchUserAgent(),
-        Accept: 'application/pdf',
-      },
-    })
-    if (!response.ok) return { error: `Wiley TDM returned HTTP ${response.status}` }
-    const buffer = Buffer.from(await response.arrayBuffer())
-    if (buffer.length > MAX_PDF_BYTES) return { error: 'Wiley TDM PDF exceeds the 25 MB limit' }
+  return limiter.run(async () => {
+    let download
+    try {
+      download = await guardedDownload(`https://api.wiley.com/onlinelibrary/tdm/v1/articles/${encodeURIComponent(clean)}`, {
+        signal,
+        fetch: fetchImpl,
+        lookup,
+        maxBytes,
+        deadlineMs: 180_000,
+        headers: {
+          'Wiley-TDM-Client-Token': token,
+          'User-Agent': searchUserAgent(),
+          Accept: 'application/pdf',
+        },
+      })
+    } catch (error) {
+      if (!(error instanceof NetGuardError)) throw error
+      if (error.code === 'http') return { error: `Wiley TDM returned HTTP ${error.status}` }
+      if (error.code === 'size') return { error: `Wiley TDM PDF exceeds the ${Math.round(maxBytes / (1024 * 1024))} MB limit` }
+      return { error: `Wiley TDM request refused or failed: ${error.message}` }
+    }
+    const { buffer } = download
     if (!buffer.subarray(0, 4).equals(PDF_MAGIC)) return { error: 'Wiley TDM response was not a PDF (check entitlement)' }
     return { buffer }
   })
-  return result
 }
 
 export async function fetchScienceDirectFull(doi, { signal } = {}) {

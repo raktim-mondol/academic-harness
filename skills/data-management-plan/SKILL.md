@@ -2,7 +2,7 @@
 name: data-management-plan
 description: Draft a funder-shaped data management plan (NIH DMS, NSF DMP, Horizon Europe, Wellcome, ERC, generic) with the `dmp` tool, link it to the preregistration and data/repro ledgers, and review the concept checklist. Use when a grant, ethics submission, or data-sharing statement needs a DMP.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness

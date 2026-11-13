@@ -68,6 +68,12 @@ jobs:
             plugin_version=$(node -p 'require(process.cwd() + "/package.json").version')
             "$DSH_HOME/profiles/ci/node_modules/.bin/dsh" plugin --profile ci allow-version "academic-harness@$plugin_version" --dsh-version "$version" --accept-risk
           fi
+      - name: Check the host approval contract
+        if: matrix.packageManager == 'npm'
+        env:
+          DSH_HOME: ${{ runner.temp }}/dsh-compat
+        run: node scripts/check-host-contract.mjs "$DSH_HOME/profiles/ci"
+
       - name: Boot and create a preset session
         env:
           DSH_HOME: ${{ runner.temp }}/dsh-compat

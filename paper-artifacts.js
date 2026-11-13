@@ -10,10 +10,9 @@
  * whether the record exists.
  */
 import { readFileSync, statSync } from 'node:fs'
-import { lookup } from 'node:dns/promises'
-import { getDefaultAutoSelectFamilyAttemptTimeout, isIP, setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net'
+import { getDefaultAutoSelectFamilyAttemptTimeout, setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net'
 import { defineTool } from 'ah-dsh-tools'
-import { privateAddress, privateHostname } from './citation.js'
+import { assertPublicUrl } from './net-guard.js'
 import { exportText, nowIso } from './ledger-kit.js'
 import { canonicalDoi } from './search-normalize.js'
 import { resolveWorkspacePath } from './workspace-path.js'
@@ -188,12 +187,9 @@ export function extractArtifacts(text) {
 }
 
 async function assertPublic(url) {
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) return false
-  if (privateHostname(url.hostname)) return false
-  const host = url.hostname.replace(/^\[|\]$/g, '')
   try {
-    const addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true, verbatim: true })
-    return addresses.length > 0 && !addresses.some((entry) => privateAddress(entry.address))
+    await assertPublicUrl(url.href)
+    return true
   } catch {
     return false
   }

@@ -114,6 +114,7 @@ export async function runCoscRank(args = {}, exec = {}) {
       slug,
       id,
       feedbackText: args.feedback_text,
+      outcome: args.outcome,
       novelty: args.novelty,
       correctness: args.correctness,
       testability: args.testability,
@@ -124,6 +125,10 @@ export async function runCoscRank(args = {}, exec = {}) {
       slug,
       id,
       reward: applied.reward,
+      outcome: applied.outcome,
+      reward_basis: applied.reward_basis,
+      ...(applied.warning ? { warning: applied.warning } : {}),
+      ...(applied.note ? { note: applied.note } : {}),
       rating_before: applied.rating_before,
       rating_after: applied.rating_after,
       rd_after: applied.rd_after,
@@ -177,7 +182,13 @@ function render(value) {
     }
     case 'feedback': {
       const moved = value.rating_after - value.rating_before
-      return [{ type: 'text', text: [`Reward ${value.reward} (${value.reward > 0.33 ? 'validated' : value.reward < -0.33 ? 'refuted' : 'neutral, scored as a draw'}) against the empirical baseline.`, `\`${value.id}\`: rating ${value.rating_before} → ${value.rating_after} (${moved >= 0 ? '+' : ''}${moved}), RD ${value.rd_after}.`].join('\n') }]
+      const lines = [
+        `Reward ${value.reward} (${value.reward > 0.33 ? 'validated' : value.reward < -0.33 ? 'refuted' : 'neutral, scored as a draw'}) against the empirical baseline${value.outcome ? `, outcome: ${value.outcome}` : ', read from the text by keywords'}.`,
+        `\`${value.id}\`: rating ${value.rating_before} → ${value.rating_after} (${moved >= 0 ? '+' : ''}${moved}), RD ${value.rd_after}.`,
+      ]
+      if (value.note) lines.push(`Note: ${value.note}`)
+      if (value.warning) lines.push(`Warning: ${value.warning}`)
+      return [{ type: 'text', text: lines.join('\n') }]
     }
     default: {
       if (!value.matches?.length) return [{ type: 'text', text: 'No matches recorded yet.' }]
@@ -194,7 +205,7 @@ export function apply(ctx) {
   ctx.tools.register(defineTool({
     name: 'coscientist_rank',
     description: [
-      'Rank half of the Co-Scientist hypothesis tournament (state under `.dsh/coscientist/<slug>/`). Actions: `propose` (the next matchup — the most uncertain hypothesis, ideally against a similar one), `record` (judge a pair and apply one Glicko-2 period), `compare` (manual head-to-head without recording), `similarity` (near-duplicate and related pairs, or one hypothesis\'s neighbours), `feedback` (an experimental result as a reward that moves the rating), `history` (matches played).',
+      'Rank half of the Co-Scientist hypothesis tournament (state under `.dsh/coscientist/<slug>/`). Actions: `propose` (the next matchup — the most uncertain hypothesis, ideally against a similar one), `record` (judge a pair and apply one Glicko-2 period), `compare` (manual head-to-head without recording), `similarity` (near-duplicate and related pairs, or one hypothesis\'s neighbours), `feedback` (an experimental result as a reward that moves the rating; state what it showed with `outcome` — supports, refutes or inconclusive — because a keyword reading of the text alone can misread negation), `history` (matches played).',
       'Judging is done by the session, not this tool: run `propose`, brief subagents with the pair in BOTH presentation orders, then `record` verdict_ab (A,B order) and verdict_ba (B,A order). A verdict that flips with order is position bias and becomes a draw; one orientation alone is recorded but flagged as uncontrolled.',
       'Only active hypotheses compete. A rating is tournament performance with visible uncertainty (RD), not a measurement of scientific merit.',
     ].join(' '),
@@ -214,6 +225,7 @@ export function apply(ctx) {
       novelty: { type: 'number', description: '0-10 post-hoc novelty (feedback). Supply all three scores or none.' },
       correctness: { type: 'number', description: '0-10 post-hoc correctness (feedback).' },
       testability: { type: 'number', description: '0-10 post-hoc testability (feedback).' },
+      outcome: { type: 'string', enum: ['supports', 'refutes', 'inconclusive'], description: 'What the experiment showed about the hypothesis: supports, refutes or inconclusive (feedback). Strongly recommended: it sets the direction of the reward. Without it the reward is a keyword reading of feedback_text, which can misread negation, and the result carries a warning.' },
       recorded_by: { type: 'string', description: 'Who supplied the result (feedback). Default user.' },
     },
     output: {

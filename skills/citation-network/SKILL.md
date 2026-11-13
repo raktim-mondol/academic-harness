@@ -2,7 +2,7 @@
 name: citation-network
 description: Build and analyze a citation graph around seed papers with `citation_network` - frozen OpenAlex builds, degree/PageRank/betweenness, bibliographic coupling and co-citation, Louvain clusters, shortest citation paths, and GraphML/CSV/Mermaid export. Use when mapping a field from a few key papers, finding the papers everything else cites, spotting sub-communities, or showing how two papers connect.
 allowed-tools: Read Write Edit Bash
-license: MIT license
+license: MIT
 metadata:
   version: "1.0"
   skill-author: Academic Harness
