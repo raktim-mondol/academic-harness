@@ -2,7 +2,9 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
-## Unreleased
+## 0.52.0
+
+Deep Research reliability from a real 31-call session, the chatbox task selector, and DSH 0.2.2-rc.1/rc.3 compatibility.
 
 - **DSH 0.2.2-rc.3 compatibility.** `subagent_pro` and `subagent_vision` now mount the host's own `@deepseek-ai/dsh-tool-subagent` at runtime instead of a vendored 0.2.1 copy. DSH 0.2.2-rc.2 moved the activation request fields from `spec.request` to the top level; the pinned copy sent the old shape and every Pro/Vision delegation failed with `Cannot read properties of undefined (reading 'id')` while the rest of the preset still worked. Resolution tries the plugin tree first, then DSH's healed packages beside profiles, so 0.2.1 and 0.2.2 share one code path; the pinned dependency is gone. On 0.2.2 the tool returns the child's model-facing `name` rather than `subagentId`, so the notebook routing recorder now resolves that name to the child session before linking its outcome, and still records the decision if linking fails. Validated with the isolated canary on 0.2.2-rc.1 with npm and 0.2.2-rc.3 with npm and pnpm, and with a `dsh plugin add` profile on 0.2.2-rc.3: preset session, Settings write, templates, `list_agents`, native `read_image`, `subagent_pro` completion, and the routing decision/outcome notebook pair. Install docs and the verify-workflow CLI pin move to 0.2.2-rc.1; the verify profile installs with `--legacy-peer-deps` so npm does not hoist the vendored libraries' 0.2.1 peers over the runtime's own host packages.
 

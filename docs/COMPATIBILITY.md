@@ -6,12 +6,12 @@ Academic Harness is a plugin for the DeepSeek Harness (DSH). This page says whic
 
 | Piece | Version | Where it comes from |
 |---|---|---|
-| Plugin-pinned tool packages | `ah-dsh-tools`, `ah-dsh-tool-subagent`, `ah-dsh-mcp-client` at **0.2.1-rc.5** | `package.json` |
-| Host CLI used in `verify.yml` | **0.2.1-rc.5** (pinned on purpose; an unpinned CLI once sent npm into a peer-resolution loop) | `.github/workflows/verify.yml` |
+| Plugin-pinned tool packages | `ah-dsh-tools` and `ah-dsh-mcp-client` at **0.2.1-rc.5**; `@deepseek-ai/dsh-tool-subagent` is resolved from the host at runtime | `package.json`, `subagent-models.js` |
+| Host CLI used in `verify.yml` | **0.2.2-rc.1** (pinned on purpose; an unpinned CLI once sent npm into a peer-resolution loop) | `.github/workflows/verify.yml` |
 | Host used day to day by the maintainer | **0.2.2-rc.1** | local install |
 | Host builds booted daily | the `latest` and `next` npm channels, with npm and pnpm | `.github/workflows/dsh-compat.yml` |
 
-The plugin is expected to work on 0.2.1-rc.5 and 0.2.2-rc.1. Anything newer is covered only by the daily boot and the contract check below until it is added to this table.
+The plugin is expected to work on 0.2.1-rc.5, 0.2.2-rc.1 and 0.2.2-rc.3. Anything newer is covered only by the daily boot and the contract check below until it is added to this table.
 
 ## What each check proves
 
