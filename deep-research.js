@@ -23,9 +23,9 @@ import { GEARS, createLlmRunner, parseJsonResponse, planFor, runSteps } from './
 import { EFFORT_LEVELS, EFFORT_PRESETS, resolveEffort } from './deep-research-effort.js'
 import {
   GATE_STATES, TIERS, accounting, appendClaims, appendFindings, appendRecords, applyHunks,
-  appendRetrieval, assertGospel, budgetState, listRuns, markStep, nextPendingStep, readArtifact,
+  appendRetrieval, assertGospel, budgetState, listRuns, markFindingApplied, markStep, nextPendingStep, readArtifact,
   linkPaperMemory, readCorpus, readFindings, readManifest, readPaperLinks, readQuery, readRun,
-  recordVerdict, shipGate, startRun,
+  recordSegment, recordVerdict, reviseClaim, shipGate, startRun,
   stepView,
 } from './deep-research-store.js'
 import { csvCell, ensureDir, exportText } from './ledger-kit.js'
@@ -42,7 +42,7 @@ import { runParallelSearch } from './parallel-search.js'
 import { runTavilySearch } from './tavily-search.js'
 import { normalizeDoi } from './independence-cluster.js'
 
-const ACTIONS = ['start', 'run', 'status', 'resume', 'verify', 'export', 'list', 'record', 'gate', 'patch', 'answers']
+const ACTIONS = ['start', 'run', 'status', 'resume', 'verify', 'export', 'list', 'record', 'revise', 'gate', 'patch', 'answers', 'show']
 const EXPORT_FORMATS = ['markdown', 'json', 'csv']
 const RECORD_KINDS = ['records', 'claims', 'findings']
 const DEFAULT_TIMEOUT_MINUTES = 90
@@ -50,6 +50,19 @@ const MAX_TIMEOUT_MINUTES = 720
 
 function text(value) {
   return String(value ?? '').trim()
+}
+
+/** Materialize host/RPC errors that are plain objects rather than Errors. */
+function errorText(error) {
+  if (error instanceof Error) return error.message
+  if (typeof error === 'string') return error
+  if (error && typeof error === 'object') {
+    for (const key of ['message', 'detail', 'code', 'reason']) {
+      if (typeof error[key] === 'string' && error[key]) return error[key]
+    }
+    try { return JSON.stringify(error) } catch { /* fall through */ }
+  }
+  return String(error)
 }
 
 function workspaceRoot(exec) {
@@ -291,6 +304,12 @@ export function buildFetch(cwd, runId, { signal, enabled, email, perBodyChars = 
         ensureDir(dir)
         const bodyFile = join(dir, `${record.record_id}.md`)
         writeFileSync(bodyFile, truncated)
+        // Retain whether this is the whole paper. A quote absent from a
+        // truncated body is unverifiable, not evidence of fabrication.
+        writeFileSync(join(dir, `${record.record_id}.meta.json`), JSON.stringify({
+          record_id: record.record_id, chars: body.length, truncated: truncated.length < body.length,
+          resolver, url, version, written_at: new Date().toISOString(),
+        }, null, 2))
         // The run cache makes the quote checkable now; PaperMemory makes it
         // durable, so the next session does not re-fetch the same paper.
         const deposited = await ingestToLibrary({ cwd, runId, bodyFile, record, signal, ingest: library.ingest ?? ingestConvertedMarkdown })
@@ -371,13 +390,40 @@ export function buildQuoteStatus(cwd, runId, { check = quoteCheck, projectOf = p
     if (!quote || !record?.record_id) return 'not_checked'
     if (!links) links = readPaperLinks(cwd, runId)
     const paperId = links.get(record.record_id)?.pm_paper ?? record.pm_paper ?? null
+    let library = null
     if (paperId) {
-      const checked = await check({ quote, paper: paperId, project: projectOf(cwd), cwd })
-      if (checked.ok) return checked.found ? 'supported' : 'unsupported'
+      try {
+        const checked = await check({ quote, paper: paperId, project: projectOf(cwd), cwd })
+        // A byte-exact miss inside the library is not the final word: PDF
+        // typography and truncation produce false misses. Keep fallbacks.
+        if (checked.ok) library = checked.found ? 'supported' : 'unsupported'
+        if (library === 'supported') return 'supported'
+      } catch {
+        // An unreadable library is not a verdict on the quote.
+        library = null
+      }
     }
+    let bodyVerdict = null
     const file = join(dir, `${record.record_id}.md`)
-    if (!existsSync(file)) return 'not_checked'
-    return fold(readFileSync(file, 'utf8')).includes(fold(quote)) ? 'supported' : 'unsupported'
+    if (existsSync(file)) {
+      const body = readFileSync(file, 'utf8')
+      if (fold(body).includes(fold(quote))) return 'supported'
+      let meta = null
+      try { meta = JSON.parse(readFileSync(join(dir, `${record.record_id}.meta.json`), 'utf8')) } catch { /* legacy body, infer below */ }
+      // Legacy bodies were capped at 60k without sidecars; a near-cap body is
+      // treated as truncated so an absent quote is not called fabricated.
+      const truncated = meta?.truncated ?? body.length >= 59_000
+      bodyVerdict = truncated ? 'not_checked' : 'unsupported'
+    }
+    // The abstract is stored corpus evidence. If the span is there, it is
+    // verified at abstract level even when a PDF conversion lost the sentence.
+    const abstract = String(record.abstract ?? '')
+    if (abstract && fold(abstract).includes(fold(quote))) return 'abstract'
+    if (bodyVerdict === 'unsupported') return 'unsupported'
+    // A library miss against a truncated body is not proof of fabrication; the
+    // span may be in the unread tail. Disclose unverified instead.
+    if (library === 'unsupported' && bodyVerdict !== 'not_checked') return 'unsupported'
+    return 'not_checked'
   }
 }
 
@@ -450,12 +496,18 @@ function renderAnswers(value) {
   return lines.join('\n')
 }
 
+function renderShow(value) {
+  return typeof value.text === 'string' ? value.text : JSON.stringify(value, null, 2)
+}
+
 const RENDERERS = {
   status: renderStatus,
   verify: renderVerify,
   export: renderExport,
   list: renderList,
   answers: renderAnswers,
+  show: renderShow,
+  gate: (value) => JSON.stringify(value, null, 2),
 }
 
 function presentCall(args) {
@@ -479,8 +531,9 @@ async function runAction(args, exec, ctx, injected = {}) {
   if (action === 'list') return { action, runs: listRuns(cwd) }
 
   if (action === 'start') {
-    const query = text(args.query ?? args.topic)
-    if (!query) throw new Error('query is required')
+    const rawQuery = args.query ?? args.topic
+    const query = typeof rawQuery === 'string' ? rawQuery : ''
+    if (!query.trim()) throw new Error('query is required')
     const statedEffort = text(args.effort) || null
     if (statedEffort && !EFFORT_LEVELS.includes(statedEffort)) {
       throw new Error(`effort must be one of ${EFFORT_LEVELS.join(', ')}`)
@@ -601,6 +654,7 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
         timeoutMs: jobTimeoutMs(manifest),
       }, (job, signal) => {
         const lines = []
+        const startedAt = Date.now()
         const sink = makeProgressSink(job, (line) => lines.push(line))
         return execute({
           cwd,
@@ -617,7 +671,11 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
           // No jobs service means nothing streamed: return what happened instead
           // of leaving the caller with a result and no account of the run.
           ...(job ? {} : { progress_lines: lines.slice(-40) }),
-        }))
+        })).finally(async () => {
+          // Count active work, never idle time between resumes or while a gate
+          // waits for a human. Accounting failure must not hide the run result.
+          try { await recordSegment({ cwd, runId, startedAt, kind: action }) } catch { /* run outcome stays authoritative */ }
+        })
       })),
     }
   }
@@ -636,13 +694,37 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
     return { action, run_id: runId, research_questions: manifest.brief.research_questions, answers }
   }
 
+  if (action === 'show') {
+    const section = text(args.section) || 'artifact'
+    const limit = Number.isFinite(Number(args.limit)) ? Math.max(1, Math.min(500, Number(args.limit))) : 50
+    const run = readRun(cwd, runId)
+    if (section === 'artifact') {
+      const name = text(args.artifact) || 'final_report'
+      const artifact = readArtifact({ cwd, runId, name })
+      if (!artifact) throw new Error(`no stored artifact "${name}" in ${runId}`)
+      const cap = Number.isFinite(Number(args.max_chars)) ? Math.max(100, Math.min(100_000, Number(args.max_chars))) : 20_000
+      return {
+        action, run_id: runId, section, artifact: artifact.artifact, chars: artifact.chars, hash: artifact.hash,
+        text: artifact.text.length > cap ? `${artifact.text.slice(0, cap)}\n\n[truncated at ${cap} of ${artifact.text.length} chars]` : artifact.text,
+      }
+    }
+    if (section === 'claims') return { action, run_id: runId, section, total: run.claims.length, claims: run.claims.slice(0, limit) }
+    if (section === 'findings') return { action, run_id: runId, section, findings: readFindings(cwd, runId).slice(0, limit) }
+    if (section === 'state') return { action, run_id: runId, section, steps: stepView(cwd, runId) }
+    if (section === 'gates') return { action, run_id: runId, section, ...readGate(cwd, runId, text(args.gate)) }
+    if (section === 'query') return { action, run_id: runId, section, query: readQuery(cwd, runId) }
+    if (section === 'manifest') return { action, run_id: runId, section, manifest }
+    throw new Error(`section must be one of artifact, claims, findings, state, gates, query, manifest`)
+  }
+
   if (action === 'export') {
     const format = text(args.format) || 'markdown'
     if (!EXPORT_FORMATS.includes(format)) throw new Error(`format must be one of ${EXPORT_FORMATS.join(', ')}`)
     const report = readArtifact({ cwd, runId, name: 'final_report' })
     if (!report) throw new Error('run has no final_report to export')
     const gate = await shipGate({ cwd, runId, deps: { ...gateDeps(cwd, runId, exec, args), ...injected } })
-    const target = join(cwd, '.dsh', 'deep-research', runId, 'exports', `report.${format === 'csv' ? 'csv' : format}`)
+    const extension = format === 'csv' ? 'csv' : format === 'json' ? 'json' : 'md'
+    const target = join(cwd, '.dsh', 'deep-research', runId, 'exports', `report.${extension}`)
     const corpus = readCorpus(cwd, runId)
     let body
     if (format === 'markdown') {
@@ -675,9 +757,42 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
     return { action, run_id: runId, kind, accepted: stored.accepted, rejected: stored.rejected }
   }
 
+  if (action === 'revise') {
+    const claimId = text(args.claim_id)
+    if (!claimId) throw new Error('claim_id is required')
+    const reason = text(args.reason)
+    if (!reason) throw new Error('a reason is required for a claim revision')
+    const current = readRun(cwd, runId).claims.find((row) => row.claim_id === claimId)
+    if (!current) throw new Error(`unknown claim ${claimId}`)
+    if (args.drop_quote !== true && args.quote === undefined) throw new Error('pass quote or drop_quote: true')
+    let quote = null
+    if (args.drop_quote !== true) {
+      quote = text(args.quote)
+      if (!quote) throw new Error('replacement quote is empty; use drop_quote: true to remove it')
+    }
+    let status = 'not_checked'
+    if (quote) {
+      const byId = new Map(readCorpus(cwd, runId).records.map((record) => [record.record_id, record]))
+      const verdicts = []
+      for (const recordId of current.record_ids.length ? current.record_ids : [null]) {
+        const record = recordId ? byId.get(recordId) : null
+        if (!record) { verdicts.push('not_checked'); continue }
+        const verdict = await buildQuoteStatus(cwd, runId)(quote, record)
+        verdicts.push(verdict ?? 'not_checked')
+      }
+      status = verdicts.includes('supported') ? 'supported'
+        : verdicts.includes('abstract') ? 'abstract'
+          : verdicts.includes('unsupported') ? 'unsupported' : 'not_checked'
+    }
+    const revised = await reviseClaim({ cwd, runId, claimId, quote, quoteStatus: status, reason })
+    return { action, run_id: runId, claim: revised }
+  }
+
   if (action === 'gate') {
     const gate = text(args.gate)
     const status = text(args.status).toLowerCase()
+    if (!status) return { action, run_id: runId, ...readGate(cwd, runId, gate) }
+    if (!gate) throw new Error('gate is required when setting a status')
     if (!GATE_STATES.includes(status)) throw new Error(`status must be one of ${GATE_STATES.join(', ')}`)
     const verdict = await recordVerdict({ cwd, runId, gate, status, severity: args.severity ?? null, reason: args.reason ?? null, route: args.route ?? null })
     // A CRITICAL gate is a fact about the run, so it blocks here rather than
@@ -688,14 +803,58 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
 
   if (action === 'patch') {
     const artifact = text(args.artifact) || 'final_report'
+    const findingId = text(args.finding_id) || null
+    if (findingId && !readFindings(cwd, runId).some((row) => row.finding_id === findingId)) {
+      throw new Error(`unknown finding ${findingId}`)
+    }
     const result = await applyHunks({
-      cwd, runId, artifact, hunks: args.hunks ?? [], findingId: text(args.finding_id) || null,
+      cwd, runId, artifact, hunks: args.hunks ?? [], findingId,
       maxHunkChars: Number.isFinite(Number(args.max_hunk_chars)) ? Number(args.max_hunk_chars) : 1200,
     })
-    return { action, run_id: runId, artifact, ...result, findings: readFindings(cwd, runId).filter((row) => row.status === 'open').length }
+    let findingStatus = null
+    if (findingId) {
+      if (result.applied.length && !result.escalated.length) {
+        await markFindingApplied({ cwd, runId, findingId, patchId: result.patch_id })
+      }
+      findingStatus = readFindings(cwd, runId).find((row) => row.finding_id === findingId)?.status ?? 'unknown'
+    }
+    let recheck = null
+    if (artifact === 'final_report' && result.applied.length) {
+      // The citation gate grades report bytes. A successful patch makes the
+      // previous gate result stale, so the next resume must re-run cite_check.
+      const cite = stepView(cwd, runId).find((step) => step.step_id === 'cite_check')
+      if (cite && ['done', 'blocked', 'failed'].includes(cite.status)) {
+        await markStep({ cwd, runId, step: 'cite_check', status: 'pending', detail: 'report patched; re-run the cite check' })
+      }
+      recheck = 'cite_check'
+    }
+    return {
+      action, run_id: runId, artifact, ...result,
+      finding_status: findingStatus,
+      recheck,
+      findings: readFindings(cwd, runId).filter((row) => row.status === 'open').length,
+    }
   }
 
   throw new Error(`unhandled action ${action}`)
+}
+
+/** Read-only gate view. Omitting a gate returns the latest verdict for every gate. */
+function readGate(cwd, runId, gate) {
+  const run = readRun(cwd, runId)
+  const latest = new Map()
+  for (const row of run?.verdicts ?? []) latest.set(row.gate, row)
+  const verdicts = [...latest.values()].filter((row) => !gate || row.gate === gate)
+  const blockedAt = stepView(cwd, runId).filter((step) => step.status === 'blocked').map((step) => step.step_id)
+  if (gate) {
+    return {
+      gate,
+      verdict: verdicts.find((row) => row.gate === gate) ?? { gate, status: 'not_checked', reason: 'no verdict recorded', route: null },
+      history: (run?.verdicts ?? []).filter((row) => row.gate === gate),
+      blocked_steps: blockedAt,
+    }
+  }
+  return { gates: verdicts, blocked_steps: blockedAt }
 }
 
 async function writeBlockedStep(cwd, runId, gate) {
@@ -948,11 +1107,15 @@ export function apply(ctx) {
     name: 'deep_research',
     description: [
       'Run a bounded, adversarially-audited deep research investigation and return a cited report.',
-      'Actions: start (frame the brief and optionally run), run, resume, status, verify, export, list, record, gate, patch, answers.',
+      'Actions: start (frame the brief and optionally run), run, resume, status, verify, export, list, record, revise, gate, patch, answers, show.',
       'Usually only action, query and effort matter: effort=low|medium|high sets how much work the run does, and is inferred from the request when omitted.',
       'Retrieval reuses the existing literature router plus a web lane for guidance, registers, and reporting; fetched open-access text is deposited in PaperMemory, so quotes are checked against the library rather than a paraphrase.',
       'Tiers route query size: light is the bounded factual path, full runs the whole pipeline, dissertation is opt-in and chaptered.',
-      'The run ledger freezes the query verbatim, resumes at the step that died, and counts independent voices rather than copies.',
+      'The run ledger freezes the query verbatim, resumes at the step that died, and counts independent voices rather than copies. resume reruns the first unfinished step; from_step is an explicit restart that also reruns a done step and resets blocked steps at or after it. A later step never runs while an earlier selected step is unfinished. Wall-clock budget counts active execution, not idle time between resumes.',
+      'gate without status is read-only and returns the latest verdicts. gate with a status records a human decision (blocked behavior is enforced by step state).',
+      'show returns a stored artifact (default final_report) or claims, findings, state, gates, query, or manifest without shell access; use it to inspect a run before resuming.',
+      'revise appends a revision of one claim to drop or replace its quote and re-verifies that quote against the cited records; it never hand-edits the claims ledger and requires a reason. Use drop_quote when a quote cannot be verified and the statement should remain an unquoted assertion.',
+      'Never edit files under .dsh/deep-research by hand: revisions belong in record/revise, report repairs in patch, and gate decisions in gate.',
       'verify reports PASS only for what was actually checked; anything unverifiable is disclosed as not_checked.',
       'Never invent a citation to fill a gap: an unsupported quote blocks the ship and an unacknowledged retraction blocks the ship.',
       'Load the `deep-research-pipeline` skill before driving a long run.',
@@ -1055,7 +1218,7 @@ export function apply(ctx) {
       gate: { type: 'string', description: 'For gate: angle, coverage, citation, taxonomy, calibration, weaving, locus_coverage, tier_routing.' },
       status: { type: 'string', enum: GATE_STATES, description: 'For gate: clear, flagged, blocked, not_checked.' },
       severity: { type: 'string', description: 'For gate: CRITICAL or MAJOR.' },
-      reason: { type: 'string', description: 'For gate: what was inspected and found.' },
+      reason: { type: 'string', description: 'For gate and revise: what was inspected and found, or why the claim quote changed. Required for revise.' },
       route: { type: 'string', description: 'For gate: how to fix it.' },
       artifact: { type: 'string', description: 'For patch: artifact name. Default final_report.' },
       hunks: {
@@ -1070,7 +1233,12 @@ export function apply(ctx) {
           },
         },
       },
-      finding_id: { type: 'string', description: 'For patch: the finding this hunk closes.' },
+      finding_id: { type: 'string', description: 'For patch: the finding these hunks close. It is marked applied only when every hunk applies; a partial patch leaves it open.' },
+      claim_id: { type: 'string', description: 'For revise: the claim to revise (cl-0001).' },
+      quote: { type: 'string', description: 'For revise: the replacement verbatim quote. Omit with drop_quote to keep the claim as an unquoted assertion.' },
+      drop_quote: { type: 'boolean', description: 'For revise: remove the claim quote and record quote_status not_checked.' },
+      section: { type: 'string', enum: ['artifact', 'claims', 'findings', 'state', 'gates', 'query', 'manifest'], description: 'For show: what to read. Default artifact.' },
+      max_chars: { type: 'number', description: 'For show artifact: character cap (default 20000, max 100000).' },
       format: { type: 'string', enum: EXPORT_FORMATS, description: 'For export: markdown, json, or csv.' },
       overwrite: { type: 'boolean', description: 'For export: replace an existing export file.' },
       skip_retraction_check: { type: 'boolean', description: 'Skip live retraction lookup in verify (offline or repeat runs).' },
@@ -1081,7 +1249,7 @@ export function apply(ctx) {
       try {
         return await runAction(args, exec, ctx)
       } catch (error) {
-        return { action: args?.action ?? 'status', error: error instanceof Error ? error.message : String(error) }
+        return { action: args?.action ?? 'status', error: errorText(error) }
       }
     },
   }

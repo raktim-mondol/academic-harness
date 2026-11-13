@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { apply, loadLegacyListAgents } from '../subagent-list-compat.js'
+import { apply, loadLegacyListAgents, resolveHostListAgents } from '../subagent-list-compat.js'
 import { readFileSync } from 'node:fs'
 
 const legacy = { name: 'legacy-list-agents' }
@@ -7,6 +7,11 @@ assert.equal(await loadLegacyListAgents(() => 'legacy', async () => legacy), leg
 const unexported = Object.assign(new Error('subpath not exported'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })
 assert.equal(await loadLegacyListAgents(() => { throw unexported }), null)
 const missing = Object.assign(new Error('package missing'), { code: 'ERR_MODULE_NOT_FOUND' })
+assert.equal(resolveHostListAgents(() => { throw missing }, () => 'host-legacy'), 'host-legacy')
+assert.equal(resolveHostListAgents(() => 'local-legacy', () => { throw new Error('must not resolve host') }), 'local-legacy')
+assert.throws(() => resolveHostListAgents(() => { throw unexported }, () => 'must-not-fallback'), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })
+assert.equal(await loadLegacyListAgents(() => resolveHostListAgents(() => { throw missing }, () => { throw unexported })), null)
+assert.throws(() => resolveHostListAgents(() => { throw missing }, () => { throw missing }), { code: 'ERR_MODULE_NOT_FOUND' })
 await assert.rejects(loadLegacyListAgents(() => { throw missing }), { code: 'ERR_MODULE_NOT_FOUND' })
 await assert.rejects(loadLegacyListAgents(() => 'legacy', async () => { throw unexported }), { code: 'ERR_PACKAGE_PATH_NOT_EXPORTED' })
 await assert.rejects(loadLegacyListAgents(() => 'legacy', async () => { throw new Error('broken module') }), /broken module/)

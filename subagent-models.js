@@ -47,16 +47,23 @@
  * property "subagents" without inject` the moment the child's `apply()` reads
  * `ctx.subagents.getProvider(...)` — a load-time failure, not a runtime one.
  *
- * This plugin pins `@deepseek-ai/dsh-tool-subagent` to the same line as
- * `npm install -g @deepseek-ai/dsh` (`latest`). 0.2.1 spawn-in-process
- * advertises `agentOptions`; a mismatched older spawn provider throws
- * `provider "spawn" does not support child agentOptions` and
+ * The two extra tools mount the host's own `@deepseek-ai/dsh-tool-subagent`
+ * instead of a vendored copy: that tool calls `subagents.startActivation`,
+ * whose payload changed in 0.2.2-rc.2 (the request fields moved from
+ * `spec.request` to the top level). A pinned copy fails delegation with
+ * `Cannot read properties of undefined (reading 'id')` as soon as the host
+ * moves ahead of the pin. Resolution tries the plugin's own tree first, then
+ * DSH's healed host packages beside profiles, like subagent-list-compat.js.
+ * 0.2.1 spawn-in-process advertises `agentOptions`; a mismatched older spawn
+ * provider throws `provider "spawn" does not support child agentOptions` and
  * `subagent_pro`/`subagent_vision` vanish as "unknown tool". DSH 0.2.1 also
  * removed `backgroundMode`: every delegation is a managed activation that
  * returns a subagent id immediately, with the final answer delivered as a
  * completion notice.
  */
-import * as ToolSubagent from 'ah-dsh-tool-subagent'
+import { createRequire } from 'node:module'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { appendNotebookEntryAt, notebookFile } from './notebook.js'
 import { getStoredKey } from './settings-keys.js'
 
@@ -89,6 +96,26 @@ const SPECS = {
       apiKey: 'SUBAGENT_VISION_API_KEY',
     },
   },
+}
+
+const TOOL_SUBAGENT = '@deepseek-ai/dsh-tool-subagent'
+
+/** Linked plugins resolve from their source tree; DSH's healed host packages live beside profiles. */
+export function resolveHostToolSubagent(
+  localResolve = () => import.meta.resolve(TOOL_SUBAGENT),
+  hostResolve = () => createRequire(join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'profiles', 'package.json')).resolve(TOOL_SUBAGENT),
+) {
+  try { return localResolve() } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error
+    return hostResolve()
+  }
+}
+
+export function loadHostToolSubagent(
+  resolve = resolveHostToolSubagent,
+  load = (specifier) => import(specifier),
+) {
+  return load(resolve())
 }
 
 /** Whether this agent is the top-level Academic Harness session, not a child. */
@@ -161,6 +188,17 @@ export function routingOutcomeEntry({
   }
 }
 
+/**
+ * Link a delegation result to the child session. 0.2.1 returns `subagentId`;
+ * 0.2.2 returns the model-facing `name`, which `resolveName` maps back to it.
+ */
+export function activationChildId(ctx, agent, value, signal) {
+  if (typeof value?.subagentId === 'string' && value.subagentId.length > 0) return value.subagentId
+  if (typeof value?.name === 'string' && value.name.length > 0 && typeof ctx.subagents?.resolveName === 'function') {
+    return ctx.subagents.resolveName(agent, value.name, signal)
+  }
+}
+
 function installAgentHooks(agent, ctx, routes, scopedInstalls) {
   if (!topLevelPresetAgent(agent) || scopedInstalls.has(agent)) return
   let fiber
@@ -170,32 +208,41 @@ function installAgentHooks(agent, ctx, routes, scopedInstalls) {
       runtimeCtx.on('tools/result', (exec, result) => {
         if (result.isError || !ROUTING_TOOLS.has(exec.name)) return
         const value = result.value
-        const subagentId = value && typeof value === 'object' ? value.subagentId : undefined
-        if (typeof subagentId !== 'string' || subagentId.length === 0) return
-        const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {}
-        const kind = exec.name === 'subagent_pro' ? 'pro' : 'vision'
-        const now = Date.now()
-        const decision = routingDecisionEntry({
-          callId: exec.callId,
-          toolName: exec.name,
-          description: args.description,
-          prompt: args.prompt,
-          route: routeLabel(kind, routes[kind]),
-          now,
-        })
-        try {
-          const file = notebookFile(exec)
-          appendNotebookEntryAt(file, decision)
-          pending.set(subagentId, {
+        const recordActivation = (subagentId) => {
+          const args = exec.arguments && typeof exec.arguments === 'object' ? exec.arguments : {}
+          const kind = exec.name === 'subagent_pro' ? 'pro' : 'vision'
+          const now = Date.now()
+          const decision = routingDecisionEntry({
             callId: exec.callId,
             toolName: exec.name,
             description: args.description,
-            file,
-            startedAt: now,
+            prompt: args.prompt,
+            route: routeLabel(kind, routes[kind]),
+            now,
           })
-        } catch (error) {
-          ctx.logger?.warn(`academic-harness: could not record ${exec.name} routing decision: ${error instanceof Error ? error.message : String(error)}`)
+          try {
+            const file = notebookFile(exec)
+            appendNotebookEntryAt(file, decision)
+            if (typeof subagentId === 'string' && subagentId.length > 0) {
+              pending.set(subagentId, {
+                callId: exec.callId,
+                toolName: exec.name,
+                description: args.description,
+                file,
+                startedAt: now,
+              })
+            }
+          } catch (error) {
+            ctx.logger?.warn(`academic-harness: could not record ${exec.name} routing decision: ${error instanceof Error ? error.message : String(error)}`)
+          }
         }
+        const childId = activationChildId(ctx, exec.agent, value, exec.signal)
+        if (typeof childId === 'string') recordActivation(childId)
+        else if (childId?.then) childId.then(recordActivation, (error) => {
+          ctx.logger?.warn(`academic-harness: could not resolve the child for ${exec.name}: ${error instanceof Error ? error.message : String(error)}`)
+          recordActivation(undefined)
+        })
+        else recordActivation(undefined)
       })
 
       runtimeCtx.on('subagent/end', (info) => {
@@ -373,7 +420,8 @@ function scheduleCustomRoutes(ctx, routes) {
   })
 }
 
-export function apply(ctx) {
+export async function apply(ctx) {
+  const ToolSubagent = await loadHostToolSubagent()
   const routes = { pro: readCustomRoute('pro'), vision: readCustomRoute('vision') }
   const proOptions = routes.pro && !routes.pro.incomplete && !routes.pro.invalid
     ? { provider: SPECS.pro.provider, model: routes.pro.model }

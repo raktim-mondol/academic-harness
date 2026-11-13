@@ -26,7 +26,7 @@ export const TIERS = ['light', 'full', 'dissertation']
 export const REGISTERS = ['teach', 'survey', 'analyze', 'advocate']
 export const DEPTH = ['surface', 'standard', 'deep']
 export const STEP_STATUSES = ['pending', 'running', 'done', 'failed', 'skipped', 'blocked']
-export const QUOTE_STATES = ['supported', 'unsupported', 'not_checked']
+export const QUOTE_STATES = ['supported', 'abstract', 'unsupported', 'not_checked']
 export const FINDING_SEVERITIES = ['High', 'Medium', 'Low']
 export const GATE_STATES = ['clear', 'flagged', 'blocked', 'not_checked']
 
@@ -102,7 +102,7 @@ export function readRun(cwd, runId) {
     manifest,
     steps: readJsonl(join(dir, FILES.state)),
     records: readJsonl(join(dir, FILES.corpus)),
-    claims: readJsonl(join(dir, FILES.claims)),
+    claims: foldClaims(readJsonl(join(dir, FILES.claims))),
     verdicts: readJsonl(join(dir, FILES.verdicts)),
     findings: readJsonl(join(dir, FILES.findings)),
     patches: readJsonl(join(dir, FILES.patches)),
@@ -184,7 +184,8 @@ export async function startRun({
   cwd, query, brief, tier = 'full', gear = 'standard', plan, budget = {}, source = 'user', execution = {},
 }) {
   if (!TIERS.includes(tier)) throw new Error(`tier must be one of ${TIERS.join(', ')}`)
-  const text = requireText(query, 'query')
+  const text = String(query ?? '')
+  requireText(text, 'query')
   const normalizedBrief = normalizeBrief(brief)
   const frozenPlan = normalizePlan(plan)
   const runId = nextRunId(cwd)
@@ -313,7 +314,7 @@ function independenceOf(clustered) {
   }
 }
 
-export async function appendRecords({ cwd, runId, records, suggestedBy = null, perspective = null }) {
+export async function appendRecords({ cwd, runId, records, suggestedBy = null, perspective = null, maxRecords = null }) {
   const rows = (Array.isArray(records) ? records : []).map((input) => {
     const title = requireText(input?.title, 'record title')
     const count = Number(input?.citation_count)
@@ -339,12 +340,20 @@ export async function appendRecords({ cwd, runId, records, suggestedBy = null, p
       retrieved_at: input?.retrieved_at ?? nowIso(),
     }
   })
-  if (!rows.length) return { added: 0, records: [], independence: independenceOf(clusterSources([])) }
+  if (!rows.length) return { added: 0, dropped: 0, capped: false, records: [], independence: independenceOf(clusterSources([])) }
   const file = fileOf(cwd, runId, FILES.corpus)
   return withLock(runDir(cwd, runId), () => {
     const existing = readJsonl(file)
+    // The corpus cap is enforced where records enter, not by blocking the next
+    // reading step after a sweep has already overrun it. This is atomic with
+    // the append, so parallel retrieval cannot race past the cap.
+    const cap = maxRecords === null || maxRecords === undefined
+      ? null
+      : Number.isFinite(Number(maxRecords)) ? Math.max(0, Math.trunc(Number(maxRecords))) : null
+    const accepted = cap === null ? rows : rows.slice(0, Math.max(0, cap - existing.length))
+    const dropped = rows.length - accepted.length
     const stamped = []
-    for (const row of rows) {
+    for (const row of accepted) {
       stamped.push({ ...row, record_id: nextId(existing.concat(stamped), 'record_id', 'src-'), run_id: runId, added_at: nowIso() })
     }
     // Cluster over the whole corpus: a new reprint can join an older cluster.
@@ -359,8 +368,8 @@ export async function appendRecords({ cwd, runId, records, suggestedBy = null, p
       row.cluster_id = clusterOf.get(row.record_id) ?? null
       row.independent = votes.get(row.cluster_id) === 1
     }
-    appendJsonl(file, stamped)
-    return { added: stamped.length, records: stamped, independence: independenceOf(clustered) }
+    if (stamped.length) appendJsonl(file, stamped)
+    return { added: stamped.length, dropped, capped: dropped > 0, records: stamped, independence: independenceOf(clustered) }
   }, { label: 'deep-research corpus' })
 }
 
@@ -464,6 +473,13 @@ export function readRetrieval(cwd, runId) {
   }
 }
 
+/** Latest revision per claim id; revisions append under the same id. */
+function foldClaims(rows) {
+  const latest = new Map()
+  for (const row of rows) latest.set(row.claim_id, row)
+  return [...latest.values()]
+}
+
 export async function appendClaims({ cwd, runId, claims }) {
   const file = fileOf(cwd, runId, FILES.claims)
   return withLock(runDir(cwd, runId), () => {
@@ -481,6 +497,7 @@ export async function appendClaims({ cwd, runId, claims }) {
         quote_status: QUOTE_STATES.includes(claim?.quote_status) ? claim.quote_status : 'not_checked',
         strength: String(claim?.strength ?? '').trim() || null,
         added_at: nowIso(),
+        revision: 1,
       })
     }
     if (rows.length) appendJsonl(file, rows)
@@ -489,10 +506,52 @@ export async function appendClaims({ cwd, runId, claims }) {
 }
 
 /**
+ * Append a new revision of one claim. The old row remains in the log; readers
+ * fold by claim_id. Used to drop or replace a quote without hand-editing the
+ * ledger, which would bypass the quote gate.
+ */
+export async function reviseClaim({ cwd, runId, claimId, quote = undefined, quoteStatus = 'not_checked', reason = null }) {
+  const file = fileOf(cwd, runId, FILES.claims)
+  return withLock(runDir(cwd, runId), () => {
+    const rows = readJsonl(file)
+    const current = foldClaims(rows).find((row) => row.claim_id === claimId)
+    if (!current) throw new Error(`unknown claim ${claimId}`)
+    const next = {
+      ...current,
+      quote: quote === undefined ? current.quote : (quote ? String(quote) : null),
+      quote_status: QUOTE_STATES.includes(quoteStatus) ? quoteStatus : 'not_checked',
+      revision: Number(current.revision ?? 1) + 1,
+      revised_at: nowIso(),
+      revision_reason: String(reason ?? '').trim() || null,
+    }
+    appendJsonl(file, [next])
+    return next
+  }, { label: 'deep-research claims' })
+}
+
+/**
  * A critic finding, in the shape Phase 9C requires: an inspected target, one
  * primary check, and a named way to confirm closure. Unobserved evidence is
  * rejected rather than promoted — it stays visible in the gate as `not_checked`.
  */
+/**
+ * Whether a finding still describes the current report.
+ *
+ * Legacy findings predate artifact binding. A patch recorded after the finding
+ * was raised proves the bytes changed, so those findings are stale rather than
+ * current; this keeps old ledgers honest without rewriting them.
+ */
+export function findingIsCurrent(row, reportHash, patches = []) {
+  if (row.artifact_hash !== undefined && row.artifact_hash !== null) return row.artifact_hash === reportHash
+  if (reportHash === null || reportHash === undefined) return true
+  const added = Date.parse(row.added_at)
+  if (!Number.isFinite(added)) return true
+  return !patches.some((patch) => {
+    const at = Date.parse(patch.at)
+    return Number.isFinite(at) && at > added
+  })
+}
+
 export async function appendFindings({ cwd, runId, findings, stepId = null }) {
   const file = fileOf(cwd, runId, FILES.findings)
   return withLock(runDir(cwd, runId), () => {
@@ -501,7 +560,17 @@ export async function appendFindings({ cwd, runId, findings, stepId = null }) {
     for (const row of existing) latest.set(row.finding_id, row)
     const accepted = []
     const rejected = []
-    const seen = new Set([...latest.values()].map((row) => `${row.target}|${row.primary_check}`))
+    // A finding belongs to the exact report bytes it was raised against. Without
+    // this, a patched report is blocked by findings about text that no longer
+    // exists, and a stale gate looks like a current one.
+    const report = readArtifact({ cwd, runId, name: 'final_report' })
+    const artifactHash = report?.hash ?? null
+    const patches = readJsonl(fileOf(cwd, runId, FILES.patches))
+    // Only currently open findings for the same report suppress a duplicate.
+    // Applied/superseded rows and findings against earlier bytes must not hide a
+    // defect that is still present after a patch or a rerun.
+    const open = [...latest.values()].filter((row) => row.status === 'open' && findingIsCurrent(row, artifactHash, patches))
+    const seen = new Set(open.map((row) => `${row.target}|${row.primary_check}`))
     for (const input of Array.isArray(findings) ? findings : []) {
       const row = {
         finding_id: nextId([...latest.values()].concat(accepted), 'finding_id', 'f-'),
@@ -520,6 +589,7 @@ export async function appendFindings({ cwd, runId, findings, stepId = null }) {
           ? { find: String(input.suggested_hunk.find ?? ''), replace: String(input.suggested_hunk.replace ?? '') }
           : null,
         status: 'open',
+        artifact_hash: artifactHash,
         added_at: nowIso(),
       }
       const missing = ['severity', 'target', 'primary_check', 'verifier'].filter((key) => !row[key])
@@ -706,15 +776,64 @@ function totalsOf(accounting) {
     : { llm_calls: 0, input_tokens: 0, output_tokens: 0 }
 }
 
+/**
+ * Persist one active execution segment. A resumable run is paused between calls
+ * and may sit blocked for hours; calendar elapsed time is not the work budget.
+ */
+export async function recordSegment({ cwd, runId, startedAt, endedAt = Date.now(), kind = 'run' }) {
+  const start = Number(startedAt)
+  const end = Number(endedAt)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return null
+  const durationMs = end - start
+  return withLock(runDir(cwd, runId), () => {
+    const row = {
+      run_id: runId, step: null, event: 'segment', kind,
+      started_at: new Date(start).toISOString(), ended_at: new Date(end).toISOString(),
+      duration_ms: durationMs, at: nowIso(),
+    }
+    appendJsonl(fileOf(cwd, runId, FILES.accounting), [row])
+    return row
+  }, { label: 'deep-research accounting' })
+}
+
+/**
+ * Active milliseconds when segment records exist. Legacy ledgers predate
+ * segments; estimate from step state transitions and never from wall-clock time
+ * since creation, which would count a paused or blocked run's idle hours.
+ */
+function activeMsOf(run, cwd, runId) {
+  const segments = run.accounting.filter((row) => row.event === 'segment' && Number.isFinite(row.duration_ms))
+  if (segments.length) return segments.reduce((sum, row) => sum + Math.max(0, row.duration_ms), 0)
+  let total = 0
+  const started = new Map()
+  for (const row of run.steps) {
+    const at = Date.parse(row.at)
+    if (!Number.isFinite(at)) continue
+    if (row.status === 'running') { started.set(row.step_id, at); continue }
+    const begin = started.get(row.step_id)
+    if (begin === undefined) continue
+    started.delete(row.step_id)
+    const elapsed = at - begin
+    // A step left running across a host restart is not provably active work.
+    if (elapsed > 0 && elapsed <= 60 * 60_000) total += elapsed
+  }
+  return total
+}
+
 export function accounting(cwd, runId) {
   const run = readRun(cwd, runId)
   if (!run) return null
   const totals = totalsOf(run.accounting)
+  const activeMs = activeMsOf(run, cwd, runId)
   const started = Date.parse(run.manifest.created_at)
   const corpus = readCorpus(cwd, runId)
   return {
     ...totals,
-    wall_ms: Number.isFinite(started) ? Math.max(0, Date.now() - started) : null,
+    active_ms: activeMs,
+    elapsed_ms: Number.isFinite(started) ? Math.max(0, Date.now() - started) : null,
+    // Kept for callers written before active time existed; it now means active
+    // execution time, never calendar time since the run was created.
+    wall_ms: activeMs,
     sources: run.records.length,
     votes: corpus.independence.votes,
     derivative_clusters: corpus.independence.derivative_clusters,
@@ -725,20 +844,24 @@ export function accounting(cwd, runId) {
 }
 
 /** Budget check before a step starts, so a run is capped rather than ballooned. */
-export function budgetState(cwd, runId) {
+export function budgetState(cwd, runId, { extraMs = 0 } = {}) {
   const manifest = readManifest(cwd, runId)
   if (!manifest) return { exceeded: false, checks: [] }
   const totals = accounting(cwd, runId)
+  const activeMs = (totals.active_ms ?? 0) + Math.max(0, Number(extraMs) || 0)
   const checks = []
   const cap = manifest.budget?.max_llm_calls
   if (cap !== null) checks.push({ kind: 'llm_calls', used: totals.llm_calls, cap, exceeded: totals.llm_calls >= cap })
   const sourceCap = manifest.budget?.max_sources
-  if (sourceCap !== null) checks.push({ kind: 'sources', used: totals.sources, cap: sourceCap, exceeded: totals.sources >= sourceCap })
+  // The corpus cap is enforced at ingestion. A legacy corpus already over the
+  // cap must not strand a run at its next step; report it as non-blocking.
+  if (sourceCap !== null) checks.push({ kind: 'sources', used: totals.sources, cap: sourceCap, exceeded: totals.sources >= sourceCap, blocking: false })
   const minutes = manifest.budget?.timeout_minutes
   if (minutes !== null) {
-    checks.push({ kind: 'wall_minutes', used: Math.round(totals.wall_ms / 6000), cap: minutes, exceeded: totals.wall_ms / 60000 >= minutes })
+    const used = Math.round(activeMs / 60_000)
+    checks.push({ kind: 'wall_minutes', used, cap: minutes, exceeded: activeMs / 60_000 >= minutes })
   }
-  return { exceeded: checks.some((check) => check.exceeded), checks }
+  return { exceeded: checks.some((check) => check.exceeded && check.blocking !== false), checks }
 }
 
 /**
@@ -779,6 +902,7 @@ export async function shipGate({ cwd, runId, deps = {} }) {
     const byId = new Map(corpus.records.map((row) => [row.record_id, row]))
     const bad = []
     let unreadable = 0
+    let abstractOnly = 0
     for (const claim of citedClaims) {
       const sources = claim.record_ids.length ? claim.record_ids : [null]
       const verdicts = []
@@ -789,13 +913,21 @@ export async function shipGate({ cwd, runId, deps = {} }) {
         if (verdict === null || verdict === undefined) { verdicts.push('not_checked'); continue }
         verdicts.push(QUOTE_STATES.includes(verdict) ? verdict : 'unsupported')
       }
-      // A span the verifier could not read is unverified; a span it read and did
-      // not find is fabricated. Only the second one stops the ship.
+      // A claim cites several papers and the sentence normally belongs to one
+      // of them, so one cited source carrying the span settles it — the same
+      // rule the digest step applies. Abstract-only support is disclosed: it is
+      // evidence that the span exists, not proof that the full text says it in
+      // this context. Only a claim no cited source supports stops the ship.
+      if (verdicts.includes('supported')) continue
+      if (verdicts.includes('abstract')) { abstractOnly += 1; continue }
       if (verdicts.includes('unsupported')) bad.push(claim.claim_id)
-      else if (!verdicts.includes('supported')) unreadable += 1
+      else unreadable += 1
     }
     if (bad.length) add('quote_integrity', 'blocked', `${bad.length} claim(s) fail the verbatim check`, { claims: bad })
-    else add('quote_integrity', unreadable ? 'not_checked' : 'pass', unreadable ? `${unreadable} span(s) the verifier could not read` : `${citedClaims.length} verified`)
+    else if (unreadable) add('quote_integrity', 'not_checked', `${unreadable} span(s) the verifier could not read`, { abstract_only: abstractOnly })
+    else add('quote_integrity', 'pass', abstractOnly
+      ? `${citedClaims.length} verified (${abstractOnly} against abstracts only)`
+      : `${citedClaims.length} verified`, abstractOnly ? { abstract_only: abstractOnly } : {})
   }
 
   if (typeof deps.retractionFor !== 'function') add('retracted_citations', 'not_checked', 'no retraction verifier supplied')
@@ -831,8 +963,16 @@ export async function shipGate({ cwd, runId, deps = {} }) {
   }
 
   const criticalOpen = findings.filter((row) => row.severity === 'High' && row.status === 'open')
-  if (criticalOpen.length) add('critical_findings_applied', 'blocked', `${criticalOpen.length} High finding(s) still open`, { findings: criticalOpen.map((row) => row.finding_id) })
-  else add('critical_findings_applied', 'pass', 'no open High finding')
+  const currentOpen = criticalOpen.filter((row) => findingIsCurrent(row, report?.hash ?? null, run.patches))
+  const staleOpen = criticalOpen.filter((row) => !findingIsCurrent(row, report?.hash ?? null, run.patches))
+  if (currentOpen.length) add('critical_findings_applied', 'blocked', `${currentOpen.length} High finding(s) still open`, { findings: currentOpen.map((row) => row.finding_id) })
+  else add('critical_findings_applied', 'pass', 'no open High finding for the current report')
+  if (staleOpen.length) {
+    add('findings_current', 'blocked', `${staleOpen.length} High finding(s) refer to an earlier report; re-run the affected step before shipping`, {
+      findings: staleOpen.map((row) => row.finding_id),
+      route: 'run from_step=cite_check (and critics when the text changed) so the gate grades the current bytes',
+    })
+  } else add('findings_current', 'pass', 'all High findings refer to the current report')
 
   if (!report) add('patch_only', 'not_checked', 'no report to check')
   else if (run.patches.length) add('patch_only', 'pass', `${run.patches.length} patch pass(es); no regeneration after synthesis`)

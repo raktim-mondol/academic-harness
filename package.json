@@ -62,6 +62,7 @@
     "./wikidata-lookup": "./wikidata-lookup.js",
     "./domain-search": "./domain-search.js",
     "./deep-research": "./deep-research.js",
+    "./academic-task": "./academic-task.js",
     "./deep-research-store": "./deep-research-store.js",
     "./deep-research-effort": "./deep-research-effort.js",
     "./deep-research-steps": "./deep-research-steps.js",
@@ -283,6 +284,8 @@
     "papermemory-dream.js",
     "papermemory-library.js",
     "deep-research.js",
+    "academic-task.js",
+    "task-modes.js",
     "deep-research-store.js",
     "deep-research-effort.js",
     "deep-research-steps.js",
@@ -431,7 +434,12 @@
       "inject": [
         "@deepseek-ai/dsh-client-ui-settings",
         "@deepseek-ai/dsh-client-ui-slots",
-        "@deepseek-ai/dsh-client-ui-sidebar-right"
+        "@deepseek-ai/dsh-client-ui-sidebar-right",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@deepseek-ai/dsh-client-ui-commands",
+        "@deepseek-ai/dsh-client-locale"
       ]
     }
   },
@@ -487,6 +495,7 @@
     "test:deep-research-store": "node scripts/test-deep-research-store.mjs",
     "test:deep-research-effort": "node scripts/test-deep-research-effort.mjs",
     "test:deep-research": "node scripts/test-deep-research.mjs",
+    "test:tasks": "node scripts/test-task-modes.mjs",
     "test:deep-research-all": "node scripts/test-deep-research-mechanisms.mjs && node scripts/test-deep-research-effort.mjs && node scripts/test-deep-research-store.mjs && node scripts/test-deep-research.mjs",
     "test:deep-review": "node scripts/test-deep-review-tool.mjs && node scripts/test-deep-review-validity.mjs && node scripts/test-deep-review-validity-calibration.mjs && node scripts/test-deep-review-score-correlation.mjs && node scripts/test-deep-review-calibration-report.mjs",
     "test:deep-review-validity": "node scripts/test-deep-review-validity.mjs && node scripts/test-deep-review-validity-calibration.mjs",
@@ -502,7 +511,6 @@
     "@citation-js/plugin-csl": "^0.9.0",
     "@citation-js/plugin-ris": "^0.9.0",
     "ah-dsh-mcp-client": "npm:@deepseek-ai/dsh-mcp-client@0.2.1-rc.5",
-    "ah-dsh-tool-subagent": "npm:@deepseek-ai/dsh-tool-subagent@0.2.1-rc.5",
     "ah-dsh-tools": "npm:@deepseek-ai/dsh-tools@0.2.1-rc.5",
     "@deepseek-ai/schemastery": "~3.18.5",
     "@firecrawl/pdf-inspector": "^1.25.2",

@@ -7,18 +7,18 @@ Academic Harness is a **DeepSeek Harness (DSH) profile**: the DSH web UI and DSH
 ## Requirements
 
 - **Linux** (x86_64 or ARM64). This is a Linux-only plugin: `package.json` declares `"os": ["linux"]`, so npm and pnpm refuse installation on Windows and macOS. The plugin runtime uses POSIX paths, shell commands, and Linux filesystem semantics. Bundled skills may describe external tools on other platforms, but those are not supported by this plugin.
-- **DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`**; the validated versions are `0.2.1-rc.5` (npm's `latest`) and `0.2.2-rc.1` (npm's `next`). Isolated tests cover preset sessions, a non-secret Settings write, selected tools, and delegation on both channels under npm and pnpm; a [daily canary](../.github/workflows/dsh-compat.yml) re-runs them. Newer DSH releases are adopted after the canary passes, not before. One DSH packaging quirk is documented by this repo's canary: pnpm omits the `@deepseek-ai/dsh-ptc-runtime` peer of `dsh-ptc-runtime-node`, which blocks preset sessions on 0.2.2-rc.1 with `workflow-ptc ... waiting for ptcRuntime`; npm resolves it natively, and a channel-matched profile dependency fixes pnpm.
+- **DeepSeek Harness `>=0.2.1-rc.5 <0.3.0`**; the validated versions are `0.2.2-rc.1` (npm's `latest`) and `0.2.2-rc.3` (npm's `next`). Isolated tests cover preset sessions, a non-secret Settings write, selected tools, and delegation on both channels under npm and pnpm; a [daily canary](../.github/workflows/dsh-compat.yml) re-runs them. Newer DSH releases are adopted after the canary passes, not before. One DSH packaging quirk is documented by this repo's canary: pnpm omits the `@deepseek-ai/dsh-ptc-runtime` peer of `dsh-ptc-runtime-node`, which blocks preset sessions on 0.2.2 with `workflow-ptc ... waiting for ptcRuntime`; npm resolves it natively, and a channel-matched profile dependency fixes pnpm.
 - Optional Python runtimes are installed automatically on first use, with one exception: the `sci_inspect`/`power_analysis` helpers and the `rob-figure` appraisal export need a one-time `cd python-helpers && uv sync` (matplotlib). See [Architecture](ARCHITECTURE.md#runtime-installs).
 - `modal_run` needs the Modal SDK, which the plugin installs into `$DSH_HOME/modal-sdk` on first use (no restart; set `ACADEMIC_HARNESS_MODAL_SKIP_INSTALL=1` to manage it yourself). `runpod_run` and `vastai_run` need only their API key plus OpenSSH client tools; see [Remote compute](COMPUTE.md).
 
 ## 1. Install DSH
 
 ```sh
-npm install -g @deepseek-ai/dsh@0.2.1-rc.5
-dsh --version   # 0.2.1-rc.5 — or 0.2.2-rc.1 with `npm install -g @deepseek-ai/dsh@next`
+npm install -g @deepseek-ai/dsh@0.2.2-rc.1
+dsh --version   # 0.2.2-rc.1 — or 0.2.2-rc.3 with `npm install -g @deepseek-ai/dsh@next`
 ```
 
-The explicit version avoids silently switching to a newer, unverified DSH release when npm's `latest` tag changes. All plugin examples below work the same under both versions. Without a global install, `npx @deepseek-ai/dsh@0.2.1-rc.5 web` also works. You need a working `dsh` CLI for either installation option below.
+The explicit version avoids silently switching to a newer, unverified DSH release when npm's `latest` tag changes. All plugin examples below work the same under both versions. Without a global install, `npx @deepseek-ai/dsh@0.2.2-rc.1 web` also works. You need a working `dsh` CLI for either installation option below.
 
 ## 2. Install Academic Harness
 

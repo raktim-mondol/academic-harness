@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeWorkspace } from './helpers/test-workspace.mjs'
-import { accounting, appendClaims, appendFindings, appendRecords, appendRetrieval, applyHunks, assertGospel, budgetState, displayHash, latestVerdict, listRuns, markFindingApplied, markStep, nextPendingStep, readArtifact, readCorpus, readFindings, readQuery, readRetrieval, readRun, recordUsage, recordVerdict, shipGate, startRun, stepView, supersedeFindings, writeArtifact } from '../deep-research-store.js'
+import { accounting, appendClaims, appendFindings, appendRecords, appendRetrieval, applyHunks, assertGospel, budgetState, displayHash, latestVerdict, listRuns, markFindingApplied, markStep, nextPendingStep, readArtifact, readCorpus, readFindings, readQuery, readRetrieval, readRun, recordSegment, recordUsage, recordVerdict, shipGate, startRun, stepView, supersedeFindings, writeArtifact } from '../deep-research-store.js'
 
 const workspace = makeWorkspace('ah-deep-research-store-')
 const cwd = workspace.cwd
@@ -218,6 +218,25 @@ try {
   ok('the budget check names which cap', budgetState(cwd, capped.run_id).checks[0].kind === 'llm_calls')
   ok('an uncapped run is never exceeded', budgetState(cwd, 'dr-0001').exceeded === false)
 
+  {
+    // Calendar time is not execution time: a resumed run must not inherit idle
+    // hours spent blocked or with the host shut down.
+    const timed = await startRun({
+      cwd, query: 'Timed resume check.', brief: { topic: 'timed', research_questions: ['q?'] }, plan: PLAN,
+      budget: { timeout_minutes: 1 },
+    })
+    ok('a fresh run has no active time', budgetState(cwd, timed.run_id).exceeded === false)
+    await recordSegment({ cwd, runId: timed.run_id, startedAt: Date.now() - 150_000, endedAt: Date.now(), kind: 'run' })
+    const timedState = budgetState(cwd, timed.run_id)
+    const wall = timedState.checks.find((check) => check.kind === 'wall_minutes')
+    ok('active execution time is counted in minutes, not tenths', wall?.used === 3 || wall?.used === 2, wall)
+    ok('a run over its active-time cap is blocked', timedState.exceeded === true, timedState)
+    ok('active time is reported from segments, not wall-clock creation time', accounting(cwd, timed.run_id).active_ms >= 150_000, accounting(cwd, timed.run_id))
+    ok('elapsed calendar time is reported separately', typeof accounting(cwd, timed.run_id).elapsed_ms === 'number')
+    const extra = budgetState(cwd, timed.run_id, { extraMs: 60_000 })
+    ok('the current invocation time is added during a run', extra.checks.find((check) => check.kind === 'wall_minutes').used >= 3, extra)
+  }
+
 
   {
     // A re-run must retire the findings it raised against the earlier text, or the
@@ -238,6 +257,31 @@ try {
     ok('superseded findings do not block the ship', !gate.blocked.includes('critical_findings_applied'), gate.blocked)
     ok('a second retirement is a no-op', (await supersedeFindings({ cwd, runId: rerun.run_id, stepId: 'critics' })).superseded === 0)
     ok('another step still owns its findings', (await supersedeFindings({ cwd, runId: rerun.run_id, stepId: 'digest' })).superseded === 0)
+    const raisedAgain = await appendFindings({
+      cwd, runId: rerun.run_id, stepId: 'critics',
+      findings: [{ severity: 'High', title: 'Real problem again', reason: 'the same defect is still in the new text', target: 'final_report#a', primary_check: 'citation', verifier: 'v' }],
+    })
+    ok('a superseded issue can be raised again by a later review', raisedAgain.accepted.length === 1, raisedAgain)
+  }
+
+  {
+    // A finding is tied to the report bytes it graded. A patched report must not
+    // look current, and a rerun of the affected step must be required.
+    const stale = await startRun({ cwd, query: 'Stale finding check.', brief: { topic: 'stale2', research_questions: ['q?'] }, plan: PLAN })
+    await writeArtifact({ cwd, runId: stale.run_id, name: 'final_report', step: 'synthesize', body: '# Report\n\nBenefit is established.\n' })
+    const first = await appendFindings({
+      cwd, runId: stale.run_id, stepId: 'critics',
+      findings: [{ severity: 'High', title: 'Benefit overstated', reason: 'inspection found no trial', target: 'final_report#benefit', primary_check: 'coverage', verifier: 'read the cited trial' }],
+    })
+    const beforePatch = await shipGate({ cwd, runId: stale.run_id, deps: { quoteStatus: undefined, retractionFor: () => ({ retracted: false }), consensusClaimed: () => false } })
+    ok('a High finding blocks the report it was raised against', beforePatch.blocked.includes('critical_findings_applied'), beforePatch.blocked)
+    await applyHunks({ cwd, runId: stale.run_id, artifact: 'final_report', findingId: first.accepted[0].finding_id, hunks: [{ find: 'Benefit is established.', replace: 'Benefit is not established in this report.' }] })
+    const afterPatch = await shipGate({ cwd, runId: stale.run_id, deps: { quoteStatus: undefined, retractionFor: () => ({ retracted: false }), consensusClaimed: () => false } })
+    ok('a patched report does not pass on the earlier report’s finding', afterPatch.blocked.includes('findings_current'), afterPatch.blocked)
+    ok('and the stale finding is not relabelled as current', afterPatch.checks.find((check) => check.id === 'critical_findings_applied')?.state === 'pass', afterPatch.checks.find((check) => check.id === 'critical_findings_applied'))
+    await markFindingApplied({ cwd, runId: stale.run_id, findingId: first.accepted[0].finding_id, patchId: 'p-test' })
+    const closed = await shipGate({ cwd, runId: stale.run_id, deps: { quoteStatus: undefined, retractionFor: () => ({ retracted: false }), consensusClaimed: () => false } })
+    ok('closing the finding clears the stale block', !closed.blocked.includes('findings_current') && !closed.blocked.includes('critical_findings_applied'), closed.blocked)
   }
 
   // ------------------------------------------------------------ gates and verdicts
@@ -269,7 +313,7 @@ try {
   ok('a blocked run names blockers and unverified checks alike', bare.blocked.length > 0 && bare.not_checked.length > 0)
   ok('gospel passes on a healthy run', bare.checks.find((check) => check.id === 'query_is_gospel').state === 'pass')
   ok('RQ coverage blocks while rq-0003 is unanswered', bare.blocked.includes('research_questions_answered'), bare.blocked)
-  ok('an open High finding blocks the ship', bare.blocked.includes('critical_findings_applied'))
+  ok('an open High finding blocks the ship', bare.blocked.includes('critical_findings_applied') || bare.blocked.includes('findings_current'), bare.blocked)
   ok('quotes block until something verifies them', bare.blocked.includes('quote_integrity') || bare.not_checked.includes('quote_integrity'))
 
   await appendClaims({ cwd, runId: 'dr-0001', claims: [{ rq_id: 'rq-0003', text: 'Exclusions are documented.', record_ids: ['src-0006'] }] })

@@ -79,11 +79,11 @@ jobs:
             exit 1
           fi
 
-      # Pin the CLI to the same 0.2.1-rc.5 line as package.json dsh-* deps.
-      # An unpinned CLI plus a web-app override once sent npm into a peer-
-      # resolution loop that OOM'd the runner (~1h, exit 134).
+      # Pin the CLI to npm's current latest line. An unpinned CLI plus a
+      # web-app override once sent npm into a peer-resolution loop that OOM'd
+      # the runner (~1h, exit 134).
       - name: Install the dsh CLI
-        run: npm install -g @deepseek-ai/dsh@0.2.1-rc.5
+        run: npm install -g @deepseek-ai/dsh@0.2.2-rc.1
 
       - name: Compose a throwaway profile that installs this plugin
         run: |
@@ -106,7 +106,11 @@ jobs:
 
       - name: Install profile dependencies
         working-directory: /tmp/dsh-home/profiles/ci
-        run: npm install
+        # npm auto-installs the peer host packages that the plugin's vendored
+        # DSH libraries declare at 0.2.1, which would shadow the newer runtime
+        # the CLI provides; pnpm (and `dsh plugin add`) leave those peers to
+        # the host.
+        run: npm install --legacy-peer-deps
 
       - name: Boot the profile and confirm it comes up clean
         env:

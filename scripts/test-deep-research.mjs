@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { makeWorkspace } from './helpers/test-workspace.mjs'
 import { apply, buildFetch, buildQuoteStatus, buildWebSearch, inject, name as MODULE_NAME, runDeepResearchAction, webRecord, WEB_PROVIDERS } from '../deep-research.js'
-import { appendClaims, appendRecords, readArtifact, readCorpus, readFindings, readPaperLinks, readRetrieval, readRun, latestVerdict as latestVerdictOf, stepView, writeArtifact } from '../deep-research-store.js'
+import { appendClaims, appendFindings, appendRecords, budgetState, markStep, readArtifact, readCorpus, readFindings, readPaperLinks, readRetrieval, readRun, latestVerdict as latestVerdictOf, stepView, writeArtifact } from '../deep-research-store.js'
 
 const workspace = makeWorkspace('ah-deep-research-tool-')
 const cwd = workspace.cwd
@@ -22,6 +22,7 @@ const ok = (label, condition, detail) => {
 // A route is required before anything can run; record what each call was asked.
 let citationFree = false
 let challengeBindings = false
+let supportedCoCitation = false
 const transcript = []
 const PAPERS = [
   { source: 'openalex', doi: '10.1/semaglutide', title: 'Cardiovascular outcomes with semaglutide in overweight adults', year: 2023, citation_count: 410, url: 'https://journal.example/a', abstract: 'Randomised trial reporting a 20% relative reduction in major adverse cardiovascular events.' },
@@ -56,9 +57,14 @@ const CANNED = [
   [/Draft from this angle/iu, () => citationFree
     ? 'The trial reported a large benefit. Exclusions were broad across the field.'
     : 'The trial reported a 20% relative reduction in MACE [src-0001]. Exclusions were broad [src-0004].'],
-  [/Audit whether each cited record/iu, () => challengeBindings
-    ? { bindings: ['src-0001', 'src-0002', 'src-0003'].map((id) => ({ record_id: id, sentence: `sentence citing ${id}`, verdict: 'partial', evidence: 'the supplied text does not state it' })) }
-    : { bindings: [{ record_id: 'src-0001', sentence: 'The trial reported a 20% relative reduction in MACE', verdict: 'supports', evidence: 'abstract states the same' }] }],
+  [/Audit whether each cited record/iu, () => supportedCoCitation
+    ? { bindings: [
+      { record_id: 'src-0001', sentence: 'Benefit was reported [src-0001] [src-0002].', verdict: 'partial', evidence: 'the allocation is not stated here' },
+      { record_id: 'src-0002', sentence: 'Benefit was reported [src-0001] [src-0002].', verdict: 'supports', evidence: 'the co-citation carries the claim' },
+    ] }
+    : challengeBindings
+      ? { bindings: ['src-0001', 'src-0002', 'src-0003'].map((id) => ({ record_id: id, sentence: `sentence citing ${id}`, verdict: 'partial', evidence: 'the supplied text does not state it' })) }
+      : { bindings: [{ record_id: 'src-0001', sentence: 'The trial reported a 20% relative reduction in MACE', verdict: 'supports', evidence: 'abstract states the same' }] }],
   [/Cut filler, hedge-stacking/iu, () => ({ hunks: [{ find: 'Exclusions were broad', replace: 'Exclusions were broad across nine of eleven trials' }] })],
   [/Recommend rhythm and structure/iu, () => ({ suggestions: [{ why: 'split a long paragraph', find: 'The trial reported', replace: 'The trial reported', priority: 'low' }] })],
   [/Choose where deep investigation would most change the answer/iu, () => ({ loci: [{ title: 'Trial populations', question: 'who was studied', record_ids: ['src-0001', 'src-0004'], expected_yield: 3, why: 'the exclusion criteria decide the claim' }] })],
@@ -233,8 +239,25 @@ try {
   const blockedNames = stepView(cwd, 'dr-0002').filter((step) => step.status === 'blocked').map((step) => step.step_id)
   ok('the block is attributable to a named step', blockedNames.length === 1, blockedNames)
   ok('and it is the step the gate was raised on', blockedNames[0] === 'decompose', blockedNames)
+  const gateRead = await run({ action: 'gate', run_id: 'dr-0002', gate: 'citation' })
+  ok('gate without status is a read-only view', gateRead.verdict?.status === 'blocked' && gateRead.history?.length >= 1, gateRead)
+  const allGates = await run({ action: 'gate', run_id: 'dr-0002' })
+  ok('gate without a name lists the latest verdict per gate', Array.isArray(allGates.gates) && allGates.gates.some((row) => row.gate === 'citation'), allGates)
   const restart = await run({ action: 'run', run_id: 'dr-0002', from_step: 'decompose' })
   ok('an explicit from_step restart is allowed', restart.status !== 'blocked', restart.status)
+
+  {
+    // Low effort sets max_sources=250. The sweep must stop at the cap rather
+    // than store every hit and then block draft on the next step.
+    const cappedSources = await run({ action: 'start', query: 'Capped-source light investigation.', tier: 'light', gear: 'scout', max_sources: 4, run: true })
+    const corpus = readCorpus(cwd, cappedSources.run_id)
+    const sweep = stepView(cwd, cappedSources.run_id).find((step) => step.step_id === 'sweep')
+    ok('the source cap is enforced where records enter', corpus.records.length <= 4, corpus.records.length)
+    ok('the sweep reports how many records the cap dropped', /capped_records=[1-9]/u.test(sweep?.detail ?? '') || (cappedSources.steps ?? []).some((step) => step.step === 'sweep' && step.summary?.capped_records > 0), { sweep, steps: cappedSources.steps })
+    const overCap = budgetState(cwd, cappedSources.run_id).checks.find((check) => check.kind === 'sources')
+    ok('an at-cap source counter is non-blocking', overCap?.blocking === false, overCap)
+    ok('the source cap never blocks the following reading step', !stepView(cwd, cappedSources.run_id).some((step) => step.status === 'blocked' && /sources/u.test(step.detail ?? '')), stepView(cwd, cappedSources.run_id).filter((step) => step.status === 'blocked'))
+  }
 
   // ---------------------------------------------------------------- budget
   const capped = await run({ action: 'start', query: 'Capped investigation.', tier: 'light', gear: 'scout', max_llm_calls: 2, run: true })
@@ -259,10 +282,22 @@ try {
   // ---------------------------------------------------------------- verification seam
   await run({ action: 'record', run_id: seededId, kind: 'claims', claims: [{ text: 'MACE fell by 20% in the trial.', rq_id: 'rq-0001', record_ids: ['src-0001'], quote: 'reporting a 20% relative reduction in major adverse cardiovascular events' }] })
   const noBodies = await run({ action: 'verify', run_id: seededId })
-  ok('with no full text the quote check is not_checked, never a pass', noBodies.checks.find((check) => check.id === 'quote_integrity')?.state === 'not_checked', noBodies.checks.find((c) => c.id === 'quote_integrity'))
-  ok('an unverifiable span is listed as unverified, not as a fabrication', noBodies.not_checked.includes('quote_integrity'), noBodies.not_checked)
+  const abstractCheck = noBodies.checks.find((check) => check.id === 'quote_integrity')
+  ok('an abstract-backed quote verifies when no full text was fetched', abstractCheck?.state === 'pass' && abstractCheck.abstract_only === 1, abstractCheck)
+  ok('abstract-only support is disclosed, not reported as full-text verification', /against abstracts only/u.test(abstractCheck?.detail ?? ''), abstractCheck?.detail)
   ok('a missing report blocks the ship', noBodies.blocked.includes('report_present'), noBodies.blocked)
   ok('independence counts votes, not copies', /4 records, 3 independent votes/.test(noBodies.checks.find((check) => check.id === 'independence_recorded')?.detail ?? ''), noBodies.checks.find((c) => c.id === 'independence_recorded'))
+
+  const seededClaim = readRun(cwd, seededId).claims[0]
+  const noReason = await run({ action: 'revise', run_id: seededId, claim_id: seededClaim.claim_id, drop_quote: true })
+  ok('a claim revision without a reason is refused', /reason is required/u.test(noReason.error ?? ''), noReason)
+  const dropped = await run({ action: 'revise', run_id: seededId, claim_id: seededClaim.claim_id, drop_quote: true, reason: 'keep the assertion, not the unverifiable quote' })
+  ok('revise drops a quote without hand-editing the claims ledger', dropped.claim?.quote === null && dropped.claim?.quote_status === 'not_checked' && dropped.claim?.revision === 2, dropped)
+  const restored = await run({ action: 'revise', run_id: seededId, claim_id: seededClaim.claim_id, quote: 'reporting a 20% relative reduction in major adverse cardiovascular events', reason: 'restore the abstract-backed span' })
+  ok('revise re-verifies a replacement quote against the cited record', restored.claim?.quote_status === 'abstract', restored)
+  const rawClaimRows = readFileSync(workspace.path(join('.dsh/deep-research', seededId, 'claims.jsonl')), 'utf8').trim().split('\n').map((line) => JSON.parse(line))
+  ok('the claim ledger keeps both revisions append-only', rawClaimRows.filter((row) => row.claim_id === seededClaim.claim_id).length === 3, rawClaimRows.filter((row) => row.claim_id === seededClaim.claim_id).length)
+  ok('readers fold to the latest claim revision', readRun(cwd, seededId).claims.filter((row) => row.claim_id === seededClaim.claim_id).length === 1)
 
   const bodies = workspace.path(join('.dsh/deep-research', seededId, 'bodies'))
   mkdirSync(bodies, { recursive: true })
@@ -311,6 +346,9 @@ try {
   ok('patch_only is satisfied by the patch log', fullVerify.checks.find((check) => check.id === 'patch_only')?.state === 'pass')
   const exported = await run({ action: 'export', run_id: fullId, format: 'markdown' })
   ok('export writes the report with its verification section', exported.bytes > 200 && /# Verification/.test(readFileSync(exported.path, 'utf8')), exported)
+  ok('markdown export uses a conventional .md extension', exported.path.endsWith('.md'), exported.path)
+  const shownReport = await run({ action: 'show', run_id: fullId, section: 'artifact', max_chars: 100 })
+  ok('show caps an artifact and says so', shownReport.text.length < 400 && /truncated at 100/u.test(shownReport.text), shownReport.text?.slice(-80))
   ok('export refuses to clobber silently', /already exists/.test((await run({ action: 'export', run_id: fullId, format: 'markdown' })).error ?? ''))
   ok('export with overwrite succeeds', (await run({ action: 'export', run_id: fullId, format: 'markdown', overwrite: true })).bytes > 200)
   const csv = await run({ action: 'export', run_id: fullId, format: 'csv' })
@@ -435,16 +473,65 @@ try {
   }
 
   {
-    // A cluster id written as a citation must surface as an unknown reference.
+    // A cluster id written as a citation must surface as an invalid reference.
     const malformed = await run({ action: 'start', query: 'Malformed citation detection run.', tier: 'light', gear: 'scout' })
     await appendRecords({ cwd, runId: malformed.run_id, records: PAPERS.slice(0, 2) })
-    await writeArtifactFile(malformed.run_id, 'The benefit was large [src-c0004] and also [src-0001].')
+    await writeArtifactFile(malformed.run_id, 'The benefit was large [src-c0004], [c0001], and also [src-0001].')
     const checked = await run({ action: 'run', run_id: malformed.run_id, from_step: 'cite_check' })
-    const unknown = readFindings(cwd, malformed.run_id).filter((row) => /not in the corpus/iu.test(row.title ?? ''))
-    ok('a cluster id used as a citation is reported as unknown', unknown.some((row) => row.target === 'src-c0004'), unknown.map((row) => row.target))
-    ok('a valid id beside it is still counted', checked.status !== 'failed', checked.status)
+    const findings = readFindings(cwd, malformed.run_id)
+    const unknown = findings.filter((row) => /not in the corpus/iu.test(row.title ?? ''))
+    const invalid = findings.filter((row) => /cluster, not a record/iu.test(row.title ?? ''))
+    ok('an unknown src id used as a citation is reported', unknown.some((row) => row.target === 'src-c0004'), unknown.map((row) => row.target))
+    ok('a bare cluster id used as a citation is reported as invalid, not ignored', invalid.some((row) => row.target === 'c0001'), invalid.map((row) => `${row.target}:${row.reason}`))
+    ok('the invalid-cluster finding names the representative record', /src-\d+/u.test(invalid.find((row) => row.target === 'c0001')?.verifier ?? ''), invalid.find((row) => row.target === 'c0001'))
+    ok('the invalid-cluster finding carries a mechanical repair hunk', invalid.find((row) => row.target === 'c0001')?.suggested_hunk?.find === '[c0001]', invalid.find((row) => row.target === 'c0001')?.suggested_hunk)
+    ok('a valid id beside them is still counted', checked.status !== 'failed' && checked.steps?.find((step) => step.step === 'cite_check')?.summary?.cited === 1, checked.steps?.find((step) => step.step === 'cite_check'))
+    ok('from_step does not run earlier pending steps', checked.steps?.length === 1 && checked.steps[0].step === 'cite_check', checked.steps)
+    await markStep({ cwd, runId: malformed.run_id, step: 'cite_check', status: 'blocked', detail: 'test gate' })
+    const blockedRerun = await run({ action: 'run', run_id: malformed.run_id, from_step: 'cite_check' })
+    ok('from_step resets and actually reruns a blocked step', blockedRerun.steps?.length === 1 && blockedRerun.steps[0].step === 'cite_check', blockedRerun.steps)
+    await markStep({ cwd, runId: malformed.run_id, step: 'cite_check', status: 'done', detail: 'test done' })
+    const doneRerun = await run({ action: 'run', run_id: malformed.run_id, from_step: 'cite_check' })
+    ok('from_step reruns the named step even when it is done', doneRerun.steps?.length === 1 && doneRerun.steps[0].step === 'cite_check', doneRerun.steps)
   }
 
+
+  {
+    // A manual patch is the documented repair path; it must close the finding it
+    // actually fixed and tell the caller to refresh the citation gate.
+    const patchRun = await run({ action: 'start', query: 'Patch closure check.', tier: 'light', gear: 'scout' })
+    await writeArtifactFile(patchRun.run_id, 'The trial reported a benefit.\n')
+    const made = await appendFindings({
+      cwd, runId: patchRun.run_id, stepId: 'critics',
+      findings: [{ severity: 'High', title: 'Benefit lacks a size', reason: 'inspection found no effect size', target: 'final_report#benefit', primary_check: 'coverage', verifier: 'read the effect sentence' }],
+    })
+    await markStep({ cwd, runId: patchRun.run_id, step: 'cite_check', status: 'done', detail: 'prior check' })
+    const patched = await run({
+      action: 'patch', run_id: patchRun.run_id, finding_id: made.accepted[0].finding_id,
+      hunks: [{ find: 'a benefit', replace: 'a 20% benefit' }],
+    })
+    ok('a manual patch closes the finding it applied', patched.finding_status === 'applied' && readFindings(cwd, patchRun.run_id).find((row) => row.finding_id === made.accepted[0].finding_id)?.status === 'applied', patched)
+    ok('a report patch asks for a fresh cite check', patched.recheck === 'cite_check' && stepView(cwd, patchRun.run_id).find((step) => step.step_id === 'cite_check')?.status === 'pending', patched)
+    const beforeUnknown = readArtifact({ cwd, runId: patchRun.run_id, name: 'final_report' }).text
+    const unknownFinding = await run({
+      action: 'patch', run_id: patchRun.run_id, finding_id: 'f-9999',
+      hunks: [{ find: 'The trial', replace: 'The changed trial' }],
+    })
+    ok('an unknown finding is refused before the report changes', /unknown finding/u.test(unknownFinding.error ?? '') && readArtifact({ cwd, runId: patchRun.run_id, name: 'final_report' }).text === beforeUnknown, unknownFinding)
+    const partial = await appendFindings({
+      cwd, runId: patchRun.run_id, stepId: 'critics',
+      findings: [{ severity: 'High', title: 'Another defect', reason: 'inspection found it', target: 'final_report#other', primary_check: 'calibration', verifier: 'read it' }],
+    })
+    const partialPatch = await run({
+      action: 'patch', run_id: patchRun.run_id, finding_id: partial.accepted[0].finding_id,
+      hunks: [{ find: 'reported', replace: 'reported once' }, { find: 'text that is absent', replace: 'x' }],
+    })
+    ok('a partial patch leaves its finding open', partialPatch.finding_status === 'open' && partialPatch.escalated.length === 1, partialPatch)
+    const shown = await run({ action: 'show', run_id: patchRun.run_id, section: 'artifact' })
+    ok('show reads a stored artifact without shell access', shown.text?.includes('20% benefit') && shown.hash?.startsWith('sha256:'), shown)
+    const shownClaims = await run({ action: 'show', run_id: patchRun.run_id, section: 'claims', limit: 1 })
+    ok('show reads claims with a bounded page', Array.isArray(shownClaims.claims) && shownClaims.claims.length <= 1, shownClaims)
+  }
 
   // ---------------------------------------------------------------- retrieval contract
   {
@@ -559,6 +646,41 @@ try {
     challengeBindings = false
     ok('the same verdicts do block when the text was readable', checked.status === 'blocked', checked)
     ok('and the gate names the citation check', checked.reason === 'citation', checked.reason)
+
+    // A sentence cites two records; one is partial, the other supports it.
+    // The sentence is supported and must not produce a High finding.
+    const mixed = await runDeepResearchAction(
+      { action: 'start', query: 'Co-citation support run.', tier: 'light', gear: 'scout' },
+      exec, ctx, DEPS,
+    )
+    await appendRecords({
+      cwd, runId: mixed.run_id,
+      records: [
+        { title: 'Trial one of semaglutide outcomes', doi: '10.7/one', source: 'openalex', abstract: 'A randomised trial reporting benefit.' },
+        { title: 'Trial two of semaglutide outcomes', doi: '10.7/two', source: 'openalex', abstract: 'The trial allocated 8,803 to semaglutide and 8,801 to placebo.' },
+      ],
+    })
+    await writeArtifact({ cwd, runId: mixed.run_id, name: 'final_report', overwrite: true, body: 'Benefit was reported [src-0001] [src-0002].' })
+    supportedCoCitation = true
+    const coCited = await run({ action: 'run', run_id: mixed.run_id, from_step: 'cite_check' })
+    supportedCoCitation = false
+    ok('a co-citation that supports the sentence settles the claim', coCited.status !== 'blocked' && readFindings(cwd, mixed.run_id).filter((row) => row.severity === 'High').length === 0, coCited)
+
+    // The live checker truncated abstracts at 400 chars and then challenged a
+    // quote whose supporting sentence sat after the cut. The full abstract must
+    // travel into the audit prompt.
+    const longAbstract = await runDeepResearchAction(
+      { action: 'start', query: 'Long abstract citation run.', tier: 'light', gear: 'scout' },
+      exec, ctx, DEPS,
+    )
+    await appendRecords({
+      cwd, runId: longAbstract.run_id,
+      records: [{ title: 'Long abstract trial', doi: '10.8/long', source: 'openalex', abstract: `${'background detail. '.repeat(40)}TAIL-SENTINEL the trial reported benefit.` }],
+    })
+    await writeArtifact({ cwd, runId: longAbstract.run_id, name: 'final_report', overwrite: true, body: 'Benefit was reported [src-0001].' })
+    await run({ action: 'run', run_id: longAbstract.run_id, from_step: 'cite_check' })
+    const auditPrompt = transcript.filter((entry) => /Audit whether each cited record/u.test(entry.system)).at(-1)?.content ?? ''
+    ok('cite check sends the full abstract, not the first 400 characters', auditPrompt.includes('TAIL-SENTINEL'), auditPrompt.slice(-200))
   }
 
 
@@ -654,10 +776,14 @@ try {
     const links = readPaperLinks(cwd, pmRun.run_id)
     ok('the link is persisted in its own append-only ledger', links.get('src-0001')?.pm_paper === 'PM-PAPER-1', [...links.values()])
 
-    // The library decides, even when the run's own cache would have said yes.
+    // A library byte-miss is a false-negative source (PDF typography, truncation),
+    // so the run cache and the stored abstract remain valid fallbacks.
     const cacheFirst = buildQuoteStatusFor(pmRun.run_id, () => ({ ok: true, found: false }))
-    ok('quote verification consults the library, not just the run cache',
-      await cacheFirst('random random', { record_id: 'src-0001' }) === 'unsupported', 'expected unsupported')
+    ok('a library miss falls back to fetched text instead of declaring fabrication',
+      await cacheFirst('random random', { record_id: 'src-0001' }) === 'supported', 'expected cache fallback')
+    const absentEverywhere = buildQuoteStatusFor(pmRun.run_id, () => ({ ok: true, found: false }))
+    ok('a span absent from the library, body, and abstract is unsupported',
+      await absentEverywhere('a sentence that appears nowhere in the paper', { record_id: 'src-0001', abstract: 'unrelated abstract text' }) === 'unsupported')
     const libraryBlind = buildQuoteStatusFor(pmRun.run_id, () => ({ ok: false, code: 'not_installed' }))
     ok('an unreadable library is not a verdict on the quote',
       await libraryBlind('random random', { record_id: 'src-0001' }) === 'supported', 'falls back to cache')

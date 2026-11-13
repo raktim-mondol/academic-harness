@@ -151,6 +151,10 @@
             isolate:
               planMode: true
             config:
+              # The task command shares this realm so its executor can check planMode.
+              - id: academic-task
+                name: academic-harness/academic-task
+
               - id: plan-mode
                 name: '@deepseek-ai/dsh-plan-mode'
                 config:
@@ -268,11 +272,14 @@
               # connectors below, and for the `inject` declaration a
               # `ctx.plugin()`-mounted child like this one needs.
               #
-              # `agentOptions` is forwarded by `@deepseek-ai/dsh-tool-subagent`. Pin that
-              # dependency to the same line as `npm install -g @deepseek-ai/dsh`
-              # (`latest`). Spawn-in-process on 0.2.1 advertises `agentOptions`; a
-              # mismatched older spawn provider throws at mount and drops
-              # `subagent_pro`/`subagent_vision` as "unknown tool".
+              # `agentOptions` is forwarded by `@deepseek-ai/dsh-tool-subagent`. The
+              # programmatic mount resolves the host's own copy of that package at
+              # runtime (source tree first, then DSH's healed packages beside profiles),
+              # so its `startActivation` call always matches the running subagent
+              # service; DSH 0.2.2-rc.2 flattened that payload. Spawn-in-process on
+              # 0.2.1 advertises `agentOptions`; a mismatched older spawn provider
+              # throws at mount and drops `subagent_pro`/`subagent_vision` as
+              # "unknown tool".
               - id: subagent-models
                 name: academic-harness/subagent-models
 

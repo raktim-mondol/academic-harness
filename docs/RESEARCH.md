@@ -127,6 +127,16 @@ A disagreement is a first-class state: `appraisal_status` lists it, `reconcile` 
 
 ## Deep research
 
+### Chatbox task selector
+
+Select **Deep Research** below the chatbox, enter a question, and use the normal Send button (or Enter). Selecting the chip alone spends nothing; clicking its main segment again clears the selection without clearing the question. The selected chip carries its own **Auto / Low / Medium / High** effort segment and a menu, mirroring the model control; the menu grows outside the composer rather than taking a separate toolbar slot. Effort maps to the existing engine settings, and the choice appears on the chip (`Deep Research | High ▾`) so the setting is visible before Send. No selection means ordinary Chat. Only Deep Research is enabled in this first phase; the shared catalogue reserves the other six task modes without exposing nonfunctional buttons.
+
+The selector uses DSH's command-input hooks (`/research`) and the preset-scoped `academic-task` command, not a prompt prefix asking the model to choose a tool. The host validates the request and invokes `deep_research` through the tool-policy pipeline on the receiving session's model. Plan mode blocks admission and is checked again at execution. Phase 1 accepts a text question only; remove attachments rather than silently discarding them. Existing command/reference chips are not rewritten into plain text when selecting a task.
+
+The selected chip is visibly active: it takes the theme primary fill and contrasting text, shows a check, and keeps the effort segment on the chip. After Send, a persistent receipt appears in the composer dock with the question, effort, job/run id, and a pointer to Background tasks; the command also returns an immediate notice. This covers the empty-session hero, which may not render the command transcript node until later. The receipt is dismissible and is cleared by the next submission. Background jobs shows the task and the engine's step-by-step research job; stopping the task forwards cancellation to the engine. An ambiguous Auto-effort request stays in the composer with the engine's clarification question: choose an explicit effort and send the unchanged question again. Submission failures preserve the draft and selection. A session-scoped request identity is retained in browser session storage until acknowledgment when storage is available, so retrying a lost acknowledgment does not start another costly run.
+
+Task receipts live under `.dsh/tasks/<session-hash>/<request-id>.json` and refer to the existing research run rather than replacing its ledger. They record the submitted question, options, job/run ids, and terminal outcome. Reusing an accepted request id never restarts it, including after a host restart; a receipt's recorded `running` state is not proof that a live job survived. Inspect the referenced run with `deep_research action=status` before explicitly resuming interrupted work. Completed reports remain under `.dsh/deep-research/<run-id>/artifacts/final-report.md`. A blocked or failed run is not reported as a completed report.
+
 `deep_research` runs the survey-to-report pipeline that `skills/deep-research`
 describes, with the part prose cannot provide: durable state and enforced gates.
 It is a preset tool, so it inherits this harness's retrieval and memory rather
@@ -166,6 +176,39 @@ What it guarantees:
   context, an oversized hunk, and a hunk count that would amount to a rewrite;
   those escalate as structural findings instead of being applied. A patched
   artifact cannot be overwritten at all — the store refuses it.
+- **Resume is active-time and order-safe.** The wall-clock budget counts active
+  execution segments, not idle hours while the host is down or a gate waits for
+  a person; the status line reports both active and elapsed time. `from_step` is
+  an explicit restart: it reruns the named step even when it is done, resets
+  blocked steps at or after it, and does not walk backwards into earlier steps.
+  A normal `resume` never skips a blocked or unfinished earlier step. `gate`
+  without a `status` reads the latest verdicts; `show` reads a stored artifact,
+  claims, findings, state, gates, query, or manifest; `revise` drops or replaces
+  one claim's quote and re-verifies the replacement, appending a revision rather
+  than editing the claims ledger; `patch` is the only supported way to repair a
+  report and closes its `finding_id` only when every hunk applies. Never edit
+  `.dsh/deep-research` files by hand.
+- **The citation gate sees cluster ids and whole sentences.** A bracket token
+  shaped like a cluster id (`c0242`) or an unknown `src-` id is a High citation
+  finding, not an ignored label; the finding names the cluster's representative
+  record. A sentence is judged as a citation set: if any readable co-citation
+  supports it, a partial binding on another cited record does not block it.
+  Cite-check samples up to 30 records and sends full abstracts (up to 2000
+  characters), because a 400-character head produced false partials in a live
+  run. A quote found verbatim in a stored abstract is `abstract`-supported, is
+  disclosed as abstract-only, and is not a fabrication when a PDF conversion
+  loses the span. A quote absent from the library, the fetched body, and the
+  abstract remains `unsupported`; a truncated body with no match is
+  `not_checked`.
+- **The source cap is an ingestion cap.** A low-effort run stops storing at
+  `max_sources`; the sweep reports how many records the cap dropped. A legacy
+  corpus already over the cap is reported non-blocking, so it cannot strand the
+  next reading step.
+- **Findings belong to the report bytes they graded.** A patch makes the old
+  citation/critic findings stale instead of letting them block forever; the ship
+  gate reports `findings_current` and asks for a fresh `from_step=cite_check`
+  (and `critics` when the text changed). Re-raising a fixed issue after a rerun
+  is allowed; only currently open findings for the same report suppress duplicates.
 - **A blocker is a human decision.** `blocked` step state halts both `run` and
   `resume`; only an explicit `from_step` resets it.
 - **A pass never overclaims.** Each gate check is `pass`, `blocked`, or

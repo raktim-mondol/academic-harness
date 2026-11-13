@@ -104,6 +104,33 @@ def test_quote_check_reasons(tmp_path):
     store.close()
 
 
+def test_quote_check_reads_through_conversion_typography(tmp_path):
+    """PDF conversion writes the document's own emphasis into the markdown."""
+    store = _store(tmp_path)
+    body = """# Paper
+
+## Results
+
+Of the architectures tested,** **the Swin Transformer outperformed at 384 *×* 384.
+"""
+    ingested = _ingest(store, tmp_path, name="typed.md", body=body, doi="10.6/typed")
+    found = quote_check(
+        store,
+        "Of the architectures tested, the Swin Transformer outperformed",
+        paper_id=ingested["paper_id"],
+    )
+    assert found["found"] is True and found["occurrences"]
+    # The reported span still points at the marked-up original.
+    assert "** **" in (found["occurrences"][0]["snippet"] or "")
+    missing = quote_check(
+        store,
+        "Of the architectures tested, the Swin Transformer underperformed",
+        paper_id=ingested["paper_id"],
+    )
+    assert missing["found"] is False and missing["reason"] == "no-match"
+    store.close()
+
+
 def test_verify_walk_promotes_and_detects_drift(tmp_path):
     store = _store(tmp_path)
     ingested = _ingest(store, tmp_path)

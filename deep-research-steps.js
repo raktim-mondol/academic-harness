@@ -18,8 +18,8 @@
  */
 import {
   DEPTH, REGISTERS, TIERS, appendClaims, appendFindings, appendRecords, applyHunks,
-  budgetState, markFindingApplied, markStep, readArtifact, readCorpus, readFindings,
-  readManifest, readQuery, recordUsage, recordVerdict, stepView, supersedeFindings, writeArtifact,
+  budgetState, findingIsCurrent, markFindingApplied, markStep, readArtifact, readCorpus, readFindings,
+  readManifest, readQuery, readRun, recordUsage, recordVerdict, stepView, supersedeFindings, writeArtifact,
 } from './deep-research-store.js'
 import { UNTRUSTED_RULE, fenceMany } from './untrusted-fence.js'
 
@@ -251,6 +251,15 @@ function clipTitle(value, max = 46) {
  * Rank the corpus for a draft that has no digest: most-cited first, then the
  * order retrieved. Ties keep retrieval order so the result is deterministic.
  */
+/** Record ids that actually appear in supplied material. Used to constrain synthesis to real citations. */
+function allowedRecordIds(...texts) {
+  const ids = new Set()
+  for (const text of texts) {
+    for (const match of String(text ?? '').matchAll(/\[(src-[a-z0-9-]+)\]/gu)) ids.add(match[1])
+  }
+  return [...ids]
+}
+
 function rankRecords(records, limit = 60) {
   return [...records]
     .map((record, index) => ({ record, index }))
@@ -368,6 +377,11 @@ const STEP_RUNNERS = {
     }))
     const seen = new Set()
     const lines = []
+    const configuredSources = manifest.budget?.max_sources
+    const maxSources = configuredSources === null || configuredSources === undefined
+      ? null
+      : Number.isFinite(Number(configuredSources)) ? Number(configuredSources) : null
+    let cappedRecords = 0
     let added = 0
     let landed = 0
     for (const entry of results) {
@@ -380,9 +394,10 @@ const STEP_RUNNERS = {
         seen.add(key)
         return true
       })
-      const stored = await appendRecords({ cwd, runId, perspective: entry.value.perspective, records: fresh })
+      const stored = await appendRecords({ cwd, runId, perspective: entry.value.perspective, records: fresh, maxRecords: maxSources })
       added += stored.added
-      lines.push(`## ${entry.value.perspective} — ${entry.value.papers.length} returned, ${stored.added} new\n${corpusDigest(stored.records, { perRecord: 160, limit: 20 })}`)
+      cappedRecords += stored.dropped ?? 0
+      lines.push(`## ${entry.value.perspective} — ${entry.value.papers.length} returned, ${stored.added} new${stored.dropped ? `, ${stored.dropped} over the ${maxSources}-record cap` : ''}\n${corpusDigest(stored.records, { perRecord: 160, limit: 20 })}`)
     }
     // The web lane runs after the scholarly one, on its own queries. It exists
     // for guidance documents, registers, and reporting — not to out-vote the
@@ -398,9 +413,10 @@ const STEP_RUNNERS = {
           objective: `${manifest.brief.topic}${manifest.brief.angle ? ` — ${manifest.brief.angle}` : ''}`,
           queries: webQueries,
         })
-        const stored = await appendRecords({ cwd, runId, perspective: 'web lane', suggestedBy: 'web_sweep', records: papers })
+        const stored = await appendRecords({ cwd, runId, perspective: 'web lane', suggestedBy: 'web_sweep', records: papers, maxRecords: maxSources })
         webAdded = stored.added
-        webNotes.push(`- ${webQueries.length} web queries → ${papers.length} pages, ${stored.added} new records`)
+        cappedRecords += stored.dropped ?? 0
+        webNotes.push(`- ${webQueries.length} web queries → ${papers.length} pages, ${stored.added} new records${stored.dropped ? `, ${stored.dropped} over the ${maxSources}-record cap` : ''}`)
       } catch (error) {
         webNotes.push(`- web lane failed: ${error instanceof Error ? error.message : String(error)}`)
       }
@@ -421,6 +437,7 @@ const STEP_RUNNERS = {
     const written = await writeArtifact({
       cwd, runId, name: 'sweep', step: 'sweep', overwrite: true,
       body: ['# Width sweep', '', `Records: ${corpus.independence.records} · Independent votes: ${corpus.independence.votes}`,
+        ...(maxSources !== null ? [`Corpus cap: ${maxSources} records${cappedRecords ? `; ${cappedRecords} returned beyond it were not stored` : '; not reached'}`] : []),
         ...(webNotes.length ? ['', '## Web lane', ...webNotes] : []),
         ...(sourceFailures.length ? ['', '## Retrieval failures', ...sourceFailures.map((f) => `- ${f.perspective} · ${f.query} · ${f.error}`)] : []),
         '', ...lines].join('\n\n'),
@@ -428,7 +445,7 @@ const STEP_RUNNERS = {
     if (!corpus.independence.records) throw new Error('the sweep retrieved nothing; a report from memory is not research')
     return {
       artifact: written,
-      summary: { perspectives: perspectives.length, records: corpus.independence.records, votes: corpus.independence.votes, web_records: webAdded, failures: sourceFailures.length },
+      summary: { perspectives: perspectives.length, records: corpus.independence.records, votes: corpus.independence.votes, web_records: webAdded, failures: sourceFailures.length, capped_records: cappedRecords },
       verdict: sourceFailures.length ? { gate: 'coverage', status: 'flagged', reason: `${sourceFailures.length} retrieval failure(s)`, route: 'retry or widen sources' } : null,
     }
   },
@@ -660,7 +677,8 @@ const STEP_RUNNERS = {
         verdicts.push(verdict === null || verdict === undefined ? 'not_checked' : verdict)
       }
       statuses.push(verdicts.includes('supported') ? 'supported'
-        : verdicts.includes('unsupported') ? 'unsupported' : 'not_checked')
+        : verdicts.includes('abstract') ? 'abstract'
+          : verdicts.includes('unsupported') ? 'unsupported' : 'not_checked')
     }
     const claims = await appendClaims({
       cwd, runId,
@@ -675,7 +693,11 @@ const STEP_RUNNERS = {
     return {
       artifact: written,
       summary: { claims: claims.length, unsupported: unsupported.length, answered: new Set(claims.filter((claim) => claim.rq_id).map((claim) => claim.rq_id)).size },
-      verdict: unsupported.length ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${unsupported.length} quote(s) not present verbatim`, route: 'drop the quote or re-verify against the source', detail: unsupported.map((claim) => claim.claim_id).join(', ') } : null,
+      verdict: unsupported.length
+        ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${unsupported.length} quote(s) not present verbatim`, route: 'drop the quote or re-verify against the source', detail: unsupported.map((claim) => claim.claim_id).join(', ') }
+        // A successful rerun must supersede the digest's earlier blocked verdict;
+        // otherwise `gate` keeps reporting a defect the rerun just cleared.
+        : { gate: 'citation', status: 'clear', reason: 'no claim quote failed the verbatim check' },
     }
   },
 
@@ -734,14 +756,17 @@ const STEP_RUNNERS = {
     const comparisons = readArtifact({ cwd, runId, name: 'comparisons' })?.text ?? ''
     const tensions = readArtifact({ cwd, runId, name: 'source-tensions' })?.text ?? ''
     const contradictions = readArtifact({ cwd, runId, name: 'contradictions' })?.text ?? ''
+    const allowed = allowedRecordIds(drafts.text, comparisons, tensions, contradictions)
     const reply = await llm({
       step: 'synthesize',
       system: [
         'Write the final report. Answer each research question by id in a closing "Answers" section.',
         'Keep disagreements in view with the conditions that produce them; never average them.',
         'Cite record ids inline as [src-0001] and cite only ids that appear in the material.',
+        'A cluster id such as c0004 names a group of copies and is never a citation. Do not invent ids or use bracket labels such as [AUC] as evidence.',
+        allowed.length ? `Allowed record ids: ${allowed.slice(0, 300).join(', ')}${allowed.length > 300 ? ` (+${allowed.length - 300} more in the drafts)` : ''}.` : '',
         registerVoice(manifest.brief.register),
-      ].join(' '),
+      ].filter(Boolean).join(' '),
       messages: [{ role: 'user', content: [briefBlock(manifest), '', contradictions, tensions, comparisons, drafts.text].join('\n\n---\n\n') }],
       json: false,
       maxTokens: 8000,
@@ -792,21 +817,26 @@ const STEP_RUNNERS = {
   },
 
   // 13 — critic-identified gaps get one targeted retrieval wave before patching.
-  async gap_fetch({ cwd, runId, deps, progress }) {
+  async gap_fetch({ cwd, runId, manifest, deps, progress }) {
     const findings = readFindings(cwd, runId).filter((finding) => finding.status === 'open')
     const wanted = findings.filter((finding) => finding.primary_check === 'coverage' || finding.primary_check === 'citation')
-    if (!wanted.length) return { summary: { queried: 0, added: 0 }, artifact: { artifact: 'gap-fetch' } }
+    if (!wanted.length) return { summary: { queried: 0, added: 0, capped_records: 0 }, artifact: { artifact: 'gap-fetch' } }
+    const configuredSources = manifest.budget?.max_sources
+    const maxSources = configuredSources === null || configuredSources === undefined
+      ? null
+      : Number.isFinite(Number(configuredSources)) ? Number(configuredSources) : null
     const results = await gather(wanted.map((finding) => async () => {
       const papers = await deps.search({ query: String(finding.title ?? finding.reason ?? ''), perSource: 15 })
-      const stored = await appendRecords({ cwd, runId, suggestedBy: finding.finding_id, records: papers })
-      return { finding_id: finding.finding_id, added: stored.added }
+      const stored = await appendRecords({ cwd, runId, suggestedBy: finding.finding_id, records: papers, maxRecords: maxSources })
+      return { finding_id: finding.finding_id, added: stored.added, dropped: stored.dropped ?? 0 }
     }))
     const added = results.reduce((sum, entry) => sum + (entry.ok ? entry.value.added : 0), 0)
+    const cappedRecords = results.reduce((sum, entry) => sum + (entry.ok ? entry.value.dropped : 0), 0)
     const written = await writeArtifact({
       cwd, runId, name: 'gap-fetch', step: 'gap_fetch', overwrite: true,
-      body: ['# Gap fetch', '', ...results.map((entry, index) => `- ${wanted[index].finding_id}: ${entry.ok ? `${entry.value.added} records` : `failed (${entry.error})`}`)].join('\n'),
+      body: ['# Gap fetch', '', ...results.map((entry, index) => `- ${wanted[index].finding_id}: ${entry.ok ? `${entry.value.added} records${entry.value.dropped ? `, ${entry.value.dropped} over the ${maxSources}-record cap` : ''}` : `failed (${entry.error})`}`)].join('\n'),
     })
-    return { artifact: written, summary: { queried: wanted.length, added } }
+    return { artifact: written, summary: { queried: wanted.length, added, capped_records: cappedRecords } }
   },
 
   // 14 — apply critic findings as capped hunks, or escalate them. Never rewrite.
@@ -821,11 +851,14 @@ const STEP_RUNNERS = {
         cwd, runId, artifact: 'final_report', findingId: finding.finding_id,
         hunks: [finding.suggested_hunk],
       })
-      if (result.applied.length) {
+      if (result.applied.length && !result.escalated.length) {
         await markFindingApplied({ cwd, runId, findingId: finding.finding_id, patchId: result.patch_id })
         applied += 1
       } else {
+        // A partial patch does not close the finding; the remaining context is
+        // still a defect the report must answer for.
         for (const entry of result.escalated) escalated.push({ finding_id: finding.finding_id, reason: entry.reason, detail: entry.detail })
+        if (!result.escalated.length) escalated.push({ finding_id: finding.finding_id, reason: 'not_applied', detail: 'no hunk changed the report' })
       }
       progress({ step: 'patcher', phase: 'finding', done: findings.indexOf(finding) + 1, total: findings.length, detail: `${finding.finding_id} ${result.applied.length ? 'patched' : 'escalated'}` })
     }
@@ -848,11 +881,24 @@ const STEP_RUNNERS = {
     // that writes [src-c0004] is citing a cluster, and a report that cites
     // nothing at all must not be handed a clean citation verdict.
     const tokens = [...new Set([...report.text.matchAll(/\[([A-Za-z][A-Za-z0-9-]{1,20})\]/gmu)].map((match) => match[1].toLowerCase()))]
-    const sourceRefs = tokens.filter((token) => /^src-[a-z0-9-]+$/u.test(token))
+    // Bracketed prose such as [AUC] is not a citation. These shapes are. A
+    // cluster id (`c0242`) is especially dangerous: it looks like a citation,
+    // is stable across copies, and names no single work, so every one is a
+    // High finding rather than an ignored token.
+    const citationShaped = tokens.filter((token) => /^(?:src-[a-z0-9-]+|c\d{3,}|cl-[a-z0-9-]+|rec-\d+)$/u.test(token))
+    const sourceRefs = [...new Set(citationShaped.filter((token) => /^src-/u.test(token)))]
     const knownIds = sourceRefs.filter((id) => corpus.records.some((record) => record.record_id === id))
     const cited = knownIds.map((id) => corpus.records.find((record) => record.record_id === id)).filter(Boolean)
-    const missing = [...new Set(sourceRefs)].filter((id) => !knownIds.includes(id))
-    const sample = cited.slice(0, 12)
+    const missing = sourceRefs.filter((id) => !knownIds.includes(id))
+    const clusterById = new Map()
+    for (const record of corpus.records) {
+      if (record.cluster_id && !clusterById.has(record.cluster_id)) clusterById.set(record.cluster_id, record)
+    }
+    const invalid = citationShaped.filter((token) => !/^src-/u.test(token))
+      .map((token) => ({ token, representative: clusterById.get(token) ?? null }))
+    // Low runs can cite 25-30 records. A 12-record sample can omit the one
+    // co-citation that supports a sentence, producing a false challenge.
+    const sample = cited.slice(0, 30)
     // A record with no abstract and no fetched body cannot confirm or refute a
     // citation. Challenging those would blame the report for a retrieval gap of
     // ours, and would block a ship that is actually unverifiable rather than wrong.
@@ -862,12 +908,15 @@ const STEP_RUNNERS = {
       step: 'cite_check',
       system: [
         'Audit whether each cited record actually supports the sentence that cites it. Return JSON: {"bindings":[{"record_id","sentence","verdict":"supports|partial|mismatch|unknown","evidence":str}]}.',
-        'Judge only the sentence-citation pair you can see. If the material does not show it, say unknown; unknown is not a mismatch.',
+        'Return one binding for every cited record in a sentence. A sentence is supported when at least one cited record carries the claim; do not challenge it merely because another co-citation is partial. Judge only the sentence-citation pair you can see. If the material does not show it, say unknown; unknown is not a mismatch.',
         UNTRUSTED_RULE,
       ].join(' '),
       messages: [{ role: 'user', content: [
         `Report:\n${report.text.slice(0, 20000)}`, '',
-        `Cited records:\n${corpusDigest(sample, { perRecord: 400, includeBody: await deps.fetch(sample) })}`,
+        // 400 chars truncated the very sentence that supported the claim in a
+        // live run (the GI/hypoglycemia details sat after the cut). Cite-check
+        // needs the full abstract, not the head of it.
+        `Cited records:\n${corpusDigest(sample, { perRecord: 2000, includeBody: await deps.fetch(sample) })}`,
         evidenceless.length
           ? `Records with no readable text (title only): ${evidenceless.map((record) => record.record_id).join(', ')}. Return verdict \"unknown\" for any binding to these; they cannot be judged.`
           : '',
@@ -875,9 +924,33 @@ const STEP_RUNNERS = {
       json: true,
     })
     const json = reply.json ?? {}
-    const challengedAll = (json.bindings ?? []).filter((binding) => ['partial', 'mismatch'].includes(binding.verdict))
-    const challenged = challengedAll.filter((binding) => readableIds.has(String(binding.record_id ?? '')))
-    const unverifiable = challengedAll.length - challenged.length
+    const normalizeSentence = (value) => String(value ?? '').replace(/\s+/gu, ' ').trim().toLowerCase()
+    const bindings = Array.isArray(json.bindings) ? json.bindings : []
+    // A sentence often carries several citations because different sources
+    // support different parts of it. One supporting co-citation settles the
+    // sentence; challenging every partial binding would block a supported claim.
+    const supportedSentences = new Set(bindings
+      .filter((binding) => binding.verdict === 'supports' && readableIds.has(String(binding.record_id ?? '')))
+      .map((binding) => normalizeSentence(binding.sentence)))
+    const challengedGroups = new Map()
+    let unverifiable = 0
+    for (const binding of bindings) {
+      if (!['partial', 'mismatch'].includes(binding.verdict)) continue
+      const key = normalizeSentence(binding.sentence) || `record:${binding.record_id ?? 'unknown'}`
+      if (supportedSentences.has(key)) continue
+      if (!challengedGroups.has(key)) challengedGroups.set(key, [])
+      challengedGroups.get(key).push(binding)
+    }
+    const challenged = []
+    for (const group of challengedGroups.values()) {
+      if (group.some((binding) => readableIds.has(String(binding.record_id ?? '')))) {
+        challenged.push({
+          ...group[0],
+          record_ids: [...new Set(group.map((binding) => String(binding.record_id ?? '')).filter(Boolean))],
+          details: group,
+        })
+      } else unverifiable += 1
+    }
     const retractions = deps.retractionFor
       ? (await Promise.all(cited.map((record) => deps.retractionFor(record)))).filter((flag) => flag?.retracted)
       : []
@@ -895,13 +968,28 @@ const STEP_RUNNERS = {
         }] : []),
         ...challenged.map((binding) => ({
           severity: 'High', title: `Citation does not support its sentence (${binding.verdict})`,
-          reason: binding.evidence ?? `record ${binding.record_id} was read against the citing sentence`,
-          target: binding.record_id ?? binding.sentence ?? 'final_report', primary_check: 'citation',
-          verifier: 're-read the passage and either restate the sentence or drop the citation',
+          reason: binding.details.map((row) => `${row.record_id}: ${row.verdict}${row.evidence ? ` — ${row.evidence}` : ''}`).join('; '),
+          target: binding.record_ids.join(',') || binding.record_id || binding.sentence || 'final_report', primary_check: 'citation',
+          verifier: `re-read the passage and either restate the sentence, replace ${binding.record_ids.join('/') || 'the citation'} with a record that supports it, or drop the citation`,
         })),
         ...missing.map((id) => ({
           severity: 'High', title: 'Citation names a record that is not in the corpus', reason: `${id} appears in the report but was never retrieved`,
           target: id, primary_check: 'citation', verifier: 'retrieve the work or delete the citation',
+        })),
+        ...invalid.map(({ token, representative }) => ({
+          severity: 'High',
+          title: 'Citation names a cluster, not a record',
+          reason: representative
+            ? `${token} names a cluster of copies; its representative record is ${representative.record_id}. Cite a specific [src-...] work, not the cluster.`
+            : `${token} is not a [src-...] record in this corpus`,
+          target: token,
+          primary_check: 'citation',
+          verifier: representative
+            ? `replace [${token}] with [${representative.record_id}] for the sentence it supports, or remove it`
+            : 'replace it with the specific [src-...] record(s) that support the sentence, or remove it',
+          // A cluster token is a mechanical substitution when it is unique in
+          // the report; the patcher applies it as a hunk and closes the finding.
+          ...(representative ? { suggested_hunk: { find: `[${token}]`, replace: `[${representative.record_id}]` } } : {}),
         })),
         ...retractions.map((flag) => ({
           severity: 'High', title: 'Retracted source cited without acknowledgement', reason: flag.notice ?? 'retraction flag returned',
@@ -912,18 +1000,26 @@ const STEP_RUNNERS = {
     })
     const written = await writeArtifact({
       cwd, runId, name: 'cite-check', step: 'cite_check', overwrite: true,
-      body: ['# Cite check', '', `Cited records: ${cited.length} · sampled: ${sample.length} · unknown ids: ${missing.length}`,
+      body: ['# Cite check', '', `Cited records: ${cited.length} · sampled: ${sample.length} · unknown or invalid ids: ${missing.length + invalid.length}`,
         `Bindings challenged: ${challenged.length} · unverifiable for want of text: ${unverifiable + evidenceless.length} · retracted cited: ${retractions.length}`,
+        ...(invalid.length ? ['', 'Cluster or non-record ids used as citations:', ...invalid.map(({ token, representative }) => `- ${token}${representative ? ` → representative ${representative.record_id}` : ' → no matching cluster'}`)] : []),
         ...(evidenceless.length ? ['', `Title-only records the sweep could not read (abstract absent from every source): ${evidenceless.map((record) => `${record.record_id} ${clipTitle(record.title)}`).join('; ')}`] : []),
         ...(findings.accepted.length ? ['', ...findings.accepted.map((finding) => `- ${finding.finding_id} ${finding.severity} · ${finding.title} → ${finding.target}`)] : []),
         ...(findings.rejected.length ? ['', 'Rejected candidates (kept visible, not promoted):', ...findings.rejected.map((row) => `- ${row.title}: ${row.rejected_reason}`)] : [])].join('\n'),
     })
-    const blocking = findings.accepted.filter((finding) => finding.severity === 'High').length
+    // The gate is about the current report, not only findings this pass happened
+    // to add. A rerun that re-observes a still-open High defect must block even
+    // when duplicate suppression returns it in `rejected`.
+    const patches = readRun(cwd, runId)?.patches ?? []
+    const currentOpen = readFindings(cwd, runId).filter((finding) => finding.status === 'open'
+      && finding.severity === 'High' && finding.primary_check === 'citation'
+      && findingIsCurrent(finding, report.hash, patches))
+    const blocking = currentOpen.length
     return {
       artifact: written,
-      summary: { cited: cited.length, challenged: challenged.length, unverifiable, title_only: evidenceless.length, unknown_ids: missing.length, retractions: retractions.length, accepted: findings.accepted.length, rejected: findings.rejected.length },
+      summary: { cited: cited.length, challenged: challenged.length, unverifiable, title_only: evidenceless.length, unknown_ids: missing.length + invalid.length, invalid_citations: invalid.length, retractions: retractions.length, accepted: findings.accepted.length, rejected: findings.rejected.length, open_high: currentOpen.length },
       verdict: blocking
-        ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${blocking} High citation finding(s) from cite check`, route: 'patch or drop the citation, then re-run the gate' }
+        ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${blocking} High citation finding(s) remain open`, route: 'patch or drop the citation, then re-run the gate' }
         : evidenceless.length && evidenceless.length >= Math.max(1, sample.length - 1)
           ? { gate: 'citation', status: 'not_checked', reason: `${evidenceless.length} of ${sample.length} sampled records had no readable text; bindings could not be judged either way`, route: 'rerun with fetch_full_text or accept an unverifiable citation set' }
           : { gate: 'citation', status: 'clear', reason: `${cited.length} citations sampled, none challenged` },
@@ -1001,9 +1097,12 @@ export async function runSteps({
   const stored = readManifest(cwd, runId)
   if (!stored) throw new Error(`unknown run ${runId}`)
   const manifest = { ...stored, gear: gear ?? stored.gear }
-  const steps = stepView(cwd, runId)
+  let steps = stepView(cwd, runId)
   const totalSteps = steps.length
   const orderOf = (id) => steps.findIndex((entry) => entry.step_id === id)
+  if (fromStep && orderOf(fromStep) < 0) {
+    throw new Error(`unknown from_step "${fromStep}"; expected one of ${steps.map((entry) => entry.step_id).join(', ')}`)
+  }
   const clamp01 = (value) => Math.min(1, Math.max(0, Number(value) || 0))
   const sink = typeof onProgress === 'function' ? onProgress : () => {}
   /**
@@ -1025,13 +1124,14 @@ export async function runSteps({
     onEvent: (event) => progress({ step: event.step, phase: 'model', kind: event.type, detail: event.detail ?? null, model: event.model, ms: event.ms, input_tokens: event.input_tokens, output_tokens: event.output_tokens, message: event.message, prompt_chars: event.prompt_chars, completion_chars: event.completion_chars }),
   })
   const log = []
+  const invocationStartedAt = Date.now()
 
   // A blocked step halts the run. Skipping past it would let a CRITICAL gate
   // verdict be walked around by simply running the later steps.
   const blockedStep = steps.find((entry) => entry.status === 'blocked')
   const order = (id) => steps.findIndex((entry) => entry.step_id === id)
-  const restartAt = fromStep && order(fromStep) >= 0 ? order(fromStep) : null
-  if (blockedStep && !(restartAt !== null && restartAt <= order(blockedStep.step_id))) {
+  const restartAt = fromStep ? order(fromStep) : null
+  if (blockedStep && restartAt === null) {
     return {
       status: 'blocked',
       reason: `step ${blockedStep.step_id} is blocked`,
@@ -1042,20 +1142,39 @@ export async function runSteps({
       steps: log,
     }
   }
-  if (blockedStep && restartAt !== null && restartAt <= order(blockedStep.step_id)) {
-    await markStep({ cwd, runId, step: blockedStep.step_id, status: 'pending', detail: 'reset by an explicit from_step restart' })
+  if (restartAt !== null) {
+    // An explicit restart means every blocked step at or after that point is
+    // being retried. Reset them all, then re-read the state: filtering a stale
+    // snapshot made the reset step invisible and let later steps run instead.
+    for (const entry of steps.slice(restartAt)) {
+      if (entry.status === 'blocked') {
+        await markStep({ cwd, runId, step: entry.step_id, status: 'pending', detail: 'reset by an explicit from_step restart' })
+      }
+    }
+    steps = stepView(cwd, runId)
+    if (!steps.some((entry) => entry.step_id === fromStep)) {
+      throw new Error(`unknown from_step "${fromStep}"`)
+    }
   }
 
+  const freshOrder = new Map(steps.map((step, index) => [step.step_id, index]))
   const queue = steps.filter((step) => {
-    if (step.status === 'done' || step.status === 'skipped') return false
-    if (step.status === 'blocked') return false
-    if (restartAt !== null) return order(step.step_id) >= restartAt
-    return true
+    if (restartAt !== null) {
+      // `from_step` is an explicit re-run: it starts at the named step (even if
+      // that step is done) and never walks backwards into earlier steps.
+      if (freshOrder.get(step.step_id) < restartAt) return false
+      if (step.step_id === fromStep) return true
+      return !['done', 'skipped', 'blocked'].includes(step.status)
+    }
+    return !['done', 'skipped', 'blocked'].includes(step.status)
   })
+
   const bounded = Number.isFinite(maxSteps) ? queue.slice(0, maxSteps) : queue
 
   for (const step of bounded) {
-    const budget = budgetState(cwd, runId)
+    // Segment rows hold completed invocations; add this one's elapsed time so
+    // the cap applies during the run rather than only after it ends.
+    const budget = budgetState(cwd, runId, { extraMs: Date.now() - invocationStartedAt })
     if (budget.exceeded) {
       const exceeded = budget.checks.filter((check) => check.exceeded)
       await markStep({ cwd, runId, step: step.step_id, status: 'blocked', detail: `budget exceeded: ${exceeded.map((c) => `${c.kind} ${c.used}/${c.cap}`).join(', ')}` })
@@ -1089,7 +1208,9 @@ export async function runSteps({
       progress({ step: step.step_id, status: blocked ? 'blocked' : 'done', summary: outcome?.summary, detail: summarize(outcome?.summary) ?? step.name })
       if (blocked) return { status: 'blocked', reason: outcome.verdict.gate, completed: log.filter((entry) => entry.status === 'done').length, steps: log }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = error instanceof Error ? error.message
+        : typeof error?.message === 'string' ? error.message
+          : error && typeof error === 'object' ? JSON.stringify(error).slice(0, 500) : String(error)
       await markStep({ cwd, runId, step: step.step_id, status: 'failed', detail: message.slice(0, 500) })
       log.push({ step: step.step_id, status: 'failed', error: message.slice(0, 500) })
       progress({ step: step.step_id, status: 'failed', error: message, detail: message.slice(0, 200) })

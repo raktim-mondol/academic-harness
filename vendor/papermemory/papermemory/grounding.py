@@ -45,6 +45,42 @@ def resolve_doc(store, *, paper_id=None, chunk_id=None, doc_id=None):
     return None
 
 
+# PDF-to-markdown conversion writes the document's own typography into the
+# stored text: emphasis arrives as `reduces** **tissue overlap`, the
+# multiplication sign as `384 *×* 384`, and soft breaks as newlines. Those marks
+# are formatting, not words, so comparing raw bytes reports a genuine quotation
+# as absent. Both sides are normalized and matches are mapped back to the
+# original offsets, which are what the caller reports.
+_EMPHASIS = frozenset("*_~`")
+_CHAR_FOLD = {
+    "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+    "\u2013": "-", "\u2014": "-", "\u2212": "-", "\u00d7": "x",
+}
+
+
+def _normalize_with_map(text: str) -> tuple[str, list[int]]:
+    """Strip emphasis marks and collapse whitespace, keeping original offsets."""
+    out: list[str] = []
+    index_map: list[int] = []
+    space = True
+    for position, char in enumerate(text):
+        if char in _EMPHASIS:
+            continue
+        if char.isspace():
+            if not space:
+                out.append(" ")
+                index_map.append(position)
+                space = True
+            continue
+        folded = _CHAR_FOLD.get(char, char)
+        if len(folded) != 1:
+            folded = char
+        out.append(folded)
+        index_map.append(position)
+        space = False
+    return "".join(out), index_map
+
+
 def quote_check(
     store,
     quote: str,
@@ -73,13 +109,16 @@ def quote_check(
             "checked_against": {"sha256": None, "doc_id": None},
         }
     text = doc["text"]
+    haystack, index_map = _normalize_with_map(text)
+    needle, _ = _normalize_with_map(quote)
     occurrences: list[dict[str, Any]] = []
-    start = 0
-    while len(occurrences) < max_matches:
-        index = text.find(quote, start)
-        if index < 0:
+    cursor = 0
+    while needle and len(occurrences) < max_matches:
+        at = haystack.find(needle, cursor)
+        if at < 0:
             break
-        end = index + len(quote)
+        index = index_map[at]
+        end = index_map[at + len(needle) - 1] + 1
         chunk = store.conn.execute(
             """SELECT c.id, c.char_start, c.char_end, c.is_bibliography, s.heading_path
                FROM chunks c LEFT JOIN sections s ON s.id=c.section_id
@@ -108,7 +147,7 @@ def quote_check(
                 "snippet": " ".join(text[max(0, index - 80):end + 80].split())[:300],
             }
         )
-        start = index + max(1, len(quote))
+        cursor = at + max(1, len(needle))
     if not occurrences:
         reason = "no-match"
     elif all(item["is_bibliography"] for item in occurrences):

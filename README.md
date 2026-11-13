@@ -1,7 +1,7 @@
 # Academic Harness
 
 [![verify](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml/badge.svg)](https://github.com/raktim-mondol/academic-harness/actions/workflows/verify.yml)
-![DeepSeek Harness 0.2.1](https://img.shields.io/badge/DeepSeek%20Harness-0.2.1-5b7bd5)
+![DeepSeek Harness 0.2.2](https://img.shields.io/badge/DeepSeek%20Harness-0.2.2-5b7bd5)
 ![Linux only](https://img.shields.io/badge/platform-Linux-2f855a)
 
 **A research workbench for DeepSeek Harness (DSH).** Academic Harness adds literature discovery, evidence-linked paper memory, scientific writing and review tools, research ledgers, and 790 bundled skills to the DSH web UI.
@@ -15,7 +15,7 @@ It installs as a DSH plugin and provides an **Academic Harness** preset. Its too
 Academic Harness requires **Linux** and **DeepSeek Harness >=0.2.1-rc.5 <0.3.0**. It is a Linux-only plugin: the npm package declares `"os": ["linux"]`, and Windows and macOS are not supported. See [installation requirements](docs/INSTALL.md#requirements) for validated versions and optional runtimes.
 
 ```sh
-npm install -g @deepseek-ai/dsh@0.2.1-rc.5
+npm install -g @deepseek-ai/dsh@0.2.2-rc.1
 dsh web
 ```
 
@@ -24,6 +24,8 @@ In the web UI:
 1. Open **Plugins → Add plugin**.
 2. Enter `github:raktim-mondol/academic-harness` and click **Install**.
 3. Start a new chat and select the **Academic Harness** preset.
+
+For a cited investigation, select **Deep Research** below the chatbox, pick **Auto / Low / Medium / High** from the effort segment on that chip, type your question, and send. It starts the existing research engine in Background jobs; the next message returns to ordinary Chat. [Task selector](docs/RESEARCH.md#chatbox-task-selector)
 
 No API key is required to install or start; some connectors and compute services require their own credentials. For a dedicated CLI profile, troubleshooting, and setup details, see [Install and run](docs/INSTALL.md) and [Configuration](docs/CONFIGURATION.md).
 

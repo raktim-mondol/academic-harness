@@ -9,12 +9,14 @@ import { ZvecIndexHeaderAction, ZvecIndexToolView } from './ZvecIndexProgress.js
 import { FoldPane } from './FoldPane.js'
 import { ReplyFold } from './ReplyFold.jsx'
 import { FOLD_TAB_ID } from './reply-fold.js'
+import { applyTaskModes } from './task-modes.js'
 
 const ENTRY_ID = 'academic-harness'
 
-export const inject = ['slots', 'configForms', 'sidebarRight', 'sidebarRightTabs']
+export const inject = ['slots', 'configForms', 'sidebarRight', 'sidebarRightTabs', 'sessions', 'conversation', 'inputTriggers', 'remote', 'remote.commands', 'locale']
 
 export function apply(ctx) {
+  applyTaskModes(ctx)
   const scope = ctx.configForms.get(ENTRY_ID)
 
   const openFoldPane = ({ text, level }) => {

@@ -3,11 +3,28 @@
  * subpath was removed and the control plugin registers it itself. Resolve
  * the host's export rather than guessing from a version string.
  */
+import { createRequire } from 'node:module'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+
 export const name = 'academic-harness-subagent-list-compat'
 export const inject = ['tools', 'subagents', 'agents']
 
+const LEGACY_LIST = '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+/** Linked plugins resolve from their source tree; DSH's healed host packages live beside profiles. */
+export function resolveHostListAgents(
+  localResolve = () => import.meta.resolve(LEGACY_LIST),
+  hostResolve = () => createRequire(join(process.env.DSH_HOME || join(homedir(), '.dsh'), 'profiles', 'package.json')).resolve(LEGACY_LIST),
+) {
+  try { return localResolve() } catch (error) {
+    if (error?.code !== 'ERR_MODULE_NOT_FOUND') throw error
+    return hostResolve()
+  }
+}
+
 export async function loadLegacyListAgents(
-  resolve = () => import.meta.resolve('@deepseek-ai/dsh-tool-subagent-control/list-agents'),
+  resolve = resolveHostListAgents,
   load = (specifier) => import(specifier),
 ) {
   let specifier

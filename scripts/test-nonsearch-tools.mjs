@@ -5,8 +5,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
+  activationChildId,
   buildCustomRoute,
   customRouteProfile,
+  loadHostToolSubagent,
+  resolveHostToolSubagent,
   routingDecisionEntry,
   routingOutcomeEntry,
   topLevelPresetAgent,
@@ -51,6 +54,20 @@ assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-h
 assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'academic-harness', origin: 'subagent' } } }), false)
 assert.equal(topLevelPresetAgent({ session: { header: { agentPreset: 'standard' } } }), false)
 assert.equal(topLevelPresetAgent({ session: { header: {} } }), false)
+assert.ok(!pkg.dependencies?.['ah-dsh-tool-subagent'], 'the delegation tool must come from the host, not a pinned copy')
+assert.doesNotMatch(read('subagent-models.js'), /from 'ah-dsh-tool-subagent'/, 'the host tool is resolved at runtime')
+const missingTool = Object.assign(new Error('missing'), { code: 'ERR_MODULE_NOT_FOUND' })
+assert.equal(resolveHostToolSubagent(() => { throw missingTool }, () => 'host-tool'), 'host-tool')
+assert.equal(resolveHostToolSubagent(() => 'local-tool', () => { throw new Error('must not resolve host') }), 'local-tool')
+assert.throws(() => resolveHostToolSubagent(() => { throw new Error('broken') }, () => 'must-not-fallback'), /broken/)
+assert.equal(await loadHostToolSubagent(() => 'module', async (specifier) => `loaded:${specifier}`), 'loaded:module')
+assert.equal(activationChildId({}, {}, { subagentId: 'child-1' }), 'child-1')
+assert.equal(activationChildId({}, {}, { name: 'lead/agent-1' }), undefined)
+assert.equal(activationChildId({ subagents: { resolveName: () => { throw new Error('must not resolve') } } }, {}, {}), undefined)
+let resolvedName
+const resolveCtx = { subagents: { resolveName: (agent, name, signal) => { resolvedName = { agent, name, signal }; return Promise.resolve('child-2') } } }
+assert.equal(await activationChildId(resolveCtx, 'agent-1', { name: 'lead/agent-1' }, 'signal-1'), 'child-2')
+assert.deepEqual(resolvedName, { agent: 'agent-1', name: 'lead/agent-1', signal: 'signal-1' })
 const decision = routingDecisionEntry({
   callId: 'call_1', toolName: 'subagent_vision', description: 'Read chart trend', prompt: 'Read /tmp/x.png and report the trend.',
   route: 'custom route academic-harness-vision/deepseek-flash (anthropic-messages)', now: 1,
