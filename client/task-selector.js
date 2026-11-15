@@ -1,14 +1,26 @@
 import { createElement, useEffect, useId, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { TASK_EFFORTS, TASK_MODES, RESEARCH_TOKEN } from '../task-modes.js'
+import { TASK_EFFORTS, TASK_MODES, taskForToken } from '../task-modes.js'
 
-const row = { display: 'inline-flex', alignItems: 'center', gap: 0, maxWidth: '100%' }
-const segment = { font: 'inherit', fontSize: 12, minHeight: 32, padding: '4px 8px', border: 0, borderRadius: 0, color: 'inherit', background: 'transparent', cursor: 'pointer' }
-const chip = { display: 'inline-flex', alignItems: 'stretch', position: 'relative', border: '1px solid var(--dsw-border, var(--color-border, currentColor))', borderRadius: 8 }
+const row = { display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: '100%', flexWrap: 'wrap' }
+const segment = { font: 'inherit', fontSize: 11, lineHeight: '16px', minHeight: 24, padding: '1px 6px', border: 0, borderRadius: 0, color: 'inherit', background: 'transparent', cursor: 'pointer', whiteSpace: 'nowrap' }
+const chip = { display: 'inline-flex', alignItems: 'stretch', flex: '0 0 auto', position: 'relative', border: '1px solid var(--dsw-border, var(--color-border, currentColor))', borderRadius: 6 }
 const menu = { position: 'fixed', zIndex: 1000, minWidth: 190, padding: 4, borderRadius: 10, border: '1px solid var(--dsw-border, var(--color-border, currentColor))', background: 'var(--dsw-surface-overlay, var(--dsw-bg-elevated, var(--color-surface-secondary, Canvas)))', boxShadow: '0 8px 24px rgba(0,0,0,0.28)' }
 const menuRow = { display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 12, font: 'inherit', fontSize: 12, padding: '7px 9px', border: 0, borderRadius: 7, color: 'inherit', background: 'transparent', textAlign: 'left', cursor: 'pointer' }
 const MENU_WIDTH = 190
 const MENU_ROW_HEIGHT = 31
+const TASK_CHROME = {
+  deep_research: { description: 'researchDescription', effort: 'effort', current: 'effort.current', started: 'started', notice: 'costNotice' },
+  deep_review: { description: 'reviewDescription', effort: 'depth', current: 'depth.current', started: 'startedReview', notice: 'costNoticeReview' },
+  find_papers: { description: 'papersDescription', effort: 'breadth', current: 'breadth.current', started: 'startedPapers', notice: 'costNoticePapers' },
+  check_references: { description: 'referencesDescription', effort: 'scope', current: 'scope.current', started: 'startedReferences', notice: 'costNoticeReferences' },
+  write_revise: { description: 'writeDescription', effort: 'effort', current: 'compile.current', started: 'startedWrite', notice: 'costNoticeWrite' },
+  analyze_data: { description: 'analyzeDescription', effort: null, current: null, started: 'startedAnalyze', notice: 'costNoticeAnalyze' },
+  generate_hypotheses: { description: 'hypothesesDescription', effort: 'ideas', current: 'ideas.current', started: 'startedHypotheses', notice: 'costNoticeHypotheses' },
+}
+function taskChrome(id) {
+  return TASK_CHROME[id] || TASK_CHROME.deep_research
+}
 
 /**
  * Effort is the right-hand segment of the selected Deep Research chip, so the
@@ -16,7 +28,7 @@ const MENU_ROW_HEIGHT = 31
  * portals above the chip on the bottom composer, matching the model seat and
  * avoiding both toolbar width and ancestor overflow clipping.
  */
-export function EffortMenu({ effort, disabled, onEffort, t }) {
+export function EffortMenu({ effort, disabled, onEffort, t, labelKey = 'effort', currentKey = 'effort.current' }) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState(null)
   const [active, setActive] = useState(() => Math.max(0, TASK_EFFORTS.indexOf(effort)))
@@ -92,14 +104,14 @@ export function EffortMenu({ effort, disabled, onEffort, t }) {
   return createElement('span', { style: { display: 'inline-flex' }, onKeyDown, 'data-ah-effort-menu': true }, [
     createElement('button', {
       key: 'trigger', ref: trigger, type: 'button',
-      style: { ...segment, borderLeft: '1px solid var(--dsw-border, var(--color-border, currentColor))', paddingLeft: 7 },
+      style: { ...segment, borderLeft: '1px solid var(--dsw-border, var(--color-border, currentColor))', paddingLeft: 5 },
       disabled,
-      'aria-label': t('effort.current', { effort: t(`effort.${effort}`) }),
+      'aria-label': t(currentKey, { effort: t(`effort.${effort}`) }),
       'aria-haspopup': 'menu', 'aria-expanded': open, 'aria-controls': open ? id : undefined,
       onClick: () => { if (open) setOpen(false); else show() },
     }, `${t(`effort.${effort}`)} ▾`),
     open && position ? createPortal(createElement('div', {
-      key: 'menu', ref: list, id, role: 'menu', 'aria-label': t('effort'),
+      key: 'menu', ref: list, id, role: 'menu', 'aria-label': t(labelKey),
       style: { ...menu, left: position.left, top: position.top },
     }, TASK_EFFORTS.map((level, index) => createElement('button', {
       key: level, ref: (node) => { rows.current[index] = node }, type: 'button', role: 'menuitemradio',
@@ -113,31 +125,38 @@ export function EffortMenu({ effort, disabled, onEffort, t }) {
   ])
 }
 
-/** One compact task chip; selecting it is what opens the effort segment. */
+/** One compact chip per enabled task. Selecting a chip opens its effort segment. */
 export function TaskSelectorView({ selected, effort, available, loading, locked, planActive, disabled, onSelect, onEffort, t }) {
-  const task = TASK_MODES.find((mode) => mode.enabled)
-  const unusable = (planActive || !available) && !selected
-  const reason = planActive ? 'planBlocked' : loading ? 'loading' : !available ? 'unavailable' : 'researchDescription'
+  const modes = TASK_MODES.filter((mode) => mode.enabled)
   const selectedFill = 'var(--dsw-alias-button-primary-fill, var(--dsw-alias-interactive-bg-active, #fff))'
   const selectedInk = 'var(--dsw-alias-label-primary-foreground, #000)'
-  return createElement('span', { style: row, 'data-ah-task-selector': true }, [
-    createElement('span', {
-      key: 'chip',
+  return createElement('span', { style: row, 'data-ah-task-selector': true }, modes.map((mode) => {
+    const isSelected = selected === mode.id
+    const chrome = taskChrome(mode.id)
+    const unusable = (planActive || !available) && !isSelected
+    const reason = planActive ? 'planBlocked' : loading ? 'loading' : !available ? 'unavailable' : chrome.description
+    return createElement('span', {
+      key: mode.id,
+      'data-ah-task': mode.id,
       style: {
         ...chip,
-        background: selected ? selectedFill : 'transparent',
-        color: selected ? selectedInk : 'inherit',
-        borderColor: selected ? selectedFill : 'var(--dsw-border, var(--color-border, currentColor))',
+        background: isSelected ? selectedFill : 'transparent',
+        color: isSelected ? selectedInk : 'inherit',
+        borderColor: isSelected ? selectedFill : 'var(--dsw-border, var(--color-border, currentColor))',
       },
     }, [
       createElement('button', {
-        key: 'task', type: 'button', 'aria-pressed': selected, disabled: locked || unusable,
-        onClick: onSelect, title: t(reason),
-        style: { ...segment, fontWeight: selected ? 600 : 400 },
-      }, `${selected ? '✓ ' : ''}${t(task.id)}`),
-      selected ? createElement(EffortMenu, { key: 'effort', effort, disabled: disabled ?? locked, onEffort, t }) : null,
-    ]),
-  ])
+        key: 'task', type: 'button', 'aria-pressed': isSelected, disabled: locked || unusable,
+        onClick: () => onSelect(mode.id), title: t(reason),
+        style: { ...segment, fontWeight: isSelected ? 600 : 400 },
+      }, `${isSelected ? '✓ ' : ''}${t(mode.id)}`),
+      isSelected && chrome.effort ? createElement(EffortMenu, {
+        key: 'effort', effort, disabled: disabled ?? locked, onEffort, t,
+        labelKey: chrome.effort,
+        currentKey: chrome.current,
+      }) : null,
+    ])
+  }))
 }
 
 /** Standard input/plan hooks keep selection tied to the actual composer command, not a second mode flag. */
@@ -148,27 +167,41 @@ export function TaskSelector({ useInput, useTaskMode, useProjection, selectTask,
   const state = useTaskMode((value) => value)
   const frozen = !['plain', 'claimed'].includes(phase)
   return createElement(TaskSelectorView, {
-    ...state, selected: token?.trim() === RESEARCH_TOKEN,
+    ...state, selected: taskForToken(token) ?? null,
     locked: frozen, disabled: frozen,
     planActive: Boolean(plan && (plan.active || plan.pending)),
     onSelect: selectTask, onEffort: setEffort, t,
   })
 }
 
-/**
- * A task command returns when the background job is accepted. The empty-session
- * hero can show no transcript node yet, so this persistent receipt is the
- * immediate answer to "did my message go anywhere?".
- */
-export function TaskRunNotice({ useTaskMode, dismiss, t }) {
-  const task = useTaskMode((state) => state.lastTask)
-  if (!task) return null
-  const meta = [t(`effort.${task.effort}`), task.runId, task.jobId].filter(Boolean).join(' · ')
-  const prompt = task.prompt.length > 180 ? `${task.prompt.slice(0, 180)}…` : task.prompt
+const RECEIPT_IDS = /(?:Research run|Review|Papers|References|Diff|Analysis|Tournament):\s*(\S+)/u
+
+/** Rebuild the start card from the durable academic-task command node. */
+export function taskReceiptFromCommand(node) {
+  const text = typeof node?.outcome?.text === 'string' ? node.outcome.text : ''
+  let request = null
+  try { request = JSON.parse(String(node?.args ?? '')) } catch { /* a cut window can omit args */ }
+  const task = TASK_CHROME[request?.task] ? request.task : 'deep_research'
+  const prompt = typeof request?.prompt === 'string' ? request.prompt : ''
+  const effort = TASK_EFFORTS.includes(request?.options?.effort) ? request.options.effort : 'auto'
+  const jobId = /Job:\s*(\S+)/u.exec(text)?.[1] ?? null
+  const runId = RECEIPT_IDS.exec(text)?.[1] ?? null
+  return { task, prompt, effort, jobId, runId }
+}
+
+function receiptPrompt(prompt) {
+  const flat = String(prompt ?? '').replace(/[ \t]*\n[ \t]*/g, ' · ').replace(/[ \t]+/g, ' ').trim()
+  return flat.length > 140 ? `${flat.slice(0, 140)}…` : flat
+}
+
+function TaskReceiptCard({ task, shown, meta, hint, dismiss, dismissLabel, transcript = false }) {
   return createElement('div', {
-    'data-ah-task-run': true, role: 'status',
+    'data-ah-task-run': true,
+    ...transcript ? { 'data-ah-task-transcript': true } : {},
+    role: 'status',
     style: {
-      display: 'flex', alignItems: 'flex-start', gap: 8, margin: '6px 0', padding: '8px 10px',
+      display: 'flex', alignItems: 'flex-start', alignSelf: 'center', gap: 8, margin: '6px auto', padding: '8px 10px',
+      width: 'min(100%, var(--dsh-composer-card-max-width, 46rem))', maxWidth: 'var(--dsh-composer-card-max-width, 46rem)', boxSizing: 'border-box',
       fontSize: 12, lineHeight: 1.45, border: '1px solid var(--dsw-alias-state-business-primary, var(--color-border, currentColor))',
       borderRadius: 8, background: 'var(--dsw-alias-bg-layer-1, transparent)',
     },
@@ -177,25 +210,73 @@ export function TaskRunNotice({ useTaskMode, dismiss, t }) {
       key: 'dot', 'aria-hidden': true,
       style: { width: 8, height: 8, marginTop: 5, flex: '0 0 auto', borderRadius: '50%', background: 'var(--dsw-alias-state-business-primary, #22c55e)' },
     }),
-    createElement('div', { key: 'body', style: { display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 } }, [
-      createElement('strong', { key: 'title' }, t('started')),
-      createElement('span', { key: 'prompt', style: { overflowWrap: 'anywhere' } }, prompt),
-      createElement('span', { key: 'meta', style: { opacity: 0.75 } }, [meta, t('backgroundHint')].filter(Boolean).join(' · ')),
+    createElement('div', { key: 'body', style: { display: 'flex', flex: '1 1 auto', flexDirection: 'column', gap: 2, minWidth: 0 } }, [
+      createElement('strong', { key: 'title' }, task),
+      createElement('span', { key: 'prompt', style: { overflowWrap: 'anywhere' } }, shown),
+      createElement('span', { key: 'meta', style: { opacity: 0.75, overflowWrap: 'anywhere' } }, meta),
+      createElement('span', { key: 'hint', style: { opacity: 0.75 } }, hint),
     ]),
-    createElement('button', {
-      key: 'dismiss', type: 'button', onClick: dismiss, 'aria-label': t('dismiss'), title: t('dismiss'),
+    dismiss ? createElement('button', {
+      key: 'dismiss', type: 'button', onClick: dismiss, 'aria-label': dismissLabel, title: dismissLabel,
       style: { border: 0, background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 16, lineHeight: 1, padding: 0 },
-    }, '×'),
+    }, '×') : null,
   ])
 }
 
-/** Long task guidance belongs in a full-width composer dock, not its compact toolbar. */
+/**
+ * A task command returns when the background job is accepted. The same card is
+ * also a transcript node. This dock copy covers the moment before that node paints.
+ */
+export function TaskRunNotice({ useTaskMode, dismiss, t }) {
+  const task = useTaskMode((state) => state.lastTask)
+  const inTranscript = useTaskMode((state) => state.inTranscript)
+  if (!task || inTranscript) return null
+  const meta = [t(`effort.${task.effort}`), task.runId, task.jobId].filter(Boolean).join(' · ')
+  return TaskReceiptCard({
+    task: t(taskChrome(task.task).started),
+    shown: receiptPrompt(task.prompt),
+    meta,
+    hint: t('backgroundHint'),
+    dismiss,
+    dismissLabel: t('dismiss'),
+  })
+}
+
+/** Durable start receipt for the academic-task command row inside the chat. */
+export function TaskCommandReceipt({ node, markInTranscript, t }) {
+  useEffect(() => { markInTranscript?.() }, [markInTranscript])
+  if (node?.outcome?.kind === 'error') {
+    return createElement('div', {
+      'data-ah-task-run': true, 'data-ah-task-transcript': true, role: 'alert',
+      style: {
+        margin: '6px auto', alignSelf: 'center', boxSizing: 'border-box', overflowWrap: 'anywhere',
+        width: 'min(100%, var(--dsh-composer-card-max-width, 46rem))', maxWidth: 'var(--dsh-composer-card-max-width, 46rem)',
+        fontSize: 12, lineHeight: 1.45,
+      },
+    }, node.outcome.text || '')
+  }
+  const receipt = taskReceiptFromCommand(node)
+  const meta = [t(`effort.${receipt.effort}`), receipt.runId, receipt.jobId].filter(Boolean).join(' · ')
+  return TaskReceiptCard({
+    task: t(taskChrome(receipt.task).started),
+    shown: receiptPrompt(receipt.prompt),
+    meta,
+    hint: t('backgroundHint'),
+    transcript: true,
+  })
+}
+
+/** Long task guidance sits in the composer dock, in a readable measure, not the compact toolbar. */
 export function TaskSelectorStatus({ useInput, useTaskMode, t }) {
-  const selected = useInput((input) => input.claim?.token?.trim() === RESEARCH_TOKEN)
+  const selected = taskForToken(useInput((input) => input.claim?.token))
   const error = useTaskMode((state) => state.error)
   if (!selected && !error) return null
+  const notice = taskChrome(selected).notice
   return createElement('p', {
     'data-ah-task-status': true, role: error ? 'alert' : 'status',
-    style: { margin: '6px 0', fontSize: 12, lineHeight: 1.5, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxWidth: '100%' },
-  }, error || t('costNotice'))
+    style: {
+      margin: '6px 0', alignSelf: 'flex-start', fontSize: 12, lineHeight: 1.5,
+      whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxWidth: 'min(36rem, 100%)',
+    },
+  }, error || t(notice))
 }

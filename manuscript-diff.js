@@ -57,7 +57,8 @@ function deriveSlug(args) {
   }
   const source = text(args.new) || text(args.path) || text(args.old)
   if (!source) throw new Error('slug is required (or give a new/path file so one can be derived)')
-  const value = slugify(basename(source).replace(/\.[^.]+$/, ''))
+  // Keep the directory. Two manuscripts both named v2.md must not share one diff.
+  const value = slugify(source.replace(/\\/g, '/').replace(/\.[^.]+$/, ''))
   return value || 'revision'
 }
 
@@ -253,7 +254,9 @@ export async function runManuscriptDiff(args, exec, deps = {}) {
       diffText = unifiedDiff(cwd, oldFile.abs, newFile.abs, oldFile.body, newFile.body)
       command = ['diff', '-u', oldFile.rel, newFile.rel]
     }
-    const written = exportText(outAbs, diffText, { overwrite: Boolean(args.overwrite) })
+    const previous = readJson(join(dir, 'meta.json'))
+    const samePair = previous?.old === oldFile.rel && previous?.new === newFile.rel && previous?.out === outRel.replace(/\\/g, '/')
+    const written = exportText(outAbs, diffText, { overwrite: Boolean(args.overwrite) || samePair })
     const meta = {
       slug,
       kind: latex ? 'latex' : 'text',

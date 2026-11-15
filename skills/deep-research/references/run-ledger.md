@@ -18,10 +18,10 @@ write-once; nothing is edited in place.
 | `patches.jsonl` | `p-` patch passes with before/after hashes and escalation counts |
 | `accounting.jsonl` | cumulative model calls, tokens, wall clock |
 | `retrieval.jsonl` | `rt-` full-text attempts: which resolver served each copy, and the reason for every failure |
-| `artifacts/*.md` | per-step output: `coverage-matrix`, `sweep`, `contradictions`, `loci`, `interim-loc-0001`, `comparisons`, `source-tensions`, `corpus-gaps`, `evidence-digest`, `drafts`, `final-report`, `cite-check`, `gap-fetch`, `readability-suggestions` |
+| `artifacts/*.md` | per-step output: `coverage-matrix`, `sweep`, `contradictions`, `loci`, `interim-loc-0001`, `comparisons`, `source-tensions`, `corpus-gaps`, `evidence-digest`, `drafts`, `evidence-map` (internal; `show`, `patch`, and `export` refuse it), `final-report` (the research report), `source-access` (which cited papers were read in full; `show` returns it), `citation-index` (reader id → corpus id; internal), `cite-check`, `gap-fetch`, `readability-suggestions`, `supplied-text` (pending user-supplied bodies) |
 | `papers.jsonl` | `pm-` links from a corpus record to the PaperMemory paper its full text was ingested into |
-| `bodies/<src-id>.md` | fetched full text, present only with `fetch_full_text: true`; a disposable run cache, not the library of record |
-| `exports/report.*` | `export` output; refuses to clobber without `overwrite` |
+| `bodies/<src-id>.md` | open-access full text, or a file supplied with `action=supply`. A stored body is reused and a user-supplied body is not replaced by a download. The `.meta.json` sidecar records the resolver or `supplied_by: user` |
+| `exports/report.*` | `export` output. Markdown is the research report only. The ship gate is `exports/verification.md`. Cited-paper access is `exports/source-access.md`. Refuses to clobber without `overwrite` |
 
 ## Effort levels
 
@@ -67,14 +67,23 @@ pass `effort` or `confirm_effort: true`.
 | `readability` | 16 — suggestions the orchestrator may decline | dissertation |
 
 Light tier is `decompose → sweep → draft → cite_check → polish`. Cite check is in
-the light path on purpose: a short run earns no exemption from verification.
+the light path on purpose: a short run earns no exemption from verification. A
+partial or mismatch binding is `flagged` and the run continues through polish;
+the report is still returned. Only a report with no citations, an unknown id, a
+cluster id with no representative, an unresolved claim label, or an
+unacknowledged retraction blocks `cite_check`. After that audit, the report's
+source numbers start at `src-0001` in citation order. The corpus keeps the
+`src-` ids it was assigned when the records were stored.
 
 ## Ids
 
 `dr-0001` run · `rq-0001` research question · `src-0001` corpus record ·
 `loc-0001` locus · `cl-0001` claim · `f-0001` finding · `v-0001` verdict ·
-`p-0001` patch · `c0001` independence cluster. Hashes are `sha256:<hex>`; the
-query hash is re-checked on every step.
+`p-0001` patch · `c0001` independence cluster. Each run's corpus and claims
+start again at `0001`. A `cl-` id is never a citation. The finished report
+renumbers the sources it actually cites so the reader also sees `src-0001`
+first; `citation-index` maps those reader ids back to corpus ids. Hashes are
+`sha256:<hex>`; the query hash is re-checked on every step.
 
 ## Step states
 
@@ -110,7 +119,7 @@ in the same breath as a pass, so a PASS never claims more than was verified.
 `query_drift`, `budget_exceeded`, `no_open_access_copy`, `pdf_conversion_failed`,
 `open_access_copy_too_thin`, `not_checked`, `unknown`, `context_not_found`,
 `context_ambiguous`, `hunk_escalated`, `patch_budget`,
-`regeneration refused` (a patched artifact cannot be rewritten).
+`regeneration refused` (a patched artifact cannot be rewritten, except the tool's own citation renumber and a rewrite from user-supplied full text, each recorded as a patch).
 
 ## Boundaries
 

@@ -141,11 +141,20 @@ Throughout, six internal gates guard quality (never shown to the reader):
 
 Detection questions and routes: references/quality-gates.md.
 
-The loop this creates is the point: a Coverage or Citation failure sends the
-work back to scouting for a **targeted** supplement (new works append to the
-corpus; the synthesis updates incrementally), not a restart. Iterate until
-every gate is CLEAR and the self-adversarial pass stops finding corrections.
-Depth is driven by the topic's complexity, not by a fixed round count.
+A coverage gap can send the work back for a targeted supplement: new works
+append to the corpus and the synthesis updates, rather than restarting. A
+citation that only partly matches its sentence is flagged beside the report.
+That flag does not stop the run, and it is not a reason to patch and resume
+until the audit goes silent. A live run that did so found a new partial on
+every pass and never returned the report. The run stops only when a citation
+names nothing in the corpus, names a cluster that has no representative
+record, names a claim label that cannot be resolved, or cites an
+unacknowledged retraction, or when the report itself is still a gateway
+evidence map. Reader-facing source numbers in the finished report start at
+`[src-0001]` in the order the works are first cited. A `cl-` label is a claim,
+not a source. An open-access paper is read from the converted PDF. A paper with
+no open copy is used only from its abstract, or from its title when the abstract
+is missing. Do not state methods, tables, or results that text does not contain.
 
 ## Presentation
 
@@ -246,9 +255,10 @@ deep_research action=verify run_id=dr-0001
   contradiction graph, loci, depth investigation, four critics, and the patcher.
   A level changes how much work happens, never how strict the checks are.
 - **Resume, do not restart.** `action=status` shows step state; `action=resume`
-  re-runs the step that died. A step blocked by a CRITICAL gate stays blocked:
-  either clear it with `action=gate status=clear` or restart deliberately with
-  `from_step`. Never run past a block by asking again.
+  re-runs the step that died. A step blocked because a citation is missing,
+  invented, or retracted stays blocked: clear it with `action=gate status=clear`
+  or restart deliberately with `from_step`. A flagged citation is already
+  recorded with the report. Do not patch and resume to chase it.
 - **Two retrieval lanes.** The scholarly sweep goes through `literature_search`
   (OpenAlex, Semantic Scholar, PubMed/Europe PMC, arXiv, Crossref, and the keyed
   indexes). A web lane then runs the model's own `web_queries` through Parallel,
@@ -273,8 +283,19 @@ deep_research action=verify run_id=dr-0001
   says `not_checked`, which is not a pass. Independence is counted in voices:
   three copies of one press release score as one source, so "several sources
   report" must mean several clusters.
-- `action=export format=markdown` appends the verification record to the report;
-  `csv` exports the corpus with cluster ids so a reviewer can audit the counting.
+- **The deliverable is the research report.** A finished run returns
+  `report_path`, and that file is `artifacts/final-report.md`.
+  `action=export format=markdown` writes the same survey. The gateway evidence
+  map is stored at `artifacts/evidence-map.md` for the writer only. `show`,
+  `patch`, and `export` refuse it. Do not ask for it and do not copy it out
+  as the result. `artifacts/source-access.md` is for the reader: which cited
+  papers were downloaded and which were used from an abstract or a title.
+  `show` returns it. Export copies it beside the report and does not paste it
+  into the report.
+- **A restricted paper can be supplied later.** `action=supply` with `record_id`
+  (the reader id, the corpus id, or the DOI) and `pdf` (a workspace `.pdf`,
+  `.md`, or `.txt`) stores that text and rewrites the report from it. A path
+  outside the workspace is refused. A stored copy is not downloaded again.
 
 Ledger layout, step names, gate ids, and every error state:
 `references/run-ledger.md`.

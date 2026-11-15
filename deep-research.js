@@ -3,7 +3,9 @@
  *
  * One call decomposes a question, sweeps the literature, finds where the
  * sources disagree, drafts, attacks the draft, repairs it with surgical hunks
- * only, and refuses to ship a report that cites a source it cannot support.
+ * only. A citation that only partly matches its sentence is recorded and the
+ * report is still returned. A missing, invented, or retracted citation stops
+ * the run.
  * The state lives in `.dsh/deep-research/<run>/` so a crashed run resumes at
  * the step that died instead of starting a two-hour investigation over again.
  *
@@ -18,16 +20,16 @@
  */
 import { runAsJob } from './job-runner.js'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, resolve as resolvePath } from 'node:path'
 import { defineTool } from 'ah-dsh-tools'
-import { GEARS, createLlmRunner, parseJsonResponse, planFor, runSteps } from './deep-research-steps.js'
+import { GEARS, createLlmRunner, looksLikeGatewayMap, parseJsonResponse, planFor, resolveSourceRecord, runSteps, writeSourceAccess } from './deep-research-steps.js'
 import { EFFORT_LEVELS, EFFORT_PRESETS, resolveEffort } from './deep-research-effort.js'
 import {
   GATE_STATES, TIERS, accounting, appendClaims, appendFindings, appendRecords, applyHunks,
   appendRetrieval, assertGospel, budgetState, listRuns, markFindingApplied, markStep, nextPendingStep, readArtifact,
   linkPaperMemory, readCorpus, readFindings, readManifest, readPaperLinks, readQuery, readRun,
-  recordSegment, recordVerdict, reviseClaim, shipGate, startRun,
-  stepView,
+  latestVerdict, recordSegment, recordVerdict, reviseClaim, shipGate, startRun,
+  stepView, writeArtifact,
 } from './deep-research-store.js'
 import { csvCell, ensureDir, exportText } from './ledger-kit.js'
 import { resolveEnv } from './credential-env.js'
@@ -43,7 +45,7 @@ import { runParallelSearch } from './parallel-search.js'
 import { runTavilySearch } from './tavily-search.js'
 import { normalizeDoi } from './independence-cluster.js'
 
-const ACTIONS = ['start', 'run', 'status', 'resume', 'verify', 'export', 'list', 'record', 'revise', 'gate', 'patch', 'answers', 'show']
+const ACTIONS = ['start', 'run', 'status', 'resume', 'verify', 'export', 'list', 'record', 'revise', 'gate', 'patch', 'answers', 'show', 'supply']
 const EXPORT_FORMATS = ['markdown', 'json', 'csv']
 const RECORD_KINDS = ['records', 'claims', 'findings']
 const DEFAULT_TIMEOUT_MINUTES = 90
@@ -279,6 +281,27 @@ export function buildFetch(cwd, runId, { signal, enabled, email, perBodyChars = 
         if (cached.body) out.push(cached)
         continue
       }
+      const bodyFile = join(dir, `${record.record_id}.md`)
+      const metaFile = join(dir, `${record.record_id}.meta.json`)
+      // A body already on disk, especially one the user supplied, is the copy
+      // this run reads. Downloading again would replace it.
+      if (existsSync(bodyFile)) {
+        const stored = readFileSync(bodyFile, 'utf8')
+        let meta = {}
+        try { meta = JSON.parse(readFileSync(metaFile, 'utf8')) } catch { /* body without a sidecar */ }
+        if (stored.trim()) {
+          const cached = {
+            record_id: record.record_id, source: record.source, body: stored,
+            truncated: Boolean(meta.truncated),
+            oa: { resolver: meta.resolver ?? null, url: meta.url ?? null, version: meta.version ?? null },
+            supplied_by: meta.supplied_by ?? null,
+            library: 'cached',
+          }
+          memory.set(record.record_id, cached)
+          out.push(cached)
+          continue
+        }
+      }
       let entry
       try {
         let url = null
@@ -303,11 +326,10 @@ export function buildFetch(cwd, runId, { signal, enabled, email, perBodyChars = 
         if (body.length < 1200) throw new Error('open_access_copy_too_thin')
         const truncated = body.length > perBodyChars ? body.slice(0, perBodyChars) : body
         ensureDir(dir)
-        const bodyFile = join(dir, `${record.record_id}.md`)
         writeFileSync(bodyFile, truncated)
         // Retain whether this is the whole paper. A quote absent from a
         // truncated body is unverifiable, not evidence of fabrication.
-        writeFileSync(join(dir, `${record.record_id}.meta.json`), JSON.stringify({
+        writeFileSync(metaFile, JSON.stringify({
           record_id: record.record_id, chars: body.length, truncated: truncated.length < body.length,
           resolver, url, version, written_at: new Date().toISOString(),
         }, null, 2))
@@ -501,6 +523,75 @@ function renderShow(value) {
   return typeof value.text === 'string' ? value.text : JSON.stringify(value, null, 2)
 }
 
+/** Names the user must not be able to open. The map is a writing input, not a result. */
+function isGatewayArtifactName(name) {
+  const safe = String(name ?? '').toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '')
+  return safe === 'evidence-map' || safe === 'gateway-map' || safe.endsWith('-evidence-map')
+}
+
+function refuseGateway(name) {
+  if (!isGatewayArtifactName(name)) return
+  throw new Error('the gateway evidence map runs internally and cannot be shown, patched, or exported; the deliverable is final_report')
+}
+
+function assertDeliverableReport(report) {
+  if (report && looksLikeGatewayMap(report.text)) {
+    throw new Error('the gateway evidence map is internal and is not delivered; this run has no research report to return')
+  }
+}
+
+/** A supply path has to stay inside the workspace. `..` and absolute paths are refused. */
+function workspaceFile(cwd, raw) {
+  const given = text(raw)
+  if (!given) throw new Error('pdf is required')
+  const abs = resolvePath(cwd, given)
+  const rel = relative(cwd, abs)
+  if (!rel || rel.startsWith('..') || isAbsolute(rel)) throw new Error('pdf must be a file inside the workspace')
+  if (!existsSync(abs)) throw new Error(`no file at ${given}`)
+  return abs
+}
+
+/**
+ * Store a paper the user already has and mark the report for a rewrite.
+ * The download path must not replace this file on a later step.
+ */
+async function acceptSuppliedPaper({ cwd, runId, args }) {
+  if (!readArtifact({ cwd, runId, name: 'final_report' })) throw new Error(`no report in ${runId} yet; finish the run before supplying a paper`)
+  const record = resolveSourceRecord(cwd, runId, args.record_id)
+  const abs = workspaceFile(cwd, args.pdf)
+  const raw = readFileSync(abs)
+  let markdown
+  if (/\.pdf$/iu.test(abs)) {
+    const converted = await convertPdfMarkdown(raw, {})
+    if (!converted?.success) throw new Error(`pdf_conversion_failed: ${String(converted?.error ?? 'unknown').slice(0, 160)}`)
+    markdown = String(converted.markdown ?? '').trim()
+  } else if (/\.(md|txt|markdown)$/iu.test(abs)) {
+    markdown = raw.toString('utf8').trim()
+  } else {
+    throw new Error('pdf must be a .pdf, .md, or .txt file')
+  }
+  if (markdown.length < 200) throw new Error('supplied text is too short to use as the paper')
+  const cap = 60000
+  const truncated = markdown.length > cap ? markdown.slice(0, cap) : markdown
+  const dir = join(cwd, '.dsh', 'deep-research', runId, 'bodies')
+  ensureDir(dir)
+  writeFileSync(join(dir, `${record.record_id}.md`), truncated)
+  writeFileSync(join(dir, `${record.record_id}.meta.json`), JSON.stringify({
+    record_id: record.record_id,
+    chars: markdown.length,
+    truncated: truncated.length < markdown.length,
+    supplied_by: 'user',
+    path: relative(cwd, abs),
+    written_at: new Date().toISOString(),
+  }, null, 2))
+  await appendRetrieval({ cwd, runId, rows: [{ record_id: record.record_id, ok: true, bytes: truncated.length, url: 'user-supplied' }] })
+  await writeArtifact({
+    cwd, runId, name: 'supplied-text', step: 'supply', overwrite: true,
+    body: `${JSON.stringify({ pending: [record.record_id], note: 'user supplied full text' }, null, 2)}\n`,
+  })
+  return record
+}
+
 const RENDERERS = {
   status: renderStatus,
   verify: renderVerify,
@@ -645,6 +736,17 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
     }
   }
 
+  if (action === 'supply') {
+    const supplied = await acceptSuppliedPaper({ cwd, runId, args })
+    await writeSourceAccess({ cwd, runId })
+    const fromStep = stepView(cwd, runId).some((step) => step.step_id === 'digest') ? 'digest' : 'draft'
+    const restarted = await dispatchAction({
+      action: 'run', cwd, runId, exec, ctx, injected,
+      args: { ...args, from_step: fromStep },
+    })
+    return { ...restarted, action: 'supply', supplied_record: supplied.record_id }
+  }
+
   if (action === 'run' || action === 'resume') {
     return {
       action,
@@ -704,8 +806,10 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
     const run = readRun(cwd, runId)
     if (section === 'artifact') {
       const name = text(args.artifact) || 'final_report'
+      refuseGateway(name)
       const artifact = readArtifact({ cwd, runId, name })
       if (!artifact) throw new Error(`no stored artifact "${name}" in ${runId}`)
+      assertDeliverableReport(artifact)
       const cap = Number.isFinite(Number(args.max_chars)) ? Math.max(100, Math.min(100_000, Number(args.max_chars))) : 20_000
       return {
         action, run_id: runId, section, artifact: artifact.artifact, chars: artifact.chars, hash: artifact.hash,
@@ -726,24 +830,51 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
     if (!EXPORT_FORMATS.includes(format)) throw new Error(`format must be one of ${EXPORT_FORMATS.join(', ')}`)
     const report = readArtifact({ cwd, runId, name: 'final_report' })
     if (!report) throw new Error('run has no final_report to export')
+    if (format !== 'csv') assertDeliverableReport(report)
     const gate = await shipGate({ cwd, runId, deps: { ...gateDeps(cwd, runId, exec, args), ...injected } })
     const extension = format === 'csv' ? 'csv' : format === 'json' ? 'json' : 'md'
     const target = join(cwd, '.dsh', 'deep-research', runId, 'exports', `report.${extension}`)
     const corpus = readCorpus(cwd, runId)
     let body
     if (format === 'markdown') {
-      body = [report.text, '', '---', '', '# Verification', gate.status === 'pass' ? `Ship gate: PASS${gate.caveat ? ` — ${gate.caveat}` : ''}` : `Ship gate: BLOCKED (${gate.blocked.join(', ')})`,
-        '', ...gate.checks.map((check) => `- ${check.state} · ${check.id} · ${check.detail ?? ''}`),
-        '', `Corpus: ${corpus.independence.records} records, ${corpus.independence.votes} independent voices.`,
-        '', ...corpus.records.map((record) => `- [${record.record_id}] ${record.title}${record.doi ? ` — doi:${record.doi}` : ''} (${record.source})`)].join('\n')
+      // The reader asked for the research writing. The ship gate and the corpus
+      // index stay beside it; gluing them on turned the export into the gateway map.
+      body = report.text
     } else if (format === 'csv') {
       body = ['record_id,cluster_id,copies_independent,title,doi,source,year,citation_count,url',
         ...corpus.records.map((record) => [record.record_id, record.cluster_id, record.independent ? '1' : '0', csvCell(record.title), csvCell(record.doi), record.source, record.year, record.citation_count, csvCell(record.url)].join(','))].join('\n')
     } else {
       body = JSON.stringify({ manifest, gate, corpus: corpus.records, claims: readRun(cwd, runId).claims, report: report.text }, null, 2)
     }
+    const verificationFile = join(cwd, '.dsh', 'deep-research', runId, 'exports', 'verification.md')
+    const accessFile = join(cwd, '.dsh', 'deep-research', runId, 'exports', 'source-access.md')
+    const accessArtifact = format === 'markdown' ? readArtifact({ cwd, runId, name: 'source-access' }) : null
+    const accessBody = accessArtifact && !looksLikeGatewayMap(accessArtifact.text) ? accessArtifact.text : null
+    if (format === 'markdown' && !args.overwrite) {
+      if (existsSync(verificationFile)) throw new Error(`${verificationFile} already exists; pass overwrite: true to replace it`)
+      if (accessBody && existsSync(accessFile)) throw new Error(`${accessFile} already exists; pass overwrite: true to replace it`)
+    }
     const written = exportText(target, body, { overwrite: Boolean(args.overwrite) })
-    return { action, run_id: runId, format, path: written.path, bytes: written.bytes, report_sha: report.hash.slice(7, 23), gate_status: gate.status }
+    let verification = null
+    if (format === 'markdown') {
+      const verificationBody = [
+        '# Verification',
+        gate.status === 'pass' ? `Ship gate: PASS${gate.caveat ? ` — ${gate.caveat}` : ''}` : `Ship gate: BLOCKED (${gate.blocked.join(', ')})`,
+        '',
+        ...gate.checks.map((check) => `- ${check.state} · ${check.id} · ${check.detail ?? ''}`),
+        '',
+        `Corpus: ${corpus.independence.records} records, ${corpus.independence.votes} independent voices.`,
+        'This file is the ship-gate record. The research report is report.md. Cited-paper access is source-access.md. The corpus index is the csv export.',
+      ].join('\n')
+      verification = exportText(verificationFile, verificationBody, { overwrite: Boolean(args.overwrite) })
+    }
+    const accessExport = accessBody ? exportText(accessFile, accessBody, { overwrite: Boolean(args.overwrite) }) : null
+    return {
+      action, run_id: runId, format, path: written.path, bytes: written.bytes,
+      report_sha: report.hash.slice(7, 23), gate_status: gate.status,
+      ...(verification ? { verification_path: verification.path } : {}),
+      ...(accessExport ? { access_path: accessExport.path } : {}),
+    }
   }
 
   if (action === 'record') {
@@ -807,6 +938,7 @@ async function dispatchAction({ action, cwd, runId, args, exec, ctx, injected = 
 
   if (action === 'patch') {
     const artifact = text(args.artifact) || 'final_report'
+    refuseGateway(artifact)
     const findingId = text(args.finding_id) || null
     if (findingId && !readFindings(cwd, runId).some((row) => row.finding_id === findingId)) {
       throw new Error(`unknown finding ${findingId}`)
@@ -895,6 +1027,7 @@ function gateDeps(cwd, runId, exec, args) {
       if (/<untrusted-source/u.test(body)) leaks.push('fenced source text left in the report')
       if (/```json/iu.test(body)) leaks.push('machine output left in the report')
       if (/\b(?:scaffold|canonical query|Register:)\b/u.test(body)) leaks.push('scaffold label echoed into the report')
+      if (looksLikeGatewayMap(body)) leaks.push('report is a gateway evidence map rather than the research writing')
       return { leaks }
     },
   }
@@ -1007,7 +1140,20 @@ async function execute({ cwd, runId, args, exec, ctx, resume, signal = null, onP
     onProgress,
   })
   const gospel = assertGospel(cwd, runId, readQuery(cwd, runId))
-  return { ...result, query_ok: gospel.ok, next_step: nextPendingStep(cwd, runId), accounting: accounting(cwd, runId) }
+  const report = readArtifact({ cwd, runId, name: 'final_report' })
+  const reportPath = report && !looksLikeGatewayMap(report.text) ? relative(cwd, report.path) : null
+  const access = readArtifact({ cwd, runId, name: 'source-access' })
+  const accessPath = access && !looksLikeGatewayMap(access.text) ? relative(cwd, access.path) : null
+  const citation = latestVerdict(cwd, runId, 'citation')
+  return {
+    report_path: reportPath,
+    access_path: accessPath,
+    citation_note: citation?.status === 'flagged' ? citation.reason : null,
+    ...result,
+    query_ok: gospel.ok,
+    next_step: nextPendingStep(cwd, runId),
+    accounting: accounting(cwd, runId),
+  }
 }
 
 function jobTimeoutMs(manifest) {
@@ -1030,18 +1176,19 @@ export function apply(ctx) {
   const define = {
     name: 'deep_research',
     description: [
-      'Run a bounded, adversarially-audited deep research investigation and return a cited report.',
-      'Actions: start (frame the brief and optionally run), run, resume, status, verify, export, list, record, revise, gate, patch, answers, show.',
+      'Run a bounded, adversarially-audited deep research investigation and return a cited Markdown research report. The gateway evidence map is stored inside the run for the writer and is never shown, patched, or exported. The deliverable is final_report.',
+      'Actions: start (frame the brief and optionally run), run, resume, status, verify, export, list, record, revise, gate, patch, answers, show, supply.',
       'Usually only action, query and effort matter: effort=low|medium|high sets how much work the run does, and is inferred from the request when omitted.',
       'Retrieval reuses the existing literature router plus a web lane for guidance, registers, and reporting; fetched open-access text is deposited in PaperMemory, so quotes are checked against the library rather than a paraphrase.',
       'Tiers route query size: light is the bounded factual path, full runs the whole pipeline, dissertation is opt-in and chaptered.',
       'The run ledger freezes the query verbatim, resumes at the step that died, and counts independent voices rather than copies. resume reruns the first unfinished step; from_step is an explicit restart that also reruns a done step and resets blocked steps at or after it. A later step never runs while an earlier selected step is unfinished. Wall-clock budget counts active execution, not idle time between resumes.',
       'gate without status is read-only and returns the latest verdicts. gate with a status records a human decision (blocked behavior is enforced by step state).',
-      'show returns a stored artifact (default final_report) or claims, findings, state, gates, query, or manifest without shell access; use it to inspect a run before resuming.',
+      'show returns the final report, or claims, findings, state, gates, query, or manifest. The stored gateway evidence map is refused. A report that is still a gateway map is not returned.',
       'revise appends a revision of one claim to drop or replace its quote and re-verifies that quote against the cited records; it never hand-edits the claims ledger and requires a reason. Use drop_quote when a quote cannot be verified and the statement should remain an unquoted assertion.',
       'Never edit files under .dsh/deep-research by hand: revisions belong in record/revise, report repairs in patch, and gate decisions in gate.',
       'verify reports PASS only for what was actually checked; anything unverifiable is disclosed as not_checked.',
-      'Never invent a citation to fill a gap: an unsupported quote blocks the ship and an unacknowledged retraction blocks the ship.',
+      'Never invent a citation to fill a gap. A missing, invented, or retracted citation blocks the run. A partial or mismatch reading is flagged beside the report and does not stop it; do not patch and resume to chase a flagged citation. Reader-facing source numbers in the finished report start at src-0001 in citation order. A cl- label is a claim, not a source.',
+      'An open-access paper is downloaded, converted from PDF to markdown, and used in the report. A paper with no open copy is answered only from its abstract, or from its title when there is no abstract. Do not state methods, tables, or results that text does not contain. artifacts/source-access.md lists which cited papers were read in full; show returns it and markdown export copies it beside the report. action=supply with record_id and a workspace pdf, markdown, or text path stores that file and rewrites the report from it.',
       'Load the `deep-research-pipeline` skill before driving a long run.',
     ].join(' '),
     parameters: {
@@ -1073,6 +1220,8 @@ export function apply(ctx) {
       contact_email: { type: 'string', description: 'Optional polite-pool contact address for OpenAlex/Crossref/PDF resolution.' },
       web_sources: { type: 'array', description: 'Web providers for the grey-literature lane, in preference order: exa, tavily, brave, perplexity. Default exa, tavily, brave. Ones without a key are skipped and reported.' },
       fetch_full_text: { type: 'boolean', description: 'Retrieve open-access full text, deposit it in PaperMemory, and verify quotes verbatim. On at medium and high effort; pass false to skip the downloads.' },
+      record_id: { type: 'string', description: 'For supply: the reader id (src-0001 in the report), the corpus id, or the DOI of the paper.' },
+      pdf: { type: 'string', description: 'For supply: a workspace path to a .pdf, .md, or .txt of that paper. A path outside the workspace is refused.' },
       max_llm_calls: { type: 'number', description: 'Advanced override of the run call cap; effort already sets a sensible one. Crossing it blocks rather than continues.' },
       max_sources: { type: 'number', description: 'Advanced override of the corpus record cap.' },
       max_steps: { type: 'number', description: 'Run at most this many steps in this call.' },
@@ -1163,7 +1312,7 @@ export function apply(ctx) {
       drop_quote: { type: 'boolean', description: 'For revise: remove the claim quote and record quote_status not_checked.' },
       section: { type: 'string', enum: ['artifact', 'claims', 'findings', 'state', 'gates', 'query', 'manifest'], description: 'For show: what to read. Default artifact.' },
       max_chars: { type: 'number', description: 'For show artifact: character cap (default 20000, max 100000).' },
-      format: { type: 'string', enum: EXPORT_FORMATS, description: 'For export: markdown, json, or csv.' },
+      format: { type: 'string', enum: EXPORT_FORMATS, description: 'For export: markdown (the research report only; the ship gate is written beside it as verification.md), json (report, gate, and corpus), or csv (the corpus index).' },
       overwrite: { type: 'boolean', description: 'For export: replace an existing export file.' },
       skip_retraction_check: { type: 'boolean', description: 'Skip live retraction lookup in verify (offline or repeat runs).' },
     },

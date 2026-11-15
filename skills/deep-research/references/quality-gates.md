@@ -52,8 +52,12 @@ Detection:
 4. For any author cited more than three times: was each entry independently
    verified?
 
-**Route**: back to verification; invented citations are deleted on
-discovery, along with every judgment that leaned on them.
+**Route**: a partial or mismatch reading is flagged beside the report and the
+report is still returned. Do not restart the run to chase it. An invented id,
+a cluster id with no representative record, a claim label used as a citation,
+a missing reference, or an unacknowledged retraction stops the run until that
+reference is repaired or removed. The reader-facing list is numbered from
+`src-0001` for that report.
 
 ## Taxonomy (MAJOR)
 

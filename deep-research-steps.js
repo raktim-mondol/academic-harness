@@ -16,11 +16,14 @@
  * Retrieval and verification arrive as `deps`, so a run is reproducible in a
  * test with no network and no model.
  */
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import {
   DEPTH, REGISTERS, TIERS, appendClaims, appendFindings, appendRecords, applyHunks,
   budgetState, findingIsCurrent, markFindingApplied, markStep, readArtifact, readCorpus, readFindings,
-  readManifest, readQuery, readRun, recordUsage, recordVerdict, stepView, supersedeFindings, writeArtifact,
+  readManifest, readQuery, readRetrievalByRecord, readRun, recordUsage, recordVerdict, stepView, supersedeFindings, writeArtifact,
 } from './deep-research-store.js'
+import { normalizeDoi } from './independence-cluster.js'
 import { UNTRUSTED_RULE, fenceMany } from './untrusted-fence.js'
 
 export const STEP_IDS = [
@@ -225,21 +228,455 @@ function briefBlock(manifest) {
 }
 
 function registerVoice(register) {
-  if (register === 'survey') return 'Map the field without delivering a verdict; represent every school on its own terms.'
+  if (register === 'survey') return 'Represent every school on its own terms and do not force a single verdict. Write that as survey prose.'
   if (register === 'teach') return 'Write a pedagogical explainer; sequence concepts so each one rests only on the ones before it.'
   if (register === 'advocate') return 'Defend one named thesis; state the strongest objection to it and answer it.'
   return 'Build an evaluative argument; let the conclusion follow the evidence.'
 }
 
-function corpusDigest(records, { perRecord = 220, limit = 60, includeBody = [] } = {}) {
+/**
+ * The reader-facing report. Research-question ids, locus notes, the ship
+ * gate, and the corpus index stay in the run; they are how the report is
+ * written, not the report.
+ */
+function researchReportContract() {
+  return [
+    'Write the final report as a research survey in Markdown that a reader can read from top to bottom.',
+    'Shape: a title that names the topic and the angle; an abstract; a numbered introduction that states the research questions in prose; a short account of how the literature was examined; thematic sections that compare sources inside sentences; a section on disagreements and the conditions that produce them; open problems; and a conclusion that answers each research question in its own paragraph.',
+    'Close with a References heading that lists only works cited in the body, one line each, keeping the same [src-] ids used inline.',
+    'Cite the [src-] ids printed in the material and copy them exactly. Do not renumber a source, and do not copy a claim number into a source id: cl-0041 is a claim, never [src-0041]. A cluster id such as c0004 names a group of copies and is never a citation.',
+    'When a source is marked full text, the fenced paper is what you may use. When it is marked abstract only, use only that abstract: do not state methods, tables, or results the abstract does not contain. A title-only source supports no factual claim about its contents. Do not paste the source-access list into the report.',
+    'The evidence map, research-question ids, locus ids, ship gate, and corpus index are private working notes. Do not publish them. Do not title the report an evidence map, do not write "How to read this map" or "Boundaries of this map", and do not use rq- ids or locus ids as headings.',
+    'Keep disagreements visible with the conditions that produce them. Do not average them into one number.',
+    'Do not append a verification section, a ship-gate ledger, or a dump of the corpus.',
+  ].join(' ')
+}
+
+/** True when the text is the internal gateway, not a survey a reader would read. */
+export function looksLikeGatewayMap(text) {
+  const body = String(text ?? '')
+  const heading = body.split('\n').find((line) => /^#\s+\S/u.test(line)) ?? ''
+  if (/evidence map/iu.test(heading)) return true
+  if (/how to read this map/iu.test(body)) return true
+  if (/boundaries of this map/iu.test(body)) return true
+  if (/^#{1,3}\s+(?:\d+\.\s*)?rq-\d+\b/imu.test(body)) return true
+  if (/^# Verification\s*$/mu.test(body) || /^Ship gate:/mu.test(body)) return true
+  return false
+}
+
+function stripGatewayTail(text) {
+  return String(text ?? '')
+    .replace(/\n+#{1,3} Verification\b[\s\S]*$/iu, '')
+    .replace(/\n+Ship gate:[\s\S]*$/iu, '')
+    .trimEnd()
+}
+
+/** Citation audit reads the argument, not the bibliography that repeats its ids. */
+function proseForCitation(text) {
+  return String(text ?? '').replace(/\n#{1,3} References\b[\s\S]*$/iu, '\n')
+}
+
+function bibliographyFor(text, records) {
+  const byId = new Map((records ?? []).map((record) => [record.record_id, record]))
+  const ids = []
+  const seen = new Set()
+  for (const match of String(text ?? '').matchAll(/\[(src-[a-z0-9-]+)\]/giu)) {
+    const id = match[1].toLowerCase()
+    if (seen.has(id) || !byId.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  if (!ids.length) return ''
+  const lines = ids.map((id) => {
+    const record = byId.get(id)
+    const year = record.year ? ` ${record.year}.` : ''
+    const doi = record.doi ? ` doi:${record.doi}.` : ''
+    return `- [${id}] ${String(record.title ?? 'Untitled').replace(/\s+/gu, ' ').trim()}.${year}${doi}`.replace(/\s+\./gu, '.').trim()
+  })
+  return ['', '## References', '', ...lines, ''].join('\n')
+}
+
+/** The model's References blurbs are not the corpus. The tool writes the list. */
+function withCorpusBibliography(text, records) {
+  const prose = proseForCitation(text).trimEnd()
+  return `${prose}${bibliographyFor(prose, records)}`
+}
+
+/**
+ * Reader-facing source numbers start at src-0001 for this report, in the
+ * order the works are first cited. The index remembers which corpus record
+ * each displayed id is, so a later cite check still opens the right paper.
+ */
+function compactCitedSources(text, records) {
+  const byId = new Map((records ?? []).map((record) => [record.record_id, record]))
+  const prose = proseForCitation(text).trimEnd()
+  const corpusToDisplay = new Map()
+  for (const match of prose.matchAll(/\[(src-[a-z0-9-]+)\]/giu)) {
+    const id = match[1].toLowerCase()
+    if (!byId.has(id) || corpusToDisplay.has(id)) continue
+    corpusToDisplay.set(id, `src-${String(corpusToDisplay.size + 1).padStart(4, '0')}`)
+  }
+  // One pass over the original text. A later corpus id must not be rewritten
+  // again just because an earlier source was displayed as that same number.
+  const renumbered = prose.replace(/\[(src-[a-z0-9-]+)\]/giu, (whole, id) => {
+    const display = corpusToDisplay.get(id.toLowerCase())
+    return display ? `[${display}]` : whole
+  })
+  const displayToCorpus = {}
+  for (const [corpusId, display] of corpusToDisplay) displayToCorpus[display] = corpusId
+  const body = `${renumbered}${bibliographyFor(renumbered, [...corpusToDisplay].map(([corpusId, display]) => {
+    const record = byId.get(corpusId)
+    return { ...record, record_id: display }
+  }))}`
+  return { text: `${body.trimEnd()}\n`, index: { display_to_corpus: displayToCorpus } }
+}
+
+function expandCitedSources(text, index) {
+  const map = index?.display_to_corpus ?? {}
+  if (!Object.keys(map).length) return String(text ?? '')
+  return String(text ?? '').replace(/\[(src-[a-z0-9-]+)\]/giu, (whole, id) => (map[id.toLowerCase()] ? `[${map[id.toLowerCase()]}]` : whole))
+}
+
+/** Order of src- brackets, so a prose edit can be told from a renumber. */
+function citationBracketKey(text) {
+  return [...String(text ?? '').matchAll(/\[(src-[a-z0-9-]+)\]/giu)].map((match) => match[1].toLowerCase()).join('|')
+}
+
+function readCitationIndex(cwd, runId) {
+  const artifact = readArtifact({ cwd, runId, name: 'citation-index' })
+  if (!artifact?.text.trim()) return null
+  try {
+    const parsed = JSON.parse(artifact.text)
+    const map = parsed?.display_to_corpus
+    if (!map || typeof map !== 'object' || Array.isArray(map)) return null
+    return {
+      space: parsed.space === 'display' ? 'display' : 'corpus',
+      bracket_key: typeof parsed.bracket_key === 'string' ? parsed.bracket_key : '',
+      display_to_corpus: map,
+    }
+  } catch {
+    return null
+  }
+}
+
+function sentenceAt(text, index) {
+  const body = String(text ?? '')
+  const before = body.slice(0, index)
+  const start = Math.max(before.lastIndexOf('\n'), before.lastIndexOf('. '))
+  const after = body.slice(index)
+  const rel = after.search(/[.\n]/u)
+  const end = rel < 0 ? body.length : index + rel + 1
+  return body.slice(start < 0 ? 0 : start + 1, end)
+}
+
+/** Six consecutive words, so a shared topic word is not treated as the same claim. */
+function sharesClaimText(sentence, claimText) {
+  const claim = String(claimText ?? '').replace(/\[[^\]]*\]/gu, ' ').replace(/\s+/gu, ' ').trim().toLowerCase()
+  const host = String(sentence ?? '').replace(/\[[^\]]*\]/gu, ' ').replace(/\s+/gu, ' ').trim().toLowerCase()
+  if (claim.length < 40) return false
+  const words = claim.split(' ').filter(Boolean)
+  if (words.length < 6) return host.includes(claim)
+  for (let i = 0; i <= words.length - 6; i += 1) {
+    if (host.includes(words.slice(i, i + 6).join(' '))) return true
+  }
+  return false
+}
+
+/**
+ * A claim label is not a paper. [cl-0041] becomes that claim's records.
+ * [src-0041] is repaired the same way only when the sentence is that claim
+ * and cl-0041 cites different records — the copy that produced src-0041 on a
+ * new topic whose corpus already started at src-0001.
+ */
+function repairClaimSerialCitations(text, claims, records) {
+  const byClaim = new Map((claims ?? []).map((claim) => [String(claim.claim_id ?? '').toLowerCase(), claim]))
+  return String(text ?? '').replace(/\[((?:cl|src)-(\d+))\]/giu, (whole, id, digits, offset, source) => {
+    const claim = byClaim.get(`cl-${digits}`)
+    if (!claim) return whole
+    const sources = sourceIdsFor(claim.record_ids, records)
+    if (!sources.length) return whole
+    const normalized = id.toLowerCase()
+    if (normalized.startsWith('src-') && sources.includes(normalized)) return whole
+    if (normalized.startsWith('src-') && !sharesClaimText(sentenceAt(source, offset), claim.text)) return whole
+    return sources.map((recordId) => `[${recordId}]`).join(' ')
+  })
+}
+
+/**
+ * Cite-check audits corpus ids. A finished report stores reader ids, so a
+ * rerun expands only when the bracket sequence still matches the index.
+ * A mismatch means the report is already in corpus space (or a crash left
+ * the two out of step) and must not be expanded a second time.
+ */
+async function expandReaderCitations({ cwd, runId, report }) {
+  const index = readCitationIndex(cwd, runId)
+  const map = index?.display_to_corpus ?? {}
+  if (index?.space !== 'display' || !Object.keys(map).length) return report
+  if (index.bracket_key !== citationBracketKey(report.text)) return report
+  const expanded = expandCitedSources(report.text, index)
+  if (expanded === report.text) return report
+  await writeArtifact({ cwd, runId, name: 'final_report', step: 'cite_check', overwrite: true, mechanical: true, body: expanded })
+  return readArtifact({ cwd, runId, name: 'final_report' })
+}
+
+async function publishReaderCitations({ cwd, runId, report, records }) {
+  const compacted = compactCitedSources(report.text, records)
+  const map = compacted.index.display_to_corpus
+  if (!Object.keys(map).length) return report
+  // Write the index before the report. If the process dies between the two,
+  // the bracket key will not match the corpus-id report and the next check
+  // will not expand it.
+  await writeArtifact({
+    cwd, runId, name: 'citation-index', step: 'cite_check', overwrite: true,
+    body: `${JSON.stringify({ space: 'display', bracket_key: citationBracketKey(compacted.text), display_to_corpus: map }, null, 2)}\n`,
+  })
+  if (compacted.text === report.text) return report
+  await writeArtifact({ cwd, runId, name: 'final_report', step: 'cite_check', overwrite: true, mechanical: true, body: compacted.text })
+  return readArtifact({ cwd, runId, name: 'final_report' })
+}
+
+/** Polish may edit prose around a citation. Keep the index pointed at those brackets. */
+async function refreshReaderCitationKey({ cwd, runId }) {
+  const index = readCitationIndex(cwd, runId)
+  if (index?.space !== 'display') return
+  const report = readArtifact({ cwd, runId, name: 'final_report' })
+  if (!report) return
+  const key = citationBracketKey(report.text)
+  if (key === index.bracket_key) return
+  const ids = key ? key.split('|') : []
+  if (!ids.length || ids.some((id) => !index.display_to_corpus[id])) return
+  await writeArtifact({
+    cwd, runId, name: 'citation-index', step: 'polish', overwrite: true,
+    body: `${JSON.stringify({ space: 'display', bracket_key: key, display_to_corpus: index.display_to_corpus }, null, 2)}\n`,
+  })
+}
+
+function clusterIndex(records) {
+  const byCluster = new Map()
+  for (const record of records ?? []) {
+    if (record.cluster_id && !byCluster.has(record.cluster_id)) byCluster.set(record.cluster_id, record)
+  }
+  return byCluster
+}
+
+/** A writer should see a paper id. A cluster id becomes its representative record. */
+function sourceIdsFor(ids, records) {
+  const known = new Set((records ?? []).map((record) => record.record_id))
+  const clusters = clusterIndex(records)
+  const out = []
+  for (const raw of ids ?? []) {
+    const id = String(raw ?? '')
+    const resolved = known.has(id) ? id : clusters.get(id.toLowerCase())?.record_id
+    if (resolved && !out.includes(resolved)) out.push(resolved)
+  }
+  return out
+}
+
+function buildEvidenceMap({ manifest, contradictions, tensions, comparisons, digest, drafts, reading }) {
+  const questions = (manifest?.brief?.research_questions ?? []).map((rq) => `- ${rq.rq_id}: ${rq.text}`).join('\n')
+  return [
+    '# Internal evidence map',
+    '',
+    'Gateway notes for writing the research report. This file is not the deliverable. The reader-facing result is the research report in final-report.md.',
+    '',
+    '## Research questions',
+    questions || '_none recorded_',
+    '',
+    '## Contradictions',
+    contradictions || '_none recorded_',
+    '',
+    '## Source tensions',
+    tensions || '_none recorded_',
+    '',
+    '## Comparisons',
+    comparisons || '_none recorded_',
+    '',
+    '## Evidence digest',
+    digest || '_none recorded_',
+    '',
+    '## What was read',
+    reading || '_none recorded_',
+    '',
+    '## Draft prose',
+    drafts || '_none recorded_',
+  ].join('\n')
+}
+
+function corpusDigest(records, { perRecord = 220, limit = 60, includeBody = [], perBodyChars = 1600 } = {}) {
   const bodyById = new Map(includeBody.map((entry) => [entry.record_id, entry.body]))
-  return records.slice(0, limit).map((record, index) => {
-    const head = `[${record.record_id}] ${record.title} (${record.source}${record.year ? `, ${record.year}` : ''}${record.doi ? `, doi:${record.doi}` : ''}${record.independent === false ? `, cluster ${record.cluster_id}` : ''})`
-    const note = String(record.abstract ?? '').replace(/\s+/gu, ' ').slice(0, perRecord)
+  return records.slice(0, limit).map((record) => {
     const body = bodyById.get(record.record_id)
-    const fenced = body ? `\n${fenceMany([{ record_id: record.record_id, source: record.source, body }], { perBodyChars: 1600 }).text}` : ''
+    const access = body ? 'full text' : (String(record.abstract ?? '').trim() ? 'abstract only' : 'title only')
+    const head = `[${record.record_id}] ${record.title} (${record.source}${record.year ? `, ${record.year}` : ''}${record.doi ? `, doi:${record.doi}` : ''}${record.independent === false ? `, cluster ${record.cluster_id}` : ''}; ${access})`
+    const note = String(record.abstract ?? '').replace(/\s+/gu, ' ').slice(0, perRecord)
+    const fenced = body ? `\n${fenceMany([{ record_id: record.record_id, source: record.source, body }], { perBodyChars }).text}` : ''
     return `${head}\n  ${note || 'no abstract'}${fenced}`
   }).join('\n\n')
+}
+
+const ACCESS_LIMIT = 'A source marked full text supports the fenced paper. A source marked abstract only supports only what its abstract states. A title-only source supports no factual claim about its contents.'
+
+/** Body already stored for this run, including one the user supplied. */
+function readStoredBody(cwd, runId, recordId) {
+  const dir = join(cwd, '.dsh', 'deep-research', runId, 'bodies')
+  const file = join(dir, `${recordId}.md`)
+  if (!existsSync(file)) return null
+  const body = readFileSync(file, 'utf8')
+  if (!body.trim()) return null
+  let meta = {}
+  try { meta = JSON.parse(readFileSync(join(dir, `${recordId}.meta.json`), 'utf8')) } catch { /* legacy body */ }
+  return {
+    body,
+    chars: body.length,
+    truncated: Boolean(meta.truncated),
+    supplied_by: meta.supplied_by ?? null,
+    resolver: meta.resolver ?? null,
+  }
+}
+
+/**
+ * Read stored papers first. Download only the records that have no body yet,
+ * and skip the call entirely when every record is already on disk.
+ */
+async function textsFor(cwd, runId, records, deps) {
+  const out = []
+  const missing = []
+  for (const record of records ?? []) {
+    if (!record?.record_id) continue
+    const stored = readStoredBody(cwd, runId, record.record_id)
+    if (stored) out.push({ record_id: record.record_id, source: record.source, body: stored.body, truncated: stored.truncated, supplied_by: stored.supplied_by })
+    else missing.push(record)
+  }
+  if (missing.length && typeof deps?.fetch === 'function') {
+    const fetched = await deps.fetch(missing)
+    for (const entry of fetched ?? []) {
+      if (entry?.body && entry.record_id) out.push(entry)
+    }
+  }
+  return out
+}
+
+function pendingSuppliedRecords(cwd, runId) {
+  const artifact = readArtifact({ cwd, runId, name: 'supplied-text' })
+  if (!artifact?.text.trim()) return []
+  try {
+    const parsed = JSON.parse(artifact.text)
+    return Array.isArray(parsed?.pending) ? parsed.pending.map(String).filter(Boolean) : []
+  } catch {
+    return []
+  }
+}
+
+async function clearSuppliedPending(cwd, runId) {
+  if (!pendingSuppliedRecords(cwd, runId).length) return
+  await writeArtifact({
+    cwd, runId, name: 'supplied-text', step: 'supply', overwrite: true,
+    body: `${JSON.stringify({ pending: [], note: 'user supplied full text' }, null, 2)}\n`,
+  })
+}
+
+/** Reader id, corpus id, or DOI. A reader id wins when the report is in display space. */
+export function resolveSourceRecord(cwd, runId, raw) {
+  const id = String(raw ?? '').trim()
+  if (!id) throw new Error('record_id is required')
+  const corpus = readCorpus(cwd, runId)
+  const byId = new Map(corpus.records.map((record) => [record.record_id, record]))
+  const index = readCitationIndex(cwd, runId)
+  const key = id.toLowerCase()
+  if (index?.space === 'display' && index.display_to_corpus[key] && byId.has(index.display_to_corpus[key])) {
+    return byId.get(index.display_to_corpus[key])
+  }
+  if (byId.has(key)) return byId.get(key)
+  const doi = normalizeDoi(id)
+  if (doi) {
+    const match = corpus.records.find((record) => normalizeDoi(record.doi) === doi)
+    if (match) return match
+  }
+  throw new Error(`no source ${id} in ${runId}`)
+}
+
+function accessDetail({ record, stored, row, fetchRequested }) {
+  if (stored) {
+    const chars = `${stored.chars} characters${stored.truncated ? ', truncated' : ''}`
+    if (stored.supplied_by === 'user') return `Supplied by you, ${chars}.`
+    return `Downloaded${stored.resolver ? ` (${stored.resolver})` : ''}, ${chars}.`
+  }
+  const reason = row && row.ok === false && row.reason ? String(row.reason) : null
+  const abstract = String(record.abstract ?? '').trim()
+  if (abstract) {
+    if (reason) return `No open-access PDF (${reason}). The report uses the abstract.`
+    if (!fetchRequested) return 'Full text was not requested. The report uses the abstract.'
+    return 'No full text stored. The report uses the abstract.'
+  }
+  if (reason) return `No abstract and no open-access PDF (${reason}).`
+  if (!fetchRequested) return 'No abstract was available, and full text was not requested.'
+  return 'No abstract and no full text stored.'
+}
+
+/**
+ * User-facing list of cited papers only. Reader ids match the report.
+ * The file states what was read. It does not include the paper text.
+ */
+export async function writeSourceAccess({ cwd, runId }) {
+  const report = readArtifact({ cwd, runId, name: 'final_report' })
+  if (!report?.text.trim()) return null
+  const corpus = readCorpus(cwd, runId)
+  const index = readCitationIndex(cwd, runId)
+  const byId = new Map(corpus.records.map((record) => [record.record_id, record]))
+  const map = index?.display_to_corpus ?? {}
+  const displaySpace = index?.space === 'display' && Object.keys(map).length > 0
+  const seen = new Set()
+  const cited = []
+  for (const match of proseForCitation(report.text).matchAll(/\[(src-[a-z0-9-]+)\]/giu)) {
+    const token = match[1].toLowerCase()
+    if (seen.has(token)) continue
+    seen.add(token)
+    const corpusId = displaySpace && map[token] ? map[token] : token
+    const record = byId.get(corpusId)
+    if (!record) continue
+    cited.push({ displayId: displaySpace && map[token] ? token : record.record_id, record })
+  }
+  const fetchRequested = Boolean(readManifest(cwd, runId)?.execution?.fetch_full_text)
+  const retrieval = readRetrievalByRecord(cwd, runId)
+  const groups = { full: [], abstract: [], title: [] }
+  for (const entry of cited) {
+    const stored = readStoredBody(cwd, runId, entry.record.record_id)
+    const detail = accessDetail({
+      record: entry.record, stored, row: retrieval.get(entry.record.record_id), fetchRequested,
+    })
+    const year = entry.record.year ? ` ${entry.record.year}.` : ''
+    const doi = entry.record.doi ? ` doi:${entry.record.doi}.` : ''
+    const title = String(entry.record.title ?? 'Untitled').replace(/\s+/gu, ' ').trim() || 'Untitled'
+    const line = `- [${entry.displayId}] ${title}.${year}${doi} ${detail}`.replace(/\s+\./gu, '.').trim()
+    groups[stored ? 'full' : (String(entry.record.abstract ?? '').trim() ? 'abstract' : 'title')].push(line)
+  }
+  const intro = !fetchRequested && !groups.full.length
+    ? 'Full text was not requested for this run. Each cited source was used from its abstract or its title. To read a paper in full, give deep_research action supply a PDF or markdown file for that source. The report is then rewritten from that text.'
+    : 'Open-access papers are downloaded and converted from PDF to markdown when a copy can be retrieved. A paper with no open copy is used only at the depth of the text on hand (its abstract, or its title). To go further, give deep_research action supply a PDF or markdown file for that source. The report is then rewritten from that text.'
+  const sections = ['# Source access', '', intro, '']
+  if (!cited.length) sections.push('No cited source was found in the report.', '')
+  if (groups.full.length) sections.push('## Read in full', '', ...groups.full, '')
+  if (groups.abstract.length) sections.push('## Abstract only', '', ...groups.abstract, '')
+  if (groups.title.length) sections.push('## Title only', '', ...groups.title, '')
+  return writeArtifact({
+    cwd, runId, name: 'source-access', step: 'cite_check', overwrite: true,
+    body: `${sections.join('\n').trimEnd()}\n`,
+  })
+}
+
+function loadBearingRecords(cwd, runId, records) {
+  const byId = new Map((records ?? []).map((record) => [record.record_id, record]))
+  const out = []
+  const seen = new Set()
+  for (const claim of readRun(cwd, runId)?.claims ?? []) {
+    for (const id of sourceIdsFor(claim.record_ids, records)) {
+      if (seen.has(id) || !byId.has(id)) continue
+      seen.add(id)
+      out.push(byId.get(id))
+      if (out.length >= 24) return out
+    }
+  }
+  return out
 }
 
 function clipTitle(value, max = 46) {
@@ -532,12 +969,13 @@ const STEP_RUNNERS = {
     const corpus = readCorpus(cwd, runId)
     const results = await gather(loci.map((locus) => async () => {
       const assigned = corpus.records.filter((record) => lociArtifact.text.includes(record.record_id))
-      const fetched = await deps.fetch(assigned.slice(0, 6))
+      const fetched = await textsFor(cwd, runId, assigned.slice(0, 6), deps)
       const reply = await llm({
         step: 'depth',
         system: [
           'Investigate this one locus and commit to a position. Return JSON: {"position":str,"confidence":"supported|provisional|contested","claims":[{"text","record_ids":[str],"quote":str}],"what_would_change_it":str}.',
           'A quote is copied out of the supplied text exactly, or it is not given. Never paraphrase inside the quote field.',
+          ACCESS_LIMIT,
           UNTRUSTED_RULE,
         ].join(' '),
         messages: [{ role: 'user', content: [briefBlock(manifest), `Locus: ${locus.locus_id} ${locus.title}`, '', corpusDigest(assigned, { perRecord: 300, includeBody: fetched })].join('\n\n') }],
@@ -558,7 +996,7 @@ const STEP_RUNNERS = {
         `# Interim note ${locus.locus_id} · ${locus.title}`, '',
         `**Position:** ${json.position ?? 'not committed'}`, `**Confidence:** ${['supported', 'provisional', 'contested'].includes(json.confidence) ? json.confidence : 'provisional'}`,
         `**What would change it:** ${json.what_would_change_it ?? 'unstated'}`, '',
-        ...claims.map((claim) => `- ${claim.claim_id}: ${claim.text}${claim.quote ? ` (quoted: "${claim.quote}")` : ''}`),
+        ...claims.map((claim) => `- ${sourceIdsFor(claim.record_ids, corpus.records).map((id) => `[${id}]`).join(' ') || '[no source id]'}: ${claim.text}${claim.quote ? ` (quoted: "${claim.quote}")` : ''}`),
       ].join('\n')
       await writeArtifact({ cwd, runId, name: `interim-${locus.locus_id}`, step: 'depth', body: note, overwrite: true })
       progress({ step: 'depth', phase: 'locus', done: loci.indexOf(locus) + 1, total: loci.length, detail: `${locus.locus_id} ${clipTitle(locus.title)} — ${claims.length} claim(s)` })
@@ -602,8 +1040,8 @@ const STEP_RUNNERS = {
     const corpus = readCorpus(cwd, runId)
     const reply = await llm({
       step: 'tensions',
-      system: 'Extract expert disagreements present in the corpus. Return JSON: {"tensions":[{"issue","positions":[{"stance","record_ids":[str],"rationale"}],"stake"}]}. One entry per genuine disagreement; syndicated copies are one voice.',
-      messages: [{ role: 'user', content: [briefBlock(manifest), '', clusterNote(corpus), corpusDigest(corpus.records, { perRecord: 300, includeBody: await deps.fetch(corpus.records.slice(0, 8)) })].join('\n\n') }],
+      system: `Extract expert disagreements present in the corpus. Return JSON: {"tensions":[{"issue","positions":[{"stance","record_ids":[str],"rationale"}],"stake"}]}. One entry per genuine disagreement; syndicated copies are one voice. ${ACCESS_LIMIT}`,
+      messages: [{ role: 'user', content: [briefBlock(manifest), '', clusterNote(corpus), corpusDigest(corpus.records, { perRecord: 300, includeBody: await textsFor(cwd, runId, corpus.records.slice(0, 8), deps) })].join('\n\n') }],
       json: true,
     })
     const json = requireJson(reply, 'tensions')
@@ -611,7 +1049,7 @@ const STEP_RUNNERS = {
     const written = await writeArtifact({
       cwd, runId, name: 'source-tensions', step: 'tensions', overwrite: true,
       body: ['# Source tensions', '', ...(tensions.length ? tensions : [{ issue: 'no explicit disagreement recorded', positions: [] }])
-        .map((tension) => `## ${tension.issue}\n${(tension.positions ?? []).map((p) => `- **${p.stance}** (${(p.record_ids ?? []).join(', ')}): ${p.rationale}`).join('\n')}\n- Stake: ${tension.stake ?? 'unstated'}`)].join('\n\n'),
+        .map((tension) => `## ${tension.issue}\n${(tension.positions ?? []).map((p) => `- **${p.stance}** (${sourceIdsFor(p.record_ids, corpus.records).map((id) => `[${id}]`).join(' ') || 'no source id'}): ${p.rationale}`).join('\n')}\n- Stake: ${tension.stake ?? 'unstated'}`)].join('\n\n'),
     })
     return { artifact: written, summary: { tensions: tensions.length } }
   },
@@ -648,8 +1086,8 @@ const STEP_RUNNERS = {
     const corpus = readCorpus(cwd, runId)
     const reply = await llm({
       step: 'digest',
-      system: 'Select the load-bearing claims. Return JSON: {"claims":[{"text","rq_id","record_ids":[str],"quote":str,"strength":"supported|provisional|contested"}]}. A quote is copied verbatim from the supplied text or omitted.',
-      messages: [{ role: 'user', content: [briefBlock(manifest), '', clusterNote(corpus), corpusDigest(corpus.records, { perRecord: 400, includeBody: await deps.fetch(corpus.records.slice(0, 12)) })].join('\n\n') }],
+      system: `Select the load-bearing claims. Return JSON: {"claims":[{"text","rq_id","record_ids":[str],"quote":str,"strength":"supported|provisional|contested"}]}. A quote is copied verbatim from the supplied text or omitted. ${ACCESS_LIMIT}`,
+      messages: [{ role: 'user', content: [briefBlock(manifest), '', clusterNote(corpus), corpusDigest(corpus.records, { perRecord: 400, perBodyChars: 4000, includeBody: await textsFor(cwd, runId, corpus.records.slice(0, 12), deps) })].join('\n\n') }],
       json: true,
     })
     const json = requireJson(reply, 'digest')
@@ -687,16 +1125,20 @@ const STEP_RUNNERS = {
     const unsupported = claims.filter((claim) => claim.quote_status === 'unsupported')
     const written = await writeArtifact({
       cwd, runId, name: 'evidence-digest', step: 'digest', overwrite: true,
-      body: ['# Evidence digest', '', ...claims.map((claim) => `- **${claim.claim_id}** [${claim.rq_id ?? 'no rq'}] (${claim.strength}, quote ${claim.quote_status}) ${claim.text}${claim.quote ? `\n  > ${claim.quote}` : ''}`)].join('\n')
+      body: ['# Evidence digest', '', 'Copy each [src-] id exactly as printed. A cl- label is a claim, not a source, and must not be turned into a citation.', '', ...claims.map((claim) => {
+        const sources = sourceIdsFor(claim.record_ids, corpus.records)
+        return `- ${sources.map((id) => `[${id}]`).join(' ') || '[no source id]'} [${claim.rq_id ?? 'no rq'}] (${claim.strength}, quote ${claim.quote_status}) ${claim.text}${claim.quote ? `\n  > ${claim.quote}` : ''}`
+      })].join('\n')
         + (unsupported.length ? `\n\n${unsupported.length} claim(s) failed the verbatim check and must not be cited as quoted.` : ''),
     })
     return {
       artifact: written,
       summary: { claims: claims.length, unsupported: unsupported.length, answered: new Set(claims.filter((claim) => claim.rq_id).map((claim) => claim.rq_id)).size },
+      // A quote that is not verbatim is disclosed on the claim. It does not halt
+      // the run: the live session showed a citation block sending the host into
+      // a patch-and-resume loop that never returned the report.
       verdict: unsupported.length
-        ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${unsupported.length} quote(s) not present verbatim`, route: 'drop the quote or re-verify against the source', detail: unsupported.map((claim) => claim.claim_id).join(', ') }
-        // A successful rerun must supersede the digest's earlier blocked verdict;
-        // otherwise `gate` keeps reporting a defect the rerun just cleared.
+        ? { gate: 'citation', status: 'flagged', severity: 'MAJOR', reason: `${unsupported.length} quote(s) not present verbatim`, route: 'the claims stay marked unsupported and the report is still written', detail: unsupported.map((claim) => claim.claim_id).join(', ') }
         : { gate: 'citation', status: 'clear', reason: 'no claim quote failed the verbatim check' },
     }
   },
@@ -712,19 +1154,22 @@ const STEP_RUNNERS = {
     // `fetch_full_text` has to mean something on the light path too, or the
     // draft cites titles it was never allowed to read and every binding comes
     // back "partial" against an abstract.
-    const bodies = digestArtifact || typeof deps.fetch !== 'function' ? [] : await deps.fetch(ranked.slice(0, 12))
+    const bodies = digestArtifact ? [] : await textsFor(cwd, runId, ranked.slice(0, 12), deps)
     const evidence = digestArtifact?.text?.trim()
       ? digestArtifact.text
-      : `## Retrieved corpus (ranked by citation authority)\n\n${corpusDigest(ranked, { perRecord: 320, limit: 60, includeBody: bodies })}`
+      : `## Retrieved corpus (ranked by citation authority)\n\n${corpusDigest(ranked, { perRecord: 320, limit: 60, perBodyChars: 4000, includeBody: bodies })}`
     const angles = gear.drafts > 1
       ? ['evidence and mechanism', 'disagreement and limits', 'application, policy, and who is affected']
       : ['the question as asked']
     const results = await gather(angles.map((angle) => () => llm({
       step: 'draft',
       system: [
-        `Draft from this angle: ${angle}. Write only from the material supplied; cite record ids inline as [src-0001].`,
-        'Cite the exact ids given above. A cluster id such as c0004 names a group of copies and is never a citation.',
+        `Draft from this angle: ${angle}. Write only from the material supplied; cite record ids inline as [src-NNNN].`,
+        'Cite the [src-] ids printed on the claims and copy them exactly. A cl- label is a claim, not a source: do not turn cl-0041 into [src-0041]. A cluster id such as c0004 is never a citation.',
         'Never cite a claim the material marks unsupported, and never present a cluster of copies as several sources.',
+        manifest.tier === 'light'
+          ? researchReportContract()
+          : 'Write prose a later survey can use. Do not write an evidence map, a verification ledger, or headings that are research-question ids.',
         registerVoice(manifest.brief.register),
       ].join(' '),
       messages: [{ role: 'user', content: [briefBlock(manifest), '', clusterNote(corpus), evidence].join('\n\n') }],
@@ -742,37 +1187,78 @@ const STEP_RUNNERS = {
     })
     // Light tier has no separate synthesis step, so the single draft *is* the
     // report — and cite check, polish, and the ship gate operate on it. Nothing
-    // may skip verification, however short the run is.
+    // may skip verification, however short the run is. A gateway-shaped draft
+    // is rewritten once into the survey; the angle notes stay in `drafts`.
     if (manifest.tier === 'light') {
-      await writeArtifact({ cwd, runId, name: 'final_report', step: 'draft', body: usable[0], overwrite: true })
+      let body = usable[0]
+      if (looksLikeGatewayMap(body)) {
+        const again = await llm({
+          step: 'draft',
+          system: [researchReportContract(), registerVoice(manifest.brief.register)].join(' '),
+          messages: [{ role: 'user', content: [briefBlock(manifest), '', 'The draft below is a gateway evidence map. Rewrite it as the research report.', '', body.slice(0, 14000)].join('\n') }],
+          json: false,
+          maxTokens: 12000,
+        })
+        if (again.text.trim()) body = again.text
+      }
+      body = repairClaimSerialCitations(stripGatewayTail(body), readRun(cwd, runId)?.claims ?? [], corpus.records)
+      body = withCorpusBibliography(body, corpus.records)
+      const evidenceRewrite = pendingSuppliedRecords(cwd, runId).length > 0
+      await writeArtifact({ cwd, runId, name: 'final_report', step: 'draft', body, overwrite: true, evidenceRewrite })
+      if (evidenceRewrite) await clearSuppliedPending(cwd, runId)
     }
     return { artifact: written, summary: { angles: usable.length, failed: drafts.length - usable.length } }
   },
 
   // 11 — synthesize; from here the report is patch-only.
-  async synthesize({ cwd, runId, manifest, llm }) {
+  // The evidence map is the gateway the writer reads. The stored report is the survey.
+  async synthesize({ cwd, runId, manifest, llm, deps }) {
     const drafts = readArtifact({ cwd, runId, name: 'drafts' })
     if (!drafts) throw new Error('nothing to synthesize')
     const comparisons = readArtifact({ cwd, runId, name: 'comparisons' })?.text ?? ''
     const tensions = readArtifact({ cwd, runId, name: 'source-tensions' })?.text ?? ''
     const contradictions = readArtifact({ cwd, runId, name: 'contradictions' })?.text ?? ''
-    const allowed = allowedRecordIds(drafts.text, comparisons, tensions, contradictions)
+    const digest = readArtifact({ cwd, runId, name: 'evidence-digest' })?.text ?? ''
+    const allowed = allowedRecordIds(drafts.text, comparisons, tensions, contradictions, digest)
+    const corpus = readCorpus(cwd, runId)
+    const bearing = loadBearingRecords(cwd, runId, corpus.records)
+    const reading = corpusDigest(bearing, {
+      perRecord: 400, limit: 24, perBodyChars: 4000,
+      includeBody: await textsFor(cwd, runId, bearing, deps),
+    })
+    // Stored for the writer and for a later resume of this step. show, patch,
+    // and export refuse the name, so it never becomes the result the user sees.
+    const map = buildEvidenceMap({ manifest, contradictions, tensions, comparisons, digest, drafts: drafts.text, reading })
+    await writeArtifact({ cwd, runId, name: 'evidence-map', step: 'synthesize', body: map, overwrite: true })
+    const system = [
+      researchReportContract(),
+      allowed.length ? `Allowed record ids: ${allowed.slice(0, 300).join(', ')}${allowed.length > 300 ? ` (+${allowed.length - 300} more in the drafts)` : ''}.` : '',
+      registerVoice(manifest.brief.register),
+    ].filter(Boolean).join(' ')
     const reply = await llm({
       step: 'synthesize',
-      system: [
-        'Write the final report. Answer each research question by id in a closing "Answers" section.',
-        'Keep disagreements in view with the conditions that produce them; never average them.',
-        'Cite record ids inline as [src-0001] and cite only ids that appear in the material.',
-        'A cluster id such as c0004 names a group of copies and is never a citation. Do not invent ids or use bracket labels such as [AUC] as evidence.',
-        allowed.length ? `Allowed record ids: ${allowed.slice(0, 300).join(', ')}${allowed.length > 300 ? ` (+${allowed.length - 300} more in the drafts)` : ''}.` : '',
-        registerVoice(manifest.brief.register),
-      ].filter(Boolean).join(' '),
-      messages: [{ role: 'user', content: [briefBlock(manifest), '', contradictions, tensions, comparisons, drafts.text].join('\n\n---\n\n') }],
+      system,
+      messages: [{ role: 'user', content: [briefBlock(manifest), '', 'Private evidence map. Use it to write the report. Do not copy its title, its headings, or its ledger voice.', '', map].join('\n') }],
       json: false,
-      maxTokens: 8000,
+      maxTokens: 12000,
     })
     if (!reply.text.trim()) throw new Error('the synthesizer returned nothing')
-    const written = await writeArtifact({ cwd, runId, name: 'final_report', step: 'synthesize', body: reply.text, overwrite: true })
+    let body = reply.text
+    if (looksLikeGatewayMap(body)) {
+      const again = await llm({
+        step: 'synthesize',
+        system,
+        messages: [{ role: 'user', content: [briefBlock(manifest), '', 'The draft below is a gateway evidence map. Rewrite it as the research report. Do not reuse its headings.', '', body.slice(0, 14000)].join('\n') }],
+        json: false,
+        maxTokens: 12000,
+      })
+      if (again.text.trim()) body = again.text
+    }
+    body = repairClaimSerialCitations(stripGatewayTail(body), readRun(cwd, runId)?.claims ?? [], corpus.records)
+    body = withCorpusBibliography(body, corpus.records)
+    const evidenceRewrite = pendingSuppliedRecords(cwd, runId).length > 0
+    const written = await writeArtifact({ cwd, runId, name: 'final_report', step: 'synthesize', body, overwrite: true, evidenceRewrite })
+    if (evidenceRewrite) await clearSuppliedPending(cwd, runId)
     return { artifact: written, summary: { chars: written.chars } }
   },
 
@@ -874,9 +1360,37 @@ const STEP_RUNNERS = {
 
   // 14.5 — do the citations actually support the sentences that carry them?
   async cite_check({ cwd, runId, manifest, llm, deps, progress }) {
-    const report = readArtifact({ cwd, runId, name: 'final_report' })
+    let report = readArtifact({ cwd, runId, name: 'final_report' })
     if (!report) throw new Error('nothing to cite-check')
     const corpus = readCorpus(cwd, runId)
+    report = await expandReaderCitations({ cwd, runId, report })
+    // A cluster id is not a paper. When the corpus already names that cluster's
+    // representative record, rewrite the bracket before the audit. The DBT run
+    // blocked on fourteen of these, each of which already had a src- id.
+    const clusterById = new Map()
+    for (const record of corpus.records) {
+      if (record.cluster_id && !clusterById.has(record.cluster_id)) clusterById.set(record.cluster_id, record)
+    }
+    const seenClusters = new Set()
+    const rewrites = []
+    for (const match of report.text.matchAll(/\[(c\d{3,})\]/giu)) {
+      const token = match[1].toLowerCase()
+      if (seenClusters.has(token)) continue
+      seenClusters.add(token)
+      const representative = clusterById.get(token)
+      if (!representative) continue
+      rewrites.push({ find: match[0], replace: `[${representative.record_id}]`, all: true })
+    }
+    if (rewrites.length) {
+      const rewritten = await applyHunks({ cwd, runId, artifact: 'final_report', hunks: rewrites, maxHunks: Math.max(24, rewrites.length) })
+      if (rewritten.applied?.length) report = readArtifact({ cwd, runId, name: 'final_report' })
+    }
+    const claims = readRun(cwd, runId)?.claims ?? []
+    const repaired = repairClaimSerialCitations(report.text, claims, corpus.records)
+    if (repaired !== report.text) {
+      await writeArtifact({ cwd, runId, name: 'final_report', step: 'cite_check', overwrite: true, mechanical: true, body: repaired })
+      report = readArtifact({ cwd, runId, name: 'final_report' })
+    }
     // Scan every bracketed id-shaped token, not just well-formed ones: a model
     // that writes [src-c0004] is citing a cluster, and a report that cites
     // nothing at all must not be handed a clean citation verdict.
@@ -890,19 +1404,17 @@ const STEP_RUNNERS = {
     const knownIds = sourceRefs.filter((id) => corpus.records.some((record) => record.record_id === id))
     const cited = knownIds.map((id) => corpus.records.find((record) => record.record_id === id)).filter(Boolean)
     const missing = sourceRefs.filter((id) => !knownIds.includes(id))
-    const clusterById = new Map()
-    for (const record of corpus.records) {
-      if (record.cluster_id && !clusterById.has(record.cluster_id)) clusterById.set(record.cluster_id, record)
-    }
     const invalid = citationShaped.filter((token) => !/^src-/u.test(token))
       .map((token) => ({ token, representative: clusterById.get(token) ?? null }))
     // Low runs can cite 25-30 records. A 12-record sample can omit the one
     // co-citation that supports a sentence, producing a false challenge.
     const sample = cited.slice(0, 30)
+    const sampledBodies = await textsFor(cwd, runId, sample, deps)
+    const withBody = new Set(sampledBodies.map((entry) => entry.record_id))
     // A record with no abstract and no fetched body cannot confirm or refute a
     // citation. Challenging those would blame the report for a retrieval gap of
     // ours, and would block a ship that is actually unverifiable rather than wrong.
-    const readableIds = new Set(sample.filter((record) => String(record.abstract ?? '').trim()).map((record) => record.record_id))
+    const readableIds = new Set(sample.filter((record) => String(record.abstract ?? '').trim() || withBody.has(record.record_id)).map((record) => record.record_id))
     const evidenceless = sample.filter((record) => !readableIds.has(record.record_id))
     const reply = await llm({
       step: 'cite_check',
@@ -912,11 +1424,11 @@ const STEP_RUNNERS = {
         UNTRUSTED_RULE,
       ].join(' '),
       messages: [{ role: 'user', content: [
-        `Report:\n${report.text.slice(0, 20000)}`, '',
+        `Report:\n${proseForCitation(report.text).slice(0, 20000)}`, '',
         // 400 chars truncated the very sentence that supported the claim in a
         // live run (the GI/hypoglycemia details sat after the cut). Cite-check
         // needs the full abstract, not the head of it.
-        `Cited records:\n${corpusDigest(sample, { perRecord: 2000, includeBody: await deps.fetch(sample) })}`,
+        `Cited records:\n${corpusDigest(sample, { perRecord: 2000, perBodyChars: 4000, includeBody: sampledBodies })}`,
         evidenceless.length
           ? `Records with no readable text (title only): ${evidenceless.map((record) => record.record_id).join(', ')}. Return verdict \"unknown\" for any binding to these; they cannot be judged.`
           : '',
@@ -954,9 +1466,7 @@ const STEP_RUNNERS = {
     const retractions = deps.retractionFor
       ? (await Promise.all(cited.map((record) => deps.retractionFor(record)))).filter((flag) => flag?.retracted)
       : []
-    const findings = await appendFindings({
-      cwd, runId, stepId: 'cite_check',
-      findings: [
+    const pendingFindings = [
         // A report with no traceable reference has not been verified at all, so
         // the absence is itself the finding rather than a silent clean pass.
         ...(sourceRefs.length === 0 ? [{
@@ -966,11 +1476,14 @@ const STEP_RUNNERS = {
           target: 'final_report', primary_check: 'citation',
           verifier: 'add the record ids supplied to the draft, or mark the claim as unsourced',
         }] : []),
+        // Partial and mismatch are readings of a real paper. They are recorded
+        // beside the report. They are not High, because a High finding stops
+        // verify and the last live run then patched and re-audited forever.
         ...challenged.map((binding) => ({
-          severity: 'High', title: `Citation does not support its sentence (${binding.verdict})`,
+          severity: 'Medium', title: `Citation does not support its sentence (${binding.verdict})`,
           reason: binding.details.map((row) => `${row.record_id}: ${row.verdict}${row.evidence ? ` — ${row.evidence}` : ''}`).join('; '),
           target: binding.record_ids.join(',') || binding.record_id || binding.sentence || 'final_report', primary_check: 'citation',
-          verifier: `re-read the passage and either restate the sentence, replace ${binding.record_ids.join('/') || 'the citation'} with a record that supports it, or drop the citation`,
+          verifier: `the sentence and ${binding.record_ids.join('/') || 'the citation'} only partly agree; the report still ships with this note`,
         })),
         ...missing.map((id) => ({
           severity: 'High', title: 'Citation names a record that is not in the corpus', reason: `${id} appears in the report but was never retrieved`,
@@ -978,15 +1491,19 @@ const STEP_RUNNERS = {
         })),
         ...invalid.map(({ token, representative }) => ({
           severity: 'High',
-          title: 'Citation names a cluster, not a record',
-          reason: representative
-            ? `${token} names a cluster of copies; its representative record is ${representative.record_id}. Cite a specific [src-...] work, not the cluster.`
-            : `${token} is not a [src-...] record in this corpus`,
+          title: token.startsWith('cl-') ? 'Citation names a claim, not a record' : 'Citation names a cluster, not a record',
+          reason: token.startsWith('cl-')
+            ? `${token} is a claim label, not a source. Cite the record ids on that claim.`
+            : representative
+              ? `${token} names a cluster of copies; its representative record is ${representative.record_id}. Cite a specific [src-...] work, not the cluster.`
+              : `${token} is not a [src-...] record in this corpus`,
           target: token,
           primary_check: 'citation',
-          verifier: representative
-            ? `replace [${token}] with [${representative.record_id}] for the sentence it supports, or remove it`
-            : 'replace it with the specific [src-...] record(s) that support the sentence, or remove it',
+          verifier: token.startsWith('cl-')
+            ? 'cite the [src-] records on that claim, or remove the label'
+            : representative
+              ? `replace [${token}] with [${representative.record_id}] for the sentence it supports, or remove it`
+              : 'replace it with the specific [src-...] record(s) that support the sentence, or remove it',
           // A cluster token is a mechanical substitution when it is unique in
           // the report; the patcher applies it as a hunk and closes the finding.
           ...(representative ? { suggested_hunk: { find: `[${token}]`, replace: `[${representative.record_id}]` } } : {}),
@@ -996,8 +1513,12 @@ const STEP_RUNNERS = {
           target: flag.record_id ?? flag.doi ?? 'final_report', primary_check: 'citation',
           verifier: 'acknowledge the retraction in the text or remove the citation',
         })),
-      ],
-    })
+    ]
+    // Number the reader's sources only after the audit has used corpus ids.
+    // Findings are then bound to the report the reader actually receives.
+    report = await publishReaderCitations({ cwd, runId, report, records: corpus.records })
+    await writeSourceAccess({ cwd, runId })
+    const findings = await appendFindings({ cwd, runId, stepId: 'cite_check', findings: pendingFindings })
     const written = await writeArtifact({
       cwd, runId, name: 'cite-check', step: 'cite_check', overwrite: true,
       body: ['# Cite check', '', `Cited records: ${cited.length} · sampled: ${sample.length} · unknown or invalid ids: ${missing.length + invalid.length}`,
@@ -1012,17 +1533,23 @@ const STEP_RUNNERS = {
     // when duplicate suppression returns it in `rejected`.
     const patches = readRun(cwd, runId)?.patches ?? []
     const currentOpen = readFindings(cwd, runId).filter((finding) => finding.status === 'open'
-      && finding.severity === 'High' && finding.primary_check === 'citation'
+      && finding.primary_check === 'citation'
       && findingIsCurrent(finding, report.hash, patches))
-    const blocking = currentOpen.length
+    // These are not readings. The reference does not name a paper the run can
+    // stand behind, so the report is not ready to return.
+    const stopsTheRun = (finding) => /^(?:Report cites no traceable record|Citation names a record that is not in the corpus|Citation names a cluster, not a record|Citation names a claim, not a record|Retracted source cited without acknowledgement)/u.test(finding.title ?? '')
+    const mechanical = currentOpen.filter(stopsTheRun)
+    const judged = currentOpen.filter((finding) => !stopsTheRun(finding))
     return {
       artifact: written,
-      summary: { cited: cited.length, challenged: challenged.length, unverifiable, title_only: evidenceless.length, unknown_ids: missing.length + invalid.length, invalid_citations: invalid.length, retractions: retractions.length, accepted: findings.accepted.length, rejected: findings.rejected.length, open_high: currentOpen.length },
-      verdict: blocking
-        ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${blocking} High citation finding(s) remain open`, route: 'patch or drop the citation, then re-run the gate' }
-        : evidenceless.length && evidenceless.length >= Math.max(1, sample.length - 1)
+      summary: { cited: cited.length, challenged: challenged.length, unverifiable, title_only: evidenceless.length, unknown_ids: missing.length + invalid.length, invalid_citations: invalid.length, retractions: retractions.length, accepted: findings.accepted.length, rejected: findings.rejected.length, open_high: mechanical.length, flagged: judged.length },
+      verdict: mechanical.length
+        ? { gate: 'citation', status: 'blocked', severity: 'CRITICAL', reason: `${mechanical.length} citation(s) name nothing in the corpus, a cluster, a claim label, or a retraction`, route: 'repair or remove that reference before resuming' }
+        : evidenceless.length && evidenceless.length >= Math.max(1, sample.length - 1) && !judged.length
           ? { gate: 'citation', status: 'not_checked', reason: `${evidenceless.length} of ${sample.length} sampled records had no readable text; bindings could not be judged either way`, route: 'rerun with fetch_full_text or accept an unverifiable citation set' }
-          : { gate: 'citation', status: 'clear', reason: `${cited.length} citations sampled, none challenged` },
+          : judged.length
+            ? { gate: 'citation', status: 'flagged', severity: 'MAJOR', reason: `${judged.length} citation(s) only partly match their sentence`, route: 'recorded beside the report; the run continues and the report is returned' }
+            : { gate: 'citation', status: 'clear', reason: `${cited.length} citations sampled, none challenged` },
     }
   },
 
@@ -1034,7 +1561,7 @@ const STEP_RUNNERS = {
       step: 'polish',
       system: [
         'Cut filler, hedge-stacking, and any leaked scaffolding (section labels, frontmatter, prompt echoes). Return JSON: {"hunks":[{"find","replace"}]} with at most 20 hunks.',
-        '`find` must be copied exactly from the report and must appear once. You are not permitted to restructure or rewrite.',
+        '`find` must be copied exactly from the report and must appear once. You are not permitted to restructure or rewrite. Do not add, remove, or renumber [src-] citations.',
         manifest.brief.register === 'survey' ? 'In survey register, keep the hedges that report uncertainty honestly.' : 'Tighten wording that overstates the evidence.',
       ].join(' '),
       messages: [{ role: 'user', content: report.text }],
@@ -1043,6 +1570,7 @@ const STEP_RUNNERS = {
     const hunks = (reply.json?.hunks ?? []).slice(0, 20)
     const result = await applyHunks({ cwd, runId, artifact: 'final_report', hunks })
     progress({ step: 'polish', phase: 'hunk', done: 1, total: 1, detail: `${result.applied.length} of ${hunks.length} hunks applied, ${result.escalated.length} escalated` })
+    await refreshReaderCitationKey({ cwd, runId })
     return {
       artifact: { artifact: 'final_report' },
       summary: { proposed: hunks.length, applied: result.applied.length, escalated: result.escalated.length },

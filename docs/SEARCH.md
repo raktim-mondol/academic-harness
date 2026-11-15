@@ -21,6 +21,8 @@ MCP connector keys need a `dsh` restart; the native REST tools below do not. See
 
 ![How literature_search uses Jev](assets/diagrams/jev-routing.png)
 
+The chatbox **Find Papers** chip runs one `literature_search` and shows the first results in Background tasks. Auto keeps the default 20 results; Low, Medium, and High ask for 10, 20, and 50.
+
 `literature_search` in auto mode always runs OpenAlex and Semantic Scholar, then adds domain sources. With a TypeSafe key (`TYPESAFE_API_KEY`, set under Settings → Academic Harness API keys) [Jev](https://docs.typesafe.ai) decides which; without one, or if Jev fails, the keyword rules decide. Nothing else changes: explicit `sources` always win, and `routing: "rules"` keeps a query off TypeSafe.
 
 One request asks Jev a yes/no question per source (`jev-1.14.0`, pinned so thresholds do not drift) and code applies the policy:

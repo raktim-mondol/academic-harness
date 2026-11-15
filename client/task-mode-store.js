@@ -6,7 +6,7 @@ export function createTaskModeStore({ sessionId, storage } = {}) {
   const key = `academic-harness.task-draft.v1.${sessionId}`
   let restored
   try { restored = JSON.parse(storage?.getItem(key) ?? 'null') } catch { /* private mode or an invalid saved draft */ }
-  let snapshot = { available: false, loading: true, effort: 'auto', error: null, lastTask: null }
+  let snapshot = { available: false, loading: true, effort: 'auto', error: null, lastTask: null, inTranscript: false }
   let request = null
   try {
     if (restored?.request) {

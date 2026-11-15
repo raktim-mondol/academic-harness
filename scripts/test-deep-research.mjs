@@ -220,6 +220,19 @@ try {
   ok('polish applied its hunk as a patch', existsSync(workspace.path(join('.dsh/deep-research', runId, 'patches.jsonl'))))
   const polished = readFileSync(workspace.path(join('.dsh/deep-research', runId, 'artifacts/final-report.md')), 'utf8')
   ok('the patched sentence is in the report', polished.includes('nine of eleven trials'), polished)
+  {
+    const readerIds = [...new Set([...polished.matchAll(/\[(src-\d+)\]/gu)].map((match) => match[1]))]
+    ok('a finished report numbers its sources from src-0001',
+      readerIds[0] === 'src-0001' && readerIds.every((id, index) => id === `src-${String(index + 1).padStart(4, '0')}`), readerIds)
+  }
+  const sourceAccess = readArtifactText(runId, 'source-access')
+  ok('a finished run writes which cited papers were read in full',
+    sourceAccess.startsWith('# Source access') && /\[src-0001\]/.test(sourceAccess) && /\[src-0002\]/.test(sourceAccess)
+    && /## Abstract only/.test(sourceAccess) && !/## Read in full/.test(sourceAccess) && !/Downloaded/.test(sourceAccess)
+    && /Full text was not requested/.test(sourceAccess) && !/Press release/.test(sourceAccess), sourceAccess)
+  ok('show returns the source-access file', /# Source access/.test((await run({ action: 'show', run_id: runId, section: 'artifact', artifact: 'source-access' })).text ?? ''))
+  ok('show still refuses the gateway map by name', /cannot be shown/.test((await run({ action: 'show', run_id: runId, section: 'artifact', artifact: 'evidence-map' })).error ?? ''))
+  ok('the finished run points at the source-access file', String(resultRun.access_path ?? '').endsWith('source-access.md'), resultRun.access_path)
   ok('spend was accounted for the run', resultRun.accounting.llm_calls >= 4, resultRun.accounting)
 
   // ---------------------------------------------------------------- resume
@@ -326,6 +339,8 @@ try {
   // ---------------------------------------------------------------- full tier
   const full = await run({ action: 'start', query: 'Full tier investigation of GLP-1 cardiovascular evidence.', tier: 'full', gear: 'scout', run: true })
   ok('the full tier ran the whole plan', full.status === 'complete', JSON.stringify(full.steps?.filter((step) => step.status !== 'done')))
+  ok('a finished run delivers the final report path', String(full.report_path ?? '').endsWith('final-report.md'), full.report_path)
+  ok('and the source-access file beside it', String(full.access_path ?? '').endsWith('source-access.md'), full.access_path)
   const fullSteps = (full.steps ?? []).map((step) => step.step)
   ok('full tier is 17 steps without chapters', fullSteps.length === 17, fullSteps.length)
   ok('contradiction, loci, depth, reconcile all ran',
@@ -333,7 +348,27 @@ try {
     fullSteps)
   const fullId = full.run_id
   ok('every locus produced an interim note', existsSync(workspace.path(join('.dsh/deep-research', fullId, 'artifacts/interim-loc-0001.md'))))
+  {
+    const interim = readFileSync(workspace.path(join('.dsh/deep-research', fullId, 'artifacts/interim-loc-0001.md')), 'utf8')
+    const digest = readFileSync(workspace.path(join('.dsh/deep-research', fullId, 'artifacts/evidence-digest.md')), 'utf8')
+    ok('interim notes cite record ids, not claim labels', /\[src-/.test(interim) && !/\bcl-\d+\b/.test(interim), interim)
+    ok('the digest cites record ids and does not print claim labels', /\[src-0001\]/.test(digest) && !/\bcl-\d+\b/.test(digest), digest.slice(0, 400))
+  }
   ok('synthesize wrote the report', existsSync(workspace.path(join('.dsh/deep-research', fullId, 'artifacts/final-report.md'))))
+  {
+    const fullReport = readFileSync(workspace.path(join('.dsh/deep-research', fullId, 'artifacts/final-report.md')), 'utf8')
+    const readerIds = [...new Set([...fullReport.matchAll(/\[(src-\d+)\]/gu)].map((match) => match[1]))]
+    ok('a full report numbers cited sources from src-0001',
+      readerIds[0] === 'src-0001' && readerIds.every((id, index) => id === `src-${String(index + 1).padStart(4, '0')}`) && !/\[src-0004\]/.test(fullReport), readerIds)
+  }
+  const evidenceMapPath = workspace.path(join('.dsh/deep-research', fullId, 'artifacts/evidence-map.md'))
+  const evidenceMap = readFileSync(evidenceMapPath, 'utf8')
+  ok('the gateway map is stored inside the run', /Internal evidence map/i.test(evidenceMap) && /not the deliverable/i.test(evidenceMap), evidenceMap.slice(0, 160))
+  ok('the internal map records what was read without becoming the access list', /## What was read/.test(evidenceMap) && !/How to read this map/.test(evidenceMap) && !/# Source access/.test(evidenceMap), evidenceMap.slice(0, 400))
+  ok('the gateway map is used only as the writer prompt', transcript.some((entry) => /Internal evidence map/i.test(entry.content) && /not the deliverable/i.test(entry.content)))
+  ok('synthesis is told to write a survey and not to publish the map', transcript.some((entry) => /Write the final report as a research survey/i.test(entry.system) && /Do not title the report an evidence map/i.test(entry.system)))
+  ok('show refuses the gateway map', /cannot be shown/i.test((await run({ action: 'show', run_id: fullId, section: 'artifact', artifact: 'evidence-map' })).error ?? ''))
+  ok('patch refuses the gateway map', /cannot be shown, patched, or exported/i.test((await run({ action: 'patch', run_id: fullId, artifact: 'evidence-map', hunks: [{ find: 'a', replace: 'b' }] })).error ?? ''))
   ok('the digest verified quotes against fetched text', readRunClaims(cwd, fullId).some((claim) => claim.quote_status === 'not_checked'), readRunClaims(cwd, fullId).slice(0, 2))
   const regeneration = await run({ action: 'patch', run_id: fullId, artifact: 'final_report', hunks: [{ find: 'Eligibility excluded insulin-treated diabetes in most trials', replace: 'Eligibility excluded insulin-treated diabetes in nine of eleven trials' }] })
   ok('the patcher edits surgically', regeneration.applied?.length === 1, regeneration)
@@ -345,7 +380,11 @@ try {
   ok('locus coverage is checked, not assumed', fullVerify.checks.some((check) => check.id === 'locus_coverage'))
   ok('patch_only is satisfied by the patch log', fullVerify.checks.find((check) => check.id === 'patch_only')?.state === 'pass')
   const exported = await run({ action: 'export', run_id: fullId, format: 'markdown' })
-  ok('export writes the report with its verification section', exported.bytes > 200 && /# Verification/.test(readFileSync(exported.path, 'utf8')), exported)
+  const exportedReport = readFileSync(exported.path, 'utf8')
+  const verification = readFileSync(exported.verification_path, 'utf8')
+  ok('markdown export is the research report, not the ship-gate ledger', exported.bytes > 200 && !/# Verification/.test(exportedReport) && !/Ship gate:/.test(exportedReport) && !/# Source access/.test(exportedReport), exportedReport.slice(0, 200))
+  ok('markdown export copies source access beside the report', exported.access_path?.endsWith('source-access.md') && /# Source access/.test(readFileSync(exported.access_path, 'utf8')), exported.access_path)
+  ok('the ship gate is kept beside the report', /# Verification/.test(verification) && /Ship gate:/.test(verification) && !/\[src-0001\]/.test(verification), verification.slice(0, 240))
   ok('markdown export uses a conventional .md extension', exported.path.endsWith('.md'), exported.path)
   const shownReport = await run({ action: 'show', run_id: fullId, section: 'artifact', max_chars: 100 })
   ok('show caps an artifact and says so', shownReport.text.length < 400 && /truncated at 100/u.test(shownReport.text), shownReport.text?.slice(-80))
@@ -354,6 +393,14 @@ try {
   const csv = await run({ action: 'export', run_id: fullId, format: 'csv' })
   ok('csv export lists every record with its cluster', /record_id,cluster_id/.test(readFileSync(csv.path, 'utf8')))
   ok('nothing escaped the run directory', !existsSync(workspace.path('report.md')))
+  await writeArtifact({
+    cwd, runId: seededId, name: 'final_report', overwrite: true,
+    body: '# Deep learning for DBT: An Evidence Map\n\n## 1. How to read this map\n\n## 2. rq-0001 — Detection\n\nBenchmark superiority [src-0001].\n',
+  })
+  const mapped = await run({ action: 'verify', run_id: seededId, skip_retraction_check: true })
+  ok('an evidence map cannot ship as the research report', mapped.checks.find((check) => check.id === 'hygiene')?.state === 'blocked', mapped.checks.find((check) => check.id === 'hygiene'))
+  ok('show does not return a gateway-shaped report', /not delivered/i.test((await run({ action: 'show', run_id: seededId, section: 'artifact' })).error ?? ''))
+  ok('markdown export does not write a gateway-shaped report', /not delivered/i.test((await run({ action: 'export', run_id: seededId, format: 'markdown' })).error ?? ''))
 
   // report rendering
   const status = await run({ action: 'status', run_id: seededId })
@@ -482,9 +529,9 @@ try {
     const unknown = findings.filter((row) => /not in the corpus/iu.test(row.title ?? ''))
     const invalid = findings.filter((row) => /cluster, not a record/iu.test(row.title ?? ''))
     ok('an unknown src id used as a citation is reported', unknown.some((row) => row.target === 'src-c0004'), unknown.map((row) => row.target))
-    ok('a bare cluster id used as a citation is reported as invalid, not ignored', invalid.some((row) => row.target === 'c0001'), invalid.map((row) => `${row.target}:${row.reason}`))
-    ok('the invalid-cluster finding names the representative record', /src-\d+/u.test(invalid.find((row) => row.target === 'c0001')?.verifier ?? ''), invalid.find((row) => row.target === 'c0001'))
-    ok('the invalid-cluster finding carries a mechanical repair hunk', invalid.find((row) => row.target === 'c0001')?.suggested_hunk?.find === '[c0001]', invalid.find((row) => row.target === 'c0001')?.suggested_hunk)
+    const repaired = readArtifact({ cwd, runId: malformed.run_id, name: 'final_report' }).text
+    ok('a cluster id with a representative is rewritten to that record before the gate', !/\[c0001\]/iu.test(repaired) && /\[src-\d+\]/u.test(repaired), repaired)
+    ok('a rewritten cluster is not left as a blocking finding', !invalid.some((row) => row.target === 'c0001'), invalid.map((row) => row.target))
     ok('a valid id beside them is still counted', checked.status !== 'failed' && checked.steps?.find((step) => step.step === 'cite_check')?.summary?.cited === 1, checked.steps?.find((step) => step.step === 'cite_check'))
     ok('from_step does not run earlier pending steps', checked.steps?.length === 1 && checked.steps[0].step === 'cite_check', checked.steps)
     await markStep({ cwd, runId: malformed.run_id, step: 'cite_check', status: 'blocked', detail: 'test gate' })
@@ -562,6 +609,18 @@ try {
     ok('so is the version, because accepted and published are not interchangeable', bodies[0]?.oa?.version === 'publishedVersion', bodies[0]?.oa)
     const stored = readRetrieval(cwd, fetchId)
     ok('a successful retrieval is recorded as one attempt with text', stored.attempts === 1 && stored.with_text === 1, stored)
+    let secondDownloads = 0
+    const cached = buildFetch(cwd, fetchId, {
+      enabled: true,
+      resolvers: {
+        resolvePdfSources: async function* () { secondDownloads += 1; yield { candidate: { source: 'unpaywall', pdfUrl: 'https://example.invalid/again.pdf' } } },
+        fetchPdf: async () => { secondDownloads += 1; return Buffer.from('%PDF-1.4') },
+        convertPdfMarkdown: async () => { secondDownloads += 1; return { success: true, markdown: 'SHOULD NOT REPLACE' } },
+      },
+    })
+    const reused = await cached(readCorpus(cwd, fetchId).records)
+    ok('a stored body is reused and not downloaded again',
+      secondDownloads === 0 && reused.length === 1 && reused[0].body === long && readRetrieval(cwd, fetchId).attempts === 1, { secondDownloads, attempts: readRetrieval(cwd, fetchId) })
 
     // Now the failing path: only attempts, no candidate.
     const failRun = await run({ action: 'start', query: 'Retrieval failure run.', tier: 'light', gear: 'scout' })
@@ -599,6 +658,24 @@ try {
 
     const off = buildFetch(cwd, failRun.run_id, { enabled: false, resolvers: {} })
     ok('fetch stays off unless asked for', (await off([{ record_id: 'src-0001' }])).length === 0)
+
+    const userDir = workspace.path(join('.dsh/deep-research', failRun.run_id, 'bodies'))
+    mkdirSync(userDir, { recursive: true })
+    const userText = `USER-COPY-SENTINEL ${'methods paragraph '.repeat(20)}`
+    writeFileSync(join(userDir, 'src-0001.md'), userText)
+    writeFileSync(join(userDir, 'src-0001.meta.json'), JSON.stringify({ supplied_by: 'user', chars: userText.length }))
+    let userDownloads = 0
+    const hostile = buildFetch(cwd, failRun.run_id, {
+      enabled: true,
+      resolvers: {
+        resolvePdfSources: async function* () { userDownloads += 1; yield { candidate: { source: 'unpaywall', pdfUrl: 'https://example.invalid/user.pdf' } } },
+        fetchPdf: async () => { userDownloads += 1; return Buffer.from('%PDF-1.4') },
+        convertPdfMarkdown: async () => { userDownloads += 1; return { success: true, markdown: 'x'.repeat(4000) } },
+      },
+    })
+    const kept = await hostile(readCorpus(cwd, failRun.run_id).records)
+    ok('a user-supplied body is not replaced by a download',
+      userDownloads === 0 && kept[0]?.body?.includes('USER-COPY-SENTINEL') && readFileSync(join(userDir, 'src-0001.md'), 'utf8').includes('USER-COPY-SENTINEL'), { userDownloads, library: kept[0]?.library })
   }
 
 
@@ -644,8 +721,12 @@ try {
     challengeBindings = true
     const checked = await run({ action: 'run', run_id: readable.run_id, from_step: 'cite_check' })
     challengeBindings = false
-    ok('the same verdicts do block when the text was readable', checked.status === 'blocked', checked)
-    ok('and the gate names the citation check', checked.reason === 'citation', checked.reason)
+    ok('a partial reading is recorded and the run continues', checked.status === 'complete', checked)
+    const flagged = latestVerdictOf(cwd, readable.run_id, 'citation')
+    ok('the citation gate is flagged rather than blocked', flagged?.status === 'flagged' && /partly match/.test(flagged?.reason ?? ''), flagged)
+    ok('polish still runs after a flagged citation', checked.steps?.some((step) => step.step === 'polish' && step.status === 'done'), checked.steps)
+    ok('a partial reading is not a High stop', readFindings(cwd, readable.run_id).filter((row) => row.severity === 'High').length === 0
+      && readFindings(cwd, readable.run_id).some((row) => row.severity === 'Medium' && /does not support/.test(row.title)), readFindings(cwd, readable.run_id).map((row) => `${row.severity}:${row.title}`))
 
     // A sentence cites two records; one is partial, the other supports it.
     // The sentence is supported and must not produce a High finding.
@@ -681,6 +762,84 @@ try {
     await run({ action: 'run', run_id: longAbstract.run_id, from_step: 'cite_check' })
     const auditPrompt = transcript.filter((entry) => /Audit whether each cited record/u.test(entry.system)).at(-1)?.content ?? ''
     ok('cite check sends the full abstract, not the first 400 characters', auditPrompt.includes('TAIL-SENTINEL'), auditPrompt.slice(-200))
+  }
+
+  {
+    // A new topic's reader-facing sources start at src-0001 even when the
+    // first paper cited is not the first record the sweep stored.
+    const serial = await run({ action: 'start', query: 'Reader source numbers start at one.', tier: 'light', gear: 'scout' })
+    await appendRecords({ cwd, runId: serial.run_id, records: PAPERS })
+    await writeArtifact({
+      cwd, runId: serial.run_id, name: 'final_report', overwrite: true,
+      body: 'A later paper narrowed eligibility [src-0004]. The trial reported a 20% relative reduction in MACE [src-0001].\n',
+    })
+    const numbered = await run({ action: 'run', run_id: serial.run_id, from_step: 'cite_check' })
+    const numberedReport = readArtifactText(serial.run_id, 'final_report')
+    const index = JSON.parse(readArtifactText(serial.run_id, 'citation-index'))
+    ok('the first cited work is displayed as src-0001', /narrowed eligibility \[src-0001\]/.test(numberedReport) && !/\[src-0004\]/.test(numberedReport), numberedReport)
+    ok('that displayed src-0001 keeps the corpus record\'s title', /\[src-0001\] Who is left out/.test(numberedReport), numberedReport)
+    ok('the next cited work takes the next number and its own title', /\[src-0002\] Cardiovascular outcomes/.test(numberedReport), numberedReport)
+    ok('the citation index maps each reader id back to the corpus record',
+      index.space === 'display' && index.display_to_corpus['src-0001'] === 'src-0004' && index.display_to_corpus['src-0002'] === 'src-0001', index)
+    ok('numbering a citation does not block the run', numbered.status === 'complete', numbered.status)
+    await run({ action: 'run', run_id: serial.run_id, from_step: 'cite_check' })
+    const expandedAudit = transcript.filter((entry) => /Audit whether each cited record/u.test(entry.system)).at(-1)?.content ?? ''
+    ok('a later cite check expands reader ids before it audits', /narrowed eligibility \[src-0004\]/.test(expandedAudit), expandedAudit.slice(0, 500))
+
+    // cl-0004 cited as [src-0004] is the claim's number, not the paper's.
+    const copied = await run({ action: 'start', query: 'Claim serial copied into a source id.', tier: 'light', gear: 'scout' })
+    await appendRecords({ cwd, runId: copied.run_id, records: PAPERS })
+    await appendClaims({
+      cwd, runId: copied.run_id,
+      claims: [
+        { text: 'A filler claim that is not the eligibility sentence at all.', record_ids: ['src-0002'] },
+        { text: 'Another filler claim about press coverage only.', record_ids: ['src-0003'] },
+        { text: 'A third filler claim with no eligibility wording.', record_ids: ['src-0002'] },
+        { text: 'Eligibility criteria excluded insulin-treated diabetes in 9 of 11 trials.', record_ids: ['src-0001'] },
+      ],
+    })
+    await writeArtifact({
+      cwd, runId: copied.run_id, name: 'final_report', overwrite: true,
+      body: 'Eligibility criteria excluded insulin-treated diabetes in 9 of 11 trials [src-0004]. The claim label leaked [cl-0004]. A press note repeated the headline [src-0002].\n',
+    })
+    const repaired = await run({ action: 'run', run_id: copied.run_id, from_step: 'cite_check' })
+    const repairedReport = readArtifactText(copied.run_id, 'final_report')
+    ok('a source serial copied from a claim id is rewritten to that claim\'s record',
+      /insulin-treated diabetes in 9 of 11 trials \[src-0001\]/.test(repairedReport) && !/\[src-0004\]/.test(repairedReport) && !/\[cl-0004\]/.test(repairedReport), repairedReport)
+    ok('the repaired reference uses the claim\'s paper, not the serial that was copied',
+      /\[src-0001\] Cardiovascular outcomes/.test(repairedReport), repairedReport)
+    ok('repairing a copied claim serial still returns the report', repaired.status === 'complete', repaired.status)
+  }
+
+  {
+    const suppliedRun = await run({ action: 'start', query: 'Supply a restricted paper after the report.', tier: 'light', gear: 'scout', run: true })
+    const suppliedId = suppliedRun.run_id
+    const paperFile = join(cwd, 'restricted-paper.md')
+    writeFileSync(paperFile, `UNIQUE-SUPPLIED-SENTENCE about the insulin exclusion in the full methods. ${'The methods section states the exclusion was applied before randomisation. '.repeat(6)}`)
+    const outside = await run({ action: 'supply', run_id: suppliedId, record_id: 'src-0002', pdf: '/etc/passwd' })
+    ok('a paper outside the workspace is refused', /inside the workspace/.test(outside.error ?? ''), outside.error)
+    const unknown = await run({ action: 'supply', run_id: suppliedId, record_id: 'src-9999', pdf: 'restricted-paper.md' })
+    ok('an unknown source is refused', /no source src-9999/.test(unknown.error ?? ''), unknown.error)
+    writeFileSync(join(cwd, 'too-short.md'), 'too short to be a paper')
+    const thin = await run({ action: 'supply', run_id: suppliedId, record_id: 'src-0002', pdf: 'too-short.md' })
+    ok('a supplied file that is not a paper is refused', /too short/.test(thin.error ?? ''), thin.error)
+    let fetchedIds = []
+    const supplied = await runDeepResearchAction(
+      { action: 'supply', run_id: suppliedId, record_id: 'src-0002', pdf: 'restricted-paper.md' },
+      exec, ctx,
+      { ...DEPS, fetch: async (records) => { fetchedIds.push(...(records ?? []).map((record) => record.record_id)); return [] } },
+    )
+    const suppliedBody = readFileSync(workspace.path(join('.dsh/deep-research', suppliedId, 'bodies/src-0004.md')), 'utf8')
+    const suppliedAccess = readArtifactText(suppliedId, 'source-access')
+    const draftPrompt = transcript.filter((entry) => /Draft from this angle/iu.test(entry.system)).at(-1)?.content ?? ''
+    ok('a supplied paper is stored against the corpus record', suppliedBody.includes('UNIQUE-SUPPLIED-SENTENCE'), suppliedBody.slice(0, 80))
+    ok('the rewrite reads that paper and does not download it again',
+      draftPrompt.includes('UNIQUE-SUPPLIED-SENTENCE') && /<untrusted-source/u.test(draftPrompt) && !fetchedIds.includes('src-0004'), { fetchedIds, tail: draftPrompt.slice(-180) })
+    ok('source access lists the supplied paper as full text and the other as abstract only',
+      /## Read in full[\s\S]*\[src-0002\]/.test(suppliedAccess) && /Supplied by you/.test(suppliedAccess)
+      && /## Abstract only[\s\S]*\[src-0001\]/.test(suppliedAccess), suppliedAccess)
+    ok('supplying a paper rewrites the report and finishes', supplied.status === 'complete' && supplied.supplied_record === 'src-0004', { status: supplied.status, record: supplied.supplied_record, error: supplied.error })
+    ok('the supplied-text rewrite is recorded as a patch', /supplied full text/.test(readFileSync(workspace.path(join('.dsh/deep-research', suppliedId, 'patches.jsonl')), 'utf8')))
   }
 
 

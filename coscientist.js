@@ -200,8 +200,12 @@ function renderStatus(value) {
       }
       return [{ type: 'text', text: lines.join('\n') }]
     }
-    case 'design_protocol':
-      return [{ type: 'text', text: `Protocol for \`${value.hypothesis.id}\` recorded (${value.steps} steps). It belongs to that hypothesis only.` }]
+    case 'design_protocol': {
+      // The saved row is the hypothesis; older callers also put the id on the result itself.
+      const id = value.hypothesis?.id || value.id
+      const count = typeof value.steps === 'number' ? value.steps : Array.isArray(value.steps) ? value.steps.length : 0
+      return [{ type: 'text', text: `Protocol for \`${id || 'hypothesis'}\` recorded (${count} steps). It belongs to that hypothesis only.` }]
+    }
     case 'synthesize': {
       const saved = [value.critique ? 'Meta-review critique stored; it steers later generation.' : '', value.overview ? 'Research overview stored.' : ''].filter(Boolean)
       return [{ type: 'text', text: saved.join('\n') }]
@@ -538,7 +542,8 @@ export async function runCosc(args = {}, exec = {}, deps = {}) {
 
   if (action === 'design_protocol') {
     const saved = await saveExperimentProtocol({ cwd, slug, id: requireId(args), steps: listParam(args.steps) })
-    return { action, slug, id: requireId(args), steps: saved.steps }
+    // output.render reads hypothesis.id. Returning only the id made a successful save look like a tool failure.
+    return { action, slug, hypothesis: saved.hypothesis, steps: saved.steps }
   }
 
   if (action === 'synthesize') {

@@ -308,6 +308,8 @@ try {
     steps: ['Primary human motor neurons with the candidate genotype', 'Perturb the load-bearing assumption only', 'Read the predicted discriminator'],
   }, exec)
   assert.equal(design.steps, 3)
+  assert.equal(design.hypothesis.id, boardView.ranked[0].id)
+  assert.match(text(renderTournament(design)), new RegExp(`Protocol for \`${boardView.ranked[0].id}\` recorded \\(3 steps\\)`))
 
   const exported = await tournament.execute({ action: 'export', slug, format: 'markdown' }, exec)
   assert.equal(exported.error, undefined, exported.error)

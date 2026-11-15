@@ -10,6 +10,59 @@
  * Extracted from two near-identical copies in deep-research.js and deep-review.js.
  */
 
+/** Tool calls whose caller already owns the row the user sees. The engine updates that row. */
+const parentJobs = new Map()
+
+/**
+ * Bind a tool-call id to a job that is already on screen.
+ * `runAsJob` then writes progress there instead of opening a second background job.
+ * The returned function drops the binding; call it when the tool call settles.
+ */
+export function bindParentJob(callId, job) {
+  if (!callId || !job) return () => {}
+  parentJobs.set(callId, job)
+  return () => {
+    if (parentJobs.get(callId) === job) parentJobs.delete(callId)
+  }
+}
+
+function adoptedJob(exec) {
+  if (!exec) return undefined
+  return parentJobs.get(exec.callId) || (exec.rootCallId ? parentJobs.get(exec.rootCallId) : undefined)
+}
+
+/**
+ * Run `work` on a job the caller already registered. Progress and the log land on
+ * that row. This does not call `jobs.start`, `jobs.wait`, or `jobs.kill`.
+ */
+async function runAdopted(job, exec, { timeoutMs, noun, resumeHint }, work) {
+  const controller = new AbortController()
+  const onAbort = () => controller.abort(exec?.signal?.reason || 'tool call aborted')
+  if (exec?.signal?.aborted) onAbort()
+  else exec?.signal?.addEventListener?.('abort', onAbort, { once: true })
+  let timer
+  try {
+    return await new Promise((resolve, reject) => {
+      if (Number.isFinite(timeoutMs)) {
+        timer = setTimeout(() => {
+          controller.abort(`${noun} timed out`)
+          reject(new Error(`${noun} timed out after ${Math.round(timeoutMs / 60_000)} minutes${resumeHint}`))
+        }, timeoutMs)
+      }
+      work(job, controller.signal).then((value) => {
+        if (controller.signal.aborted && String(controller.signal.reason || '').endsWith('timed out')) {
+          reject(new Error(`${noun} timed out after ${Math.round(timeoutMs / 60_000)} minutes${resumeHint}`))
+          return
+        }
+        resolve(value)
+      }, reject)
+    })
+  } finally {
+    if (timer) clearTimeout(timer)
+    exec?.signal?.removeEventListener?.('abort', onAbort)
+  }
+}
+
 /**
  * @param ctx   plugin context; `ctx.jobs` is the host job service when present
  * @param exec  the tool call (`signal`, `callId`, `rootCallId`, `agent.id`)
@@ -20,6 +73,8 @@
  * @param work  async (job, signal) => value; `job` is null when there is no jobs service
  */
 export async function runAsJob(ctx, exec, { kind, label, timeoutMs, noun = 'job', resumeHint = '', resultClip = Infinity, detailFromStatus = true }, work) {
+  const adopted = adoptedJob(exec)
+  if (adopted) return runAdopted(adopted, exec, { timeoutMs, noun, resumeHint }, work)
   const jobs = ctx?.jobs
   if (!jobs) return work(null, exec?.signal ?? null)
   const owner = exec?.agent?.id

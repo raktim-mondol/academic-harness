@@ -117,6 +117,21 @@ try {
     assert.match(compiled.error, /older PDF|compile failed/i)
   }
 
+  workspace.write('oat/v1.md', 'oat old\n')
+  workspace.write('oat/v2.md', 'oat new\n')
+  workspace.write('mg/v1.md', 'mg old\n')
+  workspace.write('mg/v2.md', 'mg new\n')
+  const oatDiff = await run({ action: 'diff', old: 'oat/v1.md', new: 'oat/v2.md', compile: false })
+  const mgDiff = await run({ action: 'diff', old: 'mg/v1.md', new: 'mg/v2.md', compile: false })
+  assert.equal(oatDiff.error, undefined, oatDiff.error)
+  assert.equal(mgDiff.error, undefined, mgDiff.error)
+  assert.match(oatDiff.out, /manuscript-diff\/oat-v2\/diff\.md$/)
+  assert.match(mgDiff.out, /manuscript-diff\/mg-v2\/diff\.md$/)
+  workspace.write('mg/v2.md', 'mg newer\n')
+  const again = await run({ action: 'diff', old: 'mg/v1.md', new: 'mg/v2.md', compile: false })
+  assert.equal(again.error, undefined, again.error)
+  assert.match(workspace.read(again.out), /mg newer/)
+
   await assert.rejects(
     () => runManuscriptDiff({ action: 'diff', slug: 'bad-pair', old: 'paper/old.md', new: 'paper/revised.docx' }, exec),
     /two \.tex files|two \.md/,

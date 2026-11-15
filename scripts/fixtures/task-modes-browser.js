@@ -72,14 +72,14 @@ function Fixture() {
     event.preventDefault()
     setNotice('')
     let claim = input.claim
-    if (!claim && input.draft.startsWith('/research ')) claim = (await source.matchEnter({ sessionId: selected.sessionId }, input.draft, null, {}))?.claim
+    if (!claim && /^\/(research|review|papers|references|write|analyze|hypotheses)(?:\s|\n|$)/u.test(input.draft)) claim = (await source.matchEnter({ sessionId: selected.sessionId }, input.draft, null, {}))?.claim
     if (!claim) {
       setNotice(`Chat: ${input.draft}`)
       current.state.set({ ...input, draft: '', draftRev: input.draftRev + 1 })
       return
     }
     current.state.set({ ...input, phase: 'submitting' })
-    const result = await claim.submit(input.draft.replace(/^\/research /u, ''), current.actx, [])
+    const result = await claim.submit(input.draft.replace(/^\/(?:research|review|papers|references|write|analyze|hypotheses) /u, ''), current.actx, [])
     if (result.kind === 'error') {
       current.state.set({ ...input, claim, phase: 'claimed' })
       setNotice(result.text)
