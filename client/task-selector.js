@@ -266,7 +266,7 @@ export function TaskCommandReceipt({ node, markInTranscript, t }) {
   })
 }
 
-/** Long task guidance sits in the composer dock, in a readable measure, not the compact toolbar. */
+/** Long task guidance sits in the composer dock, on the chat box column, not the compact toolbar. */
 export function TaskSelectorStatus({ useInput, useTaskMode, t }) {
   const selected = taskForToken(useInput((input) => input.claim?.token))
   const error = useTaskMode((state) => state.error)
@@ -275,8 +275,14 @@ export function TaskSelectorStatus({ useInput, useTaskMode, t }) {
   return createElement('p', {
     'data-ah-task-status': true, role: error ? 'alert' : 'status',
     style: {
-      margin: '6px 0', alignSelf: 'flex-start', fontSize: 12, lineHeight: 1.5,
-      whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxWidth: 'min(36rem, 100%)',
+      // The dock slot is a flex child of the full-width composer stack. Match
+      // the input card: side clearance on a narrow column, the card cap when
+      // the column is wider, centered either way.
+      margin: '6px auto', alignSelf: 'center', boxSizing: 'border-box',
+      width: 'calc(100% - 2 * var(--dsh-composer-side-clearance, 16px))',
+      maxWidth: 'var(--dsh-composer-card-max-width, 46rem)',
+      fontSize: 12, lineHeight: 1.5,
+      whiteSpace: 'pre-wrap', overflowWrap: 'anywhere',
     },
   }, error || t(notice))
 }

@@ -472,6 +472,12 @@ try {
     const status = renderToStaticMarkup(createElement(TaskSelectorStatus, { useInput: (fn) => fn({ claim: { token: '/research ' } }), useTaskMode: (fn) => fn({ error: 'Choose effort' }), t: (key) => key }))
     assert.match(status, /role="alert"/u)
     assert.match(status, /Choose effort/u)
+    assert.match(status, /align-self:center/u, 'chip guidance sits on the chat column')
+    assert.match(status, /margin:6px auto/u)
+    assert.match(status, /--dsh-composer-card-max-width/u, 'chip guidance uses the chat box width')
+    assert.match(status, /--dsh-composer-side-clearance/u)
+    assert.ok(!status.includes('align-self:flex-start'), 'chip guidance is not pinned to the left edge')
+    assert.ok(!status.includes('36rem'), 'chip guidance is not a narrower left-aligned measure')
     const runNotice = renderToStaticMarkup(createElement(TaskRunNotice, {
       useTaskMode: (fn) => fn({ lastTask: { prompt: 'A question', effort: 'low', jobId: 'deep-research-abc', runId: null } }),
       dismiss() {},

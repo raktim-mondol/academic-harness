@@ -2,6 +2,12 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.54.1
+
+The note under a selected chatbox task sits on the chat box.
+
+- **Chip guidance matches the composer.** Selecting Find Papers, Deep Research, or any other task chip shows its explanation in the composer column. The line uses the chat box width and stays with the card on a wide window and on a narrow one.
+
 ## 0.54.0
 
 An author-approved outline can carry a draft contract taken from the outline idea in [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Research, Apache-2.0). Academic Harness stores that contract on the existing plan and runs it with the tools already in this plugin. PaperOrchestra's Python, prompts, Gemini client, and venue style files stay in that repository.
