@@ -1,6 +1,6 @@
 # Skills
 
-Academic Harness bundles **790 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
+Academic Harness bundles **791 skills** in `skills/`. They are shipped with the plugin, seeded for filesystem discovery, and loaded through DSH's `skill` tool — no separate checkout or setup.
 
 ![Skill sources](assets/diagrams/skills-map.svg)
 
@@ -26,14 +26,14 @@ Scientific skills are vendored into `skills/` from open-source catalogues, bundl
 | [`AER-Skills`](https://github.com/brycewang-stanford/AER-Skills) | 16 vendored skills (MIT) | `aer-skills` (router, plus shared docs, examples and templates) and 15 `aer-*` sub-skills covering the AER / AER:Insights / AEJ manuscript lifecycle: topic selection, causal identification (DiD, IV, RDD, SCM, shift-share), pre-registration, robustness, drafting, AER-style tables, consistency audit, referee simulation, AEA replication deposits, submission preflight, and R&R rebuttals. Economics-specific; for other fields use `causal-inference-scientist` or the writing skills |
 | Local, adapted from Wikipedia's "Signs of AI writing" | 1 adapted skill | `remove-ai-signs` — density-based prose style editing: AI-ish vocabulary clusters, formulaic rhythm, hedging boilerplate; preserves meaning, numbers, and citations. A style pass, not a detector-evasion tool |
 
-The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 790.
+The remaining first-party workflow, tool, notebook, compute, and specialist-brief skills bring the total on disk to 791.
 
 ## Workflow and tool skills
 
 | Skill | What it is for |
 |---|---|
 | `academic-harness` | Router for the writing engine |
-| `ah-write-unit`, `ah-plan-section`, `ah-fix-findings`, `ah-audit-section`, `ah-revise-from-review` | The writing engine's unit-level workflows; see [Writing](WRITING.md#academic-harness-engine) |
+| `ah-write-unit`, `ah-plan-section`, `ah-draft-from-plan`, `ah-fix-findings`, `ah-audit-section`, `ah-revise-from-review` | The writing engine's unit-level workflows; see [Writing](WRITING.md#academic-harness-engine) |
 | `ah-rsi` | Inspecting and steering the local RSI loop; see [RSI](RSI.md) |
 | `academic-harness-notebook` | Lab-notebook discipline for research sessions; see [Lab notebook](WORKSPACE.md#lab-notebook) |
 | `academic-search` | Routing across discovery, journal metrics, merged paper/BibTeX, and focused full-text context; see [Search](SEARCH.md) |

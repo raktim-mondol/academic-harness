@@ -4,7 +4,7 @@
 ![DeepSeek Harness 0.2.2](https://img.shields.io/badge/DeepSeek%20Harness-0.2.2-5b7bd5)
 ![Linux only](https://img.shields.io/badge/platform-Linux-2f855a)
 
-**A research workbench for DeepSeek Harness (DSH).** Academic Harness adds literature discovery, evidence-linked paper memory, scientific writing and review tools, research ledgers, and 790 bundled skills to the DSH web UI.
+**A research workbench for DeepSeek Harness (DSH).** Academic Harness adds literature discovery, evidence-linked paper memory, scientific writing and review tools, research ledgers, and 791 bundled skills to the DSH web UI.
 
 It installs as a DSH plugin and provides an **Academic Harness** preset. Its tools support human-directed research; advisory reviews and audit results are not substitutes for expert judgment.
 
@@ -33,9 +33,11 @@ No API key is required to install or start; some connectors and compute services
 
 - **Find and assess literature:** search scholarly sources, retrieve papers, check claims against stored quotations, and triage prior art with explicit coverage limits. [Search](docs/SEARCH.md) · [Papers and evidence](docs/PAPERS.md) · [Prior-art triage](docs/IDENTITY-AND-AUDIT-TOOLS.md#prior_art)
 - **Investigate research questions:** run deep research, systematic reviews, meta-analyses, and hypothesis tournaments; follow the approval-gated research cycle from scope and prior art to review and export. [Research](docs/RESEARCH.md#guided-research-cycle)
-- **Write and revise:** use the LaTeX writing oracle, citation tools, manuscript reviews, and reviewer-response ledgers. [Writing](docs/WRITING.md) · [Deep review](docs/PAPERS.md#deep-review)
+- **Write and revise:** use the LaTeX writing oracle, citation tools, manuscript reviews, and reviewer-response ledgers. An author-approved outline can also carry a draft contract (literature searches, citation hints, figures, and section points) from the outline idea in [PaperOrchestra](https://github.com/google-research/paper-orchestra). [Writing](docs/WRITING.md) · [Deep review](docs/PAPERS.md#deep-review)
 - **Keep work auditable:** record scoped experiment comparisons, repeated-seed summaries, and read-only branch views; attribute components with ablation; and trace figures back to their declared generating runs. [Analysis](docs/ANALYSIS.md) · [Provenance](docs/PROVENANCE.md) · [Workspace](docs/WORKSPACE.md)
 - **Extend your workflow:** use scientific data tools, specialist agents, bundled skills, and remote compute. [Scientific data](docs/SCIENCE-DATA.md) · [Agents](docs/AGENTS.md) · [Skills](docs/SKILLS.md) · [Compute](docs/COMPUTE.md)
+
+The draft contract on an approved outline follows [PaperOrchestra](https://github.com/google-research/paper-orchestra). Academic Harness keeps that shape on `ah_plan` and runs the searches, sources, and figures with its own tools. The author approves the plan before any of that work starts. PaperOrchestra's code is not included in this plugin.
 
 ## Documentation
 

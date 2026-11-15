@@ -58,7 +58,7 @@ ok('engine README does not require Pi', !/you use it through \*\*\[Pi\]/.test(re
     const name = readFileSync(join(skillsDir, dir, 'SKILL.md'), 'utf8').match(/^name:\s*(.+)$/m)?.[1]?.trim()
     if (name) names.set(name, (names.get(name) || 0) + 1)
   }
-  ok('skill catalogue has 790 entries', dirs.length === 790, String(dirs.length))
+  ok('skill catalogue has 791 entries', dirs.length === 791, String(dirs.length))
   ok('skill names are unique', names.size === dirs.length, `${names.size} names`)
   for (const name of [
     'deep-research',
@@ -175,6 +175,23 @@ ok('ah_sweep value', JSON.stringify(toolArgv('ah_sweep', { value: '79' })) === J
 ok('ah_plan approve blocked', toolArgv('ah_plan', { action: 'approve' }).error)
 ok('ah_plan propose needs id', toolArgv('ah_plan', { action: 'propose' }).error)
 ok('ah_plan propose argv', Array.isArray(toolArgv('ah_plan', { action: 'propose', id: 'p1', thesis: 'T' })))
+ok('ah_plan propose forwards draft blocks', (() => {
+  const a = toolArgv('ah_plan', {
+    action: 'propose', id: 'p1', thesis: 'T',
+    literature: { cutoff: '2024-11', introduction: { hook: 'h', gap: 'g', searches: ['q'] }, related_work: [{ cluster: 'c', searches: ['q2'], limitation: 'l', bridge: 'b' }] },
+    citation_hints: [{ name: 'ImageNet', kind: 'dataset', query: 'paper introducing ImageNet' }],
+    figures: [{ id: 'fig_ablation', type: 'plot', source: 'experiment', experiment: 'ablation', objective: 'Show the drop', aspect: '16:9' }],
+    section_points: [{ file: 'sections/02_method/index.tex', point: 'Formalize equation 3 from the idea note.' }],
+  })
+  const spec = JSON.parse(a[3])
+  return a[0] === 'plan' && a[1] === 'propose' && spec.id === 'p1' && spec.outline.thesis === 'T'
+    && spec.outline.literature.cutoff === '2024-11'
+    && spec.outline.citation_hints[0].name === 'ImageNet'
+    && spec.outline.figures[0].id === 'fig_ablation'
+    && spec.outline.section_points[0].file === 'sections/02_method/index.tex'
+})())
+ok('ah_plan queries argv', JSON.stringify(toolArgv('ah_plan', { action: 'queries' })) === JSON.stringify(['plan', 'queries'])
+  && JSON.stringify(toolArgv('ah_plan', { action: 'queries', id: 'p1' })) === JSON.stringify(['plan', 'queries', 'p1']))
 ok('ah_migrate apply without confirm blocked', toolArgv('ah_migrate', { apply: true }).error)
 ok('ah_migrate dry-run', JSON.stringify(toolArgv('ah_migrate', { dir: '/tmp/p' })) === JSON.stringify(['migrate', '/tmp/p']))
 ok('ah_author waive', JSON.stringify(toolArgv('ah_author', { action: 'waive', id: 'abc', reason: 'ok' })).includes('finding'))
@@ -244,7 +261,7 @@ ok('truncate long', truncate('x'.repeat(10), 4).includes('more characters'))
 
 // ── skills + preset + package ─────────────────────────────────────────────
 
-const skills = ['academic-harness', 'ah-write-unit', 'ah-plan-section', 'ah-fix-findings', 'ah-audit-section', 'ah-revise-from-review']
+const skills = ['academic-harness', 'ah-write-unit', 'ah-plan-section', 'ah-draft-from-plan', 'ah-fix-findings', 'ah-audit-section', 'ah-revise-from-review']
 for (const s of skills) {
   const p = join(ROOT, 'skills', s, 'SKILL.md')
   ok(`skill ${s}`, existsSync(p) && /DeepSeek Harness/.test(readFileSync(p, 'utf8')))

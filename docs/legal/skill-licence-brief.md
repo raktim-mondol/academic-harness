@@ -4,7 +4,7 @@ Prepared for the owner to pass to counsel. It is a description of what the packa
 
 ## The package
 
-`academic-harness` is published to npm and GitHub under the MIT licence (`LICENSE`). It bundles 790 agent skills under `skills/`, assembled from several upstream catalogues, and vendored Python code under `vendor/`. `NOTICE` records upstream sources, adaptations and licences. A skill's own `license:` frontmatter field states its label.
+`academic-harness` is published to npm and GitHub under the MIT licence (`LICENSE`). It bundles 791 agent skills under `skills/`, assembled from several upstream catalogues, and vendored Python code under `vendor/`. `NOTICE` records upstream sources, adaptations and licences. A skill's own `license:` frontmatter field states its label.
 
 Label summary after normalisation (`docs/legal/skill-licence-inventory.md` lists every skill):
 

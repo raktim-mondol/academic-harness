@@ -226,7 +226,8 @@ def cmd_plan(a):
             ol = load_outline(p)
             pending = [r for r in PL.load_proposals(p) if r.get("status") == "pending"]
             if a.json:
-                print(json.dumps({"outline": ol, "pending": [r.get("id") for r in pending]}, indent=1, default=str))
+                print(json.dumps({"outline": ol, "pending": [r.get("id") for r in pending],
+                                  "draft": PL.draft_counts(ol)}, indent=1, default=str))
             else:
                 print(f"status: {ol.get('status') or 'legacy'}")
                 if ol.get("thesis"):
@@ -238,6 +239,11 @@ def cmd_plan(a):
                     print(f"claim {c.get('id')}: supports={c.get('supports') or []} units={c.get('units') or []}")
                 if pending:
                     print("pending proposals: " + ", ".join(r["id"] for r in pending))
+                counts = PL.draft_counts(ol)
+                print(f"literature searches: {counts['literature_searches']}")
+                print(f"citation hints: {counts['citation_hints']}")
+                print(f"figures: {counts['figures']}")
+                print(f"section points: {counts['section_points']}")
         elif a.action == "list":
             rows = PL.load_proposals(p)
             if not rows:
@@ -255,6 +261,16 @@ def cmd_plan(a):
         elif a.action == "propose":
             rec = PL.propose(p, _load_json_arg(a))
             print(f"proposed plan {rec['id']}; the author approves it with `ah plan approve {rec['id']}`. Do not write prose yet.")
+        elif a.action == "queries":
+            if a.id:
+                rec = PL.get_proposal(p, a.id)
+                if rec is None:
+                    raise ValueError(f"no plan proposal '{a.id}'")
+                outline = rec.get("outline") or {}
+            else:
+                from .outline import load_outline
+                outline = load_outline(p)
+            print(json.dumps(PL.draft_queries(outline), indent=1))
         elif a.action == "diff":
             if not a.id:
                 raise ValueError("diff needs a proposal id")
@@ -441,7 +457,7 @@ def register(sub, add):
     sp.add_argument("--out")
     sp.add_argument("--yes", action="store_true")
     sp = add("plan", cmd_plan, "outline plan: propose, then the author approves")
-    sp.add_argument("action", choices=["new", "show", "list", "check", "propose", "diff", "approve"])
+    sp.add_argument("action", choices=["new", "show", "list", "check", "propose", "diff", "approve", "queries"])
     sp.add_argument("id", nargs="?")
     sp.add_argument("--data", dest="json_arg")
     sp.add_argument("--spec-file")

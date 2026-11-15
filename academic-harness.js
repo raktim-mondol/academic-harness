@@ -307,12 +307,17 @@ export function toolArgv(name, args = {}, cwd) {
         if (args.thesis !== undefined) outline.thesis = args.thesis
         if (args.sections) outline.sections = args.sections
         if (args.claims) outline.claims = args.claims
+        if (args.literature !== undefined) outline.literature = args.literature
+        if (args.citation_hints !== undefined) outline.citation_hints = args.citation_hints
+        if (args.figures !== undefined) outline.figures = args.figures
+        if (args.section_points !== undefined) outline.section_points = args.section_points
         return ['plan', 'propose', '--data', JSON.stringify({ id: args.id, outline })]
       }
       if (action === 'diff') {
         if (!args.id) return { error: 'diff needs a proposal id' }
         return ['plan', 'diff', String(args.id)]
       }
+      if (action === 'queries') return ['plan', 'queries', ...(args.id ? [String(args.id)] : [])]
       if (action === 'check') return ['plan', 'check']
       if (action === 'list') return ['plan', 'list']
       return ['plan', 'show']
@@ -824,10 +829,10 @@ export async function apply(ctx) {
   })
   register(ctx, {
     name: 'ah_plan',
-    description: 'Show, check, propose or diff an outline plan. Propose writes plans/<id>.yaml and leaves outline.yaml unchanged. Approving is the author\'s act (ah_author action=plan-approve).',
+    description: 'Show, check, propose, diff, or list the search tasks of an outline plan. Propose writes plans/<id>.yaml and leaves outline.yaml unchanged. Optional draft blocks on a proposal are literature (cutoff, introduction searches, related-work clusters), citation_hints, figures, and section_points. action=queries prints those search tasks from the approved outline, or from a proposal id. Approving is the author\'s act (ah_author action=plan-approve).',
     parameters: {
-      action: { type: 'string', required: true, description: 'show, list, check, propose or diff' },
-      id: { type: 'string', description: 'Proposal id; required for propose and diff.' },
+      action: { type: 'string', required: true, description: 'show, list, check, propose, diff, or queries' },
+      id: { type: 'string', description: 'Proposal id; required for propose and diff. queries reads that proposal, or the approved outline when omitted.' },
       thesis: { type: 'string' },
       sections: {
         type: 'array',
@@ -853,6 +858,77 @@ export async function apply(ctx) {
             supports: { type: 'array', items: { type: 'string' } },
             facts: { type: 'array', items: { type: 'string' } },
             evidence: { type: 'array', items: { type: 'string' } },
+          },
+        },
+      },
+      literature: {
+        type: 'object',
+        additionalProperties: false,
+        description: 'Optional. cutoff YYYY-MM, introduction searches, and related-work clusters.',
+        properties: {
+          cutoff: { type: 'string', required: true, description: 'YYYY-MM. Searches exclude later publications.' },
+          introduction: {
+            type: 'object',
+            additionalProperties: false,
+            properties: {
+              hook: { type: 'string', required: true },
+              gap: { type: 'string', required: true, description: 'Scoped to what the experiment log measured.' },
+              searches: { type: 'array', items: { type: 'string' }, required: true, description: '1 to 8 broad queries.' },
+            },
+          },
+          related_work: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                cluster: { type: 'string', required: true },
+                searches: { type: 'array', items: { type: 'string' }, required: true, description: '1 to 8 queries.' },
+                limitation: { type: 'string', required: true },
+                bridge: { type: 'string', required: true },
+              },
+            },
+          },
+        },
+      },
+      citation_hints: {
+        type: 'array',
+        description: 'One hint per dataset, metric, baseline, optimizer, or model named in the idea or the log.',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            name: { type: 'string', required: true },
+            kind: { type: 'string', required: true, description: 'dataset, metric, baseline, model, method, or other.' },
+            query: { type: 'string', description: 'Search query. Required when title is omitted.' },
+            title: { type: 'string', description: 'Exact paper title. Never a guessed BibTeX key.' },
+            section: { type: 'string', description: 'Must match a sections[].file pattern.' },
+          },
+        },
+      },
+      figures: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            id: { type: 'string', required: true, description: 'Token. Must not contain the word figure.' },
+            type: { type: 'string', required: true, description: 'plot or diagram.' },
+            source: { type: 'string', required: true, description: 'experiment, idea, or both. A plot cannot be idea alone.' },
+            experiment: { type: 'string', description: 'Experiment slug. Required when source is experiment or both.' },
+            objective: { type: 'string', required: true },
+            aspect: { type: 'string', required: true, description: '1:1, 4:3, 3:2, 16:9, 3:4, 2:3, or 9:16.' },
+          },
+        },
+      },
+      section_points: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            file: { type: 'string', required: true, description: 'Must match a sections[].file pattern.' },
+            point: { type: 'string', required: true, description: 'What this file must say, naming the source note.' },
           },
         },
       },

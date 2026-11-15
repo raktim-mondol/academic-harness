@@ -80,6 +80,7 @@ CATALOGUE: dict[str, tuple[str, str, str]] = {
     "ARG-03": ("T5", "major", "No outline claim supports the thesis"),
     "ARG-04": ("T5", "minor", "Outline claim supports an unknown id"),
     "ARG-05": ("T5", "info", "Planned outline section is still unwritten"),
+    "ARG-06": ("T5", "minor", "Outline draft block (literature, citation hints, figures, or section points) is malformed"),
     "PLN-01": ("T5", "blocker", "New prose file not in the approved outline or an approved brief"),
     "PLN-02": ("T5", "major", "Approved outline changed outside ah plan approve"),
     "PRM-01": ("T5", "info", "A rule promoted from a review comment matched (the author accepted the rule; it ships with its own fixtures)"),

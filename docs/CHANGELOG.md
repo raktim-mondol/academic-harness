@@ -2,6 +2,14 @@
 
 Release notes for Academic Harness. For releases before 0.18.0, see the [GitHub releases](https://github.com/raktim-mondol/academic-harness/releases).
 
+## 0.54.0
+
+An author-approved outline can carry a draft contract taken from the outline idea in [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Google Research, Apache-2.0). Academic Harness stores that contract on the existing plan and runs it with the tools already in this plugin. PaperOrchestra's Python, prompts, Gemini client, and venue style files stay in that repository.
+
+- **The plan holds the draft contract.** `ah_plan` propose accepts optional `literature` (cutoff `YYYY-MM`, an introduction hook, gap, and searches, and related-work clusters), `citation_hints` (a query or an exact title, plus a kind), `figures` (a plot tied to a logged experiment slug, or a diagram), and `section_points`. An outline with none of these keys is unchanged. A present block that is malformed is rejected at propose and leaves no proposal file. `ARG-06` (minor) reports a malformed block that later appears on the outline. `action=queries` lists the searches. Approving the plan approves those queries. The author still picks which returned papers become sources.
+- **Approval stays on the author.** `ah_plan` `action=approve` refuses and points at `ah_author` `action=plan-approve`. DSH asks before that call runs. On a live Academic Harness session, Full access rejected the call without changing `outline.yaml`. Workspace Write showed Allow once; after that confirmation the outline status was `approved`, the proposal was `accepted`, and no search, source, or prose had been written.
+- **The writing skills execute the approved contract.** `ah-draft-from-plan` (MIT, now a core skill) lists each search, registers an exact-title hint only when a downloaded paper or a file the author already has matches that title, and waits for the author before adding open-search hits. A plot reads `experiment_log` for the named slug. A diagram is drawn with `mermaid_render` or `image_generate`. Compile stays on `ah_build`. After a draft, the agent may offer `deep_review`. Write / Revise remains the manuscript-diff chip. The catalogue is 791 skills. `BUNDLE_REV` is `dsh16`.
+
 ## 0.53.0
 
 The chatbox task row is complete, and a Deep Research run delivers the research report with its citation check still in place.

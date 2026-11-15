@@ -28,7 +28,7 @@ New here? Read [Install and run](INSTALL.md), then [Architecture](ARCHITECTURE.m
 | [Workspace, notebook, and folding](WORKSPACE.md) | zvec-grep, lab notebook, `scientific_result`, `fold_text`, templates, `sci_inspect` |
 | [Remote compute](COMPUTE.md) | `modal_run`, `runpod_run`, `vastai_run`, volumes, and the Modal/Runpod/Vast.ai skills |
 | [Agents and browsing](AGENTS.md) | Subagent model routing, specialist briefs, and browser automation |
-| [Skills](SKILLS.md) | The 790-skill catalogue, its sources, and workflow skills |
+| [Skills](SKILLS.md) | The 791-skill catalogue, its sources, and workflow skills |
 | [Identity and audit tools](IDENTITY-AND-AUDIT-TOOLS.md) | Author identity, OpenReview, grants, patents, prior-art triage, statistical/figure/repo audits, figure-to-result handoff, GROBID references |
 | [Local RSI](RSI.md) | The self-improvement loop, its seven layers, store, and evaluation honesty |
 

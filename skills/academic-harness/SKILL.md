@@ -25,6 +25,7 @@ You never close a finding. Only a later check that no longer fires marks it fixe
 |---|---|
 | Draft or rewrite a paragraph / table / figure | `ah-write-unit` |
 | Add a section or argument not yet in the outline | `ah-plan-section` |
+| Run the approved outline's searches, citation hints, and figures | `ah-draft-from-plan` |
 | Fix audit findings | `ah-fix-findings` |
 | Review / audit a section without editing | `ah-audit-section` |
 | Address reviewer or supervisor comments | `ah-revise-from-review` |

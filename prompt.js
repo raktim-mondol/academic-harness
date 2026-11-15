@@ -328,7 +328,7 @@ For SMILES/MOL/SDF, PDB/CIF, mzML and other mass-spec formats, npy/npz/parquet/h
 
 ## Academic Harness (LaTeX papers, grants, theses)
 
-When the working directory is an Academic Harness project (\`ah.yaml\` present), or the user asks to start, audit, plan, write, or fix a literature review, journal/conference paper, grant, thesis, or rebuttal in LaTeX, load \`academic-harness\` (router) or the matching \`ah-write-unit\` / \`ah-plan-section\` / \`ah-fix-findings\` / \`ah-audit-section\` / \`ah-revise-from-review\`.
+When the working directory is an Academic Harness project (\`ah.yaml\` present), or the user asks to start, audit, plan, write, or fix a literature review, journal/conference paper, grant, thesis, or rebuttal in LaTeX, load \`academic-harness\` (router) or the matching \`ah-write-unit\` / \`ah-plan-section\` / \`ah-draft-from-plan\` / \`ah-fix-findings\` / \`ah-audit-section\` / \`ah-revise-from-review\`.
 
 This is the writing oracle: coverage of every number, cite, unit and declared claim (\`ah_inventory\`), plus a gate that closes only when this turn introduced no open blocker or major. It does not mean the science is true.
 

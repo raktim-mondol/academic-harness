@@ -47,3 +47,8 @@ Python package modified in this plugin (the vendored tree is maintained here as 
 Local DSH patch (ahead of upstream): registry --keys citation-key aliases
 (entry_for consulted by resolve/resolve_all/BIB-02) and byte-copy of .md/.txt
 sources so AH copies stay byte-identical to the sender's raw document.
+
+- Outline draft contract (ah/plan.py, ah/outline.py): optional literature, citation_hints,
+  figures, and section_points on a plan proposal. propose rejects a malformed block.
+  ARG-06 (minor) reports one that appears on the outline later. `ah plan queries` lists
+  the search tasks (year_max is the cutoff year). `ah plan show` counts the blocks.

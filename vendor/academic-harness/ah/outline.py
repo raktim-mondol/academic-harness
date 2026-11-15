@@ -9,7 +9,8 @@ Checks: ARG-01 a thesis-level claim must name units that exist (or are planned);
 ARG-02 a declared section must match a file unless `planned: true`;
 ARG-03 some claim supports the thesis when any claims exist;
 ARG-04 supports names a missing id;
-ARG-05 a planned file is still unwritten after approve.
+ARG-05 a planned file is still unwritten after approve;
+ARG-06 a present draft block (literature, citation hints, figures, section points) is malformed.
 """
 from __future__ import annotations
 
@@ -82,4 +83,9 @@ def check_outline(ctx: Context) -> list[dict]:
             if not any(section_matches(f, pat) for f in ctx.tex_texts):
                 out.append({"check": "ARG-05", "level": "info", "key": f"planned:{pat}", "ref": None, "file": None,
                             "message": f"planned section '{pat}' is still unwritten"})
+    # Imported here: plan.py imports this module at load time.
+    from .plan import draft_errors
+    for i, message in enumerate(draft_errors(o)):
+        out.append({"check": "ARG-06", "level": "minor", "key": f"draft:{i}", "ref": None,
+                    "file": ctx.project.cfg["outline"], "message": message})
     return out

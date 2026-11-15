@@ -290,7 +290,7 @@ On first mount the plugin prepares a local `.venv` next to that vendored tree (v
 | `ah_rubric` | anyone | The frozen rubric (tier TR): `list` criteria, `run` them (with `judge` the model is asked about paragraphs with no cached verdict), `sheet` a labelling sheet. Admitting a criterion is `ah_author action=rubric-admit` |
 | `ah_units` / `ah_fact` / `ah_bind` / `ah_fact_propose` / `ah_sweep` | anyone | Sync `%% @unit` anchors; list/build/check facts; suggest number→fact bindings; propose a new fact; find every use of a value |
 | `ah_source` / `ah_source_search` / `ah_claims` / `ah_claims_sync` / `ah_claims_bind` | anyone | Register/list sources; quote-located passages; claim sidecars; bind a claim to a source or fact |
-| `ah_pack` / `ah_brief_new` / `ah_plan` | anyone | Evidence pack before drafting; draft a brief; propose an outline (author approves) |
+| `ah_pack` / `ah_brief_new` / `ah_plan` | anyone | Evidence pack before drafting; draft a brief; propose an outline (author approves). A proposal may also carry a draft contract: `literature` (cutoff `YYYY-MM`, introduction searches, related-work clusters), `citation_hints`, `figures`, and `section_points`. `action=queries` lists those search tasks. A malformed block on the outline is `ARG-06` (minor). Search, source registration, figures, compile, and review stay on `literature_search`, `ah_source`, `experiment_log`, `image_generate` or `mermaid_render`, `ah_build`, and `deep_review`. The contract follows the outline idea in [PaperOrchestra](https://github.com/google-research/paper-orchestra); that repository's code is not part of this plugin. |
 | `ah_build` / `ah_findings` / `ah_decision_request` | anyone | Compile with errors mapped to units; list ledger findings; hand a finding to the author |
 | `ah_review` / `ah_review_set` / `ah_review_respond` / `ah_snapshot` | anyone | Import/list reviewer items; map units; response letter from real diffs; save/diff unit snapshots |
 | `ah_provenance` / `ah_disclosure` | anyone | Who wrote each unit; draft an AI-use statement (author approves) |
@@ -299,11 +299,12 @@ On first mount the plugin prepares a local `.venv` next to that vendored tree (v
 
 ### Skills
 
-The engine ships six workflow skills:
+The engine ships seven workflow skills:
 
 - `academic-harness` — router
 - `ah-write-unit`
 - `ah-plan-section`
+- `ah-draft-from-plan` — searches, sources, and figures named by an approved outline
 - `ah-fix-findings`
 - `ah-audit-section`
 - `ah-revise-from-review`
